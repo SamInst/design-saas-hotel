@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, CreditCard, Calendar, Filter, Download, Search, Sun, Moon, Minus, ChevronDown, Plus, X, Edit } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { TrendingUp, TrendingDown, DollarSign, CreditCard, Calendar, Filter, Download, Search, Sun, Moon, Minus, ChevronDown, Plus, X, Edit, ChevronLeft, ChevronRight, Shield, Check } from 'lucide-react';
 
 export default function FinancialDashboard() {
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -9,10 +9,23 @@ export default function FinancialDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [numbersAnimating, setNumbersAnimating] = useState(false);
+  const scrollContainerRef = useRef(null);
+  
+  // Estados de permissões
+  const [permissions, setPermissions] = useState({
+    acessoTotal: true,
+    mostrarResumo: true,
+    botaoAdicionar: true,
+    botaoFiltrar: true,
+    mostrarSaldoCaixa: true,
+    mostrarReceitaDespesaDia: true,
+    mostrarHistoricoSaldo: true
+  });
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -71,6 +84,50 @@ export default function FinancialDashboard() {
       [date]: !prev[date]
     }));
   };
+
+  const togglePermission = (key) => {
+    setPermissions(prev => {
+      const newPerms = { ...prev };
+      
+      if (key === 'acessoTotal') {
+        // Se ativar acesso total, ativa tudo
+        const newValue = !prev.acessoTotal;
+        Object.keys(newPerms).forEach(k => {
+          newPerms[k] = newValue;
+        });
+      } else {
+        // Toggle individual
+        newPerms[key] = !prev[key];
+        
+        // Se desmarcar algo, desmarca acesso total
+        if (!newPerms[key]) {
+          newPerms.acessoTotal = false;
+        }
+        
+        // Se tudo estiver marcado, marca acesso total
+        const allChecked = Object.keys(newPerms)
+          .filter(k => k !== 'acessoTotal')
+          .every(k => newPerms[k]);
+        
+        if (allChecked) {
+          newPerms.acessoTotal = true;
+        }
+      }
+      
+      return newPerms;
+    });
+  };
+
+  const scrollCarousel = (direction) => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = 300;
+      const newScrollPosition = scrollContainerRef.current.scrollLeft + (direction === 'left' ? -scrollAmount : scrollAmount);
+      scrollContainerRef.current.scrollTo({
+        left: newScrollPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
   
   const data = {
     pagamentos: {
@@ -100,8 +157,7 @@ export default function FinancialDashboard() {
       { id: 394, date: "11/02/2026", time: "16:03", description: "ENTRADA DIA", amount: 43.0, method: "Dinheiro", type: "income", cashBalance: 206.0 },
       { id: 393, date: "11/02/2026", time: "16:02", description: "PAGO LAVAGEM DE CARRO", amount: -40.0, method: "Dinheiro", type: "expense", cashBalance: 163.0 },
       { id: 392, date: "11/02/2026", time: "16:02", description: "PAGO COMIDA", amount: -40.0, method: "Dinheiro", type: "expense", cashBalance: 203.0 },
-      { id: 391, date: "11/02/2026", time: "16:01", description: "PAGO CHEIRO VERDE", amount: -6.0, method: "Dinheiro", type: "expense", cashBalance: 243.0 },
-      { id: 390, date: "11/02/2026", time: "16:01", description: "SALDO TRANFERIDO", amount: 249.0, method: "Dinheiro", type: "income", cashBalance: 249.0 }
+      { id: 391, date: "11/02/2026", time: "16:01", description: "PAGO CHEIRO VERDE", amount: -6.0, method: "Dinheiro", type: "expense", cashBalance: 243.0 }
     ]
   };
 
@@ -135,12 +191,111 @@ export default function FinancialDashboard() {
     textSecondary: isDark ? 'text-slate-400' : 'text-slate-600',
     card: isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200',
     cardHover: isDark ? 'hover:bg-white/10' : 'hover:bg-slate-50',
-    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500',
+    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500',
     tableHeader: isDark ? 'bg-white/5' : 'bg-slate-100',
     divider: isDark ? 'border-white/10' : 'border-slate-200',
     rowHover: isDark ? 'hover:bg-violet-500/20 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:-translate-y-0.5 hover:border-l-4 hover:border-violet-500' : 'hover:bg-violet-100 hover:shadow-[0_4px_12px_rgba(139,92,246,0.2)] hover:-translate-y-0.5 hover:border-l-4 hover:border-violet-500',
     dateHeader: isDark ? 'bg-white/10' : 'bg-slate-100',
     button: isDark ? 'bg-white/10 hover:bg-white/20 border-white/10' : 'bg-slate-100 hover:bg-slate-200 border-slate-300',
+  };
+
+  // Calcular receita/despesa/lucro do dia
+  const todayTransactions = transactionsWithChange.filter(t => t.date === "12/02/2026");
+  const todayReceitas = todayTransactions.filter(t => t.amount > 0).reduce((sum, t) => sum + t.amount, 0);
+  const todayDespesas = todayTransactions.filter(t => t.amount < 0).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const todayLucro = todayReceitas - todayDespesas;
+
+  // Filtrar cards do carrossel baseado nas permissões
+  const getVisibleCards = () => {
+    const cards = [];
+    
+    if (permissions.mostrarResumo || permissions.acessoTotal) {
+      cards.push(
+        <div key="periodo" className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg p-4 border border-violet-400/30 shadow-lg w-[280px] flex-shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-5 h-5 text-white" />
+            <div className="flex flex-col">
+              <span className="text-white font-bold text-sm">PERÍODO</span>
+              <span className="text-white/80 text-xs">11/02 - 12/02/2026</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-white/80 text-xs uppercase">Receitas</span>
+              <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.receitas.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/80 text-xs uppercase">Despesas</span>
+              <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.despesas.toFixed(2)}</span>
+            </div>
+            <div className="h-px bg-white/20 my-2"></div>
+            <div className="flex justify-between items-center">
+              <span className="text-white text-xs uppercase font-semibold">Lucro do Período</span>
+              <span className={`text-white font-bold text-base ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.lucro.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (permissions.mostrarSaldoCaixa || permissions.acessoTotal) {
+      const dinheiroData = data.pagamentos["Dinheiro"];
+      cards.push(
+        <div key="dinheiro" className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg p-4 border border-emerald-400/30 shadow-lg w-[280px] flex-shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">💵</span>
+            <span className="text-white font-bold text-sm">DINHEIRO (CAIXA)</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-white/80 text-xs uppercase">Receitas</span>
+              <span className="text-white font-bold text-sm">R$ {dinheiroData.receitas}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-white/80 text-xs uppercase">Despesas</span>
+              <span className="text-white font-bold text-sm">R$ {dinheiroData.despesas}</span>
+            </div>
+            <div className="h-px bg-white/20 my-2"></div>
+            <div className="flex justify-between items-center">
+              <span className="text-white text-xs uppercase font-semibold">Saldo em Caixa</span>
+              <span className="text-white font-bold text-base">R$ {dinheiroData.lucro}</span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    
+    if (permissions.mostrarResumo || permissions.acessoTotal) {
+      paymentMethods.filter(([method]) => method !== 'Dinheiro').forEach(([method, values]) => {
+        cards.push(
+          <div key={method} className={`${theme.card} rounded-lg p-4 border ${theme.cardHover} transition-all w-[280px] flex-shrink-0`}>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">{getMethodIcon(method)}</span>
+              <span className={`${theme.text} font-medium text-sm truncate`}>{method}</span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className={`${theme.textSecondary} text-xs uppercase`}>Receitas</span>
+                <span className="text-emerald-500 font-semibold text-sm">R$ {values.receitas}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className={`${theme.textSecondary} text-xs uppercase`}>Despesas</span>
+                <span className="text-rose-500 font-semibold text-sm">R$ {values.despesas}</span>
+              </div>
+              <div className={`h-px ${theme.divider} my-1`}></div>
+              <div className="flex justify-between items-center">
+                <span className={`${theme.text} text-xs uppercase font-semibold`}>Lucro</span>
+                <span className={`font-bold text-sm ${values.lucro >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                  R$ {values.lucro}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      });
+    }
+    
+    return cards;
   };
 
   return (
@@ -157,9 +312,26 @@ export default function FinancialDashboard() {
               <p className={`${theme.textSecondary} text-sm flex items-center gap-2`}>
                 <Calendar className="w-3.5 h-3.5" />
                 11/02/2026 - 12/02/2026
+                {(permissions.mostrarReceitaDespesaDia || permissions.acessoTotal) && (
+                  <>
+                    <span className="mx-2">•</span>
+                    <span className="text-emerald-500 font-semibold">↑ R$ {todayReceitas.toFixed(2)}</span>
+                    <span className="text-rose-500 font-semibold">↓ R$ {todayDespesas.toFixed(2)}</span>
+                    <span className={`font-bold ${todayLucro >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                      = R$ {todayLucro.toFixed(2)}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <div className="flex gap-2">
+              <button 
+                onClick={() => setShowPermissionsModal(true)}
+                className={`px-4 py-2 ${theme.button} ${theme.text} rounded-lg backdrop-blur-sm border transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95`}
+              >
+                <Shield className="w-4 h-4" />
+                Permissões
+              </button>
               <button 
                 onClick={() => setIsDark(!isDark)}
                 className={`px-4 py-2 ${theme.button} ${theme.text} rounded-lg backdrop-blur-sm border transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95`}
@@ -175,98 +347,45 @@ export default function FinancialDashboard() {
           </div>
         </header>
 
-        <div className={`${theme.card} backdrop-blur-xl rounded-xl p-4 mb-6 border shadow-xl`}>
-          <div className="flex items-center gap-2 mb-4">
-            <CreditCard className="w-4 h-4 text-violet-500" />
-            <h2 className={`text-sm font-bold ${theme.text} uppercase tracking-wider`}>Resumo Financeiro</h2>
-          </div>
-          
-          <div className="relative">
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-white/5 pb-2">
-              <div className="flex gap-3 w-max">
-                <div className="bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg p-4 border border-violet-400/30 shadow-lg w-[280px] flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="w-5 h-5 text-white" />
-                    <div className="flex flex-col">
-                      <span className="text-white font-bold text-sm">PERÍODO</span>
-                      <span className="text-white/80 text-xs">11/02 - 12/02/2026</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80 text-xs uppercase">Receitas</span>
-                      <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.receitas.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80 text-xs uppercase">Despesas</span>
-                      <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.despesas.toFixed(2)}</span>
-                    </div>
-                    <div className="h-px bg-white/20 my-2"></div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white text-xs uppercase font-semibold">Lucro do Período</span>
-                      <span className={`text-white font-bold text-base ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.lucro.toFixed(2)}</span>
-                    </div>
-                  </div>
+        {(permissions.mostrarResumo || permissions.mostrarSaldoCaixa || permissions.acessoTotal) && (
+          <div className={`${theme.card} backdrop-blur-xl rounded-xl p-4 mb-6 border shadow-xl`}>
+            <div className="flex items-center gap-2 mb-4">
+              <CreditCard className="w-4 h-4 text-violet-500" />
+              <h2 className={`text-sm font-bold ${theme.text} uppercase tracking-wider`}>Resumo Financeiro</h2>
+            </div>
+            
+            <div className="relative">
+              <button
+                onClick={() => scrollCarousel('left')}
+                className={`absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 ${theme.button} ${theme.text} rounded-full backdrop-blur-sm border transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg`}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              
+              <div ref={scrollContainerRef} className="overflow-x-auto scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-white/5 pb-2 scroll-smooth">
+                <div className="flex gap-3 w-max px-12">
+                  {getVisibleCards()}
                 </div>
-
-                <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-lg p-4 border border-indigo-400/30 shadow-lg w-[280px] flex-shrink-0">
-                  <div className="flex items-center gap-2 mb-3">
-                    <DollarSign className="w-5 h-5 text-white" />
-                    <span className="text-white font-bold text-sm">TOTAL DE VENDAS</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80 text-xs uppercase">Receitas</span>
-                      <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.receitas}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white/80 text-xs uppercase">Despesas</span>
-                      <span className={`text-white font-bold text-sm ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.despesas}</span>
-                    </div>
-                    <div className="h-px bg-white/20 my-2"></div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-white text-xs uppercase font-semibold">Lucro</span>
-                      <span className={`text-white font-bold text-base ${numbersAnimating ? 'animate-numberSpin' : ''}`}>R$ {total.lucro}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {paymentMethods.map(([method, values]) => (
-                  <div key={method} className={`${theme.card} rounded-lg p-4 border ${theme.cardHover} transition-all w-[280px] flex-shrink-0`}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xl">{getMethodIcon(method)}</span>
-                      <span className={`${theme.text} font-medium text-sm truncate`}>{method}</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className={`${theme.textSecondary} text-xs uppercase`}>Receitas</span>
-                        <span className="text-emerald-500 font-semibold text-sm">R$ {values.receitas}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className={`${theme.textSecondary} text-xs uppercase`}>Despesas</span>
-                        <span className="text-rose-500 font-semibold text-sm">R$ {values.despesas}</span>
-                      </div>
-                      <div className={`h-px ${theme.divider} my-1`}></div>
-                      <div className="flex justify-between items-center">
-                        <span className={`${theme.text} text-xs uppercase font-semibold`}>Lucro</span>
-                        <span className={`font-bold text-sm ${values.lucro >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                          R$ {values.lucro}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
+              
+              <button
+                onClick={() => scrollCarousel('right')}
+                className={`absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 ${theme.button} ${theme.text} rounded-full backdrop-blur-sm border transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg`}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="flex gap-6">
           <div className="flex-1 min-w-0">
             <div className={`${theme.card} backdrop-blur-xl rounded-xl border shadow-xl overflow-hidden`}>
               <div className={`p-4 border-b ${theme.divider}`}>
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-                  <h2 className={`text-lg font-bold ${theme.text}`}>Transações Recentes</h2>
+                  <h2 className={`text-lg font-bold ${theme.text}`}>
+                    {permissions.mostrarHistoricoSaldo || permissions.acessoTotal ? 'Histórico do Saldo' : 'Transações Recentes'}
+                  </h2>
                   <div className="flex gap-2 w-full sm:w-auto">
                     <div className="relative flex-1 sm:flex-initial">
                       <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 ${theme.textSecondary}`} />
@@ -275,23 +394,27 @@ export default function FinancialDashboard() {
                         placeholder="Buscar..."
                         value={searchTerm}
                         onChange={(e) => handleSearch(e.target.value)}
-                        className={`w-full sm:w-48 pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent`}
+                        className={`w-full sm:w-48 pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent border-2`}
                       />
                     </div>
-                    <button
-                      onClick={() => setShowFilterModal(true)}
-                      className={`px-3 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95`}
-                    >
-                      <Filter className="w-4 h-4" />
-                      Filtros
-                    </button>
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Adicionar
-                    </button>
+                    {(permissions.botaoFiltrar || permissions.acessoTotal) && (
+                      <button
+                        onClick={() => setShowFilterModal(true)}
+                        className={`px-3 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95`}
+                      >
+                        <Filter className="w-4 h-4" />
+                        Filtros
+                      </button>
+                    )}
+                    {(permissions.botaoAdicionar || permissions.acessoTotal) && (
+                      <button
+                        onClick={() => setShowAddModal(true)}
+                        className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -351,7 +474,9 @@ export default function FinancialDashboard() {
                               <th className={`text-left p-3 ${theme.textSecondary} font-semibold text-[10px] uppercase tracking-wider`}>Hora</th>
                               <th className={`text-left p-3 ${theme.textSecondary} font-semibold text-[10px] uppercase tracking-wider`}>Descrição</th>
                               <th className={`text-right p-3 ${theme.textSecondary} font-semibold text-[10px] uppercase tracking-wider`}>Valor</th>
-                              <th className={`text-right p-3 ${theme.textSecondary} font-semibold text-[10px] uppercase tracking-wider`}>Saldo Caixa</th>
+                              {(permissions.mostrarHistoricoSaldo || permissions.acessoTotal) && (
+                                <th className={`text-right p-3 ${theme.textSecondary} font-semibold text-[10px] uppercase tracking-wider`}>Saldo Caixa</th>
+                              )}
                             </tr>
                           </thead>
                           <tbody className={`divide-y ${theme.divider}`}>
@@ -378,20 +503,22 @@ export default function FinancialDashboard() {
                                     {transaction.amount >= 0 ? '+' : ''}R$ {Math.abs(transaction.amount).toFixed(2)}
                                   </span>
                                 </td>
-                                <td className="p-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <span className={`${theme.text} font-bold text-sm`}>R$ {transaction.cashBalance.toFixed(2)}</span>
-                                    {transaction.changeType === 'up' && (
-                                      <TrendingUp className="w-4 h-4 text-emerald-500" />
-                                    )}
-                                    {transaction.changeType === 'down' && (
-                                      <TrendingDown className="w-4 h-4 text-rose-500" />
-                                    )}
-                                    {transaction.changeType === 'neutral' && (
-                                      <Minus className="w-4 h-4 text-slate-400" />
-                                    )}
-                                  </div>
-                                </td>
+                                {(permissions.mostrarHistoricoSaldo || permissions.acessoTotal) && (
+                                  <td className="p-3 text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <span className={`${theme.text} font-bold text-sm`}>R$ {transaction.cashBalance.toFixed(2)}</span>
+                                      {transaction.changeType === 'up' && (
+                                        <TrendingUp className="w-4 h-4 text-emerald-500" />
+                                      )}
+                                      {transaction.changeType === 'down' && (
+                                        <TrendingDown className="w-4 h-4 text-rose-500" />
+                                      )}
+                                      {transaction.changeType === 'neutral' && (
+                                        <Minus className="w-4 h-4 text-slate-400" />
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
@@ -423,6 +550,115 @@ export default function FinancialDashboard() {
         </div>
       </div>
 
+      {/* Modal de Permissões */}
+      {showPermissionsModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full`}>
+            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-violet-500" />
+                <h3 className={`text-lg font-bold ${theme.text}`}>Configurar Permissões</h3>
+              </div>
+              <button onClick={() => setShowPermissionsModal(false)} className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className={`p-3 rounded-lg ${permissions.acessoTotal ? 'bg-emerald-500/10 border border-emerald-500/30' : `${theme.card} border`}`}>
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.acessoTotal}
+                    onChange={() => togglePermission('acessoTotal')}
+                    className="w-5 h-5 rounded accent-emerald-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className={`${theme.text} font-bold text-sm block`}>🔓 Acesso Total</span>
+                    <span className={`text-xs ${theme.textSecondary}`}>Habilita todas as visualizações e ações</span>
+                  </div>
+                  {permissions.acessoTotal && <Check className="w-5 h-5 text-emerald-500 ml-auto" />}
+                </label>
+              </div>
+
+              <div className={`h-px ${theme.divider}`}></div>
+
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.mostrarResumo}
+                    onChange={() => togglePermission('mostrarResumo')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>📊 Mostrar Resumo Financeiro</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.botaoAdicionar}
+                    onChange={() => togglePermission('botaoAdicionar')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>➕ Mostrar Botão Adicionar</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.botaoFiltrar}
+                    onChange={() => togglePermission('botaoFiltrar')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>🔍 Mostrar Botão Filtrar</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.mostrarSaldoCaixa}
+                    onChange={() => togglePermission('mostrarSaldoCaixa')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>💵 Mostrar Somente Saldo do Caixa</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.mostrarReceitaDespesaDia}
+                    onChange={() => togglePermission('mostrarReceitaDespesaDia')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>📈 Mostrar Receita/Despesa/Lucro do Dia</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={permissions.mostrarHistoricoSaldo}
+                    onChange={() => togglePermission('mostrarHistoricoSaldo')}
+                    className="w-4 h-4 rounded accent-violet-500 cursor-pointer"
+                  />
+                  <span className={`${theme.text} text-sm`}>📋 Mostrar Histórico do Saldo</span>
+                </label>
+              </div>
+            </div>
+
+            <div className={`p-4 border-t ${theme.divider}`}>
+              <button
+                onClick={() => setShowPermissionsModal(false)}
+                className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restante dos modais... (Adicionar, Filtrar, Detalhes) */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto`}>
@@ -438,13 +674,13 @@ export default function FinancialDashboard() {
                 <input
                   type="text"
                   placeholder="Ex: Entrada de diária"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                 />
               </div>
               
               <div>
                 <label className={`block text-sm font-medium ${theme.text} mb-2`}>Tipo de Lançamento</label>
-                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
+                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
                   <option value="income">Receita</option>
                   <option value="expense">Despesa</option>
                 </select>
@@ -452,7 +688,7 @@ export default function FinancialDashboard() {
 
               <div>
                 <label className={`block text-sm font-medium ${theme.text} mb-2`}>Tipo de Pagamento</label>
-                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
+                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
                   <option value="1">💵 Dinheiro</option>
                   <option value="2">💳 Cartão de Crédito</option>
                   <option value="3">💳 Cartão de Débito</option>
@@ -469,7 +705,7 @@ export default function FinancialDashboard() {
                   type="number"
                   step="0.01"
                   placeholder="0.00"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                 />
               </div>
 
@@ -478,7 +714,7 @@ export default function FinancialDashboard() {
                 <input
                   type="text"
                   placeholder="Ex: Quarto 101"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                 />
               </div>
 
@@ -517,14 +753,14 @@ export default function FinancialDashboard() {
                   <div>
                     <input
                       type="date"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                     <span className={`text-xs ${theme.textSecondary} mt-1 block`}>Data Inicial</span>
                   </div>
                   <div>
                     <input
                       type="date"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                     <span className={`text-xs ${theme.textSecondary} mt-1 block`}>Data Final</span>
                   </div>
@@ -533,7 +769,7 @@ export default function FinancialDashboard() {
 
               <div>
                 <label className={`block text-sm font-medium ${theme.text} mb-2`}>Tipo de Lançamento</label>
-                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
+                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
                   <option value="all">Todos</option>
                   <option value="income">Receitas</option>
                   <option value="expense">Despesas</option>
@@ -542,7 +778,7 @@ export default function FinancialDashboard() {
 
               <div>
                 <label className={`block text-sm font-medium ${theme.text} mb-2`}>Tipo de Pagamento</label>
-                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
+                <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
                   <option value="all">Todos</option>
                   <option value="1">💵 Dinheiro</option>
                   <option value="2">💳 Cartão de Crédito</option>
@@ -559,7 +795,7 @@ export default function FinancialDashboard() {
                 <input
                   type="text"
                   placeholder="Filtrar por quarto"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                 />
               </div>
 
@@ -568,7 +804,7 @@ export default function FinancialDashboard() {
                 <input
                   type="text"
                   placeholder="Filtrar por funcionário"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                 />
               </div>
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Search, Plus, X, Edit, Trash2, Sun, Moon, UserCheck, UserX, Mail, Phone, MapPin, Calendar, CreditCard, Building } from 'lucide-react';
+import { Users, Search, Plus, X, Edit, Trash2, Sun, Moon, UserCheck, UserX, Mail, Phone, MapPin, Calendar, CreditCard, Building, Upload, Camera, Eye, EyeOff, Lock } from 'lucide-react';
 
 export default function EmployeeManagement() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -10,10 +10,24 @@ export default function EmployeeManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImage(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleAddEmployee = () => {
@@ -21,6 +35,7 @@ export default function EmployeeManagement() {
     setTimeout(() => {
       setIsLoading(false);
       setShowAddModal(false);
+      setProfileImage(null);
       showNotification('Funcionário cadastrado com sucesso!');
     }, 1500);
   };
@@ -150,7 +165,7 @@ export default function EmployeeManagement() {
     textSecondary: isDark ? 'text-slate-400' : 'text-slate-600',
     card: isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200',
     cardHover: isDark ? 'hover:bg-white/10' : 'hover:bg-slate-50',
-    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500',
+    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500',
     tableHeader: isDark ? 'bg-white/5' : 'bg-slate-100',
     divider: isDark ? 'border-white/10' : 'border-slate-200',
     rowHover: isDark ? 'hover:bg-violet-500/20 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)] hover:-translate-y-0.5 hover:border-l-4 hover:border-violet-500' : 'hover:bg-violet-100 hover:shadow-[0_4px_12px_rgba(139,92,246,0.2)] hover:-translate-y-0.5 hover:border-l-4 hover:border-violet-500',
@@ -233,18 +248,10 @@ export default function EmployeeManagement() {
                     placeholder="Buscar por nome, CPF ou email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full sm:w-64 pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent`}
+                    className={`w-full sm:w-64 pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent border-2`}
                   />
                 </div>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className={`px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                >
-                  <option value="all">Todos</option>
-                  <option value="active">Ativos</option>
-                  <option value="inactive">Inativos</option>
-                </select>
+                
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
@@ -332,163 +339,251 @@ export default function EmployeeManagement() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto`}>
+          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto`}>
             <div className={`p-4 border-b ${theme.divider} flex items-center justify-between sticky top-0 ${theme.card} z-10`}>
               <h3 className={`text-lg font-bold ${theme.text}`}>Cadastrar Funcionário</h3>
-              <button onClick={() => setShowAddModal(false)} className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}>
+              <button onClick={() => {
+                setShowAddModal(false);
+                setProfileImage(null);
+              }} className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}>
                 <X className="w-5 h-5" />
               </button>
             </div>
+            
             <div className="p-6 space-y-6">
+              {/* Foto de Perfil */}
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className={`w-32 h-32 rounded-full ${theme.card} border-2 ${theme.divider} flex items-center justify-center overflow-hidden`}>
+                    {profileImage ? (
+                      <img src={profileImage} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className={`w-12 h-12 ${theme.textSecondary}`} />
+                    )}
+                  </div>
+                  <label className="absolute bottom-0 right-0 p-2 bg-violet-600 hover:bg-violet-700 text-white rounded-full cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg">
+                    <Upload className="w-4 h-4" />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageUpload}
+                      className="hidden" 
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Dados Pessoais */}
               <div>
                 <h4 className={`text-sm font-bold ${theme.text} mb-3 uppercase tracking-wider flex items-center gap-2`}>
                   <CreditCard className="w-4 h-4 text-violet-500" />
                   Dados Pessoais
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nome Completo</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: João da Silva"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                    />
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>CPF</label>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>CPF *</label>
                     <input
                       type="text"
                       placeholder="000.000.000-00"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nome Completo *</label>
+                    <input
+                      type="text"
+                      placeholder="Nome é obrigatório(a)"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Sexo</label>
+                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
+                      <option value="">Selecione</option>
+                      <option value="M">Masculino</option>
+                      <option value="F">Feminino</option>
+                    </select>
                   </div>
                   <div>
                     <label className={`block text-sm font-medium ${theme.text} mb-2`}>RG</label>
                     <input
                       type="text"
-                      placeholder="MG0000000"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      placeholder="00000000000-0"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                   </div>
                   <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Data de Nascimento</label>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Data de Nascimento *</label>
                     <input
                       type="date"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      placeholder="DD/MM/AAAA"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                   </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Sexo</label>
-                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
-                      <option value="">Selecione...</option>
-                      <option value="M">Masculino</option>
-                      <option value="F">Feminino</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h4 className={`text-sm font-bold ${theme.text} mb-3 uppercase tracking-wider flex items-center gap-2`}>
-                  <Mail className="w-4 h-4 text-violet-500" />
-                  Contato
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Email</label>
-                    <input
-                      type="email"
-                      placeholder="email@exemplo.com"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Telefone</label>
+                  <div className="md:col-span-2"> 
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Telefone *</label>
                     <input
                       type="tel"
                       placeholder="(00) 00000-0000"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Email *</label>
+                    <input
+                      type="email"
+                      placeholder="email@hospede.com"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                   </div>
                 </div>
               </div>
 
+              {/* Endereço */}
               <div>
                 <h4 className={`text-sm font-bold ${theme.text} mb-3 uppercase tracking-wider flex items-center gap-2`}>
                   <MapPin className="w-4 h-4 text-violet-500" />
                   Endereço
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>CEP</label>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>CEP *</label>
                     <input
                       type="text"
                       placeholder="00000-000"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Estado</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: MG"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Município</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Belo Horizonte"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Bairro</label>
-                    <input
-                      type="text"
-                      placeholder="Ex: Centro"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                   </div>
                   <div className="md:col-span-2">
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Endereço</label>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Endereço *</label>
                     <input
                       type="text"
-                      placeholder="Rua, número, complemento"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      placeholder="Rua, Avenida, etc..."
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Bairro *</label>
+                    <input
+                      type="text"
+                      placeholder="Nome do bairro"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Número</label>
+                    <input
+                      type="text"
+                      placeholder="Digite S/N se não houver número"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Complemento</label>
+                    <input
+                      type="text"
+                      placeholder="Complemento (opcional)"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>País *</label>
+                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
+                      <option value="">Selecione...</option>
+                      <option value="BR">Brasil</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Estado *</label>
+                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
+                      <option value="">Selecione...</option>
+                      <option value="MG">Minas Gerais</option>
+                      <option value="SP">São Paulo</option>
+                      <option value="RJ">Rio de Janeiro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Cidade *</label>
+                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
+                      <option value="">Selecione...</option>
+                      <option value="BH">Belo Horizonte</option>
+                    </select>
                   </div>
                 </div>
               </div>
 
+              {/* Informações Profissionais */}
+              
+
+              {/* Criar Credenciais de Acesso */}
               <div>
                 <h4 className={`text-sm font-bold ${theme.text} mb-3 uppercase tracking-wider flex items-center gap-2`}>
-                  <Building className="w-4 h-4 text-violet-500" />
-                  Informações Profissionais
+                  <Lock className="w-4 h-4 text-violet-500" />
+                  Credenciais de Acesso
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Cargo</label>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nome de Usuário *</label>
                     <input
                       type="text"
-                      placeholder="Ex: Recepcionista"
-                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                      placeholder="Digite o username ex: (joao.silva)"
+                      className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                     />
                   </div>
                   <div>
-                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Status</label>
-                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}>
-                      <option value="ATIVO">Ativo</option>
-                      <option value="INATIVO">Inativo</option>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Cargo/Permissão *</label>
+                    <select className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}>
+                      <option value="">Selecione o cargo</option>
+                      <option value="1">Gerente Geral</option>
+                      <option value="2">Recepcionista</option>
+                      <option value="3">Auxiliar Financeiro</option>
+                      <option value="4">Camareira Responsável</option>
+                      <option value="5">Segurança</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Senha *</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Digite a senha"
+                        className={`w-full px-3 py-2 pr-10 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 ${theme.textSecondary} hover:${theme.text} transition-colors`}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`block text-sm font-medium ${theme.text} mb-2`}>Confirmar Senha *</label>
+                    <div className="relative">
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="Confirme a senha"
+                        className={`w-full px-3 py-2 pr-10 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className={`absolute right-3 top-1/2 -translate-y-1/2 ${theme.textSecondary} hover:${theme.text} transition-colors`}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="flex gap-2 pt-4">
                 <button
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setProfileImage(null);
+                  }}
                   className={`flex-1 px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
                 >
                   Cancelar
@@ -625,19 +720,6 @@ export default function EmployeeManagement() {
             </div>
 
             <div className={`p-4 border-t ${theme.divider} flex gap-2`}>
-              <button
-                onClick={handleDeleteEmployee}
-                className={`px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 flex items-center gap-2`}
-              >
-                <Trash2 className="w-4 h-4" />
-                Excluir
-              </button>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className={`flex-1 px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
-              >
-                Fechar
-              </button>
               <button
                 onClick={handleEditEmployee}
                 className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"

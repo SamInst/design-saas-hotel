@@ -10,17 +10,62 @@ export default function RolePermissions() {
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState(null);
   const [isEditingPermissions, setIsEditingPermissions] = useState(false);
+  
+  // Estado para o novo cargo
+  const [newRole, setNewRole] = useState({
+    nome: '',
+    descricao: '',
+    nivel: 'Operacional',
+    modulos: {
+      dashboard: { acessoTotal: false, visualizar: false, exportar: false },
+      pernoites: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      apartamentos: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      dayuse: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      reservas: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      financeiro: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      itens: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      cadastros: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      precos: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+      usuarios: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false }
+    }
+  });
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const resetNewRole = () => {
+    setNewRole({
+      nome: '',
+      descricao: '',
+      nivel: 'Operacional',
+      modulos: {
+        dashboard: { acessoTotal: false, visualizar: false, exportar: false },
+        pernoites: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        apartamentos: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        dayuse: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        reservas: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        financeiro: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        itens: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        cadastros: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        precos: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false },
+        usuarios: { acessoTotal: false, visualizar: false, criar: false, editar: false, excluir: false }
+      }
+    });
+  };
+
   const handleAddRole = () => {
+    if (!newRole.nome.trim()) {
+      showNotification('Por favor, informe o nome do cargo', 'error');
+      return;
+    }
+    
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
       setShowAddModal(false);
+      resetNewRole();
       showNotification('Cargo criado com sucesso!');
     }, 1500);
   };
@@ -46,6 +91,38 @@ export default function RolePermissions() {
   const handleRoleClick = (role) => {
     setSelectedRole(role);
     setIsEditingPermissions(false);
+  };
+
+  const toggleModulePermission = (moduleName, permissionName) => {
+    setNewRole(prev => {
+      const updatedModulos = { ...prev.modulos };
+      const module = { ...updatedModulos[moduleName] };
+      
+      if (permissionName === 'acessoTotal') {
+        // Se ativar acesso total, ativa todas as permissões
+        const allEnabled = !module.acessoTotal;
+        Object.keys(module).forEach(key => {
+          module[key] = allEnabled;
+        });
+      } else {
+        // Toggle da permissão específica
+        module[permissionName] = !module[permissionName];
+        
+        // Se desmarcar alguma permissão, desmarca acesso total
+        if (!module[permissionName]) {
+          module.acessoTotal = false;
+        }
+        
+        // Se todas as permissões (exceto acessoTotal) estiverem marcadas, marca acessoTotal
+        const { acessoTotal, ...otherPermissions } = module;
+        if (Object.values(otherPermissions).every(v => v)) {
+          module.acessoTotal = true;
+        }
+      }
+      
+      updatedModulos[moduleName] = module;
+      return { ...prev, modulos: updatedModulos };
+    });
   };
 
   const roles = [
@@ -158,10 +235,23 @@ export default function RolePermissions() {
     textSecondary: isDark ? 'text-slate-400' : 'text-slate-600',
     card: isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-200',
     cardHover: isDark ? 'hover:bg-white/10' : 'hover:bg-slate-50',
-    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-500',
+    input: isDark ? 'bg-white/10 border-white/20 text-white placeholder-slate-400' : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-500',
     divider: isDark ? 'border-white/10' : 'border-slate-200',
     button: isDark ? 'bg-white/10 hover:bg-white/20 border-white/10' : 'bg-slate-100 hover:bg-slate-200 border-slate-300',
   };
+
+  const modulesConfig = [
+    { key: 'dashboard', icon: '📊', title: 'Dashboard', description: 'Visão geral de métricas e estatísticas', permissions: ['visualizar', 'exportar'] },
+    { key: 'pernoites', icon: '🛏️', title: 'Pernoites', description: 'Gestão de estadias e hospedagens', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'apartamentos', icon: '🏠', title: 'Apartamentos', description: 'Controle de quartos e unidades', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'dayuse', icon: '☀️', title: 'Day Use', description: 'Reservas por período diurno', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'reservas', icon: '📅', title: 'Reservas', description: 'Agendamentos e pré-reservas', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'financeiro', icon: '💰', title: 'Financeiro', description: 'Caixa, faturas e pagamentos', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'itens', icon: '📦', title: 'Itens', description: 'Produtos, serviços e estoque', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'cadastros', icon: '👥', title: 'Cadastros', description: 'Hóspedes, funcionários e fornecedores', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'precos', icon: '💵', title: 'Preços', description: 'Tabelas de valores e tarifas', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+    { key: 'usuarios', icon: '👤', title: 'Usuários', description: 'Contas de acesso ao sistema', permissions: ['visualizar', 'criar', 'editar', 'excluir'] },
+  ];
 
   const ModuleCard = ({ icon, title, description, permissions, hasAcessoTotal, theme, isEditing }) => {
     const { acessoTotal, ...otherPermissions } = permissions;
@@ -259,6 +349,61 @@ export default function RolePermissions() {
     );
   };
 
+  const ModulePermissionEditor = ({ module, moduleKey, theme }) => {
+    const { acessoTotal, ...otherPermissions } = newRole.modulos[moduleKey];
+    const hasAnyPermission = Object.values(otherPermissions).some(v => v);
+    
+    return (
+      <div className={`p-4 rounded-lg ${theme.card} border`}>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-violet-500/20 rounded-lg">
+            <span className="text-xl">{module.icon}</span>
+          </div>
+          <div className="flex-1">
+            <h4 className={`font-bold ${theme.text} text-sm`}>{module.title}</h4>
+            <p className={`text-xs ${theme.textSecondary}`}>{module.description}</p>
+          </div>
+          <span className={`text-xs font-bold uppercase ${acessoTotal ? 'text-emerald-500' : hasAnyPermission ? 'text-violet-500' : 'text-slate-500'}`}>
+            {acessoTotal ? 'Total' : hasAnyPermission ? 'Parcial' : 'Desabilitado'}
+          </span>
+        </div>
+        
+        <div className={`mb-3 pb-3 border-b ${theme.divider}`}>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input 
+              type="checkbox" 
+              checked={acessoTotal}
+              onChange={() => toggleModulePermission(moduleKey, 'acessoTotal')}
+              className="w-4 h-4 rounded accent-emerald-500 cursor-pointer" 
+            />
+            <span className={`text-sm font-bold ${theme.text}`}>🔓 Acesso Total</span>
+            <span className={`text-xs ${theme.textSecondary}`}>(habilita todas as permissões)</span>
+          </label>
+        </div>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {module.permissions.map((permission) => (
+            <label key={permission} className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={newRole.modulos[moduleKey][permission]}
+                onChange={() => toggleModulePermission(moduleKey, permission)}
+                className="w-4 h-4 rounded accent-violet-500 cursor-pointer" 
+              />
+              <span className={`text-xs ${theme.text} capitalize`}>
+                {permission === 'visualizar' ? 'Visualizar' : 
+                 permission === 'criar' ? 'Criar' : 
+                 permission === 'editar' ? 'Editar' : 
+                 permission === 'excluir' ? 'Excluir' :
+                 permission === 'exportar' ? 'Exportar' : permission}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className={`min-h-screen ${theme.bg}`}>
       <div className={`absolute inset-0 ${theme.bgOverlay}`}></div>
@@ -290,7 +435,7 @@ export default function RolePermissions() {
         <div className="flex gap-6">
           <div className="w-80 flex-shrink-0">
             <div className={`${theme.card} backdrop-blur-xl rounded-xl border shadow-xl sticky top-8`}>
-              <div className="p-4 border-b ${theme.divider}">
+              <div className={`p-4 border-b ${theme.divider}`}>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className={`text-sm font-bold ${theme.text} uppercase tracking-wider`}>Cargos</h2>
                   <button
@@ -307,7 +452,7 @@ export default function RolePermissions() {
                     placeholder="Buscar cargos..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
+                    className={`w-full pl-9 pr-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
                   />
                 </div>
               </div>
@@ -368,105 +513,18 @@ export default function RolePermissions() {
                   </h3>
 
                   <div className="space-y-4">
-                    <ModuleCard
-                      icon="📊"
-                      title="Dashboard"
-                      description="Visão geral de métricas e estatísticas"
-                      permissions={selectedRole.modulos.dashboard}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="🛏️"
-                      title="Pernoites"
-                      description="Gestão de estadias e hospedagens"
-                      permissions={selectedRole.modulos.pernoites}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="🏠"
-                      title="Apartamentos"
-                      description="Controle de quartos e unidades"
-                      permissions={selectedRole.modulos.apartamentos}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="☀️"
-                      title="Day Use"
-                      description="Reservas por período diurno"
-                      permissions={selectedRole.modulos.dayuse}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="📅"
-                      title="Reservas"
-                      description="Agendamentos e pré-reservas"
-                      permissions={selectedRole.modulos.reservas}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="💰"
-                      title="Financeiro"
-                      description="Caixa, faturas e pagamentos"
-                      permissions={selectedRole.modulos.financeiro}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="📦"
-                      title="Itens"
-                      description="Produtos, serviços e estoque"
-                      permissions={selectedRole.modulos.itens}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="👥"
-                      title="Cadastros"
-                      description="Hóspedes, funcionários e fornecedores"
-                      permissions={selectedRole.modulos.cadastros}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="💵"
-                      title="Preços"
-                      description="Tabelas de valores e tarifas"
-                      permissions={selectedRole.modulos.precos}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
-
-                    <ModuleCard
-                      icon="👤"
-                      title="Usuários"
-                      description="Contas de acesso ao sistema"
-                      permissions={selectedRole.modulos.usuarios}
-                      hasAcessoTotal={true}
-                      theme={theme}
-                      isEditing={isEditingPermissions}
-                    />
+                    {modulesConfig.map((module) => (
+                      <ModuleCard
+                        key={module.key}
+                        icon={module.icon}
+                        title={module.title}
+                        description={module.description}
+                        permissions={selectedRole.modulos[module.key]}
+                        hasAcessoTotal={true}
+                        theme={theme}
+                        isEditing={isEditingPermissions}
+                      />
+                    ))}
                   </div>
                 </div>
 
@@ -512,53 +570,94 @@ export default function RolePermissions() {
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full`}>
-            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-4xl w-full my-8`}>
+            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between sticky top-0 ${theme.card} z-10`}>
               <h3 className={`text-lg font-bold ${theme.text}`}>Novo Cargo</h3>
-              <button onClick={() => setShowAddModal(false)} className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}>
+              <button 
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetNewRole();
+                }} 
+                className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nome do Cargo</label>
-                <input
-                  type="text"
-                  placeholder="Ex: Supervisor"
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                />
+            
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nome do Cargo *</label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Supervisor"
+                    value={newRole.nome}
+                    onChange={(e) => setNewRole(prev => ({ ...prev, nome: e.target.value }))}
+                    className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium ${theme.text} mb-2`}>Nível de Acesso</label>
+                  <select
+                    value={newRole.nivel}
+                    onChange={(e) => setNewRole(prev => ({ ...prev, nivel: e.target.value }))}
+                    className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                  >
+                    <option value="Operacional">Operacional</option>
+                    <option value="Gerencial">Gerencial</option>
+                    <option value="Administrador">Administrador</option>
+                  </select>
+                </div>
               </div>
 
               <div>
                 <label className={`block text-sm font-medium ${theme.text} mb-2`}>Descrição das Atribuições</label>
                 <textarea
                   placeholder="Descreva as responsabilidades deste cargo..."
-                  rows={4}
-                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none`}
+                  value={newRole.descricao}
+                  onChange={(e) => setNewRole(prev => ({ ...prev, descricao: e.target.value }))}
+                  rows={3}
+                  className={`w-full px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none border-2`}
                 />
               </div>
 
-              <div className={`p-3 rounded-lg bg-blue-500/10 border border-blue-500/20`}>
-                <p className={`text-xs ${theme.text}`}>
-                  ℹ️ As permissões de acesso aos módulos serão configuradas após criar o cargo.
-                </p>
+              <div className={`pt-4 border-t ${theme.divider}`}>
+                <h4 className={`text-base font-bold ${theme.text} mb-4 flex items-center gap-2`}>
+                  <Lock className="w-4 h-4 text-violet-500" />
+                  Configurar Permissões dos Módulos
+                </h4>
+                
+                <div className="space-y-4">
+                  {modulesConfig.map((module) => (
+                    <ModulePermissionEditor
+                      key={module.key}
+                      module={module}
+                      moduleKey={module.key}
+                      theme={theme}
+                    />
+                  ))}
+                </div>
               </div>
+            </div>
 
-              <div className="flex gap-2 pt-4">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className={`flex-1 px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleAddRole}
-                  className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
-                >
-                  Criar Cargo
-                </button>
-              </div>
+            <div className={`p-4 border-t ${theme.divider} flex gap-2 sticky bottom-0 ${theme.card}`}>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetNewRole();
+                }}
+                className={`flex-1 px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleAddRole}
+                className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+              >
+                Criar Cargo
+              </button>
             </div>
           </div>
         </div>
@@ -575,7 +674,7 @@ export default function RolePermissions() {
 
       {notification && (
         <div className="fixed top-4 right-4 z-[110] animate-slideIn">
-          <div className={`${notification.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3`}>
+          <div className={`${notification.type === 'success' ? 'bg-emerald-500' : notification.type === 'error' ? 'bg-red-500' : 'bg-blue-500'} text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3`}>
             <div className="w-2 h-2 rounded-full bg-white animate-pulse"></div>
             <span className="font-medium">{notification.message}</span>
           </div>

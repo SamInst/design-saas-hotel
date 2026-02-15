@@ -2,6 +2,7 @@ import { useState } from 'react'
 import FinancialDashboard from './financial-dashboard.jsx'
 import EmployeeManagement from './employee-management.jsx'
 import RolePermissions from './role-permissions.jsx'
+import InventoryManagement from './inventory-management.jsx'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('financial')
@@ -23,6 +24,7 @@ function App() {
               >
                 💰 Financeiro
               </button>
+
               <button
                 onClick={() => setCurrentPage('employees')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -33,6 +35,18 @@ function App() {
               >
                 👥 Funcionários
               </button>
+
+              <button
+                onClick={() => setCurrentPage('inventory')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  currentPage === 'inventory'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                📦 Itens / Almoxarifado
+              </button>
+
               <button
                 onClick={() => setCurrentPage('permissions')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -47,9 +61,10 @@ function App() {
           </div>
         </div>
       </nav>
-      
+
       {currentPage === 'financial' && <FinancialDashboard />}
       {currentPage === 'employees' && <EmployeeManagement />}
+      {currentPage === 'inventory' && <InventoryManagement />}
       {currentPage === 'permissions' && <RolePermissions />}
     </div>
   )
