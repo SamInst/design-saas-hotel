@@ -11,11 +11,13 @@ import {
   ChevronDown,
   Info,
   Wrench,
-  Sparkles,
   User,
   KeyRound,
   Clock,
+  Sparkles,
   X,
+  Plus,
+  Edit,
 } from 'lucide-react';
 
 function formatRoomNumber(num) {
@@ -31,6 +33,8 @@ export default function RoomsManagement() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [notification, setNotification] = useState(null);
   const [collapsedCategories, setCollapsedCategories] = useState({});
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignContext, setAssignContext] = useState(null); // { type: 'LIMPEZA'|'MANUTENCAO', room }
 
   const [permissions, setPermissions] = useState({
     adicionarQuarto: true,
@@ -40,6 +44,13 @@ export default function RoomsManagement() {
     acionarManutencao: true,
     alterarStatus: true,
   });
+
+  const funcionarios = [
+    { id: 1, nome: 'Ana Paula (Camareira)' },
+    { id: 2, nome: 'Carlos Oliveira (Manutenção)' },
+    { id: 3, nome: 'João Silva (Camareira)' },
+    { id: 4, nome: 'Marcos Souza (Manutenção)' },
+  ];
 
   const showNotification = (message, type = 'info') => {
     setNotification({ message, type });
@@ -66,17 +77,15 @@ export default function RoomsManagement() {
     { id: 3, nome: 'Suíte', descricao: 'Suítes completas com sala de estar e serviços extras.' },
   ];
 
-  // STATUS possíveis
   const STATUS = {
     DISPONIVEL: 'DISPONÍVEL',
     OCUPADO: 'OCUPADO',
     RESERVADO: 'RESERVADO',
     LIMPEZA: 'LIMPEZA',
     MANUTENCAO: 'MANUTENÇÃO',
-    FORA_DE_SERVICO: 'FORA DE SERVIÇO', // status extra
+    FORA_DE_SERVICO: 'FORA DE SERVIÇO',
   };
 
-  // 22 quartos de exemplo
   const baseRooms = [
     // Standard
     {
@@ -351,10 +360,61 @@ export default function RoomsManagement() {
 
   const lowStockThreshold = 2;
   const hasLowStock = (estoqueItens) => {
-    return Object.values(estoqueItens).some((qtd) => qtd !== null && qtd !== undefined && qtd < lowStockThreshold);
+    if (!estoqueItens) return false;
+    return Object.values(estoqueItens).some(
+      (qtd) => qtd !== null && qtd !== undefined && qtd < lowStockThreshold,
+    );
   };
 
-  const statusColor = (status) => {
+  const statusTheme = (status) => {
+    // cor de fundo do card por status
+    switch (status) {
+      case STATUS.DISPONIVEL:
+        return {
+          bg: 'bg-emerald-500/10',
+          icon: 'text-emerald-400',
+          number: 'text-emerald-300',
+        };
+      case STATUS.OCUPADO:
+        return {
+          bg: 'bg-rose-500/10',
+          icon: 'text-rose-400',
+          number: 'text-rose-300',
+        };
+      case STATUS.RESERVADO:
+        return {
+          bg: 'bg-amber-500/10',
+          icon: 'text-amber-400',
+          number: 'text-amber-300',
+        };
+      case STATUS.LIMPEZA:
+        return {
+          bg: 'bg-sky-500/10',
+          icon: 'text-sky-400',
+          number: 'text-sky-300',
+        };
+      case STATUS.MANUTENCAO:
+        return {
+          bg: 'bg-indigo-500/10',
+          icon: 'text-indigo-400',
+          number: 'text-indigo-300',
+        };
+      case STATUS.FORA_DE_SERVICO:
+        return {
+          bg: 'bg-slate-500/10',
+          icon: 'text-slate-300',
+          number: 'text-slate-300',
+        };
+      default:
+        return {
+          bg: 'bg-slate-500/10',
+          icon: 'text-slate-300',
+          number: 'text-slate-300',
+        };
+    }
+  };
+
+  const statusPillColor = (status) => {
     switch (status) {
       case STATUS.DISPONIVEL:
         return 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30';
@@ -377,21 +437,18 @@ export default function RoomsManagement() {
     if (!permissions.alterarStatus) return false;
 
     if (room.status === STATUS.OCUPADO || room.status === STATUS.RESERVADO) {
-      return false; // não altera
+      return false;
     }
 
     if (room.status === STATUS.LIMPEZA || room.status === STATUS.MANUTENCAO) {
-      // só podem voltar para disponível
       return newStatus === STATUS.DISPONIVEL;
     }
 
     if (room.status === STATUS.DISPONIVEL) {
-      // pode ir para qualquer outro
       return true;
     }
 
     if (room.status === STATUS.FORA_DE_SERVICO) {
-      // poderia ir para manutenção ou disponível
       return newStatus === STATUS.MANUTENCAO || newStatus === STATUS.DISPONIVEL;
     }
 
@@ -403,8 +460,10 @@ export default function RoomsManagement() {
       showNotification('Transição de status não permitida para este quarto.', 'error');
       return;
     }
-    // aqui depois você integra com API / estado global
-    showNotification(`Status do quarto ${formatRoomNumber(room.numero)} alterado para ${newStatus}.`, 'success');
+    showNotification(
+      `Status do quarto ${formatRoomNumber(room.numero)} alterado para ${newStatus}.`,
+      'success',
+    );
   };
 
   const handleCallCleaning = (room) => {
@@ -412,7 +471,8 @@ export default function RoomsManagement() {
       showNotification('Você não tem permissão para acionar limpeza.', 'error');
       return;
     }
-    showNotification(`Limpeza acionada para o quarto ${formatRoomNumber(room.numero)}.`, 'success');
+    setAssignContext({ type: 'LIMPEZA', room });
+    setShowAssignModal(true);
   };
 
   const handleCallMaintenance = (room) => {
@@ -420,7 +480,25 @@ export default function RoomsManagement() {
       showNotification('Você não tem permissão para acionar manutenção.', 'error');
       return;
     }
-    showNotification(`Manutenção acionada para o quarto ${formatRoomNumber(room.numero)}.`, 'success');
+    setAssignContext({ type: 'MANUTENCAO', room });
+    setShowAssignModal(true);
+  };
+
+  const handleAssignFuncionario = (funcId) => {
+    const func = funcionarios.find((f) => f.id === funcId);
+    if (!func || !assignContext) return;
+
+    const tipo =
+      assignContext.type === 'LIMPEZA' ? 'limpeza' : 'manutenção';
+
+    showNotification(
+      `${tipo.charAt(0).toUpperCase() + tipo.slice(1)} do quarto ${formatRoomNumber(
+        assignContext.room.numero,
+      )} atribuída a ${func.nome}.`,
+      'success',
+    );
+    setShowAssignModal(false);
+    setAssignContext(null);
   };
 
   const theme = {
@@ -449,6 +527,7 @@ export default function RoomsManagement() {
     limpeza: rooms.filter((r) => r.status === STATUS.LIMPEZA).length,
     manutencao: rooms.filter((r) => r.status === STATUS.MANUTENCAO).length,
   };
+  
 
   const filteredRooms = rooms.filter((room) => {
     const categoryOk = selectedCategory === 'all' || room.categoriaId === selectedCategory;
@@ -462,12 +541,9 @@ export default function RoomsManagement() {
   }));
 
   const renderRoomCardContent = (room) => {
-    const lowStock = hasLowStock(room.estoqueItens || {});
-
     if (room.status === STATUS.DISPONIVEL) {
       return (
         <div className="space-y-2">
-          <p className={`${theme.textSecondary} text-xs line-clamp-2`}>{room.descricao}</p>
           <div className="flex items-center gap-2 text-xs">
             <Users className="w-3.5 h-3.5 text-violet-400" />
             <span className={`${theme.text} font-semibold`}>{room.tipoOcupacao}</span>
@@ -494,20 +570,6 @@ export default function RoomsManagement() {
               </span>
             )}
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px]">
-            <span className={`${theme.textSecondary}`}>Estoque de itens</span>
-            <div className="flex gap-2">
-              <span className={`${theme.textSecondary}`}>Toalhas: {room.estoqueItens.toalhas}</span>
-              <span className={`${theme.textSecondary}`}>Trav.: {room.estoqueItens.travesseiros}</span>
-              <span className={`${theme.textSecondary}`}>Amen.: {room.estoqueItens.amenities}</span>
-            </div>
-          </div>
-          {lowStock && (
-            <div className="mt-2 flex items-center gap-2 text-[11px] text-amber-400">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Poucos itens disponíveis neste quarto.</span>
-            </div>
-          )}
         </div>
       );
     }
@@ -520,10 +582,6 @@ export default function RoomsManagement() {
           <div className="flex items-center gap-2">
             <User className="w-3.5 h-3.5 text-violet-400" />
             <span className={`${theme.text} font-semibold`}>{h.nome}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <KeyRound className="w-3.5 h-3.5 text-slate-400" />
-            <span className={theme.textSecondary}>Categoria: {h.categoriaReserva}</span>
           </div>
           <div className="flex flex-col gap-1 mt-1">
             <div className="flex items-center gap-2">
@@ -545,20 +603,13 @@ export default function RoomsManagement() {
         <div className="space-y-2 text-xs">
           <div className="flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span className={`${theme.textSecondary}`}>Em limpeza</span>
+            <span className={`${theme.textSecondary}`}>
+              Em limpeza por{' '}
+              <span className={theme.text}>
+                {l?.funcionario || 'não atribuído'}
+              </span>
+            </span>
           </div>
-          {l && (
-            <>
-              <div className="flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-violet-400" />
-                <span className={`${theme.text} font-semibold`}>{l.funcionario}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span className={`${theme.textSecondary}`}>Início: {l.inicio}</span>
-              </div>
-            </>
-          )}
         </div>
       );
     }
@@ -570,26 +621,22 @@ export default function RoomsManagement() {
           <div className="flex items-center gap-2">
             <Wrench className="w-3.5 h-3.5 text-indigo-400" />
             <span className={`${theme.textSecondary}`}>
-              {room.status === STATUS.FORA_DE_SERVICO ? 'Fora de serviço' : 'Em manutenção'}
+              Em manutenção por{' '}
+              <span className={theme.text}>
+                {m?.responsavel || 'não atribuído'}
+              </span>
             </span>
           </div>
-          {m && (
-            <>
-              <div className="flex items-center gap-2">
-                <User className="w-3.5 h-3.5 text-violet-400" />
-                <span className={`${theme.text} font-semibold`}>{m.responsavel}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Info className="w-3.5 h-3.5 text-slate-400" />
-                <span className={`${theme.textSecondary}`}>{m.descricao}</span>
-              </div>
-            </>
-          )}
         </div>
       );
     }
 
     return null;
+  };
+
+  const openDetails = (room) => {
+    setSelectedRoom(room);
+    setShowDetailsModal(true);
   };
 
   return (
@@ -626,457 +673,7 @@ export default function RoomsManagement() {
           </div>
         </header>
 
-        {/* Dashboard */}
-        {permissions.dashboard && (
-          <div className={`${theme.card} backdrop-blur-xl rounded-xl p-4 mb-6 border shadow-xl`}>
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-4 h-4 text-violet-500" />
-              <h2 className={`text-sm font-bold ${theme.text} uppercase tracking-wider`}>Resumo dos Quartos</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <div className="bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <BedDouble className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">TOTAL</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.total}</p>
-                <p className="text-white/80 text-xs mt-1">Quartos cadastrados</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <BedDouble className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">DISPONÍVEIS</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.disponiveis}</p>
-                <p className="text-white/80 text-xs mt-1">Prontos para ocupar</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-rose-500 to-red-600 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <Users className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">OCUPADOS</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.ocupados}</p>
-                <p className="text-white/80 text-xs mt-1">Hóspedes no hotel</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-amber-500 to-yellow-500 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <BedDouble className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">RESERVADOS</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.reservados}</p>
-                <p className="text-white/80 text-xs mt-1">Próximas chegadas</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-sky-500 to-blue-500 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <Sparkles className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">LIMPEZA</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.limpeza}</p>
-                <p className="text-white/80 text-xs mt-1">Em limpeza</p>
-              </div>
-
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-3 mb-2">
-                  <Wrench className="w-5 h-5 text-white" />
-                  <span className="text-white font-bold text-sm">MANUTENÇÃO</span>
-                </div>
-                <p className="text-3xl font-bold text-white">{stats.manutencao}</p>
-                <p className="text-white/80 text-xs mt-1">Em manutenção</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Filtros */}
-        <div className={`${theme.card} backdrop-blur-xl rounded-xl border shadow-xl mb-6 p-4`}>
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
-            <div>
-              <h2 className={`text-lg font-bold ${theme.text}`}>Lista de Quartos</h2>
-              <p className={`${theme.textSecondary} text-xs`}>Visualize o status e detalhes de cada quarto.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <select
-                value={selectedCategory}
-                onChange={(e) =>
-                  setSelectedCategory(e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10))
-                }
-                className={`px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
-              >
-                <option value="all">Todas categorias</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.nome}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={selectedStatusFilter}
-                onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                className={`px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
-              >
-                <option value="all">Todos status</option>
-                {Object.values(STATUS).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Cards por categoria */}
-        <div className="space-y-4">
-          {roomsByCategory.map((cat) => (
-            <div key={cat.id} className={`${theme.card} rounded-xl border shadow-xl overflow-hidden`}>
-              <div
-                className={`px-4 py-3 flex items-center justify-between border-b ${theme.divider} cursor-pointer ${theme.cardHover} transition-colors`}
-                onClick={() => toggleCategoryCollapse(cat.id)}
-              >
-                <div className="flex items-center gap-3">
-                  <ChevronDown
-                    className={`w-4 h-4 text-violet-400 transition-transform duration-200 ${
-                      collapsedCategories[cat.id] ? '-rotate-90' : ''
-                    }`}
-                  />
-                  <span className={`${theme.text} font-bold text-sm`}>{cat.nome}</span>
-                  <span className={`${theme.textSecondary} text-xs`}>{cat.descricao}</span>
-                  <span className={`${theme.textSecondary} text-xs`}>
-                    ({cat.rooms.length} {cat.rooms.length === 1 ? 'quarto' : 'quartos'})
-                  </span>
-                </div>
-              </div>
-
-              {!collapsedCategories[cat.id] && (
-                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {cat.rooms.map((room) => {
-                    const lowStock = room.estoqueItens && hasLowStock(room.estoqueItens);
-                    return (
-                      <div
-                        key={room.numero}
-                        onClick={() => {
-                          setSelectedRoom(room);
-                          setShowDetailsModal(true);
-                          if (room.status === STATUS.DISPONIVEL && lowStock) {
-                            showNotification(
-                              `Quarto ${formatRoomNumber(room.numero)} com estoque baixo de itens.`,
-                              'warning',
-                            );
-                          }
-                        }}
-                        className={`${theme.card} rounded-xl border p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${theme.cardHover} group`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <BedDouble className="w-4 h-4 text-violet-400" />
-                            <span className="text-xs uppercase tracking-wide text-slate-400">Quarto</span>
-                          </div>
-                          <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-semibold ${statusColor(
-                              room.status,
-                            )}`}
-                          >
-                            {room.status}
-                          </span>
-                        </div>
-
-                        <div className="mb-3">
-                          <span className="block text-3xl font-extrabold text-violet-400 drop-shadow-sm">
-                            {formatRoomNumber(room.numero)}
-                          </span>
-                          <span className={`${theme.textSecondary} text-xs`}>{cat.nome}</span>
-                        </div>
-
-                        {renderRoomCardContent(room)}
-
-                        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1">
-                            <Info className="w-3.5 h-3.5" />
-                            Clique para detalhes
-                          </span>
-                          {room.status === STATUS.DISPONIVEL && lowStock && (
-                            <span className="flex items-center gap-1 text-amber-400">
-                              <AlertTriangle className="w-3.5 h-3.5" />
-                              Estoque baixo
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {cat.rooms.length === 0 && (
-                    <div className={`${theme.textSecondary} text-xs italic`}>Nenhum quarto nesta categoria com os filtros atuais.</div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Modal detalhes do quarto */}
-      {showDetailsModal && selectedRoom && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto`}>
-            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center">
-                  <span className="text-2xl font-extrabold text-violet-400">
-                    {formatRoomNumber(selectedRoom.numero)}
-                  </span>
-                </div>
-                <div>
-                  <h3 className={`text-lg font-bold ${theme.text}`}>Quarto {formatRoomNumber(selectedRoom.numero)}</h3>
-                  <p className={`text-xs ${theme.textSecondary}`}>
-                    Categoria:{' '}
-                    {categories.find((c) => c.id === selectedRoom.categoriaId)?.nome || 'N/A'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
-                    Status atual
-                  </span>
-                  <span
-                    className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold ${statusColor(
-                      selectedRoom.status,
-                    )}`}
-                  >
-                    {selectedRoom.status}
-                  </span>
-                </div>
-
-                <div className="flex flex-wrap gap-2 justify-end">
-                  {permissions.acionarLimpeza && (
-                    <button
-                      onClick={() => handleCallCleaning(selectedRoom)}
-                      className={`px-3 py-1.5 text-xs rounded-lg border ${theme.button} ${theme.text} flex items-center gap-1 hover:scale-105 active:scale-95`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Limpeza
-                    </button>
-                  )}
-                  {permissions.acionarManutencao && (
-                    <button
-                      onClick={() => handleCallMaintenance(selectedRoom)}
-                      className={`px-3 py-1.5 text-xs rounded-lg border ${theme.button} ${theme.text} flex items-center gap-1 hover:scale-105 active:scale-95`}
-                    >
-                      <Wrench className="w-3.5 h-3.5" />
-                      Manutenção
-                    </button>
-                  )}
-                  {permissions.alterarStatus && (
-                    <div className="relative">
-                      <select
-                        onChange={(e) => {
-                          const newStatus = e.target.value;
-                          if (!newStatus) return;
-                          handleChangeStatus(selectedRoom, newStatus);
-                          e.target.value = '';
-                        }}
-                        defaultValue=""
-                        className={`px-3 py-1.5 text-xs rounded-lg border ${theme.input} focus:outline-none focus:ring-2 focus:ring-violet-500`}
-                      >
-                        <option value="">Alterar status...</option>
-                        {Object.values(STATUS).map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Conteúdo detalhado conforme status */}
-              {selectedRoom.status === STATUS.DISPONIVEL && (
-                <>
-                  <div>
-                    <h4 className={`text-sm font-bold ${theme.text} mb-2`}>Descrição</h4>
-                    <p className={`${theme.textSecondary} text-sm`}>{selectedRoom.descricao}</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
-                        Tipo de ocupação
-                      </span>
-                      <span className={`${theme.text} font-bold`}>{selectedRoom.tipoOcupacao}</span>
-                    </div>
-                    <div>
-                      <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
-                        Configuração de camas
-                      </span>
-                      <div className="flex flex-wrap gap-2 text-[11px] mt-1">
-                        {selectedRoom.camas.casal > 0 && (
-                          <span className="px-2 py-1 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30">
-                            Cama casal x{selectedRoom.camas.casal}
-                          </span>
-                        )}
-                        {selectedRoom.camas.solteiro > 0 && (
-                          <span className="px-2 py-1 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
-                            Cama solteiro x{selectedRoom.camas.solteiro}
-                          </span>
-                        )}
-                        {selectedRoom.camas.beliche > 0 && (
-                          <span className="px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                            Beliche x{selectedRoom.camas.beliche}
-                          </span>
-                        )}
-                        {selectedRoom.camas.rede > 0 && (
-                          <span className="px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                            Rede x{selectedRoom.camas.rede}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={`p-3 rounded-lg ${theme.card} border`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide`}>
-                        Estoque de itens do quarto
-                      </span>
-                      {hasLowStock(selectedRoom.estoqueItens || {}) && (
-                        <span className="flex items-center gap-1 text-[11px] text-amber-400">
-                          <AlertTriangle className="w-3.5 h-3.5" />
-                          Estoque baixo
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-4 text-xs">
-                      <span className={theme.textSecondary}>
-                        Toalhas:{' '}
-                        <span className={theme.text}>
-                          {selectedRoom.estoqueItens.toalhas}
-                        </span>
-                      </span>
-                      <span className={theme.textSecondary}>
-                        Travesseiros:{' '}
-                        <span className={theme.text}>
-                          {selectedRoom.estoqueItens.travesseiros}
-                        </span>
-                      </span>
-                      <span className={theme.textSecondary}>
-                        Amenities:{' '}
-                        <span className={theme.text}>
-                          {selectedRoom.estoqueItens.amenities}
-                        </span>
-                      </span>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {(selectedRoom.status === STATUS.OCUPADO || selectedRoom.status === STATUS.RESERVADO) &&
-                selectedRoom.hospede && (
-                  <>
-                    <div>
-                      <h4 className={`text-sm font-bold ${theme.text} mb-2`}>Hóspede</h4>
-                      <div className="flex items-center gap-2 text-sm">
-                        <User className="w-4 h-4 text-violet-400" />
-                        <span className={`${theme.text} font-semibold`}>{selectedRoom.hospede.nome}</span>
-                      </div>
-                      <p className={`${theme.textSecondary} text-xs mt-1`}>
-                        Categoria: {selectedRoom.hospede.categoriaReserva}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                        <div>
-                          <div className={`${theme.textSecondary}`}>Check-in</div>
-                          <div className={theme.text}>{selectedRoom.hospede.checkin}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-3.5 h-3.5 text-rose-400" />
-                        <div>
-                          <div className={`${theme.textSecondary}`}>Check-out</div>
-                          <div className={theme.text}>{selectedRoom.hospede.checkout}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-              {selectedRoom.status === STATUS.LIMPEZA && selectedRoom.limpeza && (
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-sky-400" />
-                    <span className={`${theme.text} font-semibold`}>Em limpeza</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="flex items-center gap-2">
-                      <User className="w-3.5 h-3.5 text-violet-400" />
-                      <div>
-                        <div className={theme.textSecondary}>Funcionário</div>
-                        <div className={theme.text}>{selectedRoom.limpeza.funcionario}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <div>
-                        <div className={theme.textSecondary}>Início</div>
-                        <div className={theme.text}>{selectedRoom.limpeza.inicio}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {(selectedRoom.status === STATUS.MANUTENCAO || selectedRoom.status === STATUS.FORA_DE_SERVICO) &&
-                selectedRoom.manutencao && (
-                  <div className="space-y-3 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="w-4 h-4 text-indigo-400" />
-                      <span className={`${theme.text} font-semibold`}>
-                        {selectedRoom.status === STATUS.FORA_DE_SERVICO
-                          ? 'Fora de serviço'
-                          : 'Em manutenção'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-xs">
-                      <div className="flex items-center gap-2">
-                        <User className="w-3.5 h-3.5 text-violet-400" />
-                        <div>
-                          <div className={theme.textSecondary}>Responsável</div>
-                          <div className={theme.text}>{selectedRoom.manutencao.responsavel}</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 col-span-2">
-                        <Info className="w-3.5 h-3.5 text-slate-400" />
-                        <div>
-                          <div className={theme.textSecondary}>Descrição</div>
-                          <div className={theme.text}>{selectedRoom.manutencao.descricao}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal permissons */}
+        {/* Modal permissons */}
       {showPermissionsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full`}>
@@ -1203,6 +800,551 @@ export default function RoomsManagement() {
         </div>
       )}
 
+        {/* Dashboard como filtro */}
+        {permissions.dashboard && (
+          <div className={`${theme.card} backdrop-blur-xl rounded-xl p-4 mb-6 border shadow-xl`}>
+            <div className="flex items-center gap-2 mb-4 justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-violet-500" />
+                <h2 className={`text-sm font-bold ${theme.text} uppercase tracking-wider`}>
+                  Filtros rápidos de status
+                </h2>
+              </div>
+              {permissions.adicionarQuarto && (
+                <button
+                  onClick={() => showNotification('Ação de adicionar quarto (implementar formulário).', 'info')}
+                  className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Adicionar quarto
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <button
+                onClick={() => setSelectedStatusFilter('all')}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === 'all' ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-slate-500 to-slate-700`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <BedDouble className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">TODOS</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.total}</p>
+                <p className="text-white/80 text-xs mt-1">Todos os quartos</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedStatusFilter(STATUS.DISPONIVEL)}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === STATUS.DISPONIVEL ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-emerald-500 to-teal-600`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <BedDouble className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">DISPONÍVEIS</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.disponiveis}</p>
+                <p className="text-white/80 text-xs mt-1">Prontos para ocupar</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedStatusFilter(STATUS.OCUPADO)}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === STATUS.OCUPADO ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-rose-500 to-red-600`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Users className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">OCUPADOS</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.ocupados}</p>
+                <p className="text-white/80 text-xs mt-1">Hóspedes no hotel</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedStatusFilter(STATUS.RESERVADO)}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === STATUS.RESERVADO ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-amber-500 to-yellow-500`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <BedDouble className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">RESERVADOS</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.reservados}</p>
+                <p className="text-white/80 text-xs mt-1">Próximas chegadas</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedStatusFilter(STATUS.LIMPEZA)}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === STATUS.LIMPEZA ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-sky-500 to-blue-500`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Sparkles className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">LIMPEZA</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.limpeza}</p>
+                <p className="text-white/80 text-xs mt-1">Em limpeza</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedStatusFilter(STATUS.MANUTENCAO)}
+                className={`rounded-lg p-4 text-left transition-all ${
+                  selectedStatusFilter === STATUS.MANUTENCAO ? 'ring-2 ring-white/60' : ''
+                } bg-gradient-to-br from-indigo-500 to-purple-600`}
+              >
+                <div className="flex items-center gap-3 mb-2">
+                  <Wrench className="w-5 h-5 text-white" />
+                  <span className="text-white font-bold text-sm">MANUTENÇÃO</span>
+                </div>
+                <p className="text-3xl font-bold text-white">{stats.manutencao}</p>
+                <p className="text-white/80 text-xs mt-1">Em manutenção</p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filtros adicionais por categoria */}
+        <div className={`${theme.card} backdrop-blur-xl rounded-xl border shadow-xl mb-6 p-4`}>
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+            <div>
+              <h2 className={`text-lg font-bold ${theme.text}`}>Lista de Quartos</h2>
+              <p className={`${theme.textSecondary} text-xs`}>
+                Clique em um quarto para ver detalhes, estoque e ações.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <select
+                value={selectedCategory}
+                onChange={(e) =>
+                  setSelectedCategory(e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10))
+                }
+                className={`px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+              >
+                <option value="all">Todas categorias</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap gap-1">
+              <select
+                value={selectedCategory}
+                onChange={(e) =>
+                  setSelectedCategory(e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10))
+                }
+                className={`px-3 py-2 ${theme.input} rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+              >
+                <option value="all">Tipo de ocupação</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+          </div>
+        </div>
+
+        {/* Cards por categoria */}
+        <div className="space-y-4">
+          {roomsByCategory.map((cat) => (
+            <div key={cat.id} className={`${theme.card} rounded-xl border shadow-xl overflow-hidden`}>
+              <div
+                className={`px-4 py-3 flex items-center justify-between border-b ${theme.divider} cursor-pointer ${theme.cardHover} transition-colors`}
+                onClick={() => toggleCategoryCollapse(cat.id)}
+              >
+                <div className="flex items-center gap-3">
+                  <ChevronDown
+                    className={`w-4 h-4 text-violet-400 transition-transform duration-200 ${
+                      collapsedCategories[cat.id] ? '-rotate-90' : ''
+                    }`}
+                  />
+                  <span className={`${theme.text} font-bold text-sm`}>{cat.nome}</span>
+                  <span className={`${theme.textSecondary} text-xs`}>
+                    ({cat.rooms.length} {cat.rooms.length === 1 ? 'quarto' : 'quartos'})
+                  </span>
+                </div>
+                <span className={`${theme.textSecondary} text-xs hidden sm:inline`}>
+                  {cat.descricao}
+                </span>
+              </div>
+
+              {!collapsedCategories[cat.id] && (
+                <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {cat.rooms.map((room) => {
+                    const lowStock = hasLowStock(room.estoqueItens);
+                    const stTheme = statusTheme(room.status);
+                    return (
+                      <div
+                        key={room.numero}
+                        onClick={() => openDetails(room)}
+                        className={`${theme.card} rounded-xl border p-4 cursor-pointer transition-all duration-200 hover:scale-[1.02] ${theme.cardHover} group ${stTheme.bg}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <BedDouble className={`w-4 h-4 ${stTheme.icon}`} />
+                            <span className="text-xs uppercase tracking-wide text-slate-400">
+                              Quarto
+                            </span>
+                          </div>
+                          <span
+                            className={`px-3 py-1 rounded-full text-[10px] font-semibold ${statusPillColor(
+                              room.status,
+                            )}`}
+                          >
+                            {room.status}
+                          </span>
+                        </div>
+
+                        <div className="mb-2">
+                          <span
+                            className={`block text-3xl font-extrabold drop-shadow-sm ${stTheme.number}`}
+                          >
+                            {formatRoomNumber(room.numero)}
+                          </span>
+                        </div>
+
+                        {renderRoomCardContent(room)}
+
+                        {room.status === STATUS.DISPONIVEL && lowStock && (
+                          <div className="mt-2 flex items-center gap-2 text-[11px] text-amber-400">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>Poucos itens disponíveis neste quarto.</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {cat.rooms.length === 0 && (
+                    <div className={`${theme.textSecondary} text-xs italic`}>
+                      Nenhum quarto nesta categoria com os filtros atuais.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal detalhes do quarto */}
+      {showDetailsModal && selectedRoom && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto`}>
+            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center">
+                  <span className="text-2xl font-extrabold text-violet-400">
+                    {formatRoomNumber(selectedRoom.numero)}
+                  </span>
+                </div>
+                <div>
+                  <h3 className={`text-lg font-bold ${theme.text}`}>
+                    Quarto {formatRoomNumber(selectedRoom.numero)}
+                  </h3>
+                  <p className={`text-xs ${theme.textSecondary}`}>
+                    Categoria:{' '}
+                    {categories.find((c) => c.id === selectedRoom.categoriaId)?.nome || 'N/A'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
+                    Status atual
+                  </span>
+                  <span
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold ${statusPillColor(
+                      selectedRoom.status,
+                    )}`}
+                  >
+                    {selectedRoom.status}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {permissions.acionarLimpeza && (
+                    <button
+                      onClick={() => handleCallCleaning(selectedRoom)}
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${theme.button} ${theme.text} flex items-center gap-1 hover:scale-105 active:scale-95`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Limpeza
+                    </button>
+                  )}
+                  {permissions.acionarManutencao && (
+                    <button
+                      onClick={() => handleCallMaintenance(selectedRoom)}
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${theme.button} ${theme.text} flex items-center gap-1 hover:scale-105 active:scale-95`}
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      Manutenção
+                    </button>
+                  )}
+                  {permissions.editarQuarto && (
+                    <button
+                      onClick={() =>
+                        showNotification('Ação de editar quarto (implementar formulário).', 'info')
+                      }
+                      className={`px-3 py-1.5 text-xs rounded-lg border ${theme.button} ${theme.text} flex items-center gap-1 hover:scale-105 active:scale-95`}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Editar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Descrição e configuração */}
+              <div>
+                <h4 className={`text-sm font-bold ${theme.text} mb-2`}>Descrição</h4>
+                <p className={`${theme.textSecondary} text-sm`}>{selectedRoom.descricao}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
+                    Tipo de ocupação
+                  </span>
+                  <span className={`${theme.text} font-bold`}>{selectedRoom.tipoOcupacao}</span>
+                </div>
+                <div>
+                  <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-1`}>
+                    Configuração de camas
+                  </span>
+                  <ul className={`text-xs ${theme.text}`}>
+                    {selectedRoom.camas.casal > 0 && (
+                      <li>- Cama casal x{selectedRoom.camas.casal}</li>
+                    )}
+                    {selectedRoom.camas.solteiro > 0 && (
+                      <li>- Cama solteiro x{selectedRoom.camas.solteiro}</li>
+                    )}
+                    {selectedRoom.camas.beliche > 0 && (
+                      <li>- Beliche x{selectedRoom.camas.beliche}</li>
+                    )}
+                    {selectedRoom.camas.rede > 0 && (
+                      <li>- Rede x{selectedRoom.camas.rede}</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Estoque em lista */}
+              <div className={`p-3 rounded-lg ${theme.card} border`}>
+                <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-2`}>
+                  Estoque de itens do quarto
+                </span>
+                {selectedRoom.estoqueItens ? (
+                  <ul className={`text-xs ${theme.text} space-y-1`}>
+                    <li>• Toalhas: {selectedRoom.estoqueItens.toalhas}</li>
+                    <li>• Travesseiros: {selectedRoom.estoqueItens.travesseiros}</li>
+                    <li>• Amenities: {selectedRoom.estoqueItens.amenities}</li>
+                  </ul>
+                ) : (
+                  <span className={`${theme.textSecondary} text-xs`}>Sem itens cadastrados.</span>
+                )}
+              </div>
+
+              {/* Blocos específicos por status */}
+              {(selectedRoom.status === STATUS.OCUPADO ||
+                selectedRoom.status === STATUS.RESERVADO) &&
+                selectedRoom.hospede && (
+                  <>
+                    <div>
+                      <h4 className={`text-sm font-bold ${theme.text} mb-2`}>Hóspede</h4>
+                      <div className="flex items-center gap-2 text-sm">
+                        <User className="w-4 h-4 text-violet-400" />
+                        <span className={`${theme.text} font-semibold`}>
+                          {selectedRoom.hospede.nome}
+                        </span>
+                      </div>
+                      <p className={`${theme.textSecondary} text-xs mt-1`}>
+                        Categoria: {selectedRoom.hospede.categoriaReserva}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                        <div>
+                          <div className={theme.textSecondary}>Check-in</div>
+                          <div className={theme.text}>{selectedRoom.hospede.checkin}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-3.5 h-3.5 text-rose-400" />
+                        <div>
+                          <div className={theme.textSecondary}>Check-out</div>
+                          <div className={theme.text}>{selectedRoom.hospede.checkout}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+              {selectedRoom.status === STATUS.LIMPEZA && (
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-sky-400" />
+                    <span className={`${theme.text} font-semibold`}>
+                      Em limpeza por{' '}
+                      {selectedRoom.limpeza?.funcionario || 'não atribuído'}
+                    </span>
+                  </div>
+                  {selectedRoom.limpeza && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span className={theme.textSecondary}>
+                        Início: {selectedRoom.limpeza.inicio}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(selectedRoom.status === STATUS.MANUTENCAO ||
+                selectedRoom.status === STATUS.FORA_DE_SERVICO) && (
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-indigo-400" />
+                    <span className={`${theme.text} font-semibold`}>
+                      Em manutenção por{' '}
+                      {selectedRoom.manutencao?.responsavel || 'não atribuído'}
+                    </span>
+                  </div>
+                  {selectedRoom.manutencao && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <Info className="w-3.5 h-3.5 text-slate-400" />
+                      <span className={theme.textSecondary}>
+                        {selectedRoom.manutencao.descricao}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+                           {/* Alterar status (respeitando regras) */}
+              {permissions.alterarStatus && (
+                <div>
+                  <span className={`text-xs ${theme.textSecondary} uppercase tracking-wide block mb-2`}>
+                    Alterar status
+                  </span>
+                  <select
+                    onChange={(e) => {
+                      const newStatus = e.target.value;
+                      if (!newStatus) return;
+                      handleChangeStatus(selectedRoom, newStatus);
+                      e.target.value = '';
+                    }}
+                    defaultValue=""
+                    className={`px-3 py-2 ${theme.input} rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 border-2`}
+                  >
+                    <option value="">Selecione um status...</option>
+                    {Object.values(STATUS).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className={`p-4 border-t ${theme.divider} flex justify-end`}>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className={`px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de atribuição de funcionário (limpeza / manutenção) */}
+      {showAssignModal && assignContext && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full`}>
+            <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
+              <div className="flex items-center gap-2">
+                {assignContext.type === 'LIMPEZA' ? (
+                  <Sparkles className="w-5 h-5 text-sky-400" />
+                ) : (
+                  <Wrench className="w-5 h-5 text-indigo-400" />
+                )}
+                <h3 className={`text-lg font-bold ${theme.text}`}>
+                  {assignContext.type === 'LIMPEZA' ? 'Designar limpeza' : 'Designar manutenção'}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssignContext(null);
+                }}
+                className={`${theme.textSecondary} hover:${theme.text} transition-transform duration-200 hover:scale-110 active:scale-90`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className={`${theme.textSecondary} text-sm`}>
+                Selecione o funcionário para o quarto{' '}
+                <span className={theme.text}>
+                  {formatRoomNumber(assignContext.room.numero)}
+                </span>.
+              </p>
+
+              <ul className="space-y-2">
+                {funcionarios.map((f) => (
+                  <li key={f.id}>
+                    <button
+                      onClick={() => handleAssignFuncionario(f.id)}
+                      className={`w-full text-left px-3 py-2 rounded-lg border ${theme.button} ${theme.text} flex items-center justify-between text-sm hover:scale-105 active:scale-95`}
+                    >
+                      <span>{f.nome}</span>
+                      <Check className="w-4 h-4 text-emerald-400 opacity-70" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className={`p-4 border-t ${theme.divider}`}>
+              <button
+                onClick={() => {
+                  setShowAssignModal(false);
+                  setAssignContext(null);
+                }}
+                className={`w-full px-4 py-2 ${theme.button} ${theme.text} rounded-lg border transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95`}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {notification && (
         <div className="fixed top-4 right-4 z-[110] animate-slideIn">
           <div
@@ -1240,3 +1382,4 @@ export default function RoomsManagement() {
     </div>
   );
 }
+
