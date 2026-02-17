@@ -5,11 +5,10 @@ import RolePermissions from './role-permissions.jsx'
 import InventoryManagement from './inventory-management.jsx'
 import RoomsManagement from './rooms-management.jsx'
 import PricingManagement from './pricing-management.jsx'
-
+import StaysManagement from './stays-management.jsx'  // <-- ADICIONE
 
 function App() {
   const [currentPage, setCurrentPage] = useState('financial')
-
 
   return (
     <div>
@@ -73,7 +72,6 @@ function App() {
                 🛏️ Quartos
               </button>
 
-              {/* ADICIONE ESTE BOTÃO */}
               <button
                 onClick={() => setCurrentPage('pricing')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -83,6 +81,18 @@ function App() {
                 }`}
               >
                 💵 Preços
+              </button>
+
+              {/* ADICIONE ESTE BOTÃO */}
+              <button
+                onClick={() => setCurrentPage('stays')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  currentPage === 'stays'
+                    ? 'bg-violet-600 text-white'
+                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                }`}
+              >
+                🛌 Pernoites
               </button>
             </div>
           </div>
@@ -95,6 +105,7 @@ function App() {
       {currentPage === 'permissions' && <RolePermissions />}
       {currentPage === 'rooms' && <RoomsManagement />}
       {currentPage === 'pricing' && <PricingManagement />}
+      {currentPage === 'stays' && <StaysManagement />}  {/* <-- ADICIONE */}
     </div>
   )
 }
