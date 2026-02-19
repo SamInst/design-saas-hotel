@@ -373,7 +373,7 @@ export default function InventoryManagement() {
           </div>
         )}
 
-        {/* Lista de Categorias de Estoque - Estilo Cards Expansíveis */}
+        Lista de Categorias de Estoque - Estilo Cards Expansíveis
 <div className={`${theme.card} rounded-xl border shadow-xl overflow-hidden mb-6`}>
   <div className="px-4 py-3 border-b flex items-center justify-between gap-3">
     <div>
@@ -410,11 +410,11 @@ export default function InventoryManagement() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="hidden sm:flex flex-col text-right text-xs">
+              {/* <div className="hidden sm:flex flex-col text-right text-xs">
                 <span className={`${theme.textSecondary}`}>
                   Lucro: <span className="text-violet-500 font-semibold">R$ {category.lucro.toFixed(2)}</span>
                 </span>
-              </div>
+              </div> */}
 
               {permissions.adicionarEditarCategoria && (
                 <button
