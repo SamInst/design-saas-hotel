@@ -81,7 +81,7 @@ function App() {
                     : 'bg-white/10 text-slate-300 hover:bg-white/20'
                 }`}
               >
-                💵 Preços
+                💵 Categorias e Preços
               </button>
 
               <button
