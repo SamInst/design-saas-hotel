@@ -254,7 +254,7 @@ export default function EmployeeManagement() {
                 
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+                  className="px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 flex items-center gap-2 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg "
                 >
                   <Plus className="w-4 h-4" />
                   Adicionar
@@ -590,7 +590,7 @@ export default function EmployeeManagement() {
                 </button>
                 <button
                   onClick={handleAddEmployee}
-                  className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+                  className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium hover:scale-105 active:scale-95 hover:shadow-lg "
                 >
                   Cadastrar
                 </button>
@@ -722,7 +722,7 @@ export default function EmployeeManagement() {
             <div className={`p-4 border-t ${theme.divider} flex gap-2`}>
               <button
                 onClick={handleEditEmployee}
-                className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 hover:scale-105 active:scale-95 hover:shadow-lg hover:shadow-violet-500/50"
+                className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-all duration-200 text-sm font-medium flex items-center justify-center gap-2 hover:scale-105 active:scale-95 hover:shadow-lg "
               >
                 <Edit className="w-4 h-4" />
                 Editar

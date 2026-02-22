@@ -1,25 +1,78 @@
 import React, { useState } from 'react';
 import {
   BedDouble, Calendar, DollarSign, Sun, Moon, Plus, Edit,
-  Shield, ChevronDown, Users, Clock, Tag, X, Info, Check, Trash2, RefreshCw,
+  Shield, ChevronDown, Users, Clock, Tag, X, Check, Trash2, RefreshCw,
 } from 'lucide-react';
 
 function formatRoomNumber(num) { return num < 10 ? `0${num}` : `${num}`; }
 const fmt = (v) => `R$ ${Number(v || 0).toFixed(2)}`;
 
-// ─── Helpers de recorrência ───────────────────────────────────────────────────
-const RECORRENCIAS = ['Diária', 'Semanal', 'Quinzenal', 'Mensal', 'Trimestral', 'Semestral', 'Anual'];
 const DIAS_SEMANA  = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MESES        = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DIAS_MES     = Array.from({ length: 31 }, (_, i) => i + 1);
 
 function describeSchedule(s) {
-  if (s.modoOperacao === 'data-especifica') {
-    return `${s.dataInicio} ${s.horaInicio} → ${s.dataFim} ${s.horaFim}`;
+  switch (s.modoOperacao) {
+    case 'data-especifica':
+      return `${s.dataInicio} ${s.horaInicio} → ${s.dataFim} ${s.horaFim}`;
+    case 'diario':
+      if (s.diaIntegral) return `Diário · Integral · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+      return `Diário · ${s.horaInicioCiclo}–${s.horaFimCiclo} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+    case 'semanal': {
+      const dias = (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ');
+      return `Semanal · ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+    }
+    case 'mensal': {
+      const dias = (s.diasMes || []).join(', ');
+      return `Mensal · dias ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+    }
+    case 'anual': {
+      const meses = (s.meses || []).map((m) => MESES[m]).join(', ');
+      return `Anual · ${meses || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+    }
+    default: return '';
   }
-  const base = `${s.recorrencia} · ${s.horaInicioRecorrencia}–${s.horaFimRecorrencia}`;
-  if (s.recorrencia === 'Semanal' && s.diasSemana?.length) {
-    return `${base} · ${s.diasSemana.map((d) => DIAS_SEMANA[d]).join(', ')}`;
-  }
-  return base;
+}
+
+// ── Componentes reutilizáveis ─────────────────────────────────────────────────
+
+function RadioCard({ value, current, onChange, icon: Icon, label, description, color = 'violet' }) {
+  const active = current === value;
+  const colors = {
+    violet: active ? 'border-violet-500 bg-violet-500/10 text-violet-300' : '',
+    sky:    active ? 'border-sky-500 bg-sky-500/10 text-sky-300' : '',
+    amber:  active ? 'border-amber-500 bg-amber-500/10 text-amber-300' : '',
+  };
+  return (
+    <button type="button" onClick={() => onChange(value)}
+      className={`flex-1 flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl border-2 transition-all text-center cursor-pointer
+        ${active ? colors[color] : 'border-white/10 hover:border-white/25 text-slate-400 hover:text-slate-200'}`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? 'bg-current/20' : 'bg-white/5'}`}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <span className="text-xs font-semibold leading-tight">{label}</span>
+      {description && <span className="text-[10px] leading-tight opacity-70">{description}</span>}
+    </button>
+  );
+}
+
+function RadioPill({ value, current, onChange, label, activeClass = 'bg-violet-600 text-white border-violet-400' }) {
+  const active = current === value;
+  return (
+    <button type="button" onClick={() => onChange(value)}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${active ? activeClass : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/25'}`}>
+      {label}
+    </button>
+  );
+}
+
+function ToggleChip({ active, onClick, label, activeClass = 'bg-violet-600 text-white border-violet-400' }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${active ? activeClass : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/25'}`}>
+      {label}
+    </button>
+  );
 }
 
 export default function PricingManagement() {
@@ -47,28 +100,34 @@ export default function PricingManagement() {
   const [formSazonaisAtivas, setFormSazonaisAtivas]         = useState([]);
 
   // ── Seasonal form ─────────────────────────────────────────────────────────────
-  const [sNome, setSNome]                         = useState('');
-  const [sDescricao, setSDescricao]               = useState('');
-  const [sModo, setSModo]                         = useState('data-especifica'); // 'data-especifica' | 'recorrencia'
+  const [sNome, setSNome]                     = useState('');
+  const [sDescricao, setSDescricao]           = useState('');
+  const [sModo, setSModo]                     = useState('data-especifica');
   // Data específica
-  const [sDataInicio, setSDataInicio]             = useState('');
-  const [sDataFim, setSDataFim]                   = useState('');
-  const [sHoraInicio, setSHoraInicio]             = useState('');
-  const [sHoraFim, setSHoraFim]                   = useState('');
-  // Recorrência
-  const [sRecorrencia, setSRecorrencia]           = useState('Mensal');
-  const [sDiasSemana, setSDiasSemana]             = useState([]);
-  const [sHoraInicioRec, setSHoraInicioRec]       = useState('');
-  const [sHoraFimRec, setSHoraFimRec]             = useState('');
+  const [sDataInicio, setSDataInicio]         = useState('');
+  const [sDataFim, setSDataFim]               = useState('');
+  const [sHoraInicio, setSHoraInicio]         = useState('');
+  const [sHoraFim, setSHoraFim]               = useState('');
+  // Diário
+  const [sDiaIntegral, setSDiaIntegral]       = useState(true);
+  const [sHoraInicioCiclo, setSHoraInicioCiclo] = useState('');
+  const [sHoraFimCiclo, setSHoraFimCiclo]     = useState('');
+  // Checkin/checkout (semanal, mensal, anual, diário)
+  const [sHoraCheckin, setSHoraCheckin]       = useState('');
+  const [sHoraCheckout, setSHoraCheckout]     = useState('');
+  // Seleções
+  const [sDiasSemana, setSDiasSemana]         = useState([]);
+  const [sDiasMes, setSDiasMes]               = useState([]);
+  const [sMeses, setSMeses]                   = useState([]);
   // Preços
-  const [sModeloCobranca, setSModeloCobranca]     = useState('Por ocupação');
-  const [sPrecoFixo, setSPrecoFixo]               = useState(0);
-  const [sPrecosOcupacao, setSPrecosOcupacao]     = useState({});
-  const [sMaxPessoas, setSMaxPessoas]             = useState(5);
+  const [sModeloCobranca, setSModeloCobranca] = useState('Por ocupação');
+  const [sPrecoFixo, setSPrecoFixo]           = useState(0);
+  const [sPrecosOcupacao, setSPrecosOcupacao] = useState({});
+  const [sMaxPessoas, setSMaxPessoas]         = useState(5);
   // Day Use sazonal
-  const [sDayUseAtivo, setSDayUseAtivo]           = useState(false);
-  const [sDayUsePreco, setSDayUsePreco]           = useState(0);
-  const [sDayUsePrecoAd, setSDayUsePrecoAd]       = useState(0);
+  const [sDayUseAtivo, setSDayUseAtivo]       = useState(false);
+  const [sDayUsePreco, setSDayUsePreco]       = useState(0);
+  const [sDayUsePrecoAd, setSDayUsePrecoAd]   = useState(0);
 
   const [permissions, setPermissions] = useState({
     acessoTotal: true, dashboard: true, adicionarCategoria: true,
@@ -85,8 +144,8 @@ export default function PricingManagement() {
 
   const [categories, setCategories] = useState([
     { id:1, nome:'Standard Até 5 Pessoas', descricao:'Categoria base para quartos standard, cobrando por ocupação até 5 pessoas.', maxPessoas:5, modeloCobranca:'Por ocupação', vinculoQuartos:[1,2,3,4], precoFixo:null, precosOcupacao:{1:120,2:160,3:190,4:210,5:230}, dayUse:{ativo:true,precoFixo:90,precoAdicional:15}, sazonaisAtivas:['alta-verao'] },
-    { id:2, nome:'Luxo Até 5 Pessoas',     descricao:'Categoria luxo com foco em casais e famílias pequenas.',                     maxPessoas:5, modeloCobranca:'Por ocupação', vinculoQuartos:[6,7,8],    precoFixo:null, precosOcupacao:{1:220,2:280,3:320,4:360,5:400}, dayUse:{ativo:true,precoFixo:150,precoAdicional:25}, sazonaisAtivas:['reveillon'] },
-    { id:3, nome:'Suíte Família',          descricao:'Suítes amplas, tarifa fixa por quarto.',                                     maxPessoas:5, modeloCobranca:'Por quarto (tarifa fixa)', vinculoQuartos:[9,10], precoFixo:450, precosOcupacao:null, dayUse:{ativo:false,precoFixo:0,precoAdicional:0}, sazonaisAtivas:[] },
+    { id:2, nome:'Luxo Até 5 Pessoas', descricao:'Categoria luxo com foco em casais e famílias pequenas.', maxPessoas:5, modeloCobranca:'Por ocupação', vinculoQuartos:[6,7,8], precoFixo:null, precosOcupacao:{1:220,2:280,3:320,4:360,5:400}, dayUse:{ativo:true,precoFixo:150,precoAdicional:25}, sazonaisAtivas:['reveillon'] },
+    { id:3, nome:'Suíte Família', descricao:'Suítes amplas, tarifa fixa por quarto.', maxPessoas:5, modeloCobranca:'Por quarto (tarifa fixa)', vinculoQuartos:[9,10], precoFixo:450, precosOcupacao:null, dayUse:{ativo:false,precoFixo:0,precoAdicional:0}, sazonaisAtivas:[] },
   ]);
 
   const [seasonalDefinitions, setSeasonalDefinitions] = useState([
@@ -94,7 +153,9 @@ export default function PricingManagement() {
       id:'alta-verao', nome:'Alta Temporada Verão', descricao:'Período de alta demanda no verão',
       modoOperacao:'data-especifica',
       dataInicio:'2026-12-01', dataFim:'2027-02-28', horaInicio:'14:00', horaFim:'12:00',
-      recorrencia:null, diasSemana:[], horaInicioRecorrencia:'', horaFimRecorrencia:'',
+      diaIntegral:false, horaInicioCiclo:'', horaFimCiclo:'',
+      horaCheckin:'', horaCheckout:'',
+      diasSemana:[], diasMes:[], meses:[],
       modeloCobranca:'Por ocupação', maxPessoas:5, precoFixo:null,
       precosOcupacao:{1:150,2:200,3:240,4:270,5:300},
       dayUse:{ativo:true,precoFixo:110,precoAdicional:20},
@@ -103,16 +164,20 @@ export default function PricingManagement() {
       id:'reveillon', nome:'Revéillon', descricao:'Virada de ano com tarifas especiais',
       modoOperacao:'data-especifica',
       dataInicio:'2026-12-28', dataFim:'2027-01-02', horaInicio:'15:00', horaFim:'11:00',
-      recorrencia:null, diasSemana:[], horaInicioRecorrencia:'', horaFimRecorrencia:'',
+      diaIntegral:false, horaInicioCiclo:'', horaFimCiclo:'',
+      horaCheckin:'', horaCheckout:'',
+      diasSemana:[], diasMes:[], meses:[],
       modeloCobranca:'Por ocupação', maxPessoas:5, precoFixo:null,
       precosOcupacao:{1:300,2:380,3:440,4:500,5:560},
       dayUse:{ativo:false,precoFixo:0,precoAdicional:0},
     },
     {
       id:'fim-semana', nome:'Fim de Semana', descricao:'Tarifa especial para finais de semana',
-      modoOperacao:'recorrencia',
+      modoOperacao:'semanal',
       dataInicio:'', dataFim:'', horaInicio:'', horaFim:'',
-      recorrencia:'Semanal', diasSemana:[5,6], horaInicioRecorrencia:'14:00', horaFimRecorrencia:'12:00',
+      diaIntegral:false, horaInicioCiclo:'', horaFimCiclo:'',
+      horaCheckin:'14:00', horaCheckout:'12:00',
+      diasSemana:[5,6], diasMes:[], meses:[],
       modeloCobranca:'Por ocupação', maxPessoas:5, precoFixo:null,
       precosOcupacao:{1:180,2:240,3:280,4:310,5:340},
       dayUse:{ativo:false,precoFixo:0,precoAdicional:0},
@@ -126,13 +191,14 @@ export default function PricingManagement() {
     text:          isDark ? 'text-white'        : 'text-slate-900',
     textSecondary: isDark ? 'text-slate-400'    : 'text-slate-600',
     card:          isDark ? 'bg-white/5 border-white/10'   : 'bg-white border-slate-200',
-    cardHover:     isDark ? 'hover:bg-white/10' : 'hover:bg-slate-50',
-    input:         isDark ? 'bg-slate-800 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400',
+    cardHover:     isDark ? 'hover:bg-white/8'  : 'hover:bg-slate-50',
+    input:         isDark ? 'bg-slate-800/80 border-white/15 text-white placeholder-slate-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400',
     divider:       isDark ? 'border-white/10'   : 'border-slate-200',
-    button:        isDark ? 'bg-white/10 hover:bg-white/20 border-white/10' : 'bg-slate-100 hover:bg-slate-200 border-slate-300',
+    button:        isDark ? 'bg-white/8 hover:bg-white/15 border-white/10' : 'bg-slate-100 hover:bg-slate-200 border-slate-300',
+    sectionBg:     isDark ? 'bg-slate-800/40 border-white/8' : 'bg-slate-50 border-slate-200',
   };
 
-  const inputCls = `w-full px-3 py-2 ${theme.input} rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent`;
+  const inputCls = `w-full px-3 py-2 ${theme.input} rounded-lg text-sm border focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all`;
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const showNotification = (msg, type = 'info') => { setNotification({ message: msg, type }); setTimeout(() => setNotification(null), 3000); };
@@ -188,26 +254,20 @@ export default function PricingManagement() {
   };
 
   const toggleQuartoVinculo = (num) => setFormVinculoQuartos((p) => p.includes(num) ? p.filter((n) => n !== num) : [...p, num]);
-  const toggleSeasonalAtiva = (id)  => setFormSazonaisAtivas((p) => p.includes(id)  ? p.filter((x) => x !== id)  : [...p, id]);
-
-  const handleModeloCobrancaChange = (m) => {
-    setFormModeloCobranca(m);
-    if (m === 'Por quarto (tarifa fixa)') setFormPrecosOcupacao({}); else setFormPrecoFixo(0);
-  };
-
+  const toggleSeasonalAtiva = (id)  => setFormSazonaisAtivas((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+  const handleModeloCobrancaChange = (m) => { setFormModeloCobranca(m); if (m === 'Por quarto (tarifa fixa)') setFormPrecosOcupacao({}); else setFormPrecoFixo(0); };
   const handleMaxPessoasChange = (max) => {
     setFormMaxPessoas(max);
-    if (formModeloCobranca === 'Por ocupação') {
-      const n = {}; for (let i = 1; i <= max; i++) n[i] = formPrecosOcupacao[i] || 0;
-      setFormPrecosOcupacao(n);
-    }
+    if (formModeloCobranca === 'Por ocupação') { const n = {}; for (let i = 1; i <= max; i++) n[i] = formPrecosOcupacao[i] || 0; setFormPrecosOcupacao(n); }
   };
 
   // ── Seasonal handlers ────────────────────────────────────────────────────────
   const resetSeasonalForm = () => {
     setSNome(''); setSDescricao(''); setSModo('data-especifica');
     setSDataInicio(''); setSDataFim(''); setSHoraInicio(''); setSHoraFim('');
-    setSRecorrencia('Mensal'); setSDiasSemana([]); setSHoraInicioRec(''); setSHoraFimRec('');
+    setSDiaIntegral(true); setSHoraInicioCiclo(''); setSHoraFimCiclo('');
+    setSHoraCheckin(''); setSHoraCheckout('');
+    setSDiasSemana([]); setSDiasMes([]); setSMeses([]);
     setSModeloCobranca('Por ocupação'); setSPrecoFixo(0); setSPrecosOcupacao({}); setSMaxPessoas(5);
     setSDayUseAtivo(false); setSDayUsePreco(0); setSDayUsePrecoAd(0);
   };
@@ -223,8 +283,10 @@ export default function PricingManagement() {
     setSNome(s.nome); setSDescricao(s.descricao); setSModo(s.modoOperacao || 'data-especifica');
     setSDataInicio(s.dataInicio || ''); setSDataFim(s.dataFim || '');
     setSHoraInicio(s.horaInicio || ''); setSHoraFim(s.horaFim || '');
-    setSRecorrencia(s.recorrencia || 'Mensal'); setSDiasSemana(s.diasSemana || []);
-    setSHoraInicioRec(s.horaInicioRecorrencia || ''); setSHoraFimRec(s.horaFimRecorrencia || '');
+    setSDiaIntegral(s.diaIntegral ?? true);
+    setSHoraInicioCiclo(s.horaInicioCiclo || ''); setSHoraFimCiclo(s.horaFimCiclo || '');
+    setSHoraCheckin(s.horaCheckin || ''); setSHoraCheckout(s.horaCheckout || '');
+    setSDiasSemana(s.diasSemana || []); setSDiasMes(s.diasMes || []); setSMeses(s.meses || []);
     setSModeloCobranca(s.modeloCobranca); setSPrecoFixo(s.precoFixo || 0);
     setSPrecosOcupacao(s.precosOcupacao || {}); setSMaxPessoas(s.maxPessoas);
     setSDayUseAtivo(s.dayUse?.ativo || false);
@@ -233,47 +295,43 @@ export default function PricingManagement() {
   };
 
   const handleSaveSeasonal = () => {
-    const data = {
+    const base = {
       nome: sNome, descricao: sDescricao, modoOperacao: sModo,
-      dataInicio: sModo === 'data-especifica' ? sDataInicio : '',
-      dataFim:    sModo === 'data-especifica' ? sDataFim    : '',
-      horaInicio: sModo === 'data-especifica' ? sHoraInicio : '',
-      horaFim:    sModo === 'data-especifica' ? sHoraFim    : '',
-      recorrencia:           sModo === 'recorrencia' ? sRecorrencia    : null,
-      diasSemana:            sModo === 'recorrencia' ? sDiasSemana     : [],
-      horaInicioRecorrencia: sModo === 'recorrencia' ? sHoraInicioRec  : '',
-      horaFimRecorrencia:    sModo === 'recorrencia' ? sHoraFimRec     : '',
       modeloCobranca: sModeloCobranca, maxPessoas: sMaxPessoas,
       precoFixo: sModeloCobranca === 'Por quarto (tarifa fixa)' ? sPrecoFixo : null,
       precosOcupacao: sModeloCobranca === 'Por ocupação' ? sPrecosOcupacao : null,
       dayUse: { ativo: sDayUseAtivo, precoFixo: sDayUsePreco, precoAdicional: sDayUsePrecoAd },
+      // reset all schedule fields
+      dataInicio:'', dataFim:'', horaInicio:'', horaFim:'',
+      diaIntegral:false, horaInicioCiclo:'', horaFimCiclo:'',
+      horaCheckin:'', horaCheckout:'',
+      diasSemana:[], diasMes:[], meses:[],
     };
+    if (sModo === 'data-especifica') Object.assign(base, { dataInicio: sDataInicio, dataFim: sDataFim, horaInicio: sHoraInicio, horaFim: sHoraFim });
+    if (sModo === 'diario')          Object.assign(base, { diaIntegral: sDiaIntegral, horaInicioCiclo: sHoraInicioCiclo, horaFimCiclo: sHoraFimCiclo, horaCheckin: sHoraCheckin, horaCheckout: sHoraCheckout });
+    if (sModo === 'semanal')         Object.assign(base, { diasSemana: sDiasSemana, horaCheckin: sHoraCheckin, horaCheckout: sHoraCheckout });
+    if (sModo === 'mensal')          Object.assign(base, { diasMes: sDiasMes, horaCheckin: sHoraCheckin, horaCheckout: sHoraCheckout });
+    if (sModo === 'anual')           Object.assign(base, { meses: sMeses, horaCheckin: sHoraCheckin, horaCheckout: sHoraCheckout });
+
     if (editingSeasonal) {
-      setSeasonalDefinitions((p) => p.map((s) => s.id === editingSeasonal.id ? { ...s, ...data } : s));
+      setSeasonalDefinitions((p) => p.map((s) => s.id === editingSeasonal.id ? { ...s, ...base } : s));
       showNotification('Sazonalidade atualizada.', 'success');
     } else {
-      setSeasonalDefinitions((p) => [...p, { id: `seasonal-${Date.now()}`, ...data }]);
+      setSeasonalDefinitions((p) => [...p, { id: `seasonal-${Date.now()}`, ...base }]);
       showNotification('Sazonalidade criada.', 'success');
     }
     setShowSeasonalFormModal(false);
   };
 
   const handleDeleteSeasonal = (id) => { setSeasonalDefinitions((p) => p.filter((s) => s.id !== id)); showNotification('Sazonalidade removida.', 'success'); };
-
-  const handleSeasonalModeloCobrancaChange = (m) => {
-    setSModeloCobranca(m);
-    if (m === 'Por quarto (tarifa fixa)') setSPrecosOcupacao({}); else setSPrecoFixo(0);
-  };
-
+  const handleSeasonalModeloCobrancaChange = (m) => { setSModeloCobranca(m); if (m === 'Por quarto (tarifa fixa)') setSPrecosOcupacao({}); else setSPrecoFixo(0); };
   const handleSeasonalMaxPessoasChange = (max) => {
     setSMaxPessoas(max);
-    if (sModeloCobranca === 'Por ocupação') {
-      const n = {}; for (let i = 1; i <= max; i++) n[i] = sPrecosOcupacao[i] || 0;
-      setSPrecosOcupacao(n);
-    }
+    if (sModeloCobranca === 'Por ocupação') { const n = {}; for (let i = 1; i <= max; i++) n[i] = sPrecosOcupacao[i] || 0; setSPrecosOcupacao(n); }
   };
-
   const toggleDiaSemana = (d) => setSDiasSemana((p) => p.includes(d) ? p.filter((x) => x !== d) : [...p, d]);
+  const toggleDiaMes    = (d) => setSDiasMes((p) => p.includes(d) ? p.filter((x) => x !== d) : [...p, d]);
+  const toggleMes       = (m) => setSMeses((p) => p.includes(m) ? p.filter((x) => x !== m) : [...p, m]);
 
   const baseStats = {
     totalCategorias:    categories.length,
@@ -282,15 +340,18 @@ export default function PricingManagement() {
     totalSazonalidades: seasonalDefinitions.length,
   };
 
-  // ─── Tab button helper ───────────────────────────────────────────────────────
-  const ModoTab = ({ value, label, icon: Icon, current, onChange }) => (
-    <button type="button" onClick={() => onChange(value)}
-      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${current === value ? 'bg-violet-600 text-white' : `${theme.button} ${theme.text}`}`}>
-      <Icon className="w-4 h-4" /> {label}
-    </button>
-  );
+  // ── Modos de operação config ─────────────────────────────────────────────────
+  const MODOS_OPERACAO = [
+    { value:'data-especifica', label:'Data Específica', desc:'Período fixo',        icon:Calendar  },
+    { value:'diario',          label:'Diário',          desc:'Todo dia',            icon:Clock     },
+    { value:'semanal',         label:'Semanal',         desc:'Dias da semana',      icon:RefreshCw },
+    { value:'mensal',          label:'Mensal',          desc:'Dias do mês',         icon:Tag       },
+    { value:'anual',           label:'Anual',           desc:'Meses do ano',        icon:Calendar  },
+  ];
 
-  // ─── Render ──────────────────────────────────────────────────────────────────
+  const modoLabel = { 'data-especifica':'Data Específica', diario:'Diário', semanal:'Semanal', mensal:'Mensal', anual:'Anual' };
+
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className={`min-h-screen relative ${theme.bg}`}>
       <div className={`fixed inset-0 ${theme.bgOverlay} pointer-events-none`} />
@@ -366,7 +427,7 @@ export default function PricingManagement() {
             </div>
           </div>
 
-          <div className="divide-y divide-slate-700/40">
+          <div className="divide-y divide-white/5">
             {categories.map((cat) => {
               const quartosVinc = getQuartosVinc(cat);
               const isCollapsed = collapsedCategories[cat.id];
@@ -451,8 +512,8 @@ export default function PricingManagement() {
                                 return (
                                   <div key={sid} className={`rounded-lg px-2 py-1.5 border ${theme.divider}`}>
                                     <div className="flex items-center gap-1.5">
-                                      {s.modoOperacao === 'recorrencia' ? <RefreshCw className="w-3 h-3 text-amber-400" /> : <Calendar className="w-3 h-3 text-amber-400" />}
                                       <span className={`${theme.text} font-semibold text-xs`}>{s.nome}</span>
+                                      <span className={`text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300`}>{modoLabel[s.modoOperacao]}</span>
                                     </div>
                                     <div className={`${theme.textSecondary} text-[10px] mt-0.5`}>{describeSchedule(s)}</div>
                                   </div>
@@ -483,12 +544,11 @@ export default function PricingManagement() {
             <h2 className={`text-lg font-bold ${theme.text}`}>Sazonalidades Cadastradas</h2>
             <p className={`${theme.textSecondary} text-xs`}>Clique para expandir e ver detalhes.</p>
           </div>
-          <div className="divide-y divide-slate-700/40">
+          <div className="divide-y divide-white/5">
             {seasonalDefinitions.length === 0
               ? <div className="p-8 text-center"><p className={`${theme.textSecondary} text-sm`}>Nenhuma sazonalidade cadastrada.</p></div>
               : seasonalDefinitions.map((s) => {
                 const expanded = collapsedSeasonals[s.id] === true;
-                const isRecorrencia = s.modoOperacao === 'recorrencia';
                 return (
                   <div key={s.id}>
                     <div onClick={() => toggleSeaCollapse(s.id)}
@@ -498,15 +558,12 @@ export default function PricingManagement() {
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`${theme.text} font-semibold text-sm`}>{s.nome}</span>
-                            <span className={`text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1 ${isRecorrencia ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'}`}>
-                              {isRecorrencia ? <RefreshCw className="w-2.5 h-2.5" /> : <Calendar className="w-2.5 h-2.5" />}
-                              {isRecorrencia ? (s.recorrencia || 'Recorrente') : 'Data Específica'}
-                            </span>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">{modoLabel[s.modoOperacao] || s.modoOperacao}</span>
                             <span className="text-[11px] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/30">{s.modeloCobranca}</span>
                             {s.dayUse?.ativo && <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Day Use</span>}
                           </div>
                           <p className={`${theme.textSecondary} text-xs mt-0.5`}>{s.descricao}</p>
-                          <p className={`${theme.textSecondary} text-[11px] mt-0.5`}>{describeSchedule(s)}</p>
+                          <p className={`${theme.textSecondary} text-[11px] mt-0.5 font-mono`}>{describeSchedule(s)}</p>
                         </div>
                       </div>
                       <div className="flex gap-2 shrink-0 ml-2">
@@ -527,36 +584,46 @@ export default function PricingManagement() {
 
                     {expanded && (
                       <div className="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {/* Período / Recorrência */}
+                        {/* Agendamento */}
                         <div className={`${theme.card} rounded-lg border p-3`}>
-                          <div className="flex items-center gap-2 mb-2">
-                            {isRecorrencia ? <RefreshCw className="w-4 h-4 text-sky-400" /> : <Calendar className="w-4 h-4 text-amber-400" />}
-                            <span className={`${theme.text} text-xs font-semibold uppercase`}>{isRecorrencia ? 'Recorrência' : 'Período'}</span>
-                          </div>
+                          <div className="flex items-center gap-2 mb-2"><Clock className="w-4 h-4 text-sky-400" /><span className={`${theme.text} text-xs font-semibold uppercase`}>Agendamento</span></div>
                           <div className="space-y-1.5 text-xs">
-                            {isRecorrencia ? (
-                              <>
-                                <div className="flex justify-between"><span className={theme.textSecondary}>Tipo</span><span className={`${theme.text} font-medium`}>{s.recorrencia}</span></div>
-                                {s.recorrencia === 'Semanal' && s.diasSemana?.length > 0 && (
-                                  <div className="flex justify-between items-start gap-2">
-                                    <span className={theme.textSecondary}>Dias</span>
-                                    <div className="flex flex-wrap gap-1 justify-end">
-                                      {s.diasSemana.map((d) => <span key={d} className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px]">{DIAS_SEMANA[d]}</span>)}
-                                    </div>
-                                  </div>
-                                )}
-                                <div className="flex justify-between"><span className={theme.textSecondary}>Horário</span><span className={`${theme.text} font-medium`}>{s.horaInicioRecorrencia} – {s.horaFimRecorrencia}</span></div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex justify-between"><span className={theme.textSecondary}>Início</span><span className={`${theme.text} font-medium`}>{s.dataInicio} {s.horaInicio}</span></div>
-                                <div className="flex justify-between"><span className={theme.textSecondary}>Fim</span><span className={`${theme.text} font-medium`}>{s.dataFim} {s.horaFim}</span></div>
-                              </>
-                            )}
-                            <div className="flex justify-between"><span className={theme.textSecondary}>Modelo</span><span className={`${theme.text} font-medium`}>{s.modeloCobranca}</span></div>
+                            <div className="flex justify-between"><span className={theme.textSecondary}>Modo</span><span className={`${theme.text} font-medium`}>{modoLabel[s.modoOperacao]}</span></div>
+                            {s.modoOperacao === 'data-especifica' && (<>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Início</span><span className={`${theme.text} font-medium`}>{s.dataInicio} {s.horaInicio}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Fim</span><span className={`${theme.text} font-medium`}>{s.dataFim} {s.horaFim}</span></div>
+                            </>)}
+                            {s.modoOperacao === 'diario' && (<>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Ciclo</span><span className={`${theme.text} font-medium`}>{s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-in</span><span className={`${theme.text} font-medium`}>{s.horaCheckin}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-out</span><span className={`${theme.text} font-medium`}>{s.horaCheckout}</span></div>
+                            </>)}
+                            {s.modoOperacao === 'semanal' && (<>
+                              <div className="flex justify-between items-start gap-2">
+                                <span className={theme.textSecondary}>Dias</span>
+                                <div className="flex flex-wrap gap-1 justify-end">{(s.diasSemana||[]).map((d) => <span key={d} className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px]">{DIAS_SEMANA[d]}</span>)}</div>
+                              </div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-in</span><span className={`${theme.text} font-medium`}>{s.horaCheckin}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-out</span><span className={`${theme.text} font-medium`}>{s.horaCheckout}</span></div>
+                            </>)}
+                            {s.modoOperacao === 'mensal' && (<>
+                              <div className="flex justify-between items-start gap-2">
+                                <span className={theme.textSecondary}>Dias</span>
+                                <div className="flex flex-wrap gap-1 justify-end">{(s.diasMes||[]).map((d) => <span key={d} className="px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 text-[10px]">{d}</span>)}</div>
+                              </div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-in</span><span className={`${theme.text} font-medium`}>{s.horaCheckin}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-out</span><span className={`${theme.text} font-medium`}>{s.horaCheckout}</span></div>
+                            </>)}
+                            {s.modoOperacao === 'anual' && (<>
+                              <div className="flex justify-between items-start gap-2">
+                                <span className={theme.textSecondary}>Meses</span>
+                                <div className="flex flex-wrap gap-1 justify-end">{(s.meses||[]).map((m) => <span key={m} className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px]">{MESES[m]}</span>)}</div>
+                              </div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-in</span><span className={`${theme.text} font-medium`}>{s.horaCheckin}</span></div>
+                              <div className="flex justify-between"><span className={theme.textSecondary}>Check-out</span><span className={`${theme.text} font-medium`}>{s.horaCheckout}</span></div>
+                            </>)}
                           </div>
                         </div>
-
                         {/* Tabela de Preços */}
                         <div className={`${theme.card} rounded-lg border p-3`}>
                           <div className="flex items-center gap-2 mb-2"><DollarSign className="w-4 h-4 text-violet-400" /><span className={`${theme.text} text-xs font-semibold uppercase`}>Tabela de Preços</span></div>
@@ -580,7 +647,6 @@ export default function PricingManagement() {
                             </div>
                           )}
                         </div>
-
                         {/* Day Use */}
                         <div className={`${theme.card} rounded-lg border p-3`}>
                           <div className="flex items-center justify-between mb-2">
@@ -592,7 +658,7 @@ export default function PricingManagement() {
                               <div className="flex justify-between"><span className={theme.textSecondary}>Preço base</span><span className={`${theme.text} font-semibold`}>{fmt(s.dayUse.precoFixo)}</span></div>
                               <div className="flex justify-between"><span className={theme.textSecondary}>Hora adicional</span><span className={`${theme.text} font-semibold`}>{fmt(s.dayUse.precoAdicional)}</span></div>
                             </div>
-                          ) : <p className={`${theme.textSecondary} text-xs`}>Não habilitado nesta sazonalidade.</p>}
+                          ) : <p className={`${theme.textSecondary} text-xs`}>Não habilitado.</p>}
                         </div>
                       </div>
                     )}
@@ -603,73 +669,104 @@ export default function PricingManagement() {
         </div>
       </div>
 
-      {/* ── Modal Categoria ── */}
+      {/* ════════════════════════════════════════════════════════════
+          Modal Categoria
+      ════════════════════════════════════════════════════════════ */}
       {showCategoryModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-4xl w-full my-8`}>
+          <div className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'} rounded-xl border shadow-2xl max-w-4xl w-full my-8`}>
             <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
               <h3 className={`text-lg font-bold ${theme.text}`}>{editingCategory ? 'Editar categoria' : 'Nova categoria'}</h3>
               <button onClick={() => setShowCategoryModal(false)} className={`${theme.textSecondary} hover:scale-110 active:scale-90 transition-transform`}><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-4 text-sm max-h-[70vh] overflow-y-auto">
+            <div className="p-4 space-y-5 text-sm max-h-[75vh] overflow-y-auto">
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Nome *</label><input type="text" value={formNome} onChange={(e) => setFormNome(e.target.value)} className={inputCls} placeholder="Ex: Standard até 5 pessoas" /></div>
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Máximo de pessoas</label><input type="number" min={1} max={10} value={formMaxPessoas} onChange={(e) => handleMaxPessoasChange(parseInt(e.target.value, 10))} className={inputCls} /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Nome *</label><input type="text" value={formNome} onChange={(e) => setFormNome(e.target.value)} className={inputCls} placeholder="Ex: Standard até 5 pessoas" /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Máximo de pessoas</label><input type="number" min={1} max={10} value={formMaxPessoas} onChange={(e) => handleMaxPessoasChange(parseInt(e.target.value,10))} className={inputCls} /></div>
               </div>
-              <div><label className={`block mb-1 ${theme.textSecondary}`}>Descrição</label><textarea rows={2} value={formDescricao} onChange={(e) => setFormDescricao(e.target.value)} className={`${inputCls} resize-none`} /></div>
+              <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Descrição</label><textarea rows={2} value={formDescricao} onChange={(e) => setFormDescricao(e.target.value)} className={`${inputCls} resize-none`} /></div>
+
+              {/* Quartos */}
               <div>
-                <label className={`block mb-1 ${theme.textSecondary}`}>Vincular quartos</label>
+                <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Vincular quartos</label>
                 <div className="flex flex-wrap gap-2">
                   {baseRooms.map((r) => {
                     const sel = formVinculoQuartos.includes(r.numero);
-                    return <button key={r.numero} type="button" onClick={() => toggleQuartoVinculo(r.numero)} className={`px-2 py-1 rounded-full text-xs border transition-all ${sel ? 'bg-violet-600 text-white border-violet-400' : `${theme.button} ${theme.text}`}`}>{formatRoomNumber(r.numero)}</button>;
+                    return <button key={r.numero} type="button" onClick={() => toggleQuartoVinculo(r.numero)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${sel ? 'bg-violet-600 text-white border-violet-400' : `${theme.button} ${theme.text}`}`}>{formatRoomNumber(r.numero)}</button>;
                   })}
                 </div>
               </div>
-              <div><label className={`block mb-1 ${theme.textSecondary}`}>Modelo de cobrança</label>
-                <select value={formModeloCobranca} onChange={(e) => handleModeloCobrancaChange(e.target.value)} className={inputCls}>
-                  <option>Por ocupação</option><option>Por quarto (tarifa fixa)</option>
-                </select>
+
+              {/* Modelo de cobrança — RadioCard */}
+              <div>
+                <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Modelo de cobrança</label>
+                <div className="flex gap-2">
+                  {[
+                    { value:'Por ocupação',          label:'Por Ocupação',   desc:'Preço por nº de pessoas', icon:Users     },
+                    { value:'Por quarto (tarifa fixa)', label:'Tarifa Fixa', desc:'Valor fixo por quarto',  icon:BedDouble },
+                  ].map(({ value, label, desc, icon }) => (
+                    <RadioCard key={value} value={value} current={formModeloCobranca} onChange={handleModeloCobrancaChange} label={label} description={desc} icon={icon} color="violet" />
+                  ))}
+                </div>
               </div>
+
               {formModeloCobranca === 'Por quarto (tarifa fixa)' ? (
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Preço fixo (R$)</label><input type="number" step="0.01" value={formPrecoFixo} onChange={(e) => setFormPrecoFixo(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Preço fixo (R$)</label><input type="number" step="0.01" value={formPrecoFixo} onChange={(e) => setFormPrecoFixo(parseFloat(e.target.value)||0)} className={inputCls} /></div>
               ) : (
                 <div>
-                  <label className={`block mb-1 ${theme.textSecondary}`}>Preços por pessoas (R$)</label>
+                  <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Preços por nº de pessoas (R$)</label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {Array.from({ length: formMaxPessoas }).map((_, idx) => {
                       const q = idx + 1;
-                      return <div key={q}><label className={`block mb-1 ${theme.textSecondary} text-xs`}>{q} pessoa{q > 1 ? 's' : ''}</label><input type="number" step="0.01" value={formPrecosOcupacao[q] || 0} onChange={(e) => setFormPrecosOcupacao((p) => ({ ...p, [q]: parseFloat(e.target.value) || 0 }))} className={inputCls} /></div>;
+                      return <div key={q}><label className={`block mb-1 text-xs ${theme.textSecondary}`}>{q} pessoa{q>1?'s':''}</label><input type="number" step="0.01" value={formPrecosOcupacao[q]||0} onChange={(e) => setFormPrecosOcupacao((p) => ({ ...p, [q]: parseFloat(e.target.value)||0 }))} className={inputCls} /></div>;
                     })}
                   </div>
                 </div>
               )}
-              <div className={`border-t ${theme.divider} pt-3`}>
-                <label className={`block mb-2 ${theme.textSecondary}`}>Day Use</label>
-                <label className="flex items-center gap-2 mb-2 cursor-pointer"><input type="checkbox" checked={formDayUseAtivo} onChange={(e) => setFormDayUseAtivo(e.target.checked)} className="w-4 h-4 accent-violet-500" /><span className={theme.text}>Ativar day use nesta categoria</span></label>
+
+              {/* Day Use */}
+              <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-3`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-emerald-400" /><span className={`${theme.text} text-sm font-semibold`}>Day Use</span></div>
+                  {/* Radio moderno ativo/inativo */}
+                  <div className="flex gap-2">
+                    <RadioPill value={true}  current={formDayUseAtivo} onChange={setFormDayUseAtivo} label="Ativo"   activeClass="bg-emerald-600 text-white border-emerald-400" />
+                    <RadioPill value={false} current={formDayUseAtivo} onChange={setFormDayUseAtivo} label="Inativo" activeClass="bg-slate-600 text-white border-slate-400" />
+                  </div>
+                </div>
                 {formDayUseAtivo && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Preço base (R$)</label><input type="number" step="0.01" value={formDayUsePrecoFixo} onChange={(e) => setFormDayUsePrecoFixo(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora adicional (R$)</label><input type="number" step="0.01" value={formDayUsePrecoAdicional} onChange={(e) => setFormDayUsePrecoAdicional(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Preço base (R$)</label><input type="number" step="0.01" value={formDayUsePrecoFixo} onChange={(e) => setFormDayUsePrecoFixo(parseFloat(e.target.value)||0)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora adicional (R$)</label><input type="number" step="0.01" value={formDayUsePrecoAdicional} onChange={(e) => setFormDayUsePrecoAdicional(parseFloat(e.target.value)||0)} className={inputCls} /></div>
                   </div>
                 )}
               </div>
-              <div className={`border-t ${theme.divider} pt-3`}>
-                <label className={`block mb-2 ${theme.textSecondary}`}>Ativar sazonalidades</label>
+
+              {/* Sazonalidades */}
+              <div className={`rounded-xl border ${theme.sectionBg} p-4`}>
+                <div className="flex items-center gap-2 mb-3"><Calendar className="w-4 h-4 text-amber-400" /><span className={`${theme.text} text-sm font-semibold`}>Sazonalidades ativas</span></div>
                 {seasonalDefinitions.length === 0 ? <p className={`${theme.textSecondary} text-xs`}>Nenhuma sazonalidade cadastrada.</p> : (
                   <div className="space-y-2">
-                    {seasonalDefinitions.map((s) => (
-                      <label key={s.id} className="flex items-start gap-2 cursor-pointer">
-                        <input type="checkbox" checked={formSazonaisAtivas.includes(s.id)} onChange={() => toggleSeasonalAtiva(s.id)} className="w-4 h-4 accent-violet-500 mt-0.5" />
-                        <div>
-                          <span className={`${theme.text} text-xs font-semibold flex items-center gap-1`}>
-                            {s.modoOperacao === 'recorrencia' ? <RefreshCw className="w-3 h-3 text-sky-400" /> : <Calendar className="w-3 h-3 text-amber-400" />}
-                            {s.nome}
-                          </span>
-                          <p className={`${theme.textSecondary} text-[11px]`}>{describeSchedule(s)}</p>
-                        </div>
-                      </label>
-                    ))}
+                    {seasonalDefinitions.map((s) => {
+                      const active = formSazonaisAtivas.includes(s.id);
+                      return (
+                        <button key={s.id} type="button" onClick={() => toggleSeasonalAtiva(s.id)}
+                          className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${active ? 'border-amber-500/50 bg-amber-500/8' : `border-white/8 ${theme.cardHover}`}`}>
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? 'border-amber-400 bg-amber-500' : 'border-white/20'}`}>
+                            {active && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`${theme.text} text-xs font-semibold`}>{s.nome}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300">{modoLabel[s.modoOperacao]}</span>
+                            </div>
+                            <p className={`${theme.textSecondary} text-[11px] mt-0.5 truncate`}>{describeSchedule(s)}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -682,113 +779,209 @@ export default function PricingManagement() {
         </div>
       )}
 
-      {/* ── Modal Sazonalidade ── */}
+      {/* ════════════════════════════════════════════════════════════
+          Modal Sazonalidade
+      ════════════════════════════════════════════════════════════ */}
       {showSeasonalFormModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-3xl w-full my-8`}>
+          <div className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'} rounded-xl border shadow-2xl max-w-3xl w-full my-8`}>
             <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
               <h3 className={`text-lg font-bold ${theme.text}`}>{editingSeasonal ? 'Editar sazonalidade' : 'Nova sazonalidade'}</h3>
               <button onClick={() => setShowSeasonalFormModal(false)} className={`${theme.textSecondary} hover:scale-110 active:scale-90 transition-transform`}><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-4 space-y-4 text-sm max-h-[75vh] overflow-y-auto">
 
-              {/* Nome + Máx. pessoas */}
+            <div className="p-4 space-y-5 text-sm max-h-[78vh] overflow-y-auto">
+
+              {/* Nome + Máx pessoas */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Nome *</label><input type="text" value={sNome} onChange={(e) => setSNome(e.target.value)} className={inputCls} placeholder="Ex: Alta Temporada Verão" /></div>
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Máx. pessoas</label><input type="number" min={1} max={10} value={sMaxPessoas} onChange={(e) => handleSeasonalMaxPessoasChange(parseInt(e.target.value, 10))} className={inputCls} /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Nome *</label><input type="text" value={sNome} onChange={(e) => setSNome(e.target.value)} className={inputCls} placeholder="Ex: Alta Temporada Verão" /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Máx. pessoas</label><input type="number" min={1} max={10} value={sMaxPessoas} onChange={(e) => handleSeasonalMaxPessoasChange(parseInt(e.target.value,10))} className={inputCls} /></div>
               </div>
-              <div><label className={`block mb-1 ${theme.textSecondary}`}>Descrição</label><textarea rows={2} value={sDescricao} onChange={(e) => setSDescricao(e.target.value)} className={`${inputCls} resize-none`} /></div>
+              <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Descrição</label><textarea rows={2} value={sDescricao} onChange={(e) => setSDescricao(e.target.value)} className={`${inputCls} resize-none`} /></div>
 
-              {/* ── Seletor de Modo ── */}
+              {/* ── Modo de Operação — RadioCard ── */}
               <div>
-                <label className={`block mb-2 ${theme.textSecondary} font-medium`}>Modo de operação *</label>
-                <div className="flex gap-2">
-                  <ModoTab value="data-especifica" label="Data Específica"  icon={Calendar}   current={sModo} onChange={setSModo} />
-                  <ModoTab value="recorrencia"     label="Recorrência"      icon={RefreshCw}  current={sModo} onChange={setSModo} />
+                <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Modo de operação *</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {MODOS_OPERACAO.map(({ value, label, desc, icon: Icon }) => {
+                    const active = sModo === value;
+                    return (
+                      <button key={value} type="button" onClick={() => setSModo(value)}
+                        className={`flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border-2 transition-all cursor-pointer
+                          ${active ? 'border-sky-500 bg-sky-500/10 text-sky-300' : `${isDark ? 'border-white/10 hover:border-white/25 text-slate-400 hover:text-slate-200' : 'border-slate-200 hover:border-slate-300 text-slate-500'}`}`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${active ? 'bg-sky-500/20' : 'bg-white/5'}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span className="text-xs font-semibold leading-tight text-center">{label}</span>
+                        <span className="text-[10px] leading-tight opacity-70 text-center">{desc}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* ── Data Específica ── */}
+              {/* ── DATA ESPECÍFICA ── */}
               {sModo === 'data-especifica' && (
-                <div className={`${theme.card} rounded-lg border p-3 space-y-3`}>
-                  <p className={`text-xs ${theme.textSecondary}`}>Período com data de início e fim definidos.</p>
+                <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-3`}>
+                  <p className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}><Calendar className="w-3.5 h-3.5" /> Período com data de início e fim definidos.</p>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Data início</label><input type="date" value={sDataInicio} onChange={(e) => setSDataInicio(e.target.value)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora check-in</label><input type="time" value={sHoraInicio} onChange={(e) => setSHoraInicio(e.target.value)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Data fim</label><input type="date" value={sDataFim} onChange={(e) => setSDataFim(e.target.value)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora check-out</label><input type="time" value={sHoraFim} onChange={(e) => setSHoraFim(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Data início</label><input type="date" value={sDataInicio} onChange={(e) => setSDataInicio(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora check-in</label><input type="time" value={sHoraInicio} onChange={(e) => setSHoraInicio(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Data fim</label><input type="date" value={sDataFim} onChange={(e) => setSDataFim(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora check-out</label><input type="time" value={sHoraFim} onChange={(e) => setSHoraFim(e.target.value)} className={inputCls} /></div>
                   </div>
                 </div>
               )}
 
-              {/* ── Recorrência ── */}
-              {sModo === 'recorrencia' && (
-                <div className={`${theme.card} rounded-lg border p-3 space-y-3`}>
-                  <p className={`text-xs ${theme.textSecondary}`}>Aplica-se automaticamente a cada ciclo de tempo definido.</p>
+              {/* ── DIÁRIO ── */}
+              {sModo === 'diario' && (
+                <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-4`}>
+                  <p className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}><Clock className="w-3.5 h-3.5" /> Aplicado todos os dias. Defina se é integral ou com horário de ciclo.</p>
+
+                  {/* Tipo de ciclo diário */}
                   <div>
-                    <label className={`block mb-1 ${theme.textSecondary} text-xs`}>Frequência *</label>
-                    <div className="flex flex-wrap gap-2">
-                      {RECORRENCIAS.map((r) => (
-                        <button key={r} type="button" onClick={() => setSRecorrencia(r)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${sRecorrencia === r ? 'bg-sky-600 text-white border-sky-400' : `${theme.button} ${theme.text}`}`}>
-                          {r}
-                        </button>
-                      ))}
+                    <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Tipo de ciclo</label>
+                    <div className="flex gap-2">
+                      {[
+                        { value:true,  label:'Integral',       desc:'Dia todo (00:00–23:59)'   },
+                        { value:false, label:'Horário Definido', desc:'Início e fim específicos' },
+                      ].map(({ value, label, desc }) => {
+                        const active = sDiaIntegral === value;
+                        return (
+                          <button key={String(value)} type="button" onClick={() => setSDiaIntegral(value)}
+                            className={`flex-1 flex flex-col items-center gap-1 px-3 py-3 rounded-xl border-2 transition-all
+                              ${active ? 'border-violet-500 bg-violet-500/10 text-violet-300' : `${isDark ? 'border-white/10 hover:border-white/25 text-slate-400' : 'border-slate-200 hover:border-slate-300 text-slate-500'}`}`}>
+                            <span className="text-xs font-semibold">{label}</span>
+                            <span className="text-[10px] opacity-70">{desc}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Dias da semana — só aparece em Semanal */}
-                  {sRecorrencia === 'Semanal' && (
-                    <div>
-                      <label className={`block mb-1 ${theme.textSecondary} text-xs`}>Dias da semana *</label>
-                      <div className="flex flex-wrap gap-2">
-                        {DIAS_SEMANA.map((dia, idx) => (
-                          <button key={idx} type="button" onClick={() => toggleDiaSemana(idx)}
-                            className={`w-11 h-9 rounded-lg text-xs font-medium border transition-all ${sDiasSemana.includes(idx) ? 'bg-sky-600 text-white border-sky-400' : `${theme.button} ${theme.text}`}`}>
-                            {dia}
-                          </button>
-                        ))}
-                      </div>
+                  {!sDiaIntegral && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora início do ciclo</label><input type="time" value={sHoraInicioCiclo} onChange={(e) => setSHoraInicioCiclo(e.target.value)} className={inputCls} /></div>
+                      <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora fim do ciclo</label><input type="time" value={sHoraFimCiclo} onChange={(e) => setSHoraFimCiclo(e.target.value)} className={inputCls} /></div>
                     </div>
                   )}
 
-                  {/* Horário do ciclo */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora início do ciclo</label><input type="time" value={sHoraInicioRec} onChange={(e) => setSHoraInicioRec(e.target.value)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora fim do ciclo</label><input type="time" value={sHoraFimRec} onChange={(e) => setSHoraFimRec(e.target.value)} className={inputCls} /></div>
+                  <div className={`border-t ${theme.divider} pt-3 grid grid-cols-2 gap-3`}>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-in (por dia)</label><input type="time" value={sHoraCheckin} onChange={(e) => setSHoraCheckin(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-out (por dia)</label><input type="time" value={sHoraCheckout} onChange={(e) => setSHoraCheckout(e.target.value)} className={inputCls} /></div>
                   </div>
                 </div>
               )}
 
-              {/* Modelo de cobrança */}
-              <div><label className={`block mb-1 ${theme.textSecondary}`}>Modelo de cobrança</label>
-                <select value={sModeloCobranca} onChange={(e) => handleSeasonalModeloCobrancaChange(e.target.value)} className={inputCls}>
-                  <option>Por ocupação</option><option>Por quarto (tarifa fixa)</option>
-                </select>
+              {/* ── SEMANAL ── */}
+              {sModo === 'semanal' && (
+                <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-4`}>
+                  <p className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}><RefreshCw className="w-3.5 h-3.5" /> Escolha os dias da semana em que a sazonalidade é aplicada.</p>
+                  <div>
+                    <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Dias da semana *</label>
+                    <div className="flex flex-wrap gap-2">
+                      {DIAS_SEMANA.map((dia, idx) => (
+                        <ToggleChip key={idx} active={sDiasSemana.includes(idx)} onClick={() => toggleDiaSemana(idx)} label={dia} activeClass="bg-sky-600 text-white border-sky-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className={`border-t ${theme.divider} pt-3 grid grid-cols-2 gap-3`}>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-in</label><input type="time" value={sHoraCheckin} onChange={(e) => setSHoraCheckin(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-out</label><input type="time" value={sHoraCheckout} onChange={(e) => setSHoraCheckout(e.target.value)} className={inputCls} /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── MENSAL ── */}
+              {sModo === 'mensal' && (
+                <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-4`}>
+                  <p className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}><Tag className="w-3.5 h-3.5" /> Escolha os dias do mês (1–31) em que a sazonalidade é aplicada.</p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className={`text-xs font-medium ${theme.textSecondary}`}>Dias do mês *</label>
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => setSDiasMes(DIAS_MES)} className="text-[11px] px-2 py-0.5 rounded bg-violet-500/15 text-violet-300 hover:bg-violet-500/25 transition-colors">Todos</button>
+                        <button type="button" onClick={() => setSDiasMes([])} className={`text-[11px] px-2 py-0.5 rounded ${theme.button} ${theme.textSecondary} transition-colors`}>Limpar</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5">
+                      {DIAS_MES.map((d) => (
+                        <ToggleChip key={d} active={sDiasMes.includes(d)} onClick={() => toggleDiaMes(d)} label={String(d)} activeClass="bg-violet-600 text-white border-violet-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className={`border-t ${theme.divider} pt-3 grid grid-cols-2 gap-3`}>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-in</label><input type="time" value={sHoraCheckin} onChange={(e) => setSHoraCheckin(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-out</label><input type="time" value={sHoraCheckout} onChange={(e) => setSHoraCheckout(e.target.value)} className={inputCls} /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── ANUAL ── */}
+              {sModo === 'anual' && (
+                <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-4`}>
+                  <p className={`text-xs ${theme.textSecondary} flex items-center gap-1.5`}><Calendar className="w-3.5 h-3.5" /> Escolha os meses do ano em que a sazonalidade é aplicada.</p>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className={`text-xs font-medium ${theme.textSecondary}`}>Meses *</label>
+                      <div className="flex gap-1.5">
+                        <button type="button" onClick={() => setSMeses(MESES.map((_,i)=>i))} className="text-[11px] px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors">Todos</button>
+                        <button type="button" onClick={() => setSMeses([])} className={`text-[11px] px-2 py-0.5 rounded ${theme.button} ${theme.textSecondary} transition-colors`}>Limpar</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {MESES.map((mes, idx) => (
+                        <ToggleChip key={idx} active={sMeses.includes(idx)} onClick={() => toggleMes(idx)} label={mes} activeClass="bg-amber-600 text-white border-amber-400" />
+                      ))}
+                    </div>
+                  </div>
+                  <div className={`border-t ${theme.divider} pt-3 grid grid-cols-2 gap-3`}>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-in</label><input type="time" value={sHoraCheckin} onChange={(e) => setSHoraCheckin(e.target.value)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Check-out</label><input type="time" value={sHoraCheckout} onChange={(e) => setSHoraCheckout(e.target.value)} className={inputCls} /></div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Modelo de cobrança — RadioCard ── */}
+              <div>
+                <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Modelo de cobrança</label>
+                <div className="flex gap-2">
+                  {[
+                    { value:'Por ocupação',             label:'Por Ocupação', desc:'Preço por nº de pessoas', icon:Users     },
+                    { value:'Por quarto (tarifa fixa)', label:'Tarifa Fixa',  desc:'Valor fixo por quarto',  icon:BedDouble },
+                  ].map(({ value, label, desc, icon }) => (
+                    <RadioCard key={value} value={value} current={sModeloCobranca} onChange={handleSeasonalModeloCobrancaChange} label={label} description={desc} icon={icon} color="violet" />
+                  ))}
+                </div>
               </div>
 
               {sModeloCobranca === 'Por quarto (tarifa fixa)' ? (
-                <div><label className={`block mb-1 ${theme.textSecondary}`}>Preço fixo (R$)</label><input type="number" step="0.01" value={sPrecoFixo} onChange={(e) => setSPrecoFixo(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
+                <div><label className={`block mb-1 text-xs font-medium ${theme.textSecondary}`}>Preço fixo (R$)</label><input type="number" step="0.01" value={sPrecoFixo} onChange={(e) => setSPrecoFixo(parseFloat(e.target.value)||0)} className={inputCls} /></div>
               ) : (
                 <div>
-                  <label className={`block mb-1 ${theme.textSecondary}`}>Preços por pessoas (R$)</label>
+                  <label className={`block mb-2 text-xs font-medium ${theme.textSecondary}`}>Preços por nº de pessoas (R$)</label>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {Array.from({ length: sMaxPessoas }).map((_, idx) => {
                       const q = idx + 1;
-                      return <div key={q}><label className={`block mb-1 ${theme.textSecondary} text-xs`}>{q} pax</label><input type="number" step="0.01" value={sPrecosOcupacao[q] || 0} onChange={(e) => setSPrecosOcupacao((p) => ({ ...p, [q]: parseFloat(e.target.value) || 0 }))} className={inputCls} /></div>;
+                      return <div key={q}><label className={`block mb-1 text-xs ${theme.textSecondary}`}>{q} pax</label><input type="number" step="0.01" value={sPrecosOcupacao[q]||0} onChange={(e) => setSPrecosOcupacao((p) => ({ ...p, [q]: parseFloat(e.target.value)||0 }))} className={inputCls} /></div>;
                     })}
                   </div>
                 </div>
               )}
 
               {/* Day Use sazonal */}
-              <div className={`border-t ${theme.divider} pt-3`}>
-                <label className={`block mb-2 ${theme.textSecondary}`}>Day Use</label>
-                <label className="flex items-center gap-2 mb-2 cursor-pointer"><input type="checkbox" checked={sDayUseAtivo} onChange={(e) => setSDayUseAtivo(e.target.checked)} className="w-4 h-4 accent-violet-500" /><span className={theme.text}>Ativar day use nesta sazonalidade</span></label>
+              <div className={`rounded-xl border ${theme.sectionBg} p-4 space-y-3`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2"><Clock className="w-4 h-4 text-emerald-400" /><span className={`${theme.text} text-sm font-semibold`}>Day Use</span></div>
+                  <div className="flex gap-2">
+                    <RadioPill value={true}  current={sDayUseAtivo} onChange={setSDayUseAtivo} label="Ativo"   activeClass="bg-emerald-600 text-white border-emerald-400" />
+                    <RadioPill value={false} current={sDayUseAtivo} onChange={setSDayUseAtivo} label="Inativo" activeClass="bg-slate-600 text-white border-slate-400" />
+                  </div>
+                </div>
                 {sDayUseAtivo && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Preço base (R$)</label><input type="number" step="0.01" value={sDayUsePreco} onChange={(e) => setSDayUsePreco(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
-                    <div><label className={`block mb-1 ${theme.textSecondary} text-xs`}>Hora adicional (R$)</label><input type="number" step="0.01" value={sDayUsePrecoAd} onChange={(e) => setSDayUsePrecoAd(parseFloat(e.target.value) || 0)} className={inputCls} /></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Preço base (R$)</label><input type="number" step="0.01" value={sDayUsePreco} onChange={(e) => setSDayUsePreco(parseFloat(e.target.value)||0)} className={inputCls} /></div>
+                    <div><label className={`block mb-1 text-xs ${theme.textSecondary}`}>Hora adicional (R$)</label><input type="number" step="0.01" value={sDayUsePrecoAd} onChange={(e) => setSDayUsePrecoAd(parseFloat(e.target.value)||0)} className={inputCls} /></div>
                   </div>
                 )}
               </div>
@@ -805,7 +998,7 @@ export default function PricingManagement() {
       {/* ── Modal Permissões ── */}
       {showPermissionsModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className={`${theme.card} rounded-xl border shadow-2xl max-w-md w-full`}>
+          <div className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'} rounded-xl border shadow-2xl max-w-md w-full`}>
             <div className={`p-4 border-b ${theme.divider} flex items-center justify-between`}>
               <div className="flex items-center gap-2"><Shield className="w-5 h-5 text-violet-500" /><h3 className={`text-lg font-bold ${theme.text}`}>Permissões de Preços</h3></div>
               <button onClick={() => setShowPermissionsModal(false)} className={`${theme.textSecondary} hover:scale-110 active:scale-90 transition-transform`}><X className="w-5 h-5" /></button>
@@ -818,13 +1011,21 @@ export default function PricingManagement() {
                 { key:'editarCategoria',       label:'✏️ Editar Categoria',         desc:'Alterar dados de uma categoria'   },
                 { key:'cadastrarSazonalidade', label:'📅 Cadastrar Sazonalidade',   desc:'Criar novos períodos sazonais'    },
                 { key:'alterarSazonalidade',   label:'🔁 Alterar Sazonalidade',     desc:'Editar/remover sazonalidades'     },
-              ].map(({ key, label, desc }) => (
-                <label key={key} className={`flex items-center gap-3 cursor-pointer p-2.5 rounded-lg ${theme.cardHover} transition-colors`}>
-                  <input type="checkbox" checked={permissions[key]} onChange={() => togglePermission(key)} className="w-4 h-4 rounded accent-violet-500" />
-                  <div className="flex-1"><span className={`${theme.text} font-medium text-sm block`}>{label}</span><span className={`${theme.textSecondary} text-xs`}>{desc}</span></div>
-                  {permissions[key] && <Check className="w-4 h-4 text-emerald-400" />}
-                </label>
-              ))}
+              ].map(({ key, label, desc }) => {
+                const active = permissions[key];
+                return (
+                  <button key={key} type="button" onClick={() => togglePermission(key)}
+                    className={`w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all text-left ${active ? 'border-violet-500/40 bg-violet-500/8' : `border-white/8 ${theme.cardHover}`}`}>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${active ? 'border-violet-400 bg-violet-500' : 'border-white/20'}`}>
+                      {active && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <span className={`${theme.text} font-medium text-sm block`}>{label}</span>
+                      <span className={`${theme.textSecondary} text-xs`}>{desc}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
             <div className={`p-4 border-t ${theme.divider}`}>
               <button onClick={() => setShowPermissionsModal(false)} className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-medium hover:scale-105 active:scale-95 transition-all">Confirmar</button>
@@ -836,7 +1037,7 @@ export default function PricingManagement() {
       {/* Notificação */}
       {notification && (
         <div className="fixed top-4 right-4 z-[110] animate-slideIn">
-          <div className={`${notification.type === 'success' ? 'bg-emerald-500' : notification.type === 'error' ? 'bg-rose-500' : notification.type === 'warning' ? 'bg-amber-500' : 'bg-slate-700'} text-white px-6 py-3 rounded-lg flex items-center gap-3`}>
+          <div className={`${notification.type==='success'?'bg-emerald-500':notification.type==='error'?'bg-rose-500':notification.type==='warning'?'bg-amber-500':'bg-slate-700'} text-white px-6 py-3 rounded-lg flex items-center gap-3`}>
             <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
             <span className="font-medium text-sm">{notification.message}</span>
           </div>
@@ -846,7 +1047,7 @@ export default function PricingManagement() {
       <style jsx>{`
         @keyframes slideIn { from { opacity:0; transform:translateX(100%); } to { opacity:1; transform:translateX(0); } }
         .animate-slideIn { animation: slideIn 0.3s ease-out; }
-        select option { background: ${isDark ? '#1e293b' : '#ffffff'}; color: ${isDark ? 'white' : '#0f172a'}; }
+        select option { background: ${isDark ? '#0f172a' : '#ffffff'}; color: ${isDark ? 'white' : '#0f172a'}; }
         input[type="date"]::-webkit-calendar-picker-indicator,
         input[type="time"]::-webkit-calendar-picker-indicator { filter: ${isDark ? 'invert(1)' : 'none'}; }
       `}</style>
