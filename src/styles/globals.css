@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;0,9..40,900;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --font: 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+
+  /* ── LIGHT THEME ── */
+  --bg:        #f0f2f7;
+  --surface:   #ffffff;
+  --surface-2: #f6f8fc;
+  --border:    #e2e6ef;
+  --card-border: #dde2ec;
+
+  --text:   #111827;
+  --text-2: #6b7280;
+
+  --violet:   #7c3aed;
+  --violet-2: #6d28d9;
+  --emerald:  #10b981;
+  --sky:      #0ea5e9;
+
+  --primary:   #7c3aed;
+  --primary-2: #6d28d9;
+
+  --success: #10b981;
+  --danger:  #ef4444;
+
+  --radius: 12px;
+  --shadow:
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-md:
+    0 4px 6px rgba(15, 23, 42, 0.06),
+    0 10px 30px rgba(15, 23, 42, 0.10);
+  --shadow-lg:
+    0 10px 40px rgba(15, 23, 42, 0.12);
+}
+
+/* ── DARK THEME ── */
+:root[data-theme="dark"] {
+  --bg:        #0b1220;
+  --surface:   #111827;
+  --surface-2: #0f172a;
+  --border:    #253248;
+  --card-border: #253248;
+
+  --text:   #e5e7eb;
+  --text-2: #9ca3af;
+
+  --shadow:    none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+/* ── RESET ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow-x: hidden; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── SCROLLBARS ── */
+.scrollbarThin::-webkit-scrollbar       { width: 6px; height: 6px; }
+.scrollbarThin::-webkit-scrollbar-track  { background: transparent; }
+.scrollbarThin::-webkit-scrollbar-thumb  {
+  background: rgba(107, 114, 128, 0.3);
+  border-radius: 999px;
+}
+.scrollbarThin::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.5);
+}
+:root[data-theme="dark"] .scrollbarThin::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+}

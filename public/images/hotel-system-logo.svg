@@ -1,0 +1,56 @@
+<svg width="600" height="600" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="buildingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Building body -->
+  <rect x="190" y="180" width="160" height="240" rx="8" fill="url(#buildingGrad)"/>
+
+  <!-- Roof -->
+  <rect x="178" y="168" width="184" height="16" rx="4" fill="#a78bfa"/>
+
+  <!-- Antenna -->
+  <rect x="296" y="120" width="8" height="52" rx="4" fill="#a78bfa"/>
+  <circle cx="300" cy="114" r="10" fill="#06b6d4"/>
+
+  <!-- Windows row 1 -->
+  <rect x="208" y="204" width="28" height="28" rx="4" fill="white" opacity="0.90"/>
+  <rect x="252" y="204" width="28" height="28" rx="4" fill="#06b6d4" opacity="0.85"/>
+  <rect x="304" y="204" width="28" height="28" rx="4" fill="white" opacity="0.90"/>
+
+  <!-- Windows row 2 -->
+  <rect x="208" y="252" width="28" height="28" rx="4" fill="#06b6d4" opacity="0.85"/>
+  <rect x="252" y="252" width="28" height="28" rx="4" fill="white" opacity="0.90"/>
+  <rect x="304" y="252" width="28" height="28" rx="4" fill="#06b6d4" opacity="0.85"/>
+
+  <!-- Windows row 3 -->
+  <rect x="208" y="300" width="28" height="28" rx="4" fill="white" opacity="0.90"/>
+  <rect x="252" y="300" width="28" height="28" rx="4" fill="#06b6d4" opacity="0.85"/>
+  <rect x="304" y="300" width="28" height="28" rx="4" fill="white" opacity="0.90"/>
+
+  <!-- Door -->
+  <rect x="264" y="372" width="32" height="48" rx="4" fill="#4c1d95"/>
+
+  <!-- Ground line -->
+  <rect x="140" y="420" width="320" height="4" rx="2" fill="#a78bfa" opacity="0.5"/>
+
+  <!-- Circuit line left -->
+  <line x1="190" y1="230" x2="140" y2="230" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="134" cy="230" r="6" fill="#a78bfa"/>
+
+  <line x1="190" y1="310" x2="120" y2="310" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+  <line x1="120" y1="310" x2="120" y2="280" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="120" cy="274" r="6" fill="#06b6d4"/>
+
+  <!-- Circuit line right -->
+  <line x1="350" y1="230" x2="400" y2="230" stroke="#06b6d4" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="406" cy="230" r="6" fill="#06b6d4"/>
+
+  <line x1="350" y1="310" x2="420" y2="310" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>
+  <line x1="420" y1="310" x2="420" y2="280" stroke="#a78bfa" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="420" cy="274" r="6" fill="#a78bfa"/>
+
+</svg>

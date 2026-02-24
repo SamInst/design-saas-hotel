@@ -1,0 +1,23 @@
+.shell {
+  width: 100%;
+  min-height: 100vh;
+}
+
+.sidebarSlot {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  z-index: 10;
+}
+
+.main {
+  min-height: 100vh;
+  margin-left: 220px; /* largura da sidebar expandida */
+  padding: 18px 22px 40px;
+  transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mainCollapsed {
+  margin-left: 60px; /* largura da sidebar colapsada */
+}
