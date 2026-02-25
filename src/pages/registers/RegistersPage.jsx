@@ -510,10 +510,13 @@ export default function RegistersPage() {
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
   const [showDetail,     setShowDetail]     = useState(false);
   const [showEdit,       setShowEdit]       = useState(false);
+  const [showDependentDetail, setShowDependentDetail] = useState(false);
+  const [showLinkedPessoaDetail, setShowLinkedPessoaDetail] = useState(false);
   const [detailItem,     setDetailItem]     = useState(null);
   const [detailType,     setDetailType]     = useState('pessoa');
   const [detailTab,      setDetailTab]      = useState('cadastro');
   const [editMode,       setEditMode]       = useState(false);
+  const [linkedPessoaBackRef, setLinkedPessoaBackRef] = useState(null);
 
   // forms
   const [titular,     setTitular]     = useState(blankPessoa());
@@ -536,6 +539,7 @@ export default function RegistersPage() {
   const [vinculSearch,  setVinculSearch]  = useState('');
   const [vinculResults, setVinculResults] = useState([]);
   const [vinculLoading, setVinculLoading] = useState(false);
+  const vinculDebounce = useRef(null);
 
   const showNotif = (msg, type = 'success') => {
     setNotification({ message: msg, type });
@@ -640,6 +644,21 @@ export default function RegistersPage() {
     return () => clearTimeout(linkDebounce.current);
   }, [linkSearch]);
 
+  // Auto-search vinculados
+  useEffect(() => {
+    clearTimeout(vinculDebounce.current);
+    if (vinculSearch.length >= 2) {
+      vinculDebounce.current = setTimeout(async () => {
+        setVinculLoading(true);
+        try {
+          const res = await cadastroApi.listarPessoas({ termo: vinculSearch, size: 20 });
+          setVinculResults(res?.content ?? []);
+        } catch {} finally { setVinculLoading(false); }
+      }, 300);
+    } else { setVinculResults([]); }
+    return () => clearTimeout(vinculDebounce.current);
+  }, [vinculSearch]);
+
   const changeFilter = mode => { setFilterMode(mode); setPage(0); fetchData(searchTerm, mode, 0); };
   const goToPage     = pg   => { setPage(pg); fetchData(searchTerm, filterMode, pg); };
 
@@ -649,6 +668,14 @@ export default function RegistersPage() {
       setShowErrors(true);
       showNotif('Preencha todos os campos obrigatórios (*).', 'error');
       return;
+    }
+    // Validar dependentes
+    for (let i = 0; i < dependentes.length; i++) {
+      const dep = dependentes[i];
+      if (!dep.nome || !dep.cpf || !dep.dataNascimento || !dep.telefone || !dep.email || !dep.cep) {
+        showNotif(`Preencha todos os campos obrigatórios do dependente ${i + 1}.`, 'error');
+        return;
+      }
     }
     setShowErrors(false);
     setConfirmStep(true);
@@ -777,31 +804,38 @@ export default function RegistersPage() {
     setShowDetail(true);
   };
 
-  const searchVinculados = async () => {
-    if (!vinculSearch) return;
-    setVinculLoading(true);
-    try {
-      const res = await cadastroApi.listarPessoas({ termo: vinculSearch, size: 20 });
-      setVinculResults(res?.content ?? []);
-    } catch {} finally { setVinculLoading(false); }
-  };
-
   const handleVincular = async pessoaId => {
     try {
-      await cadastroApi.vincularPessoa(detailItem.id, { pessoaId });
+      const vinculadoIds = (detailItem?.pessoasVinculadas ?? detailItem?.pessoas ?? []).map(p => p.id);
+      if (vinculadoIds.includes(pessoaId)) {
+        showNotif('Esta pessoa já está vinculada!', 'error');
+        return;
+      }
+      // POST to /empresas/:id/pessoa?pessoaId=X&vinculo=true
+      await fetch(`${window.location.origin}/api/empresas/${detailItem.id}/pessoa?pessoaId=${pessoaId}&vinculo=true`, { method: 'POST' });
       showNotif('Pessoa vinculada!');
       const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       setDetailItem({ ...updated, _type: 'empresa' });
+      setVinculSearch('');
+      setVinculResults([]);
     } catch (e) { showNotif(e.message || 'Erro ao vincular.', 'error'); }
   };
 
   const handleDesvincular = async pessoaId => {
+    if (!window.confirm('Tem certeza que deseja desvincular esta pessoa?')) return;
     try {
-      await cadastroApi.vincularPessoa(detailItem.id, { pessoaId });
+      await fetch(`${window.location.origin}/api/empresas/${detailItem.id}/pessoa?pessoaId=${pessoaId}&vinculo=false`, { method: 'POST' });
       showNotif('Pessoa desvinculada!');
       const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       setDetailItem({ ...updated, _type: 'empresa' });
     } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
+  };
+
+  const viewLinkedPessoa = p => {
+    setLinkedPessoaBackRef(detailItem);
+    setDetailItem(p);
+    setDetailType('pessoa');
+    setDetailTab('cadastro');
   };
 
   const openEditEmpresa = () => {
@@ -880,6 +914,16 @@ export default function RegistersPage() {
   // ── Detail modal footers ──────────────────────────────────
   const pessoaDetailFooter = detailItem && detailType === 'pessoa' ? (
     <div className={styles.detailFooterActions}>
+      {linkedPessoaBackRef && (
+        <Button onClick={() => {
+          setDetailItem(linkedPessoaBackRef);
+          setDetailType(linkedPessoaBackRef._type === 'empresa' ? 'empresa' : 'pessoa');
+          setLinkedPessoaBackRef(null);
+          setDetailTab(linkedPessoaBackRef._type === 'empresa' ? 'vinculados' : 'dependentes');
+        }}>
+          <ChevronLeft size={13} /> Voltar para {linkedPessoaBackRef._type === 'empresa' ? 'Empresa' : 'Titular'}
+        </Button>
+      )}
       {isBloqueado && (
         <span className={styles.blockedNotice}><Shield size={13} /> Bloqueado — edição desativada</span>
       )}
@@ -1051,7 +1095,7 @@ export default function RegistersPage() {
               ['cadastro',    'Cadastro'],
               ['veiculo',     'Veículo'],
               ['empresa',     'Empresa'],
-              ['historico',   'Histórico'],
+              ['historico',   'Histórico de Hospedagens'],
               ['dependentes', 'Dependentes'],
             ].map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
@@ -1160,14 +1204,18 @@ export default function RegistersPage() {
 
             {detailTab === 'dependentes' && (
               detailItem.titularId != null
-                ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Esta pessoa é dependente de {detailItem.titularNome}.</span></div>
+                ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Esta pessoa é dependente de {detailItem.titularNome}. <a style={{ color: 'var(--violet)', cursor: 'pointer' }} onClick={() => { setLinkedPessoaBackRef(null); setDetailItem(prev => ({ ...prev })); }}>Voltar</a></span></div>
                 : (detailItem.acompanhantes ?? []).length === 0
                 ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Sem dependentes cadastrados.</span></div>
                 : (
                   <div className={styles.depList}>
                     {(detailItem.acompanhantes ?? []).map(dep => (
                       <div key={dep.id} className={styles.depCard}
-                        onClick={() => { setDetailItem({ ...dep, _type: 'pessoa' }); setDetailTab('cadastro'); }}>
+                        onClick={() => {
+                          setLinkedPessoaBackRef(detailItem);
+                          setDetailItem({ ...dep, _type: 'pessoa' });
+                          setDetailTab('cadastro');
+                        }}>
                         <AvatarCircle name={dep.nome} size={34} />
                         <div>
                           <div className={styles.nome}>{dep.nome}</div>
@@ -1191,9 +1239,10 @@ export default function RegistersPage() {
           size="xl"
           title={empresaTitleJSX}
           footer={empresaDetailFooter}
+          style={{ maxHeight: '90vh' }}
         >
           <div className={styles.tabs}>
-            {[['informacoes','Informações'],['vinculados','Vinculados'],['historico','Histórico']].map(([id, label]) => (
+            {[['informacoes','Informações'],['vinculados','Vinculados'],['historico','Histórico de Hospedagens']].map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
                 onClick={() => setDetailTab(id)}>{label}</button>
             ))}
@@ -1246,12 +1295,9 @@ export default function RegistersPage() {
                     <Search size={13} className={styles.searchIcon} />
                     <Input value={vinculSearch} onChange={e => setVinculSearch(e.target.value)}
                       placeholder="Buscar pessoa por nome ou CPF..."
-                      className={styles.searchInput}
-                      onKeyDown={e => e.key === 'Enter' && searchVinculados()} />
+                      className={styles.searchInput} />
+                    {vinculLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                   </div>
-                  <Button onClick={searchVinculados} disabled={vinculLoading}>
-                    {vinculLoading ? <Loader2 size={13} className={styles.spinInline} /> : <Search size={13} />} Buscar
-                  </Button>
                 </div>
                 {vinculResults.length > 0 && (
                   <div className={styles.vinculResults}>
@@ -1273,7 +1319,7 @@ export default function RegistersPage() {
                     : vinculadosList.map(p => (
                       <div key={p.id} className={styles.depCard}>
                         <AvatarCircle name={p.nome} size={32} />
-                        <div>
+                        <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => viewLinkedPessoa(p)}>
                           <div className={styles.nome}>{p.nome}</div>
                           <div className={styles.sub}>{maskCPF(p.cpf ?? '')}</div>
                         </div>
