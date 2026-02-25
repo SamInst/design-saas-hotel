@@ -984,7 +984,10 @@ export default function EmployeeManagement() {
                       }} onMouseEnter={e => !editHistoryItem && (e.currentTarget.style.background = 'rgba(124,58,237,.04)')}
                          onMouseLeave={e => !editHistoryItem && (e.currentTarget.style.background = 'transparent')}
                          onClick={() => {
-                           if (editHistoryItem?.id !== h.id) {
+                           if (editHistoryItem?.id === h.id) {
+                             setEditHistoryItem(null);
+                             setRecebidos([]);
+                           } else {
                              setEditHistoryItem(h);
                              setHistoryForm({
                                cargoId: String(h.cargo?.id ?? ''),
@@ -998,7 +1001,7 @@ export default function EmployeeManagement() {
                             <div className={styles.nome}>{h.cargo?.descricao}</div>
                             <div className={styles.sub}>R$ {maskSalary(String(Math.round(h.salario * 100)))}</div>
                           </div>
-                          <Edit2 size={14} className={styles.iconMuted} />
+                          <ChevRight size={14} className={styles.iconMuted} style={{ transform: editHistoryItem?.id === h.id ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                         </div>
                       </div>
 
@@ -1042,32 +1045,33 @@ export default function EmployeeManagement() {
                                       {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)}
                                     </div>
                                   </div>
-                                  {r.pathArquivoComprovante && (
-                                    <button onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}
-                                      style={{
-                                        background: 'rgba(124,58,237,.15)',
-                                        border: 'none',
-                                        padding: '4px 8px',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px',
-                                        fontSize: '11px',
-                                        color: 'var(--violet)',
-                                        fontWeight: '500'
-                                      }}>
-                                      <Download size={11} /> Comprovante
-                                    </button>
-                                  )}
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    {r.pathArquivoComprovante && (
+                                      <button onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}
+                                        style={{
+                                          background: 'rgba(124,58,237,.15)',
+                                          border: 'none',
+                                          padding: '4px 8px',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '4px',
+                                          fontSize: '11px',
+                                          color: 'var(--violet)',
+                                          fontWeight: '500'
+                                        }}>
+                                        <Download size={11} /> Baixar
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           )}
 
-                          <Button
-                            variant="secondary"
-                            onClick={() => {
+                          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
+                            <button onClick={() => {
                               setAddRecebidoForm({
                                 historicoFuncionarioId: h.id,
                                 valorRecebido: '',
@@ -1080,23 +1084,43 @@ export default function EmployeeManagement() {
                               setRecebidoFile(null);
                               setShowAddRecebido(true);
                             }}
-                            style={{ fontSize: '12px', padding: '6px 10px', marginBottom: '12px' }}>
-                            <Plus size={12} /> Novo Recebimento
-                          </Button>
-
-                          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                            <Button onClick={() => {
+                            style={{
+                              background: 'rgba(124,58,237,.15)',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              color: 'var(--violet)',
+                              fontWeight: '500'
+                            }}>
+                              <Plus size={11} /> Novo Recebimento
+                            </button>
+                            <button onClick={() => {
                               setHistoryForm({
                                 cargoId: String(h.cargo?.id ?? ''),
                                 salario: maskSalary(String(Math.round(h.salario * 100)))
                               });
                               setShowEditHistory(true);
-                            }} style={{ fontSize: '12px', padding: '6px 10px' }}>
-                              <Edit2 size={12} /> Editar
-                            </Button>
-                            <Button onClick={() => setEditHistoryItem(null)} style={{ fontSize: '12px', padding: '6px 10px' }}>
-                              <X size={12} /> Fechar
-                            </Button>
+                            }}
+                            style={{
+                              background: 'rgba(124,58,237,.15)',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '11px',
+                              color: 'var(--violet)',
+                              fontWeight: '500'
+                            }}>
+                              <Edit2 size={11} /> Editar
+                            </button>
                           </div>
                         </div>
                       )}
