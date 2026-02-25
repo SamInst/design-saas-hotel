@@ -585,7 +585,7 @@ export default function EmployeeManagement() {
     setEditFunc({
       pessoa: {
         nome: item.pessoa?.nome ?? '',
-        dataNascimento: item.pessoa?.dataNascimento ? new Date(item.pessoa.dataNascimento + 'T12:00:00') : null,
+        dataNascimento: item.pessoa?.dataNascimento ? new Date(item.pessoa.dataNascimento) : null,
         cpf: maskCPF(item.pessoa?.cpf ?? ''),
         rg: item.pessoa?.rg ?? '',
         email: item.pessoa?.email ?? '',
@@ -601,7 +601,7 @@ export default function EmployeeManagement() {
         numero: item.pessoa?.numero ?? '',
         status: item.pessoa?.status ?? 'ATIVO',
       },
-      dataAdmissao: item.dataAdmissao ? new Date(item.dataAdmissao + 'T12:00:00') : null,
+      dataAdmissao: item.dataAdmissao ? new Date(item.dataAdmissao) : null,
       salario: maskSalary(String(Math.round(item.salario * 100))),
       cargoId: String(item.cargo?.id ?? ''),
       usuario: {
@@ -841,7 +841,7 @@ export default function EmployeeManagement() {
         setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
         setShowEditCredentials(true);
       }}>
-        <Lock size={13} /> Credenciais
+        <Lock size={13} /> Atualizar Credenciais
       </Button>
       <Button onClick={openEditEmployee}>
         <Edit2 size={13} /> Editar
@@ -1168,9 +1168,9 @@ export default function EmployeeManagement() {
                                       setEditRecebidoForm({
                                         historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
                                         valorRecebido: maskSalary(String(Math.round(r.valorRecebido * 100))),
-                                        dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio + 'T12:00:00') : null,
-                                        dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim + 'T12:00:00') : null,
-                                        dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento + 'T12:00:00') : null,
+                                        dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
+                                        dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
+                                        dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
                                         tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
                                         descricao: r.descricao ?? '',
                                       });

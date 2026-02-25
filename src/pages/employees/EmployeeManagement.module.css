@@ -237,4 +237,5 @@
 /* ── DatePicker Global Fix ── */
 :global(.rdp) {
   z-index: 10000 !important;
+  position: fixed !important;
 }

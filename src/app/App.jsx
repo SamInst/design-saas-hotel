@@ -27,10 +27,17 @@ const PAGE_MAP = {
 };
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('financial');
+  const [currentPage, setCurrentPage] = useState(() => {
+    return localStorage.getItem('currentPage') || 'financial';
+  });
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const { isDark, toggleTheme } = useTheme();
+
+  // Salva a página atual no localStorage quando muda
+  useEffect(() => {
+    localStorage.setItem('currentPage', currentPage);
+  }, [currentPage]);
 
   // Restaura sessão do localStorage ao montar
   useEffect(() => {
