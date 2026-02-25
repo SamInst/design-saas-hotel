@@ -4,7 +4,8 @@ import LoginPage from '../pages/LoginPage';
 import { useTheme } from '../hooks/useTheme';
 
 import FinancialDashboard  from '../pages/financial/FinancialDashboard';
-// import EmployeeManagement  from '../pages/employees/EmployeeManagement';
+import RegistersPage       from '../pages/registers/RegistersPage';
+import EmployeeManagement  from '../pages/employees/EmployeeManagement';
 // import RolePermissions     from '../pages/permissions/RolePermissions';
 // import InventoryManagement from '../pages/inventory/InventoryManagement';
 // import RoomsManagement     from '../pages/rooms/RoomsManagement';
@@ -14,7 +15,8 @@ import FinancialDashboard  from '../pages/financial/FinancialDashboard';
 
 const PAGE_MAP = {
   financial:   <FinancialDashboard />,
-  // employees:   <EmployeeManagement />,
+  registers:   <RegistersPage />,
+  employees:   <EmployeeManagement />,
   // inventory:   <InventoryManagement />,
   // permissions: <RolePermissions />,
   // rooms:       <RoomsManagement />,

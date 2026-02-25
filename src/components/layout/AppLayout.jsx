@@ -1,18 +1,18 @@
+import { useState } from 'react';
 import Sidebar from './Sidebar';
 import styles from './AppLayout.module.css';
 
 export default function AppLayout(props) {
   const { children, ...sidebarProps } = props;
+  const [collapsed, setCollapsed] = useState(false);
 
-  // Se você expuser "collapsed" para o layout, dá pra alternar mainCollapsed.
-  // Por enquanto mantém fixo 260.
   return (
     <div className={styles.shell}>
       <div className={styles.sidebarSlot}>
-        <Sidebar {...sidebarProps} />
+        <Sidebar {...sidebarProps} collapsed={collapsed} onToggleCollapse={() => setCollapsed(v => !v)} />
       </div>
 
-      <main className={styles.main}>
+      <main className={[styles.main, collapsed ? styles.mainCollapsed : ''].join(' ')}>
         {children}
       </main>
     </div>

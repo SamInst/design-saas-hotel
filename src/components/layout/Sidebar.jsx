@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   LayoutGrid, BedDouble, Clock, CalendarDays, Wallet, Package,
   Tag, LogOut, Sun, Moon, ChevronLeft, ChevronRight, MoreVertical,
@@ -16,7 +15,7 @@ const NAV_ITEMS = [
   { id: 'inventory', label: 'Itens',        icon: Package     },
   { id: 'registers', label: 'Cadastros',    icon: Users       },
   { id: 'pricing',   label: 'Preços',       icon: Tag         },
-  { id: 'users',     label: 'Funcionários', icon: UserCog     },
+  { id: 'employees', label: 'Funcionários', icon: UserCog     },
   { id: 'permissions', label: 'Permissões', icon: ShieldCheck },
 ];
 
@@ -28,9 +27,9 @@ export default function Sidebar({
   onToggleTheme,
   onLogout,
   appName = 'Hotel System',
+  collapsed = false,
+  onToggleCollapse,
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-
   return (
     <aside className={[styles.sidebar, collapsed ? styles.collapsed : ''].join(' ')}>
 
@@ -54,7 +53,7 @@ export default function Sidebar({
         <button
           type="button"
           className={styles.collapseBtn}
-          onClick={() => setCollapsed(v => !v)}
+          onClick={onToggleCollapse}
           aria-label={collapsed ? 'Expandir menu' : 'Colapsar menu'}
           title={collapsed ? 'Expandir' : 'Colapsar'}
         >

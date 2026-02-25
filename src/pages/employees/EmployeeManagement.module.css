@@ -1,0 +1,157 @@
+/* ── Layout ── */
+.page      { min-height: 100vh; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0; }
+
+/* ── Card principal ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+}
+
+/* ── Header dentro do card ── */
+.tableHeader {
+  display: flex; gap: 12px; align-items: center;
+  justify-content: space-between; flex-wrap: wrap;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+}
+.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
+.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.searchWrap    { position: relative; min-width: 220px; display: flex; align-items: center; }
+.searchIcon    { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; flex-shrink: 0; }
+.searchInput   { padding-left: 32px !important; }
+.searchSpinner { position: absolute; right: 10px; color: var(--violet); }
+
+/* ── Table ── */
+.tableWrap { overflow-x: auto; min-height: 180px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  padding: 9px 16px; text-align: left;
+  font-size: 11px; font-weight: 600;
+  color: var(--text-2);
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table td  { padding: 8px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.row       { cursor: pointer; transition: background .12s; }
+.row:hover { background: rgba(124,58,237,.04); }
+.row:last-child td { border-bottom: none; }
+
+.nome     { font-size: 13px; font-weight: 600; color: var(--text); }
+.sub      { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.mono     { font-size: 12px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; }
+
+/* ── Status badges ── */
+.badgeAtivo      { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(16,185,129,.12); color:var(--emerald); white-space:nowrap; }
+.badgeContratado { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:rgba(124,58,237,.15); color:var(--violet); white-space:nowrap; }
+.badgeDefault    { display:inline-block; padding:2px 9px; border-radius:20px; font-size:11px; font-weight:600; background:var(--surface-2); color:var(--text-2); }
+
+/* ── Paginação ── */
+.pagination { display:flex; align-items:center; gap:4px; padding:10px 16px; border-top:1px solid var(--border); background:var(--surface-2); }
+.pageBtn {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:30px; height:30px; padding:0 6px;
+  border-radius:8px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text-2);
+  font-size:12px; font-weight:500; cursor:pointer; transition:all .12s;
+}
+.pageBtn:hover:not(:disabled) { border-color:var(--violet); color:var(--violet); }
+.pageBtn:disabled              { opacity:.4; cursor:not-allowed; }
+.pageBtnActive { background:var(--violet); color:#fff; border-color:var(--violet); }
+.pageInfo      { margin-left:8px; font-size:12px; color:var(--text-2); }
+
+/* ── Empty / loading ── */
+.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:40px 20px; color:var(--text-2); font-size:13px; }
+.spin       { animation:spin .8s linear infinite; }
+.spinInline { animation:spin .8s linear infinite; display:inline-block; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Avatar ── */
+.avatar { display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(124,58,237,.15); color:var(--violet); font-weight:700; flex-shrink:0; }
+
+/* ── Modal title block (detail modals) ── */
+.modalTitleBlock { display:flex; flex-direction:row; align-items:center; gap:10px; min-width:0; }
+.modalTitleName  { font-size:15px; font-weight:700; color:var(--text); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.modalTitleMeta  { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+/* ── Detail footer actions ── */
+.detailFooterActions { display:flex; gap:8px; align-items:center; justify-content:flex-end; }
+
+/* ── List avatar (table row initials circle) ── */
+.listAvatar {
+  width:30px; height:30px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:11px; font-weight:700; flex-shrink:0;
+}
+.detailId { font-size:11px; font-family:var(--font-mono); color:var(--text-2); background:var(--surface-2); border:1px solid var(--border); padding:1px 7px; border-radius:6px; }
+
+/* ── Quick action buttons (WhatsApp/Email) ── */
+.quickBtn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px; border-radius:5px;
+  background:rgba(124,58,237,.10); color:var(--violet);
+  text-decoration:none; flex-shrink:0; transition:background .12s; cursor:pointer; border:none;
+}
+.quickBtn:hover { background:var(--violet); color:#fff; }
+
+/* ── Detail KV grid ── */
+.detailGrid  { display:flex; flex-direction:column; gap:14px; }
+.section     { }
+.sectionLabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:7px; }
+.kvList  { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; }
+.kvRow   { display:flex; flex-direction:column; gap:1px; }
+.kvLabel { font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; }
+.kvVal   { font-size:13px; color:var(--text); font-weight:500; }
+
+/* ── Modal footer ── */
+.modalFooter { display:flex; gap:8px; align-items:center; }
+.full        { flex:1; justify-content:center; }
+
+/* ── Form layout ── */
+.formBody    { display:flex; flex-direction:column; gap:10px; }
+.formDivider { height:1px; background:var(--border); margin:4px 0; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.spanTwo { grid-column:span 2; }
+
+/* ── Required field highlight ── */
+.reqField    { }
+.reqFieldErr label { color:#ef4444 !important; }
+.reqFieldErr input,
+.reqFieldErr select { border-color:#ef4444 !important; }
+.labelErr { color:#ef4444 !important; }
+
+/* ── CPF destacado ── */
+.cpfRow   { display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:10px; align-items:start; }
+.cpfBlock { display:flex; flex-direction:column; gap:3px; }
+.cpfLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; }
+.cpfWrap  { position:relative; display:flex; align-items:center; }
+.cpfIcon  { position:absolute; right:10px; display:flex; align-items:center; pointer-events:none; }
+.cpfMsg   { font-size:11px; font-weight:500; }
+.cpfInput { }
+.inputOk   { border-color:#10b981 !important; }
+.inputWarn { border-color:#f59e0b !important; }
+.inputErr  { border-color:#ef4444 !important; }
+.iconOk    { color:#10b981; }
+.iconWarn  { color:#f59e0b; }
+.iconErr   { color:#ef4444; }
+
+/* ── CEP / Salary loading ── */
+.fieldLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:5px; }
+.inputWithSpinner { position:relative; display:flex; align-items:center; }
+.inputWithSpinner input { width:100%; padding-right:30px !important; }
+.inputSpinner { position:absolute; right:10px; color:var(--violet); pointer-events:none; }
+.eyeBtn {
+  position:absolute; right:10px; display:flex; align-items:center; justify-content:center;
+  background:none; border:none; color:var(--text-2); cursor:pointer;
+  transition:color .12s; padding:0; width:20px; height:20px;
+}
+.eyeBtn:hover { color:var(--violet); }
+
+/* ── Responsive ── */
+@media (max-width:700px) {
+  .grid2, .grid3, .cpfRow { grid-template-columns:1fr; }
+  .spanTwo { grid-column:auto; }
+  .kvList  { grid-template-columns:1fr; }
+}

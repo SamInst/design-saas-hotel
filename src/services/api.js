@@ -3,9 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-const BASE_URL =
+// const BASE_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+
+  const BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+  'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -313,13 +317,21 @@ export const itemApi = {
 //  CADASTROS (pessoas, empresas, veículos)
 // ─────────────────────────────────────────────────────────────
 export const cadastroApi = {
-  listarPessoas(params)       { return request('/pessoas', { params }); },
-  buscarPessoaPorId(id)       { return request(`/pessoas/${id}`); },
-  criarPessoa(body)           { return request('/pessoas', { method: 'POST', body }); },
-  atualizarPessoa(id, body)   { return request(`/pessoas/${id}`, { method: 'PUT', body }); },
+  listarPessoas(params)         { return request('/pessoa',  { params }); },
+  buscarPessoaPorId(id)         { return request(`/pessoa/${id}`); },
+  criarPessoa(body)             { return request('/pessoa',  { method: 'POST', body }); },
+  atualizarPessoa(id, body)     { return request(`/pessoa/${id}`, { method: 'PUT', body }); },
 
-  listarEmpresas(params)      { return request('/empresas', { params }); },
-  listarVeiculos(params)      { return request('/veiculos', { params }); },
+  listarEmpresas(params)        { return request('/empresas', { params }); },
+  buscarEmpresaPorId(id)        { return request(`/empresas/${id}`); },
+  criarEmpresa(body)            { return request('/empresas', { method: 'POST', body }); },
+  atualizarEmpresa(id, body)    { return request(`/empresas/${id}`, { method: 'PUT', body }); },
+  vincularPessoa(empresaId, body){ return request(`/empresas/${empresaId}/pessoa`, { method: 'POST', body }); },
+
+  listarVeiculos(params)        { return request('/veiculos', { params }); },
+
+  buscarCEP(cep)                { return request(`/cep/${cep}`); },
+  buscarCNPJ(cnpj)              { return request(`/cnpj/${cnpj}`); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -336,10 +348,17 @@ export const precoApi = {
 //  FUNCIONÁRIOS
 // ─────────────────────────────────────────────────────────────
 export const funcionarioApi = {
-  listar(params)     { return request('/funcionarios', { params }); },
-  buscarPorId(id)    { return request(`/funcionarios/${id}`); },
-  criar(body)        { return request('/funcionarios', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/funcionarios/${id}`, { method: 'PUT', body }); },
+  listar(params)     { return request('/funcionario', { params }); },
+  buscarPorId(id)    { return request(`/funcionario/${id}`); },
+  criar(body)        { return request('/funcionario', { method: 'POST', body }); },
+  atualizar(id, body){ return request(`/funcionario/${id}`, { method: 'PUT', body }); },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  CARGOS
+// ─────────────────────────────────────────────────────────────
+export const cargoApi = {
+  listar(params)     { return request('/cargo', { params }); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -380,6 +399,7 @@ export default {
   cadastro:    cadastroApi,
   preco:       precoApi,
   funcionario: funcionarioApi,
+  cargo:       cargoApi,
   permissao:   permissaoApi,
   dashboard:   dashboardApi,
 };

@@ -14,6 +14,14 @@
 .val  { flex:1; color:var(--text); }
 .ph   { flex:1; color:var(--text-2); opacity:.6; }
 
+/* Text input inside trigger */
+.textInput {
+  flex:1; background:transparent; border:none; outline:none;
+  color:var(--text); font-size:13px; font-family:inherit;
+  padding:0; min-width:0;
+}
+.textInput::placeholder { color:var(--text-2); opacity:.6; }
+
 .clear {
   width:18px; height:18px; border-radius:50%; border:none;
   background:rgba(107,114,128,.15); color:var(--text-2); cursor:pointer;
@@ -31,12 +39,21 @@
 @keyframes popIn { from{opacity:0;transform:translateY(6px) scale(.97)} to{opacity:1;transform:none} }
 
 .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-.month { font-size:13px; font-weight:700; color:var(--text); }
+
+/* Clickable month/year label in header */
+.headBtn {
+  flex:1; font-size:13px; font-weight:700; color:var(--text);
+  background:none; border:none; cursor:pointer; padding:2px 8px;
+  border-radius:6px; transition:background .12s, color .12s;
+  text-align:center;
+}
+.headBtn:hover { background:rgba(124,58,237,.10); color:var(--violet); }
+
 .nav {
   width:28px; height:28px; border-radius:8px; border:1px solid var(--border);
   background:var(--surface-2); color:var(--text-2); cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  transition:background .12s, color .12s, border-color .12s;
+  transition:background .12s, color .12s, border-color .12s; flex-shrink:0;
 }
 .nav:hover { background:rgba(124,58,237,.10); border-color:rgba(124,58,237,.25); color:var(--violet); }
 
@@ -73,5 +90,18 @@
 }
 .dis { opacity:.3; cursor:not-allowed; }
 .hint { margin:8px 0 0; font-size:11px; color:var(--text-2); text-align:center; }
+
+/* ── Month / Year grids ── */
+.smGrid {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:4px;
+}
+.smCell {
+  width:100%; padding:8px 4px; border-radius:8px; border:none;
+  background:transparent; color:var(--text); font-size:12px;
+  font-family:inherit; font-weight:500; cursor:pointer; text-align:center;
+  transition:background .1s, color .1s;
+}
+.smCell:hover { background:rgba(124,58,237,.10); color:var(--violet); }
+.smActive { background:var(--violet) !important; color:#fff !important; font-weight:700; }
 
 :root[data-theme="dark"] .pop { box-shadow:0 10px 40px rgba(0,0,0,.45); }
