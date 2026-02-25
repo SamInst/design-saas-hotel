@@ -811,8 +811,7 @@ export default function RegistersPage() {
         showNotif('Esta pessoa já está vinculada!', 'error');
         return;
       }
-      // PUT to /empresas/:id/pessoa?pessoaId=X&vinculo=true
-      await fetch(`${window.location.origin}/api/empresas/${detailItem.id}/pessoa?pessoaId=${pessoaId}&vinculo=true`, { method: 'PUT' });
+      await cadastroApi.vincularPessoa(detailItem.id, pessoaId);
       showNotif('Pessoa vinculada!');
       const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       setDetailItem({ ...updated, _type: 'empresa' });
@@ -824,7 +823,7 @@ export default function RegistersPage() {
   const handleDesvincular = async pessoaId => {
     if (!window.confirm('Tem certeza que deseja desvincular esta pessoa?')) return;
     try {
-      await fetch(`${window.location.origin}/api/empresas/${detailItem.id}/pessoa?pessoaId=${pessoaId}&vinculo=false`, { method: 'PUT' });
+      await cadastroApi.desvincularPessoa(detailItem.id, pessoaId);
       showNotif('Pessoa desvinculada!');
       const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       setDetailItem({ ...updated, _type: 'empresa' });

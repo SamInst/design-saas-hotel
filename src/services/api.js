@@ -323,10 +323,11 @@ export const cadastroApi = {
   atualizarPessoa(id, body)     { return request(`/pessoa/${id}`, { method: 'PUT', body }); },
 
   listarEmpresas(params)        { return request('/empresas', { params }); },
-  buscarEmpresaPorId(id)        { return request(`/empresas/${id}`); },
+  buscarEmpresaPorId(id)        { return request(`/empresas?id=${id}`); },
   criarEmpresa(body)            { return request('/empresas', { method: 'POST', body }); },
   atualizarEmpresa(id, body)    { return request(`/empresas/${id}`, { method: 'PUT', body }); },
-  vincularPessoa(empresaId, body){ return request(`/empresas/${empresaId}/pessoa`, { method: 'PUT', body }); },
+  vincularPessoa(empresaId, pessoaId)    { return request(`/empresas/${empresaId}/pessoa?pessoaId=${pessoaId}&vinculo=true`, { method: 'PUT' }); },
+  desvincularPessoa(empresaId, pessoaId) { return request(`/empresas/${empresaId}/pessoa?pessoaId=${pessoaId}&vinculo=false`, { method: 'PUT' }); },
 
   listarVeiculos(params)        { return request('/veiculos', { params }); },
 
