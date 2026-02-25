@@ -3,7 +3,7 @@ import {
   Search, Plus, Loader2, AlertCircle, Calendar, Edit2, X,
   Phone, Mail, Trash2, Eye, EyeOff, Lock, Building,
   Users, ChevronLeft, ChevronRight as ChevRight,
-  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle,
+  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
@@ -11,7 +11,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification } from '../../components/ui/Notification';
 import { DatePicker } from '../../components/ui/DatePicker';
-import { funcionarioApi, cargoApi, cadastroApi, usuarioApi } from '../../services/api';
+import { funcionarioApi, cargoApi, cadastroApi, usuarioApi, enumApi } from '../../services/api';
 
 import styles from './EmployeeManagement.module.css';
 
@@ -356,22 +356,43 @@ export default function EmployeeManagement() {
   const [historyForm, setHistoryForm] = useState({ cargoId: '', salario: '' });
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // recebidos (salary payments history)
+  const [recebidos, setRecebidos] = useState([]);
+  const [recebidosLoading, setRecebidosLoading] = useState(false);
+  const [showAddRecebido, setShowAddRecebido] = useState(false);
+  const [addRecebidoForm, setAddRecebidoForm] = useState({
+    historicoFuncionarioId: '',
+    valorRecebido: '',
+    dataHoraInicio: null,
+    dataHoraFim: null,
+    dataHoraPagamento: null,
+    tipoPagamentoId: '1',
+    descricao: '',
+  });
+  const [addRecebidoLoading, setAddRecebidoLoading] = useState(false);
+  const [recebidoFile, setRecebidoFile] = useState(null);
+  const fileInputRef = useRef(null);
+  const [tipoPagamentos, setTipoPagamentos] = useState([]);
+
   const showNotif = (msg, type = 'success') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 3200);
   };
 
-  // Fetch cargos on mount
+  // Fetch cargos and tipoPagamentos on mount
   useEffect(() => {
-    const fetchCargos = async () => {
+    const fetch = async () => {
       try {
         const res = await cargoApi.listar();
         setCargos(res?.content ?? []);
+
+        const tipos = await enumApi.tipoPagamento();
+        setTipoPagamentos(tipos ?? []);
       } catch (e) {
-        console.error('Erro ao carregar cargos:', e);
+        console.error('Erro ao carregar cargos/tipos:', e);
       }
     };
-    fetchCargos();
+    fetch();
   }, []);
 
   const fetchCEP = async (cep, setter) => {
@@ -525,6 +546,7 @@ export default function EmployeeManagement() {
     setDetailItem(item);
     setDetailTab('cadastro');
     setShowDetail(true);
+    setRecebidos([]);
 
     // Fetch salary history
     setHistoricoLoading(true);
@@ -673,6 +695,77 @@ export default function EmployeeManagement() {
       showNotif(e.message || 'Erro ao atualizar histórico.', 'error');
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const loadRecebidos = async (historicoId) => {
+    setRecebidosLoading(true);
+    try {
+      const res = await funcionarioApi.listarRecebidos(historicoId);
+      setRecebidos(res ?? []);
+    } catch (e) {
+      console.error('Erro ao carregar recebidos:', e);
+      setRecebidos([]);
+    } finally {
+      setRecebidosLoading(false);
+    }
+  };
+
+  const handleAddRecebido = async () => {
+    if (!editHistoryItem) return;
+    if (!addRecebidoForm.valorRecebido || !addRecebidoForm.dataHoraInicio || !addRecebidoForm.dataHoraPagamento) {
+      showNotif('Preencha valor, data de início e pagamento.', 'error');
+      return;
+    }
+
+    setAddRecebidoLoading(true);
+    try {
+      const recebidoData = {
+        historicoFuncionarioId: editHistoryItem.id,
+        valorRecebido: cleanSalary(addRecebidoForm.valorRecebido),
+        dataHoraInicio: addRecebidoForm.dataHoraInicio instanceof Date
+          ? addRecebidoForm.dataHoraInicio.toISOString()
+          : addRecebidoForm.dataHoraInicio,
+        dataHoraFim: addRecebidoForm.dataHoraFim instanceof Date
+          ? addRecebidoForm.dataHoraFim.toISOString()
+          : addRecebidoForm.dataHoraFim,
+        dataHoraPagamento: addRecebidoForm.dataHoraPagamento instanceof Date
+          ? addRecebidoForm.dataHoraPagamento.toISOString()
+          : addRecebidoForm.dataHoraPagamento,
+        tipoPagamentoId: Number(addRecebidoForm.tipoPagamentoId),
+        descricao: addRecebidoForm.descricao || null,
+      };
+
+      await funcionarioApi.criarRecebido(recebidoData, recebidoFile);
+      showNotif('Recebido adicionado!');
+      setShowAddRecebido(false);
+      setAddRecebidoForm({
+        historicoFuncionarioId: '',
+        valorRecebido: '',
+        dataHoraInicio: null,
+        dataHoraFim: null,
+        dataHoraPagamento: null,
+        tipoPagamentoId: '1',
+        descricao: '',
+      });
+      setRecebidoFile(null);
+      await loadRecebidos(editHistoryItem.id);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao adicionar recebido.', 'error');
+    } finally {
+      setAddRecebidoLoading(false);
+    }
+  };
+
+  const handleDownloadArquivo = (filePath) => {
+    if (!filePath) {
+      showNotif('Arquivo não disponível.', 'error');
+      return;
+    }
+    try {
+      funcionarioApi.downloadArquivo(filePath);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao baixar arquivo.', 'error');
     }
   };
 
@@ -880,29 +973,133 @@ export default function EmployeeManagement() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {historico.map((h) => (
-                    <div key={h.id} className={styles.historyCard} style={{
-                      border: '1px solid var(--border)',
-                      padding: 12,
-                      borderRadius: 8,
-                      cursor: 'pointer',
-                      transition: 'background .12s'
-                    }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,.04)'}
-                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                       onClick={() => {
-                         setEditHistoryItem(h);
-                         setHistoryForm({
-                           cargoId: String(h.cargo?.id ?? ''),
-                           salario: maskSalary(String(Math.round(h.salario * 100)))
-                         });
-                         setShowEditHistory(true);
-                       }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <div className={styles.nome}>{h.cargo?.descricao}</div>
-                          <div className={styles.sub}>R$ {maskSalary(String(Math.round(h.salario * 100)))}</div>
+                    <div key={h.id}>
+                      <div className={styles.historyCard} style={{
+                        border: '1px solid var(--border)',
+                        padding: 12,
+                        borderRadius: 8,
+                        cursor: 'pointer',
+                        transition: 'background .12s',
+                        background: editHistoryItem?.id === h.id ? 'rgba(124,58,237,.08)' : 'transparent'
+                      }} onMouseEnter={e => !editHistoryItem && (e.currentTarget.style.background = 'rgba(124,58,237,.04)')}
+                         onMouseLeave={e => !editHistoryItem && (e.currentTarget.style.background = 'transparent')}
+                         onClick={() => {
+                           if (editHistoryItem?.id !== h.id) {
+                             setEditHistoryItem(h);
+                             setHistoryForm({
+                               cargoId: String(h.cargo?.id ?? ''),
+                               salario: maskSalary(String(Math.round(h.salario * 100)))
+                             });
+                             loadRecebidos(h.id);
+                           }
+                         }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div className={styles.nome}>{h.cargo?.descricao}</div>
+                            <div className={styles.sub}>R$ {maskSalary(String(Math.round(h.salario * 100)))}</div>
+                          </div>
+                          <Edit2 size={14} className={styles.iconMuted} />
                         </div>
-                        <Edit2 size={14} className={styles.iconMuted} />
                       </div>
+
+                      {/* Expandable recebidos section */}
+                      {editHistoryItem?.id === h.id && (
+                        <div style={{
+                          padding: '12px 12px 0 12px',
+                          borderLeft: '2px solid var(--violet)',
+                          marginLeft: '20px',
+                          marginTop: '8px',
+                        }}>
+                          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-2)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            Histórico de Recebimentos
+                          </div>
+
+                          {recebidosLoading ? (
+                            <div className={styles.empty} style={{ padding: '20px 10px' }}>
+                              <Loader2 size={16} className={styles.spinInline} /> Carregando...
+                            </div>
+                          ) : recebidos.length === 0 ? (
+                            <div style={{ fontSize: '12px', color: 'var(--text-2)', padding: '10px', fontStyle: 'italic' }}>
+                              Sem registros de recebimento
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '10px' }}>
+                              {recebidos.map((r) => (
+                                <div key={r.id} style={{
+                                  padding: '8px',
+                                  background: 'var(--surface-2)',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center'
+                                }}>
+                                  <div>
+                                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>
+                                      R$ {maskSalary(String(Math.round(r.valorRecebido * 100)))}
+                                    </div>
+                                    <div style={{ color: 'var(--text-2)', fontSize: '11px' }}>
+                                      {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)}
+                                    </div>
+                                  </div>
+                                  {r.pathArquivoComprovante && (
+                                    <button onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}
+                                      style={{
+                                        background: 'rgba(124,58,237,.15)',
+                                        border: 'none',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontSize: '11px',
+                                        color: 'var(--violet)',
+                                        fontWeight: '500'
+                                      }}>
+                                      <Download size={11} /> Comprovante
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              setAddRecebidoForm({
+                                historicoFuncionarioId: h.id,
+                                valorRecebido: '',
+                                dataHoraInicio: null,
+                                dataHoraFim: null,
+                                dataHoraPagamento: null,
+                                tipoPagamentoId: '1',
+                                descricao: '',
+                              });
+                              setRecebidoFile(null);
+                              setShowAddRecebido(true);
+                            }}
+                            style={{ fontSize: '12px', padding: '6px 10px', marginBottom: '12px' }}>
+                            <Plus size={12} /> Novo Recebimento
+                          </Button>
+
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                            <Button onClick={() => {
+                              setHistoryForm({
+                                cargoId: String(h.cargo?.id ?? ''),
+                                salario: maskSalary(String(Math.round(h.salario * 100)))
+                              });
+                              setShowEditHistory(true);
+                            }} style={{ fontSize: '12px', padding: '6px 10px' }}>
+                              <Edit2 size={12} /> Editar
+                            </Button>
+                            <Button onClick={() => setEditHistoryItem(null)} style={{ fontSize: '12px', padding: '6px 10px' }}>
+                              <X size={12} /> Fechar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1111,6 +1308,90 @@ export default function EmployeeManagement() {
               onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
               placeholder="0,00"
             />
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* ══ MODAL: ADICIONAR RECEBIDO ═════════════════════════ */}
+      <Modal
+        open={showAddRecebido}
+        onClose={() => setShowAddRecebido(false)}
+        size="md"
+        title="Novo Recebimento"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={() => setShowAddRecebido(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleAddRecebido} disabled={addRecebidoLoading}>
+              {addRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.formBody}>
+          <FormField label="Valor Recebido *">
+            <Input
+              value={addRecebidoForm.valorRecebido}
+              onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+              placeholder="0,00"
+            />
+          </FormField>
+
+          <div className={styles.grid2}>
+            <FormField label="Data/Hora Início *">
+              <DatePicker
+                mode="single"
+                value={addRecebidoForm.dataHoraInicio}
+                onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraInicio: d ?? null }))}
+                placeholder="dd/mm/aaaa"
+              />
+            </FormField>
+            <FormField label="Data/Hora Fim">
+              <DatePicker
+                mode="single"
+                value={addRecebidoForm.dataHoraFim}
+                onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraFim: d ?? null }))}
+                placeholder="dd/mm/aaaa"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Data/Hora Pagamento *">
+            <DatePicker
+              mode="single"
+              value={addRecebidoForm.dataHoraPagamento}
+              onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraPagamento: d ?? null }))}
+              placeholder="dd/mm/aaaa"
+            />
+          </FormField>
+
+          <FormField label="Tipo de Pagamento *">
+            <Select value={addRecebidoForm.tipoPagamentoId} onChange={e => setAddRecebidoForm(prev => ({ ...prev, tipoPagamentoId: e.target.value }))}>
+              <option value="">Selecione um tipo</option>
+              {tipoPagamentos.map(t => <option key={t.id} value={String(t.id)}>{t.descricao}</option>)}
+            </Select>
+          </FormField>
+
+          <FormField label="Descrição">
+            <Input
+              value={addRecebidoForm.descricao}
+              onChange={e => setAddRecebidoForm(prev => ({ ...prev, descricao: e.target.value }))}
+              placeholder="ex: Adiantamento, Bonus..."
+            />
+          </FormField>
+
+          <FormField label="Arquivo de Comprovante">
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={e => setRecebidoFile(e.target.files?.[0] || null)}
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              style={{ width: '100%', justifyContent: 'flex-start' }}>
+              {recebidoFile ? `✓ ${recebidoFile.name}` : '+ Selecionar Arquivo'}
+            </Button>
           </FormField>
         </div>
       </Modal>

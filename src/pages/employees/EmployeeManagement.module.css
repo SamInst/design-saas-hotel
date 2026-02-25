@@ -101,7 +101,6 @@
   gap: 0;
   border-bottom: 2px solid var(--border);
   margin-bottom: 14px;
-  background: var(--surface-2);
 }
 .tab {
   padding: 10px 14px;
