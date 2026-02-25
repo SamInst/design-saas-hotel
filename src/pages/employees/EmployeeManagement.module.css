@@ -95,8 +95,45 @@
 }
 .quickBtn:hover { background:var(--violet); color:#fff; }
 
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 14px;
+  background: var(--surface-2);
+}
+.tab {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-bottom: -2px;
+}
+.tab:hover {
+  color: var(--text);
+  background: rgba(124, 58, 237, 0.05);
+}
+.tabActive {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
+  background: transparent;
+}
+
+.tabBody {
+  min-height: 300px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
 /* ── Detail KV grid ── */
-.detailGrid  { display:flex; flex-direction:column; gap:14px; }
+.detailGrid  { display:flex; flex-direction:column; gap:14px; min-height:300px; }
 .section     { }
 .sectionLabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:7px; }
 .kvList  { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; }
