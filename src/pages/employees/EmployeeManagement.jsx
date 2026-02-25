@@ -1263,7 +1263,10 @@ export default function EmployeeManagement() {
           </div>
 
           <FormField label="Salário">
-            <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+            <div className={styles.currencyWrapper}>
+              <span className={styles.currencyPrefix}>R$</span>
+              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+            </div>
           </FormField>
 
           <div className={styles.formDivider} />
@@ -1313,7 +1316,10 @@ export default function EmployeeManagement() {
           </div>
 
           <FormField label="Salário">
-            <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+            <div className={styles.currencyWrapper}>
+              <span className={styles.currencyPrefix}>R$</span>
+              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+            </div>
           </FormField>
 
           <div className={styles.formDivider} />
@@ -1420,11 +1426,14 @@ export default function EmployeeManagement() {
             </Select>
           </FormField>
           <FormField label="Salário *">
-            <Input
-              value={historyForm.salario}
-              onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
-              placeholder="0,00"
-            />
+            <div className={styles.currencyWrapper}>
+              <span className={styles.currencyPrefix}>R$</span>
+              <Input
+                value={historyForm.salario}
+                onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
+                placeholder="0,00"
+              />
+            </div>
           </FormField>
         </div>
       </Modal>
@@ -1446,11 +1455,14 @@ export default function EmployeeManagement() {
       >
         <div className={styles.formBody}>
           <FormField label="Valor Recebido *">
-            <Input
-              value={addRecebidoForm.valorRecebido}
-              onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
-              placeholder="0,00"
-            />
+            <div className={styles.currencyWrapper}>
+              <span className={styles.currencyPrefix}>R$</span>
+              <Input
+                value={addRecebidoForm.valorRecebido}
+                onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+                placeholder="0,00"
+              />
+            </div>
           </FormField>
 
           <div className={styles.grid2}>
@@ -1530,11 +1542,14 @@ export default function EmployeeManagement() {
       >
         <div className={styles.formBody}>
           <FormField label="Valor Recebido *">
-            <Input
-              value={editRecebidoForm.valorRecebido}
-              onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
-              placeholder="0,00"
-            />
+            <div className={styles.currencyWrapper}>
+              <span className={styles.currencyPrefix}>R$</span>
+              <Input
+                value={editRecebidoForm.valorRecebido}
+                onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+                placeholder="0,00"
+              />
+            </div>
           </FormField>
 
           <div className={styles.grid2}>
