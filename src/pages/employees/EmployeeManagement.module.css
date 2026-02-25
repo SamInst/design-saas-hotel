@@ -145,7 +145,7 @@
 .full        { flex:1; justify-content:center; }
 
 /* ── Form layout ── */
-.formBody    { display:flex; flex-direction:column; gap:10px; }
+.formBody    { display:flex; flex-direction:column; gap:10px; overflow:visible; }
 .formDivider { height:1px; background:var(--border); margin:4px 0; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
