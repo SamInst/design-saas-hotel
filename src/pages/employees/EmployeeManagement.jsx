@@ -374,6 +374,22 @@ export default function EmployeeManagement() {
   const fileInputRef = useRef(null);
   const [tipoPagamentos, setTipoPagamentos] = useState([]);
 
+  // edit recebido
+  const [showEditRecebido, setShowEditRecebido] = useState(false);
+  const [editRecebidoItem, setEditRecebidoItem] = useState(null);
+  const [editRecebidoForm, setEditRecebidoForm] = useState({
+    historicoFuncionarioId: '',
+    valorRecebido: '',
+    dataHoraInicio: null,
+    dataHoraFim: null,
+    dataHoraPagamento: null,
+    tipoPagamentoId: '1',
+    descricao: '',
+  });
+  const [editRecebidoFile, setEditRecebidoFile] = useState(null);
+  const editFileInputRef = useRef(null);
+  const [editRecebidoLoading, setEditRecebidoLoading] = useState(false);
+
   const showNotif = (msg, type = 'success') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 3200);
@@ -757,6 +773,53 @@ export default function EmployeeManagement() {
     }
   };
 
+  const handleEditRecebido = async () => {
+    if (!editRecebidoItem) return;
+    if (!editRecebidoForm.valorRecebido || !editRecebidoForm.dataHoraInicio || !editRecebidoForm.dataHoraPagamento) {
+      showNotif('Preencha valor, data de início e pagamento.', 'error');
+      return;
+    }
+
+    setEditRecebidoLoading(true);
+    try {
+      const recebidoData = {
+        historicoFuncionarioId: editRecebidoItem.historicoFuncionario?.id,
+        valorRecebido: cleanSalary(editRecebidoForm.valorRecebido),
+        dataHoraInicio: editRecebidoForm.dataHoraInicio instanceof Date
+          ? editRecebidoForm.dataHoraInicio.toISOString()
+          : editRecebidoForm.dataHoraInicio,
+        dataHoraFim: editRecebidoForm.dataHoraFim instanceof Date
+          ? editRecebidoForm.dataHoraFim.toISOString()
+          : editRecebidoForm.dataHoraFim,
+        dataHoraPagamento: editRecebidoForm.dataHoraPagamento instanceof Date
+          ? editRecebidoForm.dataHoraPagamento.toISOString()
+          : editRecebidoForm.dataHoraPagamento,
+        tipoPagamentoId: Number(editRecebidoForm.tipoPagamentoId),
+        descricao: editRecebidoForm.descricao || null,
+      };
+
+      await funcionarioApi.atualizarRecebido(editRecebidoItem.id, recebidoData, editRecebidoFile);
+      showNotif('Recebido atualizado!');
+      setShowEditRecebido(false);
+      setEditRecebidoItem(null);
+      setEditRecebidoForm({
+        historicoFuncionarioId: '',
+        valorRecebido: '',
+        dataHoraInicio: null,
+        dataHoraFim: null,
+        dataHoraPagamento: null,
+        tipoPagamentoId: '1',
+        descricao: '',
+      });
+      setEditRecebidoFile(null);
+      await loadRecebidos(editHistoryItem.id);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao editar recebido.', 'error');
+    } finally {
+      setEditRecebidoLoading(false);
+    }
+  };
+
   const handleDownloadArquivo = (filePath) => {
     if (!filePath) {
       showNotif('Arquivo não disponível.', 'error');
@@ -1013,8 +1076,62 @@ export default function EmployeeManagement() {
                           marginLeft: '20px',
                           marginTop: '8px',
                         }}>
-                          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-2)', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            Histórico de Recebimentos
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Histórico de Recebimentos
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button onClick={() => {
+                                setAddRecebidoForm({
+                                  historicoFuncionarioId: h.id,
+                                  valorRecebido: '',
+                                  dataHoraInicio: null,
+                                  dataHoraFim: null,
+                                  dataHoraPagamento: null,
+                                  tipoPagamentoId: '1',
+                                  descricao: '',
+                                });
+                                setRecebidoFile(null);
+                                setShowAddRecebido(true);
+                              }}
+                              style={{
+                                background: 'rgba(124,58,237,.15)',
+                                border: 'none',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                color: 'var(--violet)',
+                                fontWeight: '500'
+                              }}>
+                                <Plus size={11} /> Novo
+                              </button>
+                              <button onClick={() => {
+                                setHistoryForm({
+                                  cargoId: String(h.cargo?.id ?? ''),
+                                  salario: maskSalary(String(Math.round(h.salario * 100)))
+                                });
+                                setShowEditHistory(true);
+                              }}
+                              style={{
+                                background: 'rgba(124,58,237,.15)',
+                                border: 'none',
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '11px',
+                                color: 'var(--violet)',
+                                fontWeight: '500'
+                              }}>
+                                <Edit2 size={11} /> Editar
+                              </button>
+                            </div>
                           </div>
 
                           {recebidosLoading ? (
@@ -1042,7 +1159,7 @@ export default function EmployeeManagement() {
                                       R$ {maskSalary(String(Math.round(r.valorRecebido * 100)))}
                                     </div>
                                     <div style={{ color: 'var(--text-2)', fontSize: '11px' }}>
-                                      {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)}
+                                      {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)} {r.descricao && `• ${r.descricao.toUpperCase()}`}
                                     </div>
                                   </div>
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -1061,67 +1178,43 @@ export default function EmployeeManagement() {
                                           color: 'var(--violet)',
                                           fontWeight: '500'
                                         }}>
-                                        <Download size={11} /> Baixar
+                                        <Download size={11} /> Doc.
                                       </button>
                                     )}
+                                    <button onClick={() => {
+                                      setEditRecebidoItem(r);
+                                      setEditRecebidoForm({
+                                        historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
+                                        valorRecebido: maskSalary(String(Math.round(r.valorRecebido * 100))),
+                                        dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio + 'T12:00:00') : null,
+                                        dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim + 'T12:00:00') : null,
+                                        dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento + 'T12:00:00') : null,
+                                        tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
+                                        descricao: r.descricao ?? '',
+                                      });
+                                      setEditRecebidoFile(null);
+                                      setShowEditRecebido(true);
+                                    }}
+                                    style={{
+                                      background: 'rgba(124,58,237,.15)',
+                                      border: 'none',
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      fontSize: '11px',
+                                      color: 'var(--violet)',
+                                      fontWeight: '500'
+                                    }}>
+                                      <Edit2 size={11} /> Editar
+                                    </button>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           )}
-
-                          <div style={{ display: 'flex', gap: '6px', marginBottom: '12px' }}>
-                            <button onClick={() => {
-                              setAddRecebidoForm({
-                                historicoFuncionarioId: h.id,
-                                valorRecebido: '',
-                                dataHoraInicio: null,
-                                dataHoraFim: null,
-                                dataHoraPagamento: null,
-                                tipoPagamentoId: '1',
-                                descricao: '',
-                              });
-                              setRecebidoFile(null);
-                              setShowAddRecebido(true);
-                            }}
-                            style={{
-                              background: 'rgba(124,58,237,.15)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '11px',
-                              color: 'var(--violet)',
-                              fontWeight: '500'
-                            }}>
-                              <Plus size={11} /> Novo Recebimento
-                            </button>
-                            <button onClick={() => {
-                              setHistoryForm({
-                                cargoId: String(h.cargo?.id ?? ''),
-                                salario: maskSalary(String(Math.round(h.salario * 100)))
-                              });
-                              setShowEditHistory(true);
-                            }}
-                            style={{
-                              background: 'rgba(124,58,237,.15)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              fontSize: '11px',
-                              color: 'var(--violet)',
-                              fontWeight: '500'
-                            }}>
-                              <Edit2 size={11} /> Editar
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>
@@ -1398,8 +1491,8 @@ export default function EmployeeManagement() {
           <FormField label="Descrição">
             <Input
               value={addRecebidoForm.descricao}
-              onChange={e => setAddRecebidoForm(prev => ({ ...prev, descricao: e.target.value }))}
-              placeholder="ex: Adiantamento, Bonus..."
+              onChange={e => setAddRecebidoForm(prev => ({ ...prev, descricao: e.target.value?.toUpperCase() }))}
+              placeholder="ex: ADIANTAMENTO, BONUS..."
             />
           </FormField>
 
@@ -1415,6 +1508,90 @@ export default function EmployeeManagement() {
               onClick={() => fileInputRef.current?.click()}
               style={{ width: '100%', justifyContent: 'flex-start' }}>
               {recebidoFile ? `✓ ${recebidoFile.name}` : '+ Selecionar Arquivo'}
+            </Button>
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* ══ MODAL: EDITAR RECEBIDO ════════════════════════════*/}
+      <Modal
+        open={showEditRecebido}
+        onClose={() => setShowEditRecebido(false)}
+        size="md"
+        title="Editar Recebimento"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={() => setShowEditRecebido(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleEditRecebido} disabled={editRecebidoLoading}>
+              {editRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.formBody}>
+          <FormField label="Valor Recebido *">
+            <Input
+              value={editRecebidoForm.valorRecebido}
+              onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+              placeholder="0,00"
+            />
+          </FormField>
+
+          <div className={styles.grid2}>
+            <FormField label="Data/Hora Início *">
+              <DatePicker
+                mode="single"
+                value={editRecebidoForm.dataHoraInicio}
+                onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraInicio: d ?? null }))}
+                placeholder="dd/mm/aaaa"
+              />
+            </FormField>
+            <FormField label="Data/Hora Fim">
+              <DatePicker
+                mode="single"
+                value={editRecebidoForm.dataHoraFim}
+                onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraFim: d ?? null }))}
+                placeholder="dd/mm/aaaa"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Data/Hora Pagamento *">
+            <DatePicker
+              mode="single"
+              value={editRecebidoForm.dataHoraPagamento}
+              onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraPagamento: d ?? null }))}
+              placeholder="dd/mm/aaaa"
+            />
+          </FormField>
+
+          <FormField label="Tipo de Pagamento *">
+            <Select value={editRecebidoForm.tipoPagamentoId} onChange={e => setEditRecebidoForm(prev => ({ ...prev, tipoPagamentoId: e.target.value }))}>
+              <option value="">Selecione um tipo</option>
+              {tipoPagamentos.map(t => <option key={t.id} value={String(t.id)}>{t.descricao}</option>)}
+            </Select>
+          </FormField>
+
+          <FormField label="Descrição">
+            <Input
+              value={editRecebidoForm.descricao}
+              onChange={e => setEditRecebidoForm(prev => ({ ...prev, descricao: e.target.value?.toUpperCase() }))}
+              placeholder="ex: ADIANTAMENTO, BONUS..."
+            />
+          </FormField>
+
+          <FormField label="Arquivo de Comprovante">
+            <input
+              ref={editFileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={e => setEditRecebidoFile(e.target.files?.[0] || null)}
+              accept=".pdf,.jpg,.jpeg,.png"
+            />
+            <Button
+              onClick={() => editFileInputRef.current?.click()}
+              style={{ width: '100%', justifyContent: 'flex-start' }}>
+              {editRecebidoFile ? `✓ ${editRecebidoFile.name}` : '+ Selecionar Arquivo'}
             </Button>
           </FormField>
         </div>

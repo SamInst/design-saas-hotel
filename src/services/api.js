@@ -392,6 +392,39 @@ export const funcionarioApi = {
     return data;
   },
 
+  async atualizarRecebido(id, recebidoData, arquivo) {
+    const token = tokenStorage.get();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const formData = new FormData();
+    formData.append('recebido', new Blob([JSON.stringify(recebidoData)], { type: 'application/json' }), 'recebido.json');
+    if (arquivo) {
+      formData.append('arquivo', arquivo);
+    }
+
+    const res = await fetch(`${BASE_URL}/historico-recebidos-funcionario/${id}`, {
+      method: 'PUT',
+      headers,
+      body: formData,
+    });
+
+    if (res.status === 204) return null;
+
+    let data;
+    try { data = await res.json(); } catch { data = null; }
+
+    if (!res.ok) {
+      const message = data?.message || data?.error || data?.detail || `Erro ${res.status}`;
+      const err = new Error(message);
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
+
+    return data;
+  },
+
   downloadArquivo(filePath) {
     const token = tokenStorage.get();
     const headers = {};
