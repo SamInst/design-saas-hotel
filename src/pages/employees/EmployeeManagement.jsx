@@ -971,7 +971,7 @@ export default function EmployeeManagement() {
         >
           {/* Tabs */}
           <div className={styles.tabs}>
-            {[['cadastro', 'Cadastro'], ['historico', 'Histórico do Funcionario']].map(([id, label]) => (
+            {[['cadastro', 'Cadastro'], ['profissional', 'Profissional'], ['historico', 'Histórico do Funcionario']].map(([id, label]) => (
               <button key={id}
                 className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
                 onClick={() => setDetailTab(id)}>
@@ -1018,6 +1018,12 @@ export default function EmployeeManagement() {
                 <KV label="Cidade" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' - ')} />
                 <KV label="País" value={detailItem.pessoa?.pais} />
               </Section>
+            </div>
+          )}
+
+          {/* Tab: Profissional */}
+          {detailTab === 'profissional' && (
+            <div className={styles.detailGrid}>
               <Section title="Profissional">
                 <KV label="Cargo" value={detailItem.cargo?.cargo} />
                 <KV label="Data Admissão" value={dateFromApi(detailItem.dataAdmissao ?? '')} />
@@ -1028,7 +1034,7 @@ export default function EmployeeManagement() {
             </div>
           )}
 
-          {/* Tab: Histórico */}
+          {/* Tab: Histórico de Salário */}
           {detailTab === 'historico' && (
             <div className={styles.tabBody}>
               {historicoLoading ? (
@@ -1101,7 +1107,9 @@ export default function EmployeeManagement() {
                                 <Plus size={11} /> Novo
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   setHistoryForm({
                                     cargoId: String(h.cargo?.id ?? ''),
                                     salario: maskSalary(String(Math.round(h.salario * 100)))

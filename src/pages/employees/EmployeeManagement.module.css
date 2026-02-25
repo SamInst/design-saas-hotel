@@ -233,3 +233,8 @@
   background: rgba(124,58,237,.25);
   color: var(--violet);
 }
+
+/* ── DatePicker Global Fix ── */
+:global(.rdp) {
+  z-index: 10000 !important;
+}
