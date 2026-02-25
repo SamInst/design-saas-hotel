@@ -3,7 +3,7 @@ import {
   Search, Plus, Loader2, AlertCircle, Calendar, Edit2, X,
   Phone, Mail, Trash2, Eye, EyeOff, Lock, Building,
   Users, ChevronLeft, ChevronRight as ChevRight,
-  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download,
+  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download, Upload,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
@@ -37,14 +37,15 @@ const maskSalary = v => {
   const decimais = (n.slice(-2) || '00').padStart(2, '0');
   return `${inteiros.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${decimais}`;
 };
-const unmaskSalary = v => v.replace(/\D/g,'').padStart(3, '0');
+const unmaskSalary = v => v.replace(/\D/g,'');
 
 const unmask = v => (v ?? '').replace(/\D/g,'');
 const up = v => (v ?? '').toUpperCase().trim();
 const cleanSalary = v => {
   const n = unmaskSalary(v);
-  const inteiros = n.slice(0, -2);
-  const decimais = n.slice(-2);
+  if (!n) return 0;
+  const inteiros = n.slice(0, -2) || '0';
+  const decimais = (n.slice(-2) || '00').padStart(2, '0');
   return parseInt(inteiros) + parseInt(decimais) / 100;
 };
 
@@ -970,7 +971,7 @@ export default function EmployeeManagement() {
         >
           {/* Tabs */}
           <div className={styles.tabs}>
-            {[['cadastro', 'Cadastro'], ['historico', 'Histórico de Salário']].map(([id, label]) => (
+            {[['cadastro', 'Cadastro'], ['historico', 'Histórico do Funcionario']].map(([id, label]) => (
               <button key={id}
                 className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
                 onClick={() => setDetailTab(id)}>
@@ -1469,7 +1470,7 @@ export default function EmployeeManagement() {
             />
           </FormField>
 
-          <FormField label="Arquivo de Comprovante">
+          <FormField label="Comprovante de pagamento">
             <input
               ref={fileInputRef}
               type="file"
@@ -1479,8 +1480,12 @@ export default function EmployeeManagement() {
             />
             <Button
               onClick={() => fileInputRef.current?.click()}
-              style={{ width: '100%', justifyContent: 'flex-start' }}>
-              {recebidoFile ? `✓ ${recebidoFile.name}` : '+ Selecionar Arquivo'}
+              style={{ width: '100%', justifyContent: 'flex-start', gap: '6px' }}>
+              {recebidoFile ? (
+                <><CheckCircle2 size={14} /> {recebidoFile.name}</>
+              ) : (
+                <><Upload size={14} /> Selecionar Arquivo</>
+              )}
             </Button>
           </FormField>
         </div>
@@ -1566,8 +1571,12 @@ export default function EmployeeManagement() {
             />
             <Button
               onClick={() => editFileInputRef.current?.click()}
-              style={{ width: '100%', justifyContent: 'flex-start' }}>
-              {editRecebidoFile ? `✓ ${editRecebidoFile.name}` : '+ Selecionar Arquivo'}
+              style={{ width: '100%', justifyContent: 'flex-start', gap: '6px' }}>
+              {editRecebidoFile ? (
+                <><CheckCircle2 size={14} /> {editRecebidoFile.name}</>
+              ) : (
+                <><Upload size={14} /> Selecionar Arquivo</>
+              )}
             </Button>
           </FormField>
         </div>

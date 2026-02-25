@@ -356,6 +356,7 @@ export const funcionarioApi = {
 
   listarHistorico(funcionarioId) { return request(`/historico-funcionario?funcionarioId=${funcionarioId}`); },
   atualizarHistorico(id, body)   { return request(`/historico-funcionario/${id}`, { method: 'PUT', body }); },
+  criarHistorico(body)           { return request(`/historico-funcionario`, { method: 'POST', body }); },
 
   listarRecebidos(historicoFuncionarioId) { return request(`/historico-recebidos-funcionario?historicoFuncionarioId=${historicoFuncionarioId}`); },
 
@@ -427,11 +428,14 @@ export const funcionarioApi = {
 
   downloadArquivo(filePath) {
     const token = tokenStorage.get();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     const encodedPath = encodeURIComponent(filePath);
-    window.location.href = `${BASE_URL}/arquivos/download?caminho=${encodedPath}`;
+    const url = `${BASE_URL}/arquivos/download?caminho=${encodedPath}`;
+    if (token) {
+      // Abrir em nova aba
+      window.open(url, '_blank');
+    } else {
+      window.open(url, '_blank');
+    }
   },
 };
 
