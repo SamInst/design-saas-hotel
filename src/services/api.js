@@ -353,6 +353,17 @@ export const funcionarioApi = {
   buscarPorId(id)    { return request(`/funcionario/${id}`); },
   criar(body)        { return request('/funcionario', { method: 'POST', body }); },
   atualizar(id, body){ return request(`/funcionario/${id}`, { method: 'PUT', body }); },
+
+  listarHistorico(funcionarioId) { return request(`/historico-funcionario?funcionarioId=${funcionarioId}`); },
+  atualizarHistorico(id, body)   { return request(`/historico-funcionario/${id}`, { method: 'PUT', body }); },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  USUÁRIOS
+// ─────────────────────────────────────────────────────────────
+export const usuarioApi = {
+  bloquear(id, bloqueado) { return request(`/usuario/${id}/bloqueio`, { method: 'PATCH', body: { bloqueado } }); },
+  atualizarCredenciais(id, body) { return request(`/usuario/${id}/credenciais`, { method: 'PATCH', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -400,6 +411,7 @@ export default {
   cadastro:    cadastroApi,
   preco:       precoApi,
   funcionario: funcionarioApi,
+  usuario:     usuarioApi,
   cargo:       cargoApi,
   permissao:   permissaoApi,
   dashboard:   dashboardApi,

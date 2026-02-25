@@ -11,7 +11,7 @@ import { Modal } from '../../components/ui/Modal';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification } from '../../components/ui/Notification';
 import { DatePicker } from '../../components/ui/DatePicker';
-import { funcionarioApi, cargoApi, cadastroApi } from '../../services/api';
+import { funcionarioApi, cargoApi, cadastroApi, usuarioApi } from '../../services/api';
 
 import styles from './EmployeeManagement.module.css';
 
@@ -336,6 +336,26 @@ export default function EmployeeManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // detail modal tabs and history
+  const [detailTab, setDetailTab] = useState('cadastro');
+  const [historico, setHistorico] = useState([]);
+  const [historicoLoading, setHistoricoLoading] = useState(false);
+
+  // edit credentials modal
+  const [showEditCredentials, setShowEditCredentials] = useState(false);
+  const [credentialsForm, setCredentialsForm] = useState({ username: '', senha: '' });
+  const [credLoading, setCredLoading] = useState(false);
+
+  // fire employee modal
+  const [showFireEmployee, setShowFireEmployee] = useState(false);
+  const [fireLoading, setFireLoading] = useState(false);
+
+  // edit history modal
+  const [showEditHistory, setShowEditHistory] = useState(false);
+  const [editHistoryItem, setEditHistoryItem] = useState(null);
+  const [historyForm, setHistoryForm] = useState({ cargoId: '', salario: '' });
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const showNotif = (msg, type = 'success') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 3200);
@@ -501,9 +521,22 @@ export default function EmployeeManagement() {
     }
   };
 
-  const openDetail = item => {
+  const openDetail = async item => {
     setDetailItem(item);
+    setDetailTab('cadastro');
     setShowDetail(true);
+
+    // Fetch salary history
+    setHistoricoLoading(true);
+    try {
+      const res = await funcionarioApi.listarHistorico(item.id);
+      setHistorico(res?.content ?? res ?? []);
+    } catch (e) {
+      console.error('Erro ao carregar histórico:', e);
+      setHistorico([]);
+    } finally {
+      setHistoricoLoading(false);
+    }
   };
 
   const openEditEmployee = () => {
@@ -569,11 +602,94 @@ export default function EmployeeManagement() {
     }
   };
 
+  const handleFireEmployee = async () => {
+    if (!detailItem || !detailItem.usuario?.id) return;
+    if (!window.confirm('Tem certeza que deseja desligar este funcionário?')) return;
+
+    setFireLoading(true);
+    try {
+      // Bloquear usuário
+      await usuarioApi.bloquear(detailItem.usuario.id, true);
+
+      // Atualizar status do funcionário para DEMITIDO
+      const pessoaBody = buildPessoaBody(detailItem.pessoa);
+      pessoaBody.status = 'DEMITIDO';
+      await cadastroApi.atualizarPessoa(detailItem.pessoa.id, pessoaBody);
+
+      showNotif('Funcionário demitido e usuário bloqueado!');
+      setShowDetail(false);
+      fetchData(searchTerm, page);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao desligar funcionário.', 'error');
+    } finally {
+      setFireLoading(false);
+    }
+  };
+
+  const handleEditCredentials = async () => {
+    if (!detailItem?.usuario?.id) return;
+    if (!credentialsForm.username.trim() || !credentialsForm.senha.trim()) {
+      showNotif('Preencha username e senha.', 'error');
+      return;
+    }
+
+    setCredLoading(true);
+    try {
+      await usuarioApi.atualizarCredenciais(detailItem.usuario.id, {
+        username: credentialsForm.username.trim(),
+        senha: credentialsForm.senha,
+      });
+      showNotif('Credenciais atualizadas!');
+      setShowEditCredentials(false);
+      setCredentialsForm({ username: '', senha: '' });
+    } catch (e) {
+      showNotif(e.message || 'Erro ao atualizar credenciais.', 'error');
+    } finally {
+      setCredLoading(false);
+    }
+  };
+
+  const handleEditHistory = async () => {
+    if (!editHistoryItem) return;
+    if (!historyForm.cargoId || !historyForm.salario) {
+      showNotif('Preencha cargo e salário.', 'error');
+      return;
+    }
+
+    setHistoryLoading(true);
+    try {
+      await funcionarioApi.atualizarHistorico(editHistoryItem.id, {
+        cargoId: Number(historyForm.cargoId),
+        funcionarioId: detailItem.id,
+        salario: cleanSalary(historyForm.salario),
+      });
+      showNotif('Histórico atualizado!');
+      setShowEditHistory(false);
+      setEditHistoryItem(null);
+      // Reload history
+      const res = await funcionarioApi.listarHistorico(detailItem.id);
+      setHistorico(res?.content ?? res ?? []);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao atualizar histórico.', 'error');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   // ── Modal footers ──────────────────────────────────────────
   const detailFooter = detailItem ? (
     <div className={styles.detailFooterActions}>
+      <Button onClick={() => {
+        setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
+        setShowEditCredentials(true);
+      }}>
+        <Lock size={13} /> Credenciais
+      </Button>
       <Button onClick={openEditEmployee}>
         <Edit2 size={13} /> Editar
+      </Button>
+      <Button variant="danger" onClick={handleFireEmployee} disabled={fireLoading}>
+        <Trash2 size={13} /> Desligar
       </Button>
     </div>
   ) : null;
@@ -625,7 +741,6 @@ export default function EmployeeManagement() {
                 <thead><tr>
                   <th style={{ width: 44 }}></th>
                   <th>Nome</th>
-                  <th style={{ width: 140 }}>CPF</th>
                   <th style={{ width: 140 }}>Cargo</th>
                   <th style={{ width: 140 }}>Data Admissão</th>
                   <th style={{ width: 100 }}>Status</th>
@@ -645,7 +760,6 @@ export default function EmployeeManagement() {
                           <div className={styles.nome}>{name}</div>
                           <div className={styles.sub}>{item.usuario?.username || '—'}</div>
                         </td>
-                        <td className={styles.mono}>{maskCPF(item.pessoa?.cpf ?? '')}</td>
                         <td className={styles.nome}>{item.cargo?.cargo || '—'}</td>
                         <td className={styles.mono}>{dateFromApi(item.dataAdmissao ?? '')}</td>
                         <td><StatusBadge status={item.pessoa?.status} /></td>
@@ -697,50 +811,104 @@ export default function EmployeeManagement() {
           }
           footer={detailFooter}
         >
-          <div className={styles.detailGrid}>
-            <Section title="Dados Pessoais">
-              <KV label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} />
-              <KV label="RG" value={detailItem.pessoa?.rg} />
-              <KV label="Nasc." value={dateFromApi(detailItem.pessoa?.dataNascimento)} />
-              <KV label="Sexo" value={detailItem.pessoa?.sexo === 1 ? 'Masculino' : detailItem.pessoa?.sexo === 2 ? 'Feminino' : 'Outro'} />
-              <KV label="Telefone" value={
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span>{maskPhone(detailItem.pessoa?.telefone ?? '') || '—'}</span>
-                  {detailItem.pessoa?.telefone && (
-                    <a href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} target="_blank"
-                      rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={e => e.stopPropagation()}>
-                      <Phone size={11} />
-                    </a>
-                  )}
-                </div>
-              } />
-              <KV label="Email" value={
-                <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                  <span>{detailItem.pessoa?.email || '—'}</span>
-                  {detailItem.pessoa?.email && (
-                    <a href={`mailto:${detailItem.pessoa.email}`} target="_blank" rel="noreferrer"
-                      className={styles.quickBtn} title="Enviar e-mail" onClick={e => e.stopPropagation()}>
-                      <Mail size={11} />
-                    </a>
-                  )}
-                </div>
-              } />
-            </Section>
-            <Section title="Endereço">
-              <KV label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} />
-              <KV label="Endereço" value={`${detailItem.pessoa?.endereco ?? ''}${detailItem.pessoa?.numero ? ', ' + detailItem.pessoa.numero : ''}`} />
-              <KV label="Bairro" value={detailItem.pessoa?.bairro} />
-              <KV label="Cidade" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' - ')} />
-              <KV label="País" value={detailItem.pessoa?.pais} />
-            </Section>
-            <Section title="Profissional">
-              <KV label="Cargo" value={detailItem.cargo?.cargo} />
-              <KV label="Data Admissão" value={dateFromApi(detailItem.dataAdmissao ?? '')} />
-              <KV label="Salário" value={`R$ ${maskSalary(String(Math.round(detailItem.salario * 100)))}`} />
-              <KV label="Usuário" value={detailItem.usuario?.username} />
-              <KV label="Status Acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Ativo'} />
-            </Section>
+          {/* Tabs */}
+          <div className={styles.tabs}>
+            {[['cadastro', 'Cadastro'], ['historico', 'Histórico de Salário']].map(([id, label]) => (
+              <button key={id}
+                className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
+                onClick={() => setDetailTab(id)}>
+                {label}
+              </button>
+            ))}
           </div>
+
+          {/* Tab: Cadastro */}
+          {detailTab === 'cadastro' && (
+            <div className={styles.detailGrid}>
+              <Section title="Dados Pessoais">
+                <KV label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} />
+                <KV label="RG" value={detailItem.pessoa?.rg} />
+                <KV label="Nasc." value={dateFromApi(detailItem.pessoa?.dataNascimento)} />
+                <KV label="Sexo" value={detailItem.pessoa?.sexo === 1 ? 'Masculino' : detailItem.pessoa?.sexo === 2 ? 'Feminino' : 'Outro'} />
+                <KV label="Telefone" value={
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span>{maskPhone(detailItem.pessoa?.telefone ?? '') || '—'}</span>
+                    {detailItem.pessoa?.telefone && (
+                      <a href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} target="_blank"
+                        rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={e => e.stopPropagation()}>
+                        <Phone size={11} />
+                      </a>
+                    )}
+                  </div>
+                } />
+                <KV label="Email" value={
+                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <span>{detailItem.pessoa?.email || '—'}</span>
+                    {detailItem.pessoa?.email && (
+                      <a href={`mailto:${detailItem.pessoa.email}`} target="_blank" rel="noreferrer"
+                        className={styles.quickBtn} title="Enviar e-mail" onClick={e => e.stopPropagation()}>
+                        <Mail size={11} />
+                      </a>
+                    )}
+                  </div>
+                } />
+              </Section>
+              <Section title="Endereço">
+                <KV label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} />
+                <KV label="Endereço" value={`${detailItem.pessoa?.endereco ?? ''}${detailItem.pessoa?.numero ? ', ' + detailItem.pessoa.numero : ''}`} />
+                <KV label="Bairro" value={detailItem.pessoa?.bairro} />
+                <KV label="Cidade" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' - ')} />
+                <KV label="País" value={detailItem.pessoa?.pais} />
+              </Section>
+              <Section title="Profissional">
+                <KV label="Cargo" value={detailItem.cargo?.cargo} />
+                <KV label="Data Admissão" value={dateFromApi(detailItem.dataAdmissao ?? '')} />
+                <KV label="Salário" value={`R$ ${maskSalary(String(Math.round(detailItem.salario * 100)))}`} />
+                <KV label="Usuário" value={detailItem.usuario?.username} />
+                <KV label="Status Acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Ativo'} />
+              </Section>
+            </div>
+          )}
+
+          {/* Tab: Histórico */}
+          {detailTab === 'historico' && (
+            <div className={styles.tabBody}>
+              {historicoLoading ? (
+                <div className={styles.empty}><Loader2 size={20} className={styles.spin} /> Carregando histórico...</div>
+              ) : historico.length === 0 ? (
+                <div className={styles.empty}><AlertCircle size={26} opacity={0.3} /><span>Sem histórico de salário.</span></div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {historico.map((h) => (
+                    <div key={h.id} className={styles.historyCard} style={{
+                      border: '1px solid var(--border)',
+                      padding: 12,
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      transition: 'background .12s'
+                    }} onMouseEnter={e => e.currentTarget.style.background = 'rgba(124,58,237,.04)'}
+                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                       onClick={() => {
+                         setEditHistoryItem(h);
+                         setHistoryForm({
+                           cargoId: String(h.cargo?.id ?? ''),
+                           salario: maskSalary(String(Math.round(h.salario * 100)))
+                         });
+                         setShowEditHistory(true);
+                       }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div className={styles.nome}>{h.cargo?.descricao}</div>
+                          <div className={styles.sub}>R$ {maskSalary(String(Math.round(h.salario * 100)))}</div>
+                        </div>
+                        <Edit2 size={14} className={styles.iconMuted} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </Modal>
       )}
 
@@ -878,6 +1046,72 @@ export default function EmployeeManagement() {
               </div>
             </div>
           </div>
+        </div>
+      </Modal>
+
+      {/* ══ MODAL: EDITAR CREDENCIAIS ═════════════════════════ */}
+      <Modal
+        open={showEditCredentials}
+        onClose={() => setShowEditCredentials(false)}
+        size="sm"
+        title="Alterar Credenciais"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={() => setShowEditCredentials(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleEditCredentials} disabled={credLoading}>
+              {credLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.formBody}>
+          <FormField label="Username *">
+            <Input
+              value={credentialsForm.username}
+              onChange={e => setCredentialsForm(prev => ({ ...prev, username: e.target.value }))}
+              placeholder="novo.username"
+            />
+          </FormField>
+          <FormField label="Senha *">
+            <Input
+              type="password"
+              value={credentialsForm.senha}
+              onChange={e => setCredentialsForm(prev => ({ ...prev, senha: e.target.value }))}
+              placeholder="••••••••"
+            />
+          </FormField>
+        </div>
+      </Modal>
+
+      {/* ══ MODAL: EDITAR HISTÓRICO ═══════════════════════════ */}
+      <Modal
+        open={showEditHistory}
+        onClose={() => setShowEditHistory(false)}
+        size="sm"
+        title="Editar Histórico de Salário"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={() => setShowEditHistory(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleEditHistory} disabled={historyLoading}>
+              {historyLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.formBody}>
+          <FormField label="Cargo *">
+            <Select value={historyForm.cargoId} onChange={e => setHistoryForm(prev => ({ ...prev, cargoId: e.target.value }))}>
+              <option value="">Selecione um cargo</option>
+              {cargos.map(c => <option key={c.id} value={String(c.id)}>{c.descricao}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Salário *">
+            <Input
+              value={historyForm.salario}
+              onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
+              placeholder="0,00"
+            />
+          </FormField>
         </div>
       </Modal>
 
