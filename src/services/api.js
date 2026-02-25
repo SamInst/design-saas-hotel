@@ -326,7 +326,7 @@ export const cadastroApi = {
   buscarEmpresaPorId(id)        { return request(`/empresas/${id}`); },
   criarEmpresa(body)            { return request('/empresas', { method: 'POST', body }); },
   atualizarEmpresa(id, body)    { return request(`/empresas/${id}`, { method: 'PUT', body }); },
-  vincularPessoa(empresaId, body){ return request(`/empresas/${empresaId}/pessoa`, { method: 'POST', body }); },
+  vincularPessoa(empresaId, body){ return request(`/empresas/${empresaId}/pessoa`, { method: 'PUT', body }); },
 
   listarVeiculos(params)        { return request('/veiculos', { params }); },
 
