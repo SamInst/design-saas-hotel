@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AppLayout from '../components/layout/AppLayout';
 import LoginPage from '../pages/LoginPage';
 import { useTheme } from '../hooks/useTheme';
+import { userStorage, tokenStorage, authApi } from '../services/api';
 
 import FinancialDashboard  from '../pages/financial/FinancialDashboard';
 import RegistersPage       from '../pages/registers/RegistersPage';
@@ -28,7 +29,38 @@ const PAGE_MAP = {
 export default function App() {
   const [currentPage, setCurrentPage] = useState('financial');
   const [user, setUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { isDark, toggleTheme } = useTheme();
+
+  // Restaura sessão do localStorage ao montar
+  useEffect(() => {
+    const storedToken = tokenStorage.get();
+    const storedUser = userStorage.get();
+
+    if (storedToken && storedUser) {
+      // Valida se a sessão ainda está ativa no backend
+      if (authApi.isAuthenticated()) {
+        setUser(storedUser);
+      } else {
+        // Token expirou ou é inválido, limpa o storage
+        authApi.logout();
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleLogout = () => {
+    authApi.logout(); // Limpa localStorage
+    setUser(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div>Carregando...</div>
+      </div>
+    );
+  }
 
   if (!user) return <LoginPage onLogin={setUser} />;
 
@@ -39,7 +71,7 @@ export default function App() {
       user={user}
       isDark={isDark}
       onToggleTheme={toggleTheme}
-      onLogout={() => setUser(null)}
+      onLogout={handleLogout}
     >
       {PAGE_MAP[currentPage]}
     </AppLayout>
