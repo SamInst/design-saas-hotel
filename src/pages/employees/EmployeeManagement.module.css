@@ -212,3 +212,24 @@
 .currencyWrapper input {
   padding-left: 30px !important;
 }
+
+/* ── History Action Buttons ── */
+.historyActionBtn {
+  background: rgba(124,58,237,.15);
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--violet);
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+}
+
+.historyActionBtn:hover {
+  background: rgba(124,58,237,.25);
+  color: var(--violet);
+}

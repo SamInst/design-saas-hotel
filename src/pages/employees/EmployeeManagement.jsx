@@ -30,6 +30,7 @@ const maskPhone = v => {
 
 const maskCEP = v => v.replace(/\D/g,'').slice(0,8).replace(/(\d{5})(\d{1,3})$/,'$1-$2');
 const maskSalary = v => {
+  if (!v) return '';
   const n = v.replace(/\D/g,'');
   if (!n) return '';
   const inteiros = n.slice(0, -2) || '0';
@@ -1081,54 +1082,32 @@ export default function EmployeeManagement() {
                               Histórico de Recebimentos
                             </div>
                             <div style={{ display: 'flex', gap: '6px' }}>
-                              <button onClick={() => {
-                                setAddRecebidoForm({
-                                  historicoFuncionarioId: h.id,
-                                  valorRecebido: '',
-                                  dataHoraInicio: null,
-                                  dataHoraFim: null,
-                                  dataHoraPagamento: null,
-                                  tipoPagamentoId: '1',
-                                  descricao: '',
-                                });
-                                setRecebidoFile(null);
-                                setShowAddRecebido(true);
-                              }}
-                              style={{
-                                background: 'rgba(124,58,237,.15)',
-                                border: 'none',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '11px',
-                                color: 'var(--violet)',
-                                fontWeight: '500'
-                              }}>
+                              <button
+                                onClick={() => {
+                                  setAddRecebidoForm({
+                                    historicoFuncionarioId: h.id,
+                                    valorRecebido: '',
+                                    dataHoraInicio: null,
+                                    dataHoraFim: null,
+                                    dataHoraPagamento: null,
+                                    tipoPagamentoId: '1',
+                                    descricao: '',
+                                  });
+                                  setRecebidoFile(null);
+                                  setShowAddRecebido(true);
+                                }}
+                                className={styles.historyActionBtn}>
                                 <Plus size={11} /> Novo
                               </button>
-                              <button onClick={() => {
-                                setHistoryForm({
-                                  cargoId: String(h.cargo?.id ?? ''),
-                                  salario: maskSalary(String(Math.round(h.salario * 100)))
-                                });
-                                setShowEditHistory(true);
-                              }}
-                              style={{
-                                background: 'rgba(124,58,237,.15)',
-                                border: 'none',
-                                padding: '4px 8px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '11px',
-                                color: 'var(--violet)',
-                                fontWeight: '500'
-                              }}>
+                              <button
+                                onClick={() => {
+                                  setHistoryForm({
+                                    cargoId: String(h.cargo?.id ?? ''),
+                                    salario: maskSalary(String(Math.round(h.salario * 100)))
+                                  });
+                                  setShowEditHistory(true);
+                                }}
+                                className={styles.historyActionBtn}>
                                 <Edit2 size={11} /> Editar
                               </button>
                             </div>
@@ -1165,19 +1144,7 @@ export default function EmployeeManagement() {
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     {r.pathArquivoComprovante && (
                                       <button onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}
-                                        style={{
-                                          background: 'rgba(124,58,237,.15)',
-                                          border: 'none',
-                                          padding: '4px 8px',
-                                          borderRadius: '4px',
-                                          cursor: 'pointer',
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          gap: '4px',
-                                          fontSize: '11px',
-                                          color: 'var(--violet)',
-                                          fontWeight: '500'
-                                        }}>
+                                        className={styles.historyActionBtn}>
                                         <Download size={11} /> Doc.
                                       </button>
                                     )}
@@ -1195,19 +1162,7 @@ export default function EmployeeManagement() {
                                       setEditRecebidoFile(null);
                                       setShowEditRecebido(true);
                                     }}
-                                    style={{
-                                      background: 'rgba(124,58,237,.15)',
-                                      border: 'none',
-                                      padding: '4px 8px',
-                                      borderRadius: '4px',
-                                      cursor: 'pointer',
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '4px',
-                                      fontSize: '11px',
-                                      color: 'var(--violet)',
-                                      fontWeight: '500'
-                                    }}>
+                                    className={styles.historyActionBtn}>
                                       <Edit2 size={11} /> Editar
                                     </button>
                                   </div>
@@ -1265,7 +1220,7 @@ export default function EmployeeManagement() {
           <FormField label="Salário">
             <div className={styles.currencyWrapper}>
               <span className={styles.currencyPrefix}>R$</span>
-              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
@@ -1318,7 +1273,7 @@ export default function EmployeeManagement() {
           <FormField label="Salário">
             <div className={styles.currencyWrapper}>
               <span className={styles.currencyPrefix}>R$</span>
-              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="0,00" />
+              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
@@ -1431,7 +1386,7 @@ export default function EmployeeManagement() {
               <Input
                 value={historyForm.salario}
                 onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
-                placeholder="0,00"
+                placeholder=""
               />
             </div>
           </FormField>
@@ -1460,7 +1415,7 @@ export default function EmployeeManagement() {
               <Input
                 value={addRecebidoForm.valorRecebido}
                 onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
-                placeholder="0,00"
+                placeholder=""
               />
             </div>
           </FormField>
@@ -1547,7 +1502,7 @@ export default function EmployeeManagement() {
               <Input
                 value={editRecebidoForm.valorRecebido}
                 onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
-                placeholder="0,00"
+                placeholder=""
               />
             </div>
           </FormField>
