@@ -1143,12 +1143,18 @@ export default function EmployeeManagement() {
                                   </div>
                                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                                     {r.pathArquivoComprovante && (
-                                      <button onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}
+                                      <button onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleDownloadArquivo(r.pathArquivoComprovante);
+                                      }}
                                         className={styles.historyActionBtn}>
                                         <Download size={11} /> Doc.
                                       </button>
                                     )}
-                                    <button onClick={() => {
+                                    <button onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
                                       setEditRecebidoItem(r);
                                       setEditRecebidoForm({
                                         historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
