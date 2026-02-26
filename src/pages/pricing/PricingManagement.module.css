@@ -1,0 +1,219 @@
+/* ── Layout ── */
+.page      { min-height: 100%; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── KPI grid ── */
+.kpiGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 900px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px) { .kpiGrid { grid-template-columns: 1fr; } }
+
+.kpiCard {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.kpiIcon { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.kpiBody  { display: flex; flex-direction: column; gap: 2px; }
+.kpiLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+.kpiValue { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.kpiSub   { font-size: 11px; color: var(--text-2); }
+
+.kpi_blue    .kpiIcon { background: rgba(14,165,233,.12);  color: #0ea5e9; }
+.kpi_violet  .kpiIcon { background: rgba(124,58,237,.12);  color: var(--violet); }
+.kpi_amber   .kpiIcon { background: rgba(245,158,11,.12);  color: #f59e0b; }
+.kpi_emerald .kpiIcon { background: rgba(16,185,129,.12);  color: var(--emerald); }
+
+/* ── Card ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+
+/* ── Toolbar ── */
+.tableHeader {
+  display: flex; gap: 12px; align-items: center;
+  justify-content: space-between; flex-wrap: wrap;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+}
+.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
+.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Expandable rows ── */
+.expandRow {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; cursor: pointer;
+  transition: background .12s; border-bottom: 1px solid var(--border);
+}
+.expandRow:hover { background: rgba(124,58,237,.04); }
+.expandRow:last-child { border-bottom: none; }
+
+.expandLeft  { display: flex; align-items: flex-start; gap: 10px; }
+.expandRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.chevron { color: var(--text-2); transition: transform .18s; flex-shrink: 0; margin-top: 2px; }
+.chevronOpen { transform: rotate(180deg); }
+
+.rowName { font-size: 14px; font-weight: 600; color: var(--text); }
+.rowDesc { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.rowMeta { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+
+.badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+
+/* ── Badges / pills ── */
+.badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+  white-space: nowrap;
+}
+.badgeViolet { border-color: rgba(124,58,237,.3); background: rgba(124,58,237,.08); color: var(--violet); }
+.badgeBlue   { border-color: rgba(14,165,233,.3);  background: rgba(14,165,233,.08);  color: #0ea5e9; }
+.badgeAmber  { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.08);  color: #d97706; }
+
+/* ── Expanded detail panel ── */
+.expandBody {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  padding: 14px 16px 16px; border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+@media (max-width: 900px) { .expandBody { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .expandBody { grid-template-columns: 1fr; } }
+
+.expandPanel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+}
+.panelTitle {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2); display: flex; align-items: center; gap: 6px;
+}
+
+/* ── Mini price table (inside expanded panel) ── */
+.miniTable { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
+.miniTable th { font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); padding: 4px 8px; text-align: left; }
+.miniTable td { font-size: 12px; padding: 5px 8px; border-top: 1px solid var(--border); color: var(--text); }
+.miniTable tbody tr:last-child td { border-bottom: none; }
+.miniPrice { font-weight: 600; color: var(--violet); }
+.fixedPrice { font-size: 20px; font-weight: 800; color: var(--violet); }
+
+/* Day Use info rows */
+.duRow { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.duLabel { color: var(--text-2); }
+.duVal   { font-weight: 600; color: var(--text); }
+.duInactive { font-size: 12px; color: var(--text-2); font-style: italic; }
+
+/* Seasonal + Rooms pills */
+.pillWrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.pill {
+  font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+}
+.pillEmpty { font-size: 12px; color: var(--text-2); font-style: italic; }
+
+/* Price range text */
+.priceRange { font-size: 12px; color: var(--text-2); white-space: nowrap; text-align: right; }
+
+/* ── Empty / loading ── */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 48px 20px; color: var(--text-2); font-size: 13px; }
+.spin  { animation: spin .8s linear infinite; }
+.spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Action buttons ── */
+.actionBtns { display: flex; gap: 4px; }
+.actionBtn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500; cursor: pointer;
+  background: var(--surface-2); color: var(--text-2);
+  transition: all .12s; white-space: nowrap;
+}
+.actionBtn:hover  { border-color: var(--violet); color: var(--violet); }
+.actionBtnDanger  { border-color: rgba(239,68,68,.25); color: #ef4444; background: rgba(239,68,68,.06); }
+.actionBtnDanger:hover { background: rgba(239,68,68,.15); }
+
+/* ── Modal footer ── */
+.modalFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+
+/* ── Tabs (inside modal) ── */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+.tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; font-size: 13px; font-weight: 500;
+  border: none; background: none; color: var(--text-2);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  cursor: pointer; transition: color .12s, border-color .12s;
+}
+.tab:hover  { color: var(--text); }
+.tabActive  { color: var(--violet); border-bottom-color: var(--violet); }
+
+/* ── Form body ── */
+.formBody { display: flex; flex-direction: column; gap: 14px; }
+.formRow  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .formRow { grid-template-columns: 1fr; } }
+
+.sectionTitle {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2);
+  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+}
+
+/* ── Mode cards (radio selection) ── */
+.modeCards { display: flex; gap: 6px; flex-wrap: wrap; }
+.modeCard {
+  flex: 1; min-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface-2); cursor: pointer; transition: all .12s;
+  text-align: center;
+}
+.modeCard:hover { border-color: rgba(124,58,237,.3); }
+.modeCardActive { border-color: var(--violet); background: rgba(124,58,237,.08); }
+.modeCardLabel  { font-size: 11px; font-weight: 600; color: var(--text); }
+.modeCardDesc   { font-size: 10px; color: var(--text-2); }
+
+/* ── Toggle chips (dias da semana, meses) ── */
+.chipGroup { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip {
+  padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500; cursor: pointer;
+  background: var(--surface-2); color: var(--text-2); transition: all .12s;
+}
+.chip:hover    { border-color: rgba(124,58,237,.4); }
+.chipActive    { background: rgba(124,58,237,.12); border-color: var(--violet); color: var(--violet); font-weight: 600; }
+.chipDanger    { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: #ef4444; }
+
+/* Dias do mês (grid 7 colunas) */
+.dayGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+
+/* ── Occupancy price inputs ── */
+.occGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+@media (max-width: 480px) { .occGrid { grid-template-columns: repeat(3, 1fr); } }
+
+.occCell { display: flex; flex-direction: column; gap: 2px; }
+.occLabel { font-size: 10px; font-weight: 600; color: var(--text-2); text-align: center; }
+
+/* ── Checkbox list (quartos / sazonais) ── */
+.checkList { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+.checkItem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface-2); cursor: pointer; transition: all .12s;
+}
+.checkItem:hover    { border-color: rgba(124,58,237,.3); }
+.checkItemActive    { border-color: var(--violet); background: rgba(124,58,237,.06); }
+.checkItemCb        { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
+.checkItemLabel     { font-size: 13px; font-weight: 500; color: var(--text); }
+.checkItemSub       { font-size: 11px; color: var(--text-2); margin-left: auto; }
+
+/* ── Checkbox row (toggle Day Use) ── */
+.checkboxRow {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  cursor: pointer;
+}
+.checkbox      { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
+.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
+.checkboxSub   { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
+
+/* ── Dark adjustments ── */
+:root[data-theme="dark"] .card    { box-shadow: none; }
+:root[data-theme="dark"] .kpiCard { box-shadow: none; }
