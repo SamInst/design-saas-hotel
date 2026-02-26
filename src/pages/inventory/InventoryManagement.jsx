@@ -93,6 +93,12 @@ export default function InventoryManagement() {
     try {
       const data = await itemApi.dashboard();
       setDashboard(data);
+      // Atualiza o modal de categoria aberto com os dados frescos
+      setCategoryModal((prev) => {
+        if (!prev) return prev;
+        const fresh = (data?.categorias ?? []).find((c) => c.id === prev.id);
+        return fresh ?? prev;
+      });
     } catch (e) {
       showNotification('Erro ao carregar inventário: ' + e.message, 'error');
     } finally {
