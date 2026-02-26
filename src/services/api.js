@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+// const BASE_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-  // const BASE_URL =
-  // import.meta.env.VITE_API_URL ||
-  // 'http://localhost:8080';
+  const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -134,6 +134,13 @@ async function request(path, { method = 'GET', body, headers = {}, params } = {}
   try { data = await res.json(); } catch { data = null; }
 
   if (!res.ok) {
+    // Token inválido ou expirado → limpa sessão e dispara evento de logout
+    if (res.status === 401) {
+      tokenStorage.remove();
+      userStorage.remove();
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
+
     const message =
       data?.message || data?.error || data?.detail || `Erro ${res.status}`;
     const err = new Error(message);

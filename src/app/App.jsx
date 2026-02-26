@@ -61,6 +61,15 @@ export default function App() {
     setUser(null);
   };
 
+  // Redireciona para login quando o token expirar/for inválido (401)
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setUser(null);
+    };
+    window.addEventListener('auth:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', onUnauthorized);
+  }, []);
+
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
