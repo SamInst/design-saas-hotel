@@ -1,0 +1,232 @@
+/* ── Layout ── */
+.page      { min-height: 100%; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Card (mesmo padrão do Financial) ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* ── Toolbar — padrão Financial ── */
+.tableHeader {
+  display: flex; gap: 12px; align-items: center;
+  justify-content: space-between; flex-wrap: wrap;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+}
+.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
+.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.clearFilter {
+  background: none; border: none; cursor: pointer;
+  color: var(--violet); font-size: 12px; padding: 0 2px; font-weight: 500;
+}
+.clearFilter:hover { text-decoration: underline; }
+
+/* Search — padrão Financial */
+.searchWrap  { position: relative; min-width: 200px; }
+.searchIcon  { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; }
+.searchInput { padding-left: 30px !important; }
+
+/* ── Category sections ── */
+.catSection { border-bottom: 1px solid var(--border); }
+.catSection:last-child { border-bottom: none; }
+
+.catHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 16px; cursor: pointer; transition: background .12s;
+  flex-wrap: wrap; gap: 8px;
+}
+.catHeader:hover { background: rgba(124,58,237,.03); }
+
+.catHeaderLeft { display: flex; align-items: center; gap: 10px; }
+
+.catChevron       { color: var(--text-2); transition: transform .18s; flex-shrink: 0; }
+.catChevronClosed { transform: rotate(-90deg); }
+
+.catName { font-size: 14px; font-weight: 700; color: var(--text); display: block; }
+.catDesc { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
+
+.catStats { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.catStat  {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+}
+.catStat_green  { border-color: rgba(16,185,129,.3);  background: rgba(16,185,129,.08);  color: #10b981; }
+.catStat_red    { border-color: rgba(239,68,68,.3);   background: rgba(239,68,68,.08);   color: #ef4444; }
+.catStat_indigo { border-color: rgba(99,102,241,.3);  background: rgba(99,102,241,.08);  color: #6366f1; }
+.catCount       {
+  font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+}
+
+/* ── Room card grid ── */
+.catBody  { padding: 12px 16px 16px; }
+.catEmpty { font-size: 13px; color: var(--text-2); padding: 8px 0; }
+
+.roomGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.roomCard {
+  border-radius: 10px; border: 1px solid var(--border);
+  padding: 12px; cursor: pointer;
+  transition: transform .12s, box-shadow .12s;
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 130px;
+}
+.roomCard:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.1); }
+
+/* Status colors */
+.roomCard_disponivel { background: rgba(16,185,129,.06);  border-color: rgba(16,185,129,.3);  }
+.roomCard_ocupado    { background: rgba(239,68,68,.06);   border-color: rgba(239,68,68,.3);   }
+.roomCard_reservado  { background: rgba(245,158,11,.06);  border-color: rgba(245,158,11,.3);  }
+.roomCard_limpeza    { background: rgba(14,165,233,.06);  border-color: rgba(14,165,233,.3);  }
+.roomCard_manutencao { background: rgba(99,102,241,.06);  border-color: rgba(99,102,241,.3);  }
+.roomCard_fora       { background: rgba(100,116,139,.06); border-color: rgba(100,116,139,.3); }
+
+.roomCardTop {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
+}
+.roomNum {
+  font-size: 30px; font-weight: 900; line-height: 1; color: var(--text); flex-shrink: 0;
+}
+
+/* Tipo de ocupação badge */
+.tipoOcupacaoBadge {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-2);
+  padding: 1px 7px; border-radius: 20px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  align-self: flex-start;
+}
+
+/* Bed pills (Disponível) */
+.roomBeds { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 2px; }
+.roomBedPill {
+  font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 20px;
+  background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.3);
+  color: #059669; white-space: nowrap;
+}
+
+/* Checkin / checkout (Pernoite) */
+.roomTimes { display: flex; flex-direction: column; gap: 3px; margin-top: 2px; }
+.roomTimeRow {
+  display: flex; align-items: center; gap: 3px;
+  font-size: 9px; color: var(--text-2); white-space: nowrap;
+}
+.roomGuestName {
+  font-size: 11px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Day Use timer */
+.dayUseRow {
+  display: flex; align-items: center; gap: 5px; margin-top: 1px;
+}
+.dayUseLabel {
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: #ef4444; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25);
+  padding: 1px 5px; border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+}
+.timer {
+  font-size: 11px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: .03em;
+}
+
+/* Limpeza / Manutenção info */
+.roomInfo {
+  display: flex; align-items: center; gap: 3px;
+  font-size: 10px; color: var(--text-2); white-space: nowrap; overflow: hidden;
+}
+.roomInfo span { overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Status badges ── */
+.statusBadge {
+  font-size: 9px; font-weight: 700; padding: 2px 5px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+  text-transform: uppercase; letter-spacing: .03em; white-space: nowrap;
+  align-self: flex-start; flex-shrink: 0;
+}
+.badge_disponivel { border-color: rgba(16,185,129,.4);  background: rgba(16,185,129,.12);  color: #10b981; }
+.badge_ocupado    { border-color: rgba(239,68,68,.4);   background: rgba(239,68,68,.12);   color: #ef4444; }
+.badge_reservado  { border-color: rgba(245,158,11,.4);  background: rgba(245,158,11,.12);  color: #d97706; }
+.badge_limpeza    { border-color: rgba(14,165,233,.4);  background: rgba(14,165,233,.12);  color: #0ea5e9; }
+.badge_manutencao { border-color: rgba(99,102,241,.4);  background: rgba(99,102,241,.12);  color: #6366f1; }
+.badge_fora       { border-color: rgba(100,116,139,.4); background: rgba(100,116,139,.12); color: #64748b; }
+
+/* ── Empty / loading ── */
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; padding: 48px 20px;
+  color: var(--text-2); font-size: 13px;
+}
+.spin       { animation: spin .8s linear infinite; }
+.spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Modal footers ── */
+.modalFooter        { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.modalFooterBetween { display: flex; gap: 8px; align-items: center; justify-content: space-between; width: 100%; }
+
+/* ── Detail body ── */
+.detailBody { display: flex; flex-direction: column; gap: 8px; }
+
+.infoRow   { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; font-size: 13px; }
+.infoLabel { color: var(--text-2); flex-shrink: 0; }
+.infoVal   { color: var(--text); font-weight: 500; text-align: right; }
+
+.contextSection { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+
+.sectionTitle {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2);
+  border-bottom: 1px solid var(--border); padding-bottom: 5px;
+  display: flex; align-items: center; gap: 5px;
+}
+
+.bedsList { display: flex; flex-wrap: wrap; gap: 5px; }
+.bedBadge {
+  font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+}
+
+/* ── Status action buttons ── */
+.actionGroup {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding-top: 2px;
+}
+.actionBtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  background: var(--surface-2); color: var(--text-2); transition: all .12s;
+  white-space: nowrap;
+}
+.actionBtn:hover    { border-color: var(--violet); color: var(--violet); }
+.actionBtnGreen     { border-color: rgba(16,185,129,.3);  color: #10b981; background: rgba(16,185,129,.06); }
+.actionBtnGreen:hover  { background: rgba(16,185,129,.15); }
+.actionBtnBlue      { border-color: rgba(14,165,233,.3);  color: #0ea5e9; background: rgba(14,165,233,.06); }
+.actionBtnBlue:hover   { background: rgba(14,165,233,.15); }
+.actionBtnIndigo    { border-color: rgba(99,102,241,.3);  color: #6366f1; background: rgba(99,102,241,.06); }
+.actionBtnIndigo:hover { background: rgba(99,102,241,.15); }
+.actionBtnSlate     { border-color: rgba(100,116,139,.3); color: #64748b; background: rgba(100,116,139,.06); }
+.actionBtnSlate:hover  { background: rgba(100,116,139,.15); }
+
+/* ── Form ── */
+.formBody { display: flex; flex-direction: column; gap: 14px; }
+.formRow  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .formRow { grid-template-columns: 1fr; } }
+
+.bedsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+@media (max-width: 400px) { .bedsGrid { grid-template-columns: repeat(2, 1fr); } }
+.bedCell  { display: flex; flex-direction: column; gap: 3px; }
+.bedLabel { font-size: 11px; font-weight: 600; color: var(--text-2); }
+
+/* ── Dark adjustments ── */
+:root[data-theme="dark"] .card       { box-shadow: none; }
+:root[data-theme="dark"] .roomCard:hover { box-shadow: 0 4px 14px rgba(0,0,0,.35); }
