@@ -526,9 +526,12 @@ export default function InventoryManagement() {
                               {fmtBRL(qty * compra)}
                             </td>
                             <td>
-                              <span className={styles.dateCell}>
-                                <Calendar size={12} />{fmtDate(item.ultimaReposicao)}
-                              </span>
+                              {(() => {
+                                const d = item.ultimaReposicao ?? item.dataUltimaReposicao ?? item.ultimaDataReposicao ?? item.dataReposicao ?? null;
+                                return d
+                                  ? <span className={styles.dateCell}><Calendar size={12} />{fmtDate(d)}</span>
+                                  : <span className={styles.dateEmpty}>—</span>;
+                              })()}
                             </td>
                             <td className={styles.tdRight} onClick={(e) => e.stopPropagation()}>
                               <div className={styles.actionBtns}>
