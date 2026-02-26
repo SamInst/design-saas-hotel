@@ -84,16 +84,13 @@
 
 .catInfo     { flex: 1; min-width: 0; }
 .catNameRow  { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
-.catName     { font-size: 13px; font-weight: 600; color: var(--text); }
+.catName     { font-size: 14px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .02em; }
 .catCount    {
   font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: 20px;
   background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border);
+  white-space: nowrap;
 }
-.catFinRow   { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.catFinLabel { font-size: 11px; color: var(--text-2); }
-.catFinVal   { font-size: 11px; font-weight: 600; color: var(--text); }
-.catFinLucro { color: var(--emerald); }
-.catFinSep   { font-size: 10px; color: var(--text-2); }
+.catDesc     { font-size: 12px; color: var(--text-2); margin: 0 0 4px; line-height: 1.4; }
 
 .catLowBadge {
   display: inline-flex; align-items: center; gap: 4px; margin-top: 5px;
@@ -164,6 +161,11 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; padding: 48px 20px; color: var(--text-2); font-size: 13px;
 }
+/* emptyInline: used inside fixed-height tab bodies */
+.emptyInline {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 40px 20px; color: var(--text-2); font-size: 13px; height: 100%;
+}
 .spin       { animation: spin .8s linear infinite; }
 .spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -185,6 +187,16 @@
 
 /* ── Category modal title ── */
 .catModalTitle { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ── Fixed-height tab bodies (prevents modal resize on tab switch) ── */
+.catTabBody {
+  min-height: 380px;
+  display: flex; flex-direction: column;
+}
+.histTabBody {
+  min-height: 360px;
+  display: flex; flex-direction: column;
+}
 
 /* ── Financial tab ── */
 .finTab { display: flex; flex-direction: column; gap: 14px; }

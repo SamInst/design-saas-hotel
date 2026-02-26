@@ -317,8 +317,14 @@ export const itemApi = {
   buscar(params)         { return request('/item/buscar', { params }); },
   criar(body)            { return request('/item', { method: 'POST', body }); },
   atualizar(id, body)    { return request(`/item/${id}`, { method: 'PUT', body }); },
-  repor(id, body)        { return request(`/item/${id}/repor`, { method: 'POST', body }); },
-  consumir(id, body)     { return request(`/item/${id}/consumir`, { method: 'POST', body }); },
+  // POST /item/{id}/repor?quantidade=10&valorCompraUnidade=2.5&valorVendaUnidade=5&fornecedor=COCA
+  repor(id, { quantidade, valorCompraUnidade, valorVendaUnidade, fornecedor }) {
+    return request(`/item/${id}/repor`, { method: 'POST', params: { quantidade, valorCompraUnidade, valorVendaUnidade, fornecedor } });
+  },
+  // POST /item/{id}/consumir?quantidade=4
+  consumir(id, { quantidade, quartoId, tipoPagamentoId, despesaPessoal }) {
+    return request(`/item/${id}/consumir`, { method: 'POST', params: { quantidade, quartoId, tipoPagamentoId, despesaPessoal } });
+  },
   historicoReposicao(id) { return request(`/item/${id}/historico-reposicao`); },
   historicoPreco(id)     { return request(`/item/${id}/historico-preco`); },
 };
@@ -327,8 +333,14 @@ export const itemApi = {
 //  CATEGORIAS
 // ─────────────────────────────────────────────────────────────
 export const categoriaApi = {
-  criar(body)        { return request('/categoria', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/categoria/${id}`, { method: 'PUT', body }); },
+  // POST /categoria?categoria=nome&descricao=desc
+  criar({ categoria, descricao }) {
+    return request('/categoria', { method: 'POST', params: { categoria, descricao } });
+  },
+  // PUT /categoria/{id}?categoria=nome&descricao=desc
+  atualizar(id, { categoria, descricao }) {
+    return request(`/categoria/${id}`, { method: 'PUT', params: { categoria, descricao } });
+  },
 };
 
 // ─────────────────────────────────────────────────────────────

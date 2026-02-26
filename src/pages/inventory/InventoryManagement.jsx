@@ -3,31 +3,43 @@ import {
   Package, Search, Plus, Edit2, Tag, DollarSign, TrendingUp,
   Boxes, History, Minus, Loader2, RefreshCw, Calendar, AlertTriangle,
 } from 'lucide-react';
-import { Modal }                     from '../../components/ui/Modal';
-import { Button }                    from '../../components/ui/Button';
-import { Input, Select, FormField }  from '../../components/ui/Input';
-import { Notification }              from '../../components/ui/Notification';
-import { itemApi, categoriaApi, enumApi } from '../../services/api';
+import { Modal }                    from '../../components/ui/Modal';
+import { Button }                   from '../../components/ui/Button';
+import { Input, Select, FormField } from '../../components/ui/Input';
+import { Notification }             from '../../components/ui/Notification';
+import { itemApi, categoriaApi, enumApi, quartoApi } from '../../services/api';
 import styles from './InventoryManagement.module.css';
 
-// ── Helpers ─────────────────────────────────────────────────
+// ── Money mask (progressive: digits become cents) ───────────
+const maskBRL = (v) => {
+  const digits = String(v ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  const num = parseInt(digits, 10) / 100;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+};
+const parseBRL = (v) => {
+  const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+};
+
+// ── Display helpers ──────────────────────────────────────────
 const fmtBRL = (v) => {
   if (v == null) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 };
-const fmtDate = (iso) => {
-  if (!iso) return '—';
-  try { return new Date(iso).toLocaleString('pt-BR'); } catch { return iso; }
-};
-const parseNum = (v) => Number(String(v ?? '').replace(',', '.')) || 0;
+// Backend already sends formatted date ("19/02/2026 00:34") — just display as-is
+const fmtDate = (v) => v ?? '—';
 
 export default function InventoryManagement() {
   // ── State ──────────────────────────────────────────────────
-  const [dashboard, setDashboard]     = useState(null);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState('');
+  const [dashboard, setDashboard]       = useState(null);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
   const [notification, setNotification] = useState(null);
   const searchTimer = useRef(null);
+
+  // Quartos (for consumir dropdown)
+  const [quartos, setQuartos] = useState([]);
 
   // Category modal
   const [categoryModal, setCategoryModal] = useState(null);
@@ -42,22 +54,22 @@ export default function InventoryManagement() {
   });
   const [itemSaving, setItemSaving] = useState(false);
 
-  // Category form modal
+  // Category form modal — has both "categoria" (name) and "descricao"
   const [catFormModal, setCatFormModal] = useState(null); // null | 'create' | 'edit'
   const [editingCat, setEditingCat]     = useState(null);
-  const [catForm, setCatForm]           = useState({ descricao: '' });
+  const [catForm, setCatForm]           = useState({ categoria: '', descricao: '' });
   const [catSaving, setCatSaving]       = useState(false);
 
   // Repor estoque modal
-  const [reporModal, setReporModal] = useState(false);
-  const [reporItem, setReporItem]   = useState(null);
-  const [reporForm, setReporForm]   = useState({ qtdUnidades: '', valorCompraUnidade: '', valorVendaUnidade: '', fornecedor: '' });
+  const [reporModal, setReporModal]   = useState(false);
+  const [reporItem, setReporItem]     = useState(null);
+  const [reporForm, setReporForm]     = useState({ quantidade: '', valorCompraUnidade: '', valorVendaUnidade: '', fornecedor: '' });
   const [reporSaving, setReporSaving] = useState(false);
 
   // Consumir item modal
   const [consumirModal, setConsumiModal]   = useState(false);
   const [consumirItem, setConsumiItem]     = useState(null);
-  const [consumirForm, setConsumiForm]     = useState({ qtdUnidades: '', quartoId: '', tipoPagamentoId: '', despesaPessoal: false });
+  const [consumirForm, setConsumiForm]     = useState({ quantidade: '', quartoId: '', tipoPagamentoId: '', despesaPessoal: false });
   const [consumirSaving, setConsumiSaving] = useState(false);
   const [tiposPagamento, setTiposPagamento] = useState([]);
 
@@ -91,6 +103,10 @@ export default function InventoryManagement() {
   useEffect(() => {
     loadDashboard();
     enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
+    quartoApi.listar().then((r) => {
+      const list = Array.isArray(r) ? r : (r?.content ?? []);
+      setQuartos(list);
+    }).catch(() => {});
   }, [loadDashboard]);
 
   // ── Search (client-side filter) ────────────────────────────
@@ -99,8 +115,9 @@ export default function InventoryManagement() {
     setSearch(e.target.value);
   };
 
-  // ── Filtered categories ────────────────────────────────────
+  // ── Computed ───────────────────────────────────────────────
   const categorias = dashboard?.categorias ?? [];
+
   const filteredCategorias = search.length < 2
     ? categorias
     : categorias
@@ -116,12 +133,17 @@ export default function InventoryManagement() {
         }))
         .filter((cat) => cat.itens.length > 0);
 
-  // ── KPI data ───────────────────────────────────────────────
+  // Total de itens = soma de todas as quantidades de todos os itens
+  const totalItens = categorias.reduce(
+    (acc, cat) => acc + (cat.itens ?? []).reduce((s, i) => s + (i.quantidadeTotal ?? i.quantidade ?? 0), 0),
+    0,
+  );
+
   const kpis = dashboard ? [
-    { label: 'Categorias',       sub: 'Categorias cadastradas',     value: dashboard.totalCategorias ?? categorias.length,  color: 'blue',    icon: <Tag size={18} /> },
-    { label: 'Total de Itens',   sub: 'Tipos de itens cadastrados', value: dashboard.totalDeItens ?? 0,                     color: 'violet',  icon: <Package size={18} /> },
-    { label: 'Valor Investido',  sub: 'Total em estoque (custo)',   value: fmtBRL(dashboard.valorTotalInvestido),           color: 'rose',    icon: <DollarSign size={18} /> },
-    { label: 'Lucro Potencial',  sub: 'Lucro estimado total',       value: fmtBRL(dashboard.lucro),                         color: 'emerald', icon: <TrendingUp size={18} /> },
+    { label: 'Categorias',      sub: 'Categorias cadastradas',    value: dashboard.totalCategorias ?? categorias.length, color: 'blue',    icon: <Tag size={18} /> },
+    { label: 'Total de Itens',  sub: 'Unidades em estoque',       value: totalItens,                                      color: 'violet',  icon: <Package size={18} /> },
+    { label: 'Valor Investido', sub: 'Total em estoque (custo)',  value: fmtBRL(dashboard.valorTotalInvestido),           color: 'rose',    icon: <DollarSign size={18} /> },
+    { label: 'Lucro Potencial', sub: 'Lucro estimado total',      value: fmtBRL(dashboard.lucro),                         color: 'emerald', icon: <TrendingUp size={18} /> },
   ] : [];
 
   // ── Category modal ─────────────────────────────────────────
@@ -130,38 +152,42 @@ export default function InventoryManagement() {
 
   // ── Item form ──────────────────────────────────────────────
   const openCreateItem = (cat) => {
-    setItemForm({ descricao: '', categoriaId: cat?.id ?? '', quantidadeTotal: '', valorCompraUnidade: '', valorVendaUnidade: '', fornecedor: '' });
+    setItemForm({
+      descricao: '', categoriaId: cat?.id ?? '', quantidadeTotal: '',
+      valorCompraUnidade: '', valorVendaUnidade: '', fornecedor: '',
+    });
     setSelectedItem(null);
     setItemFormModal('create');
   };
 
   const openEditItem = (item) => {
     setItemForm({
-      descricao:           item.descricao ?? item.nome ?? '',
-      categoriaId:         item.categoriaId ?? '',
-      quantidadeTotal:     item.quantidadeTotal ?? item.quantidade ?? '',
-      valorCompraUnidade:  item.valorCompraUnidade ?? item.valorCompra ?? '',
-      valorVendaUnidade:   item.valorVendaUnidade ?? item.valorVenda ?? '',
-      fornecedor:          item.fornecedor ?? '',
+      descricao:          item.descricao ?? item.nome ?? '',
+      categoriaId:        item.categoriaId ?? '',
+      quantidadeTotal:    item.quantidadeTotal ?? item.quantidade ?? '',
+      valorCompraUnidade: maskBRL(String(Math.round((item.valorCompraUnidade ?? item.valorCompra ?? 0) * 100))),
+      valorVendaUnidade:  maskBRL(String(Math.round((item.valorVendaUnidade ?? item.valorVenda ?? 0) * 100))),
+      fornecedor:         item.fornecedor ?? '',
     });
     setSelectedItem(item);
     setItemFormModal('edit');
   };
 
   const handleSaveItem = async () => {
-    if (!itemForm.descricao.trim() || !itemForm.categoriaId) {
-      showNotification('Preencha descrição e categoria.', 'error');
+    const { descricao, categoriaId, quantidadeTotal, valorCompraUnidade, valorVendaUnidade, fornecedor } = itemForm;
+    if (!descricao.trim() || !categoriaId || !quantidadeTotal || !valorCompraUnidade || !valorVendaUnidade || !fornecedor.trim()) {
+      showNotification('Preencha todos os campos obrigatórios.', 'error');
       return;
     }
     setItemSaving(true);
     try {
       const body = {
-        descricao:          itemForm.descricao.trim(),
-        categoriaId:        Number(itemForm.categoriaId),
-        quantidadeTotal:    Number(itemForm.quantidadeTotal) || 0,
-        valorCompraUnidade: parseNum(itemForm.valorCompraUnidade),
-        valorVendaUnidade:  parseNum(itemForm.valorVendaUnidade),
-        fornecedor:         itemForm.fornecedor.trim(),
+        descricao:          descricao.trim(),
+        categoriaId:        Number(categoriaId),
+        quantidadeTotal:    Number(quantidadeTotal),
+        valorCompraUnidade: parseBRL(valorCompraUnidade),
+        valorVendaUnidade:  parseBRL(valorVendaUnidade),
+        fornecedor:         fornecedor.trim(),
       };
       if (itemFormModal === 'create') {
         await itemApi.criar(body);
@@ -181,29 +207,33 @@ export default function InventoryManagement() {
 
   // ── Category form ──────────────────────────────────────────
   const openCreateCat = () => {
-    setCatForm({ descricao: '' });
+    setCatForm({ categoria: '', descricao: '' });
     setEditingCat(null);
     setCatFormModal('create');
   };
 
   const openEditCat = (cat) => {
-    setCatForm({ descricao: cat.descricao ?? cat.nome ?? '' });
+    setCatForm({
+      categoria: cat.categoria ?? cat.nome ?? '',
+      descricao: cat.descricao ?? '',
+    });
     setEditingCat(cat);
     setCatFormModal('edit');
   };
 
   const handleSaveCat = async () => {
-    if (!catForm.descricao.trim()) {
-      showNotification('Informe a descrição da categoria.', 'error');
+    if (!catForm.categoria.trim()) {
+      showNotification('Informe o nome da categoria.', 'error');
       return;
     }
     setCatSaving(true);
     try {
+      const payload = { categoria: catForm.categoria.trim(), descricao: catForm.descricao.trim() };
       if (catFormModal === 'create') {
-        await categoriaApi.criar({ descricao: catForm.descricao.trim() });
+        await categoriaApi.criar(payload);
         showNotification('Categoria criada com sucesso!');
       } else {
-        await categoriaApi.atualizar(editingCat.id, { descricao: catForm.descricao.trim() });
+        await categoriaApi.atualizar(editingCat.id, payload);
         showNotification('Categoria atualizada com sucesso!');
       }
       setCatFormModal(null);
@@ -221,25 +251,25 @@ export default function InventoryManagement() {
     e?.stopPropagation();
     setReporItem(item);
     setReporForm({
-      qtdUnidades:        '',
-      valorCompraUnidade: String(item.valorCompraUnidade ?? item.valorCompra ?? ''),
-      valorVendaUnidade:  String(item.valorVendaUnidade ?? item.valorVenda ?? ''),
+      quantidade:         '',
+      valorCompraUnidade: maskBRL(String(Math.round((item.valorCompraUnidade ?? item.valorCompra ?? 0) * 100))),
+      valorVendaUnidade:  maskBRL(String(Math.round((item.valorVendaUnidade ?? item.valorVenda ?? 0) * 100))),
       fornecedor:         item.fornecedor ?? '',
     });
     setReporModal(true);
   };
 
   const handleRepor = async () => {
-    if (!reporForm.qtdUnidades || !reporForm.fornecedor.trim()) {
+    if (!reporForm.quantidade || !reporForm.fornecedor.trim()) {
       showNotification('Preencha quantidade e fornecedor.', 'error');
       return;
     }
     setReporSaving(true);
     try {
       await itemApi.repor(reporItem.id, {
-        qtdUnidades:        Number(reporForm.qtdUnidades),
-        valorCompraUnidade: parseNum(reporForm.valorCompraUnidade),
-        valorVendaUnidade:  parseNum(reporForm.valorVendaUnidade),
+        quantidade:         Number(reporForm.quantidade),
+        valorCompraUnidade: parseBRL(reporForm.valorCompraUnidade),
+        valorVendaUnidade:  parseBRL(reporForm.valorVendaUnidade),
         fornecedor:         reporForm.fornecedor.trim(),
       });
       showNotification('Estoque reposto com sucesso!');
@@ -256,24 +286,24 @@ export default function InventoryManagement() {
   const openConsumir = (item, e) => {
     e?.stopPropagation();
     setConsumiItem(item);
-    setConsumiForm({ qtdUnidades: '', quartoId: '', tipoPagamentoId: '', despesaPessoal: false });
+    setConsumiForm({ quantidade: '', quartoId: '', tipoPagamentoId: '', despesaPessoal: false });
     setConsumiModal(true);
   };
 
   const handleConsumir = async () => {
-    if (!consumirForm.qtdUnidades) {
+    if (!consumirForm.quantidade) {
       showNotification('Informe a quantidade.', 'error');
       return;
     }
     setConsumiSaving(true);
     try {
-      const body = {
-        qtdUnidades:   Number(consumirForm.qtdUnidades),
+      const params = {
+        quantidade:    Number(consumirForm.quantidade),
         despesaPessoal: consumirForm.despesaPessoal,
       };
-      if (consumirForm.quartoId)      body.quartoId      = Number(consumirForm.quartoId);
-      if (consumirForm.tipoPagamentoId) body.tipoPagamentoId = Number(consumirForm.tipoPagamentoId);
-      await itemApi.consumir(consumirItem.id, body);
+      if (consumirForm.quartoId)        params.quartoId        = Number(consumirForm.quartoId);
+      if (consumirForm.tipoPagamentoId) params.tipoPagamentoId = Number(consumirForm.tipoPagamentoId);
+      await itemApi.consumir(consumirItem.id, params);
       showNotification('Item consumido com sucesso!');
       setConsumiModal(false);
       loadDashboard();
@@ -332,7 +362,6 @@ export default function InventoryManagement() {
 
         {/* ── Main card ── */}
         <div className={styles.card}>
-          {/* Toolbar inside card */}
           <div className={styles.tableHeader}>
             <div>
               <h2 className={styles.h2}>Itens e Almoxarifado</h2>
@@ -357,7 +386,6 @@ export default function InventoryManagement() {
             </div>
           </div>
 
-          {/* Content area */}
           {loading ? (
             <div className={styles.empty}>
               <Loader2 size={28} className={styles.spin} />
@@ -371,9 +399,10 @@ export default function InventoryManagement() {
           ) : (
             <div className={styles.catGrid}>
               {filteredCategorias.map((cat) => {
-                const count    = cat.itens?.length ?? 0;
-                const hasLow   = cat.itens?.some((i) => (i.quantidadeTotal ?? i.quantidade ?? 0) <= 5);
-                const itensAtencao = dashboard?.itensComAtencao ?? 0;
+                const count  = cat.itens?.length ?? 0;
+                const hasLow = cat.itens?.some((i) => (i.quantidadeTotal ?? i.quantidade ?? 0) <= 5);
+                const catNome = cat.categoria ?? cat.nome ?? '—';
+                const catDesc = cat.descricao ?? '';
                 return (
                   <button
                     key={cat.id}
@@ -387,16 +416,10 @@ export default function InventoryManagement() {
                       </div>
                       <div className={styles.catInfo}>
                         <div className={styles.catNameRow}>
-                          <span className={styles.catName}>{cat.descricao ?? cat.nome}</span>
+                          <span className={styles.catName}>{catNome}</span>
                           <span className={styles.catCount}>{count} {count === 1 ? 'item' : 'itens'}</span>
                         </div>
-                        <div className={styles.catFinRow}>
-                          <span className={styles.catFinLabel}>Investido:</span>
-                          <span className={styles.catFinVal}>{fmtBRL(cat.valorTotalInvestido)}</span>
-                          <span className={styles.catFinSep}>·</span>
-                          <span className={styles.catFinLabel}>Lucro:</span>
-                          <span className={[styles.catFinVal, styles.catFinLucro].join(' ')}>{fmtBRL(cat.lucro)}</span>
-                        </div>
+                        {catDesc && <p className={styles.catDesc}>{catDesc}</p>}
                         {hasLow && (
                           <div className={styles.catLowBadge}>
                             <AlertTriangle size={10} /> Itens com estoque baixo
@@ -422,7 +445,7 @@ export default function InventoryManagement() {
           size="xl"
           title={
             <span className={styles.catModalTitle}>
-              <Package size={16} /> {categoryModal.descricao ?? categoryModal.nome}
+              <Package size={16} /> {categoryModal.categoria ?? categoryModal.nome}
             </span>
           }
           footer={
@@ -436,7 +459,6 @@ export default function InventoryManagement() {
             </div>
           }
         >
-          {/* Tabs */}
           <div className={styles.tabs}>
             <button type="button"
               className={[styles.tab, categoryTab === 'itens' ? styles.tabActive : ''].join(' ')}
@@ -452,103 +474,15 @@ export default function InventoryManagement() {
             </button>
           </div>
 
-          {/* ── Tab: Itens ── */}
-          {categoryTab === 'itens' && (
-            !categoryModal.itens?.length ? (
-              <div className={styles.empty}>
-                <Package size={24} color="var(--text-2)" />
-                <span>Nenhum item nesta categoria</span>
-              </div>
-            ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Item</th>
-                      <th className={styles.thCenter}>Qtd</th>
-                      <th className={styles.thRight}>Compra Un.</th>
-                      <th className={styles.thRight}>Venda Un.</th>
-                      <th className={styles.thRight}>Total Estoque</th>
-                      <th>Últ. Reposição</th>
-                      <th className={styles.thRight}>Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {categoryModal.itens.map((item) => {
-                      const qty    = item.quantidadeTotal ?? item.quantidade ?? 0;
-                      const isLow  = qty <= 5;
-                      const compra = item.valorCompraUnidade ?? item.valorCompra ?? 0;
-                      return (
-                        <tr key={item.id} className={styles.row} onClick={() => openEditItem(item)}>
-                          <td>
-                            <span className={styles.itemName}>{item.descricao ?? item.nome}</span>
-                            {item.fornecedor && <span className={styles.itemSub}>{item.fornecedor}</span>}
-                          </td>
-                          <td className={styles.tdCenter}>
-                            <span className={[styles.qtyBadge, isLow ? styles.qtyBadgeLow : styles.qtyBadgeOk].join(' ')}>
-                              {qty}
-                            </span>
-                          </td>
-                          <td className={styles.tdRight}>{fmtBRL(compra)}</td>
-                          <td className={[styles.tdRight, styles.valVenda].join(' ')}>
-                            {fmtBRL(item.valorVendaUnidade ?? item.valorVenda)}
-                          </td>
-                          <td className={[styles.tdRight, styles.valTotal].join(' ')}>
-                            {fmtBRL(qty * compra)}
-                          </td>
-                          <td>
-                            {item.ultimaReposicao
-                              ? <span className={styles.dateCell}><Calendar size={12} />{fmtDate(item.ultimaReposicao)}</span>
-                              : <span className={styles.dateEmpty}>—</span>}
-                          </td>
-                          <td className={styles.tdRight} onClick={(e) => e.stopPropagation()}>
-                            <div className={styles.actionBtns}>
-                              <button type="button"
-                                className={[styles.actionBtn, styles.actionBtnConsumir].join(' ')}
-                                onClick={(e) => openConsumir(item, e)}
-                              >
-                                <Minus size={11} /> Consumir
-                              </button>
-                              <button type="button"
-                                className={[styles.actionBtn, styles.actionBtnRepor].join(' ')}
-                                onClick={(e) => openRepor(item, e)}
-                              >
-                                <RefreshCw size={11} /> Repor
-                              </button>
-                              <button type="button"
-                                className={[styles.actionBtn, styles.actionBtnHist].join(' ')}
-                                onClick={(e) => openHistorico(item, e)}
-                              >
-                                <History size={11} /> Histórico
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )
-          )}
-
-          {/* ── Tab: Resumo Financeiro ── */}
-          {categoryTab === 'financeiro' && (
-            <div className={styles.finTab}>
-              <div className={styles.finKpiGrid}>
-                {[
-                  { label: 'Tipos de Itens',  value: String(categoryModal.itens?.length ?? 0), cls: '' },
-                  { label: 'Total Investido', value: fmtBRL(categoryModal.valorTotalInvestido), cls: styles.valRose },
-                  { label: 'Valor de Venda',  value: fmtBRL(categoryModal.valorTotalVenda),     cls: styles.valVenda },
-                  { label: 'Lucro Potencial', value: fmtBRL(categoryModal.lucro),               cls: styles.valTotal },
-                ].map((k) => (
-                  <div key={k.label} className={styles.finKpiCard}>
-                    <span className={styles.finKpiLabel}>{k.label}</span>
-                    <span className={[styles.finKpiValue, k.cls].join(' ')}>{k.value}</span>
-                  </div>
-                ))}
-              </div>
-              {categoryModal.itens?.length > 0 && (
+          {/* Fixed-height body so switching tabs doesn't resize the modal */}
+          <div className={styles.catTabBody}>
+            {categoryTab === 'itens' && (
+              !categoryModal.itens?.length ? (
+                <div className={styles.emptyInline}>
+                  <Package size={24} color="var(--text-2)" />
+                  <span>Nenhum item nesta categoria</span>
+                </div>
+              ) : (
                 <div className={styles.tableWrap}>
                   <table className={styles.table}>
                     <thead>
@@ -557,36 +491,124 @@ export default function InventoryManagement() {
                         <th className={styles.thCenter}>Qtd</th>
                         <th className={styles.thRight}>Compra Un.</th>
                         <th className={styles.thRight}>Venda Un.</th>
-                        <th className={styles.thRight}>Margem</th>
-                        <th className={styles.thRight}>Lucro Total</th>
+                        <th className={styles.thRight}>Total Estoque</th>
+                        <th>Últ. Reposição</th>
+                        <th className={styles.thRight}>Ações</th>
                       </tr>
                     </thead>
                     <tbody>
                       {categoryModal.itens.map((item) => {
                         const qty    = item.quantidadeTotal ?? item.quantidade ?? 0;
+                        const isLow  = qty <= 5;
                         const compra = item.valorCompraUnidade ?? item.valorCompra ?? 0;
-                        const venda  = item.valorVendaUnidade ?? item.valorVenda ?? 0;
-                        const margin = compra > 0 ? ((venda - compra) / compra * 100).toFixed(1) : '—';
-                        const lucroTotal = qty * (venda - compra);
                         return (
-                          <tr key={item.id} className={styles.rowHover}>
-                            <td><span className={styles.itemName}>{item.descricao ?? item.nome}</span></td>
+                          <tr key={item.id} className={styles.row} onClick={() => openEditItem(item)}>
+                            <td>
+                              <span className={styles.itemName}>{item.descricao ?? item.nome}</span>
+                              {item.fornecedor && <span className={styles.itemSub}>{item.fornecedor}</span>}
+                            </td>
                             <td className={styles.tdCenter}>
-                              <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>{qty}</span>
+                              <span className={[styles.qtyBadge, isLow ? styles.qtyBadgeLow : styles.qtyBadgeOk].join(' ')}>
+                                {qty}
+                              </span>
                             </td>
                             <td className={styles.tdRight}>{fmtBRL(compra)}</td>
-                            <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(venda)}</td>
-                            <td className={[styles.tdRight, styles.valTotal].join(' ')}>{margin}{margin !== '—' ? '%' : ''}</td>
-                            <td className={[styles.tdRight, styles.valTotal].join(' ')}>{fmtBRL(lucroTotal)}</td>
+                            <td className={[styles.tdRight, styles.valVenda].join(' ')}>
+                              {fmtBRL(item.valorVendaUnidade ?? item.valorVenda)}
+                            </td>
+                            <td className={[styles.tdRight, styles.valTotal].join(' ')}>
+                              {fmtBRL(qty * compra)}
+                            </td>
+                            <td>
+                              <span className={styles.dateCell}>
+                                <Calendar size={12} />{fmtDate(item.ultimaReposicao)}
+                              </span>
+                            </td>
+                            <td className={styles.tdRight} onClick={(e) => e.stopPropagation()}>
+                              <div className={styles.actionBtns}>
+                                <button type="button"
+                                  className={[styles.actionBtn, styles.actionBtnConsumir].join(' ')}
+                                  onClick={(e) => openConsumir(item, e)}
+                                >
+                                  <Minus size={11} /> Consumir
+                                </button>
+                                <button type="button"
+                                  className={[styles.actionBtn, styles.actionBtnRepor].join(' ')}
+                                  onClick={(e) => openRepor(item, e)}
+                                >
+                                  <RefreshCw size={11} /> Repor
+                                </button>
+                                <button type="button"
+                                  className={[styles.actionBtn, styles.actionBtnHist].join(' ')}
+                                  onClick={(e) => openHistorico(item, e)}
+                                >
+                                  <History size={11} /> Histórico
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-              )}
-            </div>
-          )}
+              )
+            )}
+
+            {categoryTab === 'financeiro' && (
+              <div className={styles.finTab}>
+                <div className={styles.finKpiGrid}>
+                  {[
+                    { label: 'Tipos de Itens',  value: String(categoryModal.itens?.length ?? 0), cls: '' },
+                    { label: 'Total Investido', value: fmtBRL(categoryModal.valorTotalInvestido), cls: styles.valRose },
+                    { label: 'Valor de Venda',  value: fmtBRL(categoryModal.valorTotalVenda),     cls: styles.valVenda },
+                    { label: 'Lucro Potencial', value: fmtBRL(categoryModal.lucro),               cls: styles.valTotal },
+                  ].map((k) => (
+                    <div key={k.label} className={styles.finKpiCard}>
+                      <span className={styles.finKpiLabel}>{k.label}</span>
+                      <span className={[styles.finKpiValue, k.cls].join(' ')}>{k.value}</span>
+                    </div>
+                  ))}
+                </div>
+                {categoryModal.itens?.length > 0 && (
+                  <div className={styles.tableWrap}>
+                    <table className={styles.table}>
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th className={styles.thCenter}>Qtd</th>
+                          <th className={styles.thRight}>Compra Un.</th>
+                          <th className={styles.thRight}>Venda Un.</th>
+                          <th className={styles.thRight}>Margem</th>
+                          <th className={styles.thRight}>Lucro Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {categoryModal.itens.map((item) => {
+                          const qty    = item.quantidadeTotal ?? item.quantidade ?? 0;
+                          const compra = item.valorCompraUnidade ?? item.valorCompra ?? 0;
+                          const venda  = item.valorVendaUnidade ?? item.valorVenda ?? 0;
+                          const margin = compra > 0 ? ((venda - compra) / compra * 100).toFixed(1) : '—';
+                          return (
+                            <tr key={item.id} className={styles.rowHover}>
+                              <td><span className={styles.itemName}>{item.descricao ?? item.nome}</span></td>
+                              <td className={styles.tdCenter}>
+                                <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>{qty}</span>
+                              </td>
+                              <td className={styles.tdRight}>{fmtBRL(compra)}</td>
+                              <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(venda)}</td>
+                              <td className={[styles.tdRight, styles.valTotal].join(' ')}>{margin}{margin !== '—' ? '%' : ''}</td>
+                              <td className={[styles.tdRight, styles.valTotal].join(' ')}>{fmtBRL(qty * (venda - compra))}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Modal>
       )}
 
@@ -613,9 +635,9 @@ export default function InventoryManagement() {
         <div className={styles.formBody}>
           <FormField label="Descrição *">
             <Input
-              placeholder="Ex: Detergente Neutro 500ml"
+              placeholder="Ex: DETERGENTE NEUTRO 500ML"
               value={itemForm.descricao}
-              onChange={(e) => setItemForm((f) => ({ ...f, descricao: e.target.value }))}
+              onChange={(e) => setItemForm((f) => ({ ...f, descricao: e.target.value.toUpperCase() }))}
             />
           </FormField>
           <FormField label="Categoria *">
@@ -625,40 +647,38 @@ export default function InventoryManagement() {
             >
               <option value="">Selecione...</option>
               {categorias.map((c) => (
-                <option key={c.id} value={c.id}>{c.descricao ?? c.nome}</option>
+                <option key={c.id} value={c.id}>{c.categoria ?? c.nome}</option>
               ))}
             </Select>
           </FormField>
-          {itemFormModal === 'create' && (
-            <FormField label="Quantidade inicial">
-              <Input
-                type="number" placeholder="0" min="0"
-                value={itemForm.quantidadeTotal}
-                onChange={(e) => setItemForm((f) => ({ ...f, quantidadeTotal: e.target.value }))}
-              />
-            </FormField>
-          )}
+          <FormField label="Quantidade inicial (unidades) *">
+            <Input
+              type="number" placeholder="0" min="0"
+              value={itemForm.quantidadeTotal}
+              onChange={(e) => setItemForm((f) => ({ ...f, quantidadeTotal: e.target.value }))}
+            />
+          </FormField>
           <div className={styles.formRow}>
             <FormField label="Valor de Compra (un.) *">
               <Input
-                placeholder="0,00"
+                placeholder="R$ 0,00"
                 value={itemForm.valorCompraUnidade}
-                onChange={(e) => setItemForm((f) => ({ ...f, valorCompraUnidade: e.target.value }))}
+                onChange={(e) => setItemForm((f) => ({ ...f, valorCompraUnidade: maskBRL(e.target.value) }))}
               />
             </FormField>
             <FormField label="Valor de Venda (un.) *">
               <Input
-                placeholder="0,00"
+                placeholder="R$ 0,00"
                 value={itemForm.valorVendaUnidade}
-                onChange={(e) => setItemForm((f) => ({ ...f, valorVendaUnidade: e.target.value }))}
+                onChange={(e) => setItemForm((f) => ({ ...f, valorVendaUnidade: maskBRL(e.target.value) }))}
               />
             </FormField>
           </div>
-          <FormField label="Fornecedor">
+          <FormField label="Fornecedor *">
             <Input
-              placeholder="Nome do fornecedor"
+              placeholder="NOME DO FORNECEDOR"
               value={itemForm.fornecedor}
-              onChange={(e) => setItemForm((f) => ({ ...f, fornecedor: e.target.value }))}
+              onChange={(e) => setItemForm((f) => ({ ...f, fornecedor: e.target.value.toUpperCase() }))}
             />
           </FormField>
         </div>
@@ -685,11 +705,18 @@ export default function InventoryManagement() {
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Descrição da Categoria *">
+          <FormField label="Nome da Categoria *">
             <Input
-              placeholder="Ex: Limpeza"
+              placeholder="EX: BEBIDAS"
+              value={catForm.categoria}
+              onChange={(e) => setCatForm((f) => ({ ...f, categoria: e.target.value.toUpperCase() }))}
+            />
+          </FormField>
+          <FormField label="Descrição">
+            <Input
+              placeholder="DESCRIÇÃO DA CATEGORIA"
               value={catForm.descricao}
-              onChange={(e) => setCatForm({ descricao: e.target.value })}
+              onChange={(e) => setCatForm((f) => ({ ...f, descricao: e.target.value.toUpperCase() }))}
             />
           </FormField>
         </div>
@@ -719,36 +746,36 @@ export default function InventoryManagement() {
               <span className={styles.itemInfoLabel}>Item selecionado</span>
               <span className={styles.itemInfoName}>{reporItem.descricao ?? reporItem.nome}</span>
               <span className={styles.itemInfoSub}>
-                Qtd atual: <strong>{reporItem.quantidadeTotal ?? reporItem.quantidade ?? 0}</strong>
+                Qtd atual: <strong>{reporItem.quantidadeTotal ?? reporItem.quantidade ?? 0}</strong> unidades
               </span>
             </div>
-            <FormField label="Quantidade a Repor *">
+            <FormField label="Quantidade (unidades) *">
               <Input
                 type="number" placeholder="0" min="1"
-                value={reporForm.qtdUnidades}
-                onChange={(e) => setReporForm((f) => ({ ...f, qtdUnidades: e.target.value }))}
+                value={reporForm.quantidade}
+                onChange={(e) => setReporForm((f) => ({ ...f, quantidade: e.target.value }))}
               />
             </FormField>
             <FormField label="Fornecedor *">
               <Input
-                placeholder="Nome do fornecedor"
+                placeholder="NOME DO FORNECEDOR"
                 value={reporForm.fornecedor}
-                onChange={(e) => setReporForm((f) => ({ ...f, fornecedor: e.target.value }))}
+                onChange={(e) => setReporForm((f) => ({ ...f, fornecedor: e.target.value.toUpperCase() }))}
               />
             </FormField>
             <div className={styles.formRow}>
               <FormField label="Valor de Compra (un.)">
                 <Input
-                  placeholder="0,00"
+                  placeholder="R$ 0,00"
                   value={reporForm.valorCompraUnidade}
-                  onChange={(e) => setReporForm((f) => ({ ...f, valorCompraUnidade: e.target.value }))}
+                  onChange={(e) => setReporForm((f) => ({ ...f, valorCompraUnidade: maskBRL(e.target.value) }))}
                 />
               </FormField>
               <FormField label="Valor de Venda (un.)">
                 <Input
-                  placeholder="0,00"
+                  placeholder="R$ 0,00"
                   value={reporForm.valorVendaUnidade}
-                  onChange={(e) => setReporForm((f) => ({ ...f, valorVendaUnidade: e.target.value }))}
+                  onChange={(e) => setReporForm((f) => ({ ...f, valorVendaUnidade: maskBRL(e.target.value) }))}
                 />
               </FormField>
             </div>
@@ -780,23 +807,29 @@ export default function InventoryManagement() {
               <span className={styles.itemInfoLabel}>Item selecionado</span>
               <span className={styles.itemInfoName}>{consumirItem.descricao ?? consumirItem.nome}</span>
               <span className={styles.itemInfoSub}>
-                Disponível: <strong>{consumirItem.quantidadeTotal ?? consumirItem.quantidade ?? 0}</strong>
+                Disponível: <strong>{consumirItem.quantidadeTotal ?? consumirItem.quantidade ?? 0}</strong> unidades
               </span>
             </div>
-            <FormField label="Quantidade *">
+            <FormField label="Quantidade (unidades) *">
               <Input
                 type="number" placeholder="0" min="1"
                 max={consumirItem.quantidadeTotal ?? consumirItem.quantidade ?? 9999}
-                value={consumirForm.qtdUnidades}
-                onChange={(e) => setConsumiForm((f) => ({ ...f, qtdUnidades: e.target.value }))}
+                value={consumirForm.quantidade}
+                onChange={(e) => setConsumiForm((f) => ({ ...f, quantidade: e.target.value }))}
               />
             </FormField>
             <FormField label="Quarto (opcional)">
-              <Input
-                type="number" placeholder="Número do quarto" min="1"
+              <Select
                 value={consumirForm.quartoId}
                 onChange={(e) => setConsumiForm((f) => ({ ...f, quartoId: e.target.value }))}
-              />
+              >
+                <option value="">Nenhum (uso geral)</option>
+                {quartos.map((q) => (
+                  <option key={q.id} value={q.id}>
+                    Quarto {q.numero ?? q.nome ?? q.id}
+                  </option>
+                ))}
+              </Select>
             </FormField>
             {tiposPagamento.length > 0 && (
               <FormField label="Tipo de Pagamento (opcional)">
@@ -855,108 +888,111 @@ export default function InventoryManagement() {
           </button>
         </div>
 
-        {historicoLoading ? (
-          <div className={styles.empty}><Loader2 size={24} className={styles.spin} /></div>
-        ) : historicoTab === 'reposicao' ? (
-          <div>
-            {historicoReposicao && (
-              <div className={styles.histKpiGrid}>
-                <div className={styles.histKpiCard}>
-                  <span className={styles.histKpiLabel}>Total Investido</span>
-                  <span className={[styles.histKpiVal, styles.valRose].join(' ')}>{fmtBRL(historicoReposicao.valorTotalInvestido)}</span>
+        {/* Fixed-min-height body so tab switch doesn't resize modal */}
+        <div className={styles.histTabBody}>
+          {historicoLoading ? (
+            <div className={styles.emptyInline}><Loader2 size={24} className={styles.spin} /></div>
+          ) : historicoTab === 'reposicao' ? (
+            <div>
+              {historicoReposicao && (
+                <div className={styles.histKpiGrid}>
+                  <div className={styles.histKpiCard}>
+                    <span className={styles.histKpiLabel}>Total Investido</span>
+                    <span className={[styles.histKpiVal, styles.valRose].join(' ')}>{fmtBRL(historicoReposicao.valorTotalInvestido)}</span>
+                  </div>
+                  <div className={styles.histKpiCard}>
+                    <span className={styles.histKpiLabel}>Total de Venda</span>
+                    <span className={[styles.histKpiVal, styles.valVenda].join(' ')}>{fmtBRL(historicoReposicao.valorTotalVenda)}</span>
+                  </div>
+                  <div className={styles.histKpiCard}>
+                    <span className={styles.histKpiLabel}>Lucro Total</span>
+                    <span className={[styles.histKpiVal, styles.valTotal].join(' ')}>{fmtBRL(historicoReposicao.lucro)}</span>
+                  </div>
                 </div>
-                <div className={styles.histKpiCard}>
-                  <span className={styles.histKpiLabel}>Total de Venda</span>
-                  <span className={[styles.histKpiVal, styles.valVenda].join(' ')}>{fmtBRL(historicoReposicao.valorTotalVenda)}</span>
+              )}
+              {!historicoReposicao?.itemReposicaoList?.length ? (
+                <div className={styles.emptyInline}>
+                  <Package size={24} color="var(--text-2)" />
+                  <span>Nenhuma reposição registrada</span>
                 </div>
-                <div className={styles.histKpiCard}>
-                  <span className={styles.histKpiLabel}>Lucro Total</span>
-                  <span className={[styles.histKpiVal, styles.valTotal].join(' ')}>{fmtBRL(historicoReposicao.lucro)}</span>
-                </div>
-              </div>
-            )}
-            {!historicoReposicao?.itemReposicaoList?.length ? (
-              <div className={styles.empty}>
-                <Package size={24} color="var(--text-2)" />
-                <span>Nenhuma reposição registrada</span>
-              </div>
-            ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th className={styles.thCenter}>Qtd</th>
-                      <th className={styles.thRight}>Compra Un.</th>
-                      <th className={styles.thRight}>Venda Un.</th>
-                      <th className={styles.thRight}>Investido</th>
-                      <th className={styles.thRight}>Total Venda</th>
-                      <th className={styles.thRight}>Lucro</th>
-                      <th>Fornecedor</th>
-                      <th>Responsável</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historicoReposicao.itemReposicaoList.map((entry) => (
-                      <tr key={entry.id} className={styles.rowHover}>
-                        <td><span className={styles.dateCell}><Calendar size={12} />{fmtDate(entry.dataHoraRegistro)}</span></td>
-                        <td className={styles.tdCenter}>
-                          <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>+{entry.qtdUnidades}</span>
-                        </td>
-                        <td className={styles.tdRight}>{fmtBRL(entry.valorCompraUnidade)}</td>
-                        <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(entry.valorVendaUnidade)}</td>
-                        <td className={[styles.tdRight, styles.valRose].join(' ')}>{fmtBRL(entry.valorTotalInvestido)}</td>
-                        <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(entry.valorTotalVenda)}</td>
-                        <td className={[styles.tdRight, styles.valTotal].join(' ')}>{fmtBRL(entry.lucro)}</td>
-                        <td>{entry.fornecedor}</td>
-                        <td className={styles.tdSecondary}>{entry.funcionarioNome}</td>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th className={styles.thCenter}>Qtd</th>
+                        <th className={styles.thRight}>Compra Un.</th>
+                        <th className={styles.thRight}>Venda Un.</th>
+                        <th className={styles.thRight}>Investido</th>
+                        <th className={styles.thRight}>Total Venda</th>
+                        <th className={styles.thRight}>Lucro</th>
+                        <th>Fornecedor</th>
+                        <th>Responsável</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div>
-            {!historicoPrecos.length ? (
-              <div className={styles.empty}>
-                <Tag size={24} color="var(--text-2)" />
-                <span>Nenhum histórico de preços</span>
-              </div>
-            ) : (
-              <div className={styles.tableWrap}>
-                <table className={styles.table}>
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th className={styles.thRight}>Valor Compra</th>
-                      <th className={styles.thRight}>Valor Venda</th>
-                      <th className={styles.thRight}>Margem</th>
-                      <th>Funcionário</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historicoPrecos.map((entry) => {
-                      const margin = entry.valorCompraUnidade > 0
-                        ? ((entry.valorVendaUnidade - entry.valorCompraUnidade) / entry.valorCompraUnidade * 100).toFixed(1)
-                        : '—';
-                      return (
+                    </thead>
+                    <tbody>
+                      {historicoReposicao.itemReposicaoList.map((entry) => (
                         <tr key={entry.id} className={styles.rowHover}>
                           <td><span className={styles.dateCell}><Calendar size={12} />{fmtDate(entry.dataHoraRegistro)}</span></td>
+                          <td className={styles.tdCenter}>
+                            <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>+{entry.qtdUnidades}</span>
+                          </td>
                           <td className={styles.tdRight}>{fmtBRL(entry.valorCompraUnidade)}</td>
                           <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(entry.valorVendaUnidade)}</td>
-                          <td className={[styles.tdRight, styles.valTotal].join(' ')}>{margin}{margin !== '—' ? '%' : ''}</td>
+                          <td className={[styles.tdRight, styles.valRose].join(' ')}>{fmtBRL(entry.valorTotalInvestido)}</td>
+                          <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(entry.valorTotalVenda)}</td>
+                          <td className={[styles.tdRight, styles.valTotal].join(' ')}>{fmtBRL(entry.lucro)}</td>
+                          <td>{entry.fornecedor}</td>
                           <td className={styles.tdSecondary}>{entry.funcionarioNome}</td>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              {!historicoPrecos.length ? (
+                <div className={styles.emptyInline}>
+                  <Tag size={24} color="var(--text-2)" />
+                  <span>Nenhum histórico de preços</span>
+                </div>
+              ) : (
+                <div className={styles.tableWrap}>
+                  <table className={styles.table}>
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th className={styles.thRight}>Valor Compra</th>
+                        <th className={styles.thRight}>Valor Venda</th>
+                        <th className={styles.thRight}>Margem</th>
+                        <th>Funcionário</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historicoPrecos.map((entry) => {
+                        const margin = entry.valorCompraUnidade > 0
+                          ? ((entry.valorVendaUnidade - entry.valorCompraUnidade) / entry.valorCompraUnidade * 100).toFixed(1)
+                          : '—';
+                        return (
+                          <tr key={entry.id} className={styles.rowHover}>
+                            <td><span className={styles.dateCell}><Calendar size={12} />{fmtDate(entry.dataHoraRegistro)}</span></td>
+                            <td className={styles.tdRight}>{fmtBRL(entry.valorCompraUnidade)}</td>
+                            <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(entry.valorVendaUnidade)}</td>
+                            <td className={[styles.tdRight, styles.valTotal].join(' ')}>{margin}{margin !== '—' ? '%' : ''}</td>
+                            <td className={styles.tdSecondary}>{entry.funcionarioNome}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );
