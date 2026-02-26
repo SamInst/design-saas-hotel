@@ -306,11 +306,22 @@ export const reservaApi = {
 //  ITENS / INVENTÁRIO
 // ─────────────────────────────────────────────────────────────
 export const itemApi = {
-  listar(params)     { return request('/itens', { params }); },
-  buscarPorId(id)    { return request(`/itens/${id}`); },
-  criar(body)        { return request('/itens', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/itens/${id}`, { method: 'PUT', body }); },
-  deletar(id)        { return request(`/itens/${id}`, { method: 'DELETE' }); },
+  dashboard()            { return request('/item/dashboard'); },
+  buscar(params)         { return request('/item/buscar', { params }); },
+  criar(body)            { return request('/item', { method: 'POST', body }); },
+  atualizar(id, body)    { return request(`/item/${id}`, { method: 'PUT', body }); },
+  repor(id, body)        { return request(`/item/${id}/repor`, { method: 'POST', body }); },
+  consumir(id, body)     { return request(`/item/${id}/consumir`, { method: 'POST', body }); },
+  historicoReposicao(id) { return request(`/item/${id}/historico-reposicao`); },
+  historicoPreco(id)     { return request(`/item/${id}/historico-preco`); },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  CATEGORIAS
+// ─────────────────────────────────────────────────────────────
+export const categoriaApi = {
+  criar(body)        { return request('/categoria', { method: 'POST', body }); },
+  atualizar(id, body){ return request(`/categoria/${id}`, { method: 'PUT', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -493,6 +504,7 @@ export default {
   dayUse:      dayUseApi,
   reserva:     reservaApi,
   item:        itemApi,
+  categoria:   categoriaApi,
   cadastro:    cadastroApi,
   preco:       precoApi,
   funcionario: funcionarioApi,

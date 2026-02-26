@@ -8,7 +8,7 @@ import FinancialDashboard  from '../pages/financial/FinancialDashboard';
 import RegistersPage       from '../pages/registers/RegistersPage';
 import EmployeeManagement  from '../pages/employees/EmployeeManagement';
 import RolePermissions     from '../pages/permissions/RolePermissions';
-// import InventoryManagement from '../pages/inventory/InventoryManagement';
+import InventoryManagement from '../pages/inventory/InventoryManagement';
 // import RoomsManagement     from '../pages/rooms/RoomsManagement';
 // import PricingManagement   from '../pages/pricing/PricingManagement';
 // import StaysManagement     from '../pages/stays/StaysManagement';
@@ -19,7 +19,7 @@ const PAGE_MAP = {
   registers:   <RegistersPage />,
   employees:   <EmployeeManagement />,
   permissions: <RolePermissions />,
-  // inventory:   <InventoryManagement />,
+  inventory:   <InventoryManagement />,
   // rooms:       <RoomsManagement />,
   // pricing:     <PricingManagement />,
   // stays:       <StaysManagement />,
