@@ -7,7 +7,7 @@ import { userStorage, tokenStorage, authApi } from '../services/api';
 import FinancialDashboard  from '../pages/financial/FinancialDashboard';
 import RegistersPage       from '../pages/registers/RegistersPage';
 import EmployeeManagement  from '../pages/employees/EmployeeManagement';
-// import RolePermissions     from '../pages/permissions/RolePermissions';
+import RolePermissions     from '../pages/permissions/RolePermissions';
 // import InventoryManagement from '../pages/inventory/InventoryManagement';
 // import RoomsManagement     from '../pages/rooms/RoomsManagement';
 // import PricingManagement   from '../pages/pricing/PricingManagement';
@@ -18,8 +18,8 @@ const PAGE_MAP = {
   financial:   <FinancialDashboard />,
   registers:   <RegistersPage />,
   employees:   <EmployeeManagement />,
+  permissions: <RolePermissions />,
   // inventory:   <InventoryManagement />,
-  // permissions: <RolePermissions />,
   // rooms:       <RoomsManagement />,
   // pricing:     <PricingManagement />,
   // stays:       <StaysManagement />,

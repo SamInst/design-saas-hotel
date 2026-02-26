@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { id: 'registers', label: 'Cadastros',    icon: Users       },
   { id: 'pricing',   label: 'Preços',       icon: Tag         },
   { id: 'employees', label: 'Funcionários', icon: UserCog     },
-  { id: 'permissions', label: 'Permissões', icon: ShieldCheck },
+  { id: 'permissions', label: 'Cargos e Permissões', icon: ShieldCheck },
 ];
 
 export default function Sidebar({

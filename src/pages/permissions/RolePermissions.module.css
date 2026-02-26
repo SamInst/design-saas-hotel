@@ -1,0 +1,210 @@
+/* ── Layout ── */
+.page      { min-height: 100%; }
+.container { max-width: 1400px; margin: 0 auto; padding: 0; }
+
+/* ── Toolbar dentro do card ── */
+.tableHeader {
+  display: flex; gap: 12px; align-items: center;
+  justify-content: space-between; flex-wrap: wrap;
+  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
+}
+.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
+.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
+.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.searchWrap    { position: relative; min-width: 220px; display: flex; align-items: center; }
+.searchIcon    { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; flex-shrink: 0; }
+.searchInput   { padding-left: 32px !important; }
+.searchSpinner { position: absolute; right: 10px; color: var(--violet); }
+
+/* ── Card principal ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+}
+
+/* ── Table ── */
+.tableWrap { overflow-x: auto; min-height: 180px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  padding: 9px 16px; text-align: left;
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table td  { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.row       { cursor: pointer; transition: background .12s; }
+.row:hover { background: rgba(124,58,237,.04); }
+.row:last-child td { border-bottom: none; }
+
+.cargoName { font-size: 13px; font-weight: 600; color: var(--text); }
+.cargoId   {
+  font-size: 11px; font-family: var(--font-mono); color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 1px 7px; border-radius: 6px;
+}
+
+/* ── Tela tags in table ── */
+.telaTags  { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.telaTag   {
+  font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 20px;
+  background: rgba(124,58,237,.1); color: var(--violet);
+  border: 1px solid rgba(124,58,237,.2); white-space: nowrap;
+}
+.telaTagMore  { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
+.telaTagEmpty { font-size: 12px; color: var(--text-2); }
+
+/* ── Paginação ── */
+.pagination { display:flex; align-items:center; gap:4px; padding:10px 16px; border-top:1px solid var(--border); background:var(--surface-2); }
+.pageBtn {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:30px; height:30px; padding:0 6px;
+  border-radius:8px; border:1px solid var(--border);
+  background:var(--surface); color:var(--text-2);
+  font-size:12px; font-weight:500; cursor:pointer; transition:all .12s;
+}
+.pageBtn:hover:not(:disabled) { border-color:var(--violet); color:var(--violet); }
+.pageBtn:disabled              { opacity:.4; cursor:not-allowed; }
+.pageBtnActive { background:var(--violet); color:#fff; border-color:var(--violet); }
+.pageInfo      { margin-left:8px; font-size:12px; color:var(--text-2); }
+
+/* ── Empty / loading ── */
+.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:48px 20px; color:var(--text-2); font-size:13px; }
+.spin       { animation:spin .8s linear infinite; }
+.spinInline { animation:spin .8s linear infinite; display:inline-block; flex-shrink:0; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── Modal form ── */
+.formBody    { display: flex; flex-direction: column; gap: 14px; }
+.formDivider { height: 1px; background: var(--border); margin: 2px 0; }
+
+/* ── Telas section in form ── */
+.telasSection { display: flex; flex-direction: column; gap: 8px; }
+.telasSectionTitle {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+}
+
+.telaItem { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color .15s; }
+.telaItemActive { border-color: rgba(124,58,237,.4); }
+
+.telaItemHeader {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface-2);
+  cursor: pointer; user-select: none;
+}
+.telaItemHeaderActive { background: rgba(124,58,237,.06); }
+
+.telaCheckbox { width: 16px; height: 16px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
+.telaInfo     { flex: 1; min-width: 0; }
+.telaNome     { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* ── Acesso Total row ── */
+.acessoTotalRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-top: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; user-select: none;
+}
+.acessoTotalCheckbox { width: 14px; height: 14px; accent-color: var(--emerald); cursor: pointer; flex-shrink: 0; }
+.acessoTotalLabel    { font-size: 12px; font-weight: 600; color: var(--text); }
+.acessoTotalBadge    {
+  font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px;
+  background: rgba(16,185,129,.12); color: var(--emerald);
+  border: 1px solid rgba(16,185,129,.25); margin-left: auto;
+}
+
+/* ── Permissoes list (vertical) ── */
+.permissoesList {
+  display: flex; flex-direction: column; gap: 1px;
+  border-top: 1px solid var(--border); background: var(--surface);
+}
+.permissaoItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; cursor: pointer; user-select: none;
+  transition: background .1s;
+}
+.permissaoItem:hover:not(.permissaoItemDisabled) { background: rgba(124,58,237,.03); }
+.permissaoItemDisabled { cursor: not-allowed; opacity: .45; }
+
+.permissaoCheckbox { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
+.permissaoLabel    { font-size: 12px; color: var(--text); }
+
+.permissaoLoading {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; color: var(--text-2); font-size: 12px;
+  border-top: 1px solid var(--border);
+}
+.permissaoEmpty {
+  padding: 8px 14px; font-size: 12px; color: var(--text-2);
+  border-top: 1px solid var(--border); font-style: italic;
+}
+
+/* ── Detail (view) modal ── */
+.detailHeader {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+}
+.detailHeaderIcon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(124,58,237,.12); color: var(--violet);
+  display: flex; align-items: center; justify-content: center;
+}
+.detailHeaderText { flex: 1; min-width: 0; }
+.detailCargoName  { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.detailCargoId    {
+  font-size: 11px; font-family: var(--font-mono); color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  padding: 1px 8px; border-radius: 6px; display: inline-block; margin-top: 3px;
+}
+
+.detailSectionTitle {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2);
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+}
+
+.detailTelas { display: flex; flex-direction: column; gap: 10px; }
+.detailTelaCard  { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.detailTelaHeader {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface-2);
+}
+.detailTelaIcon {
+  width: 28px; height: 28px; border-radius: 8px;
+  background: rgba(124,58,237,.12); color: var(--violet);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.detailTelaName { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.detailTelaDesc { font-size: 11px; color: var(--text-2); }
+
+/* Permissões no detalhe — uma abaixo da outra */
+.detailPermList { display: flex; flex-direction: column; }
+.detailPermItem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text);
+}
+.detailPermBullet {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  background: var(--violet);
+}
+.detailPermEmpty {
+  padding: 8px 14px; font-size: 12px; color: var(--text-2);
+  border-top: 1px solid var(--border); font-style: italic;
+}
+
+.detailNoTelas {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 32px 20px; color: var(--text-2); font-size: 13px;
+}
+
+/* ── Modal footer ── */
+.modalFooter { display: flex; gap: 8px; align-items: center; }
+.full { flex: 1; justify-content: center; }
+
+/* ── Dark adjustments ── */
+:root[data-theme="dark"] .card { box-shadow: none; }
+:root[data-theme="dark"] .telaItemHeader       { background: var(--surface-2); }
+:root[data-theme="dark"] .telaItemHeaderActive { background: rgba(124,58,237,.08); }
+:root[data-theme="dark"] .acessoTotalRow       { background: var(--surface); }
+:root[data-theme="dark"] .permissoesList       { background: var(--surface); }

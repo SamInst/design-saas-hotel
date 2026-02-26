@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-// const BASE_URL =
-//   import.meta.env.VITE_API_URL ||
-//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
-
-  const BASE_URL =
+const BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'http://localhost:8080';
+  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+
+  // const BASE_URL =
+  // import.meta.env.VITE_API_URL ||
+  // 'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -452,20 +452,24 @@ export const usuarioApi = {
 // ─────────────────────────────────────────────────────────────
 export const cargoApi = {
   listar(params)     { return request('/cargo', { params }); },
+  criar(body)        { return request('/cargo', { method: 'POST', body }); },
+  atualizar(id, body){ return request(`/cargo/${id}`, { method: 'PUT', body }); },
+  deletar(id)        { return request(`/cargo/${id}`, { method: 'DELETE' }); },
+
+  vincularTelas(id, ids, vinculo) {
+    return request(`/cargo/${id}/telas?vinculo=${vinculo}`, { method: 'PATCH', body: ids });
+  },
+  vincularPermissoes(id, ids, vinculo) {
+    return request(`/cargo/${id}/permissoes?vinculo=${vinculo}`, { method: 'PATCH', body: ids });
+  },
 };
 
 // ─────────────────────────────────────────────────────────────
-//  PERMISSÕES / CARGOS  (ADMIN)
+//  TELAS / PERMISSÕES  (ADMIN)
 // ─────────────────────────────────────────────────────────────
 export const permissaoApi = {
-  listarCargos()          { return request('/cargos'); },
-  buscarCargoPorId(id)    { return request(`/cargos/${id}`); },
-  criarCargo(body)        { return request('/cargos', { method: 'POST', body }); },
-  atualizarCargo(id, body){ return request(`/cargos/${id}`, { method: 'PUT', body }); },
-  deletarCargo(id)        { return request(`/cargos/${id}`, { method: 'DELETE' }); },
-
-  listarTelas()           { return request('/telas'); },
-  listarPermissoes()      { return request('/permissoes'); },
+  listarTelas()                    { return request('/telas'); },
+  listarPermissoesPorTela(telaId)  { return request('/permissoes', { params: { telaId } }); },
 };
 
 // ─────────────────────────────────────────────────────────────
