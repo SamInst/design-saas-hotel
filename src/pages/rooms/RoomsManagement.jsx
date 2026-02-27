@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  BedDouble, Users, Wrench, Sparkles, Plus, Edit2, Trash2,
-  ChevronDown, Loader2, Search, User, Clock, Calendar,
-  AlertTriangle,
+  BedDouble, BedSingle, Layers, Waves,
+  Wrench, Sparkles, Plus, Edit2, Trash2,
+  ChevronDown, Loader2, Search, User, Calendar,
+  AlertTriangle, Minus, RefreshCw, Package,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -21,18 +22,19 @@ const STATUS_KEY = {
   [STATUS.FORA_DE_SERVICO]: 'fora',
 };
 
-const BEDS_LABELS    = { casal: 'Casal', solteiro: 'Solteiro', beliche: 'Beliche', rede: 'Rede' };
-const BEDS_LABELS_SH = { casal: 'Casal', solteiro: 'Solt.', beliche: 'Beliche', rede: 'Rede' };
+const BEDS_LABELS = { casal: 'Casal', solteiro: 'Solteiro', beliche: 'Beliche', rede: 'Rede' };
 
-const fmtTime = (dt) => (dt ? String(dt).split(' ')[1] || dt : '—');
-const fmtDate = (dt) => {
+const fmtDay = (dt) => {
   if (!dt) return '—';
-  const parts = String(dt).split(' ');
-  if (parts.length >= 2) {
-    const [year, month, day] = parts[0].split('-');
-    return `${day}/${month} ${parts[1]}`;
-  }
-  return dt;
+  const [datePart] = String(dt).split(' ');
+  const [, month, day] = datePart.split('-');
+  return `${day}/${month}`;
+};
+const fmtDayTime = (dt) => {
+  if (!dt) return '—';
+  const [datePart, timePart] = String(dt).split(' ');
+  const [, month, day] = datePart.split('-');
+  return `${day}/${month}${timePart ? ' ' + timePart : ''}`;
 };
 
 const blankForm    = () => ({ numero: '', categoriaId: 1, tipoOcupacao: 'Casal', descricao: '', camas: { casal: 0, solteiro: 0, beliche: 0, rede: 0 } });
@@ -40,6 +42,10 @@ const blankService = () => ({ responsavel: '', descricao: '', previsaoFim: '' })
 
 const canChangeStatus = (room) =>
   room && room.status !== STATUS.OCUPADO && room.status !== STATUS.RESERVADO;
+
+const fmtBRL = (v) =>
+  v == null ? 'R$ 0,00' :
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 // ── Elapsed timer (for Day Use) ───────────────────────────────────────────────
 function ElapsedTimer({ checkin }) {
@@ -74,6 +80,16 @@ export default function RoomsManagement() {
 
   // Detail modal
   const [detailRoom, setDetailRoom] = useState(null);
+  const [detailTab, setDetailTab]   = useState('detalhes');
+
+  // Consume item modal
+  const [consumirTarget, setConsumiTarget]   = useState(null); // { item, room }
+  const [consumirQty, setConsumiQty]         = useState(1);
+  const [consumirLoading, setConsumiLoading] = useState(false);
+
+  // Restock item modal
+  const [reporTarget, setReporTarget]     = useState(null); // { item, room }
+  const [reporLoading, setReporLoading]   = useState(false);
 
   // Form modal (create / edit)
   const [formModal, setFormModal]     = useState(null);
@@ -194,6 +210,50 @@ export default function RoomsManagement() {
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
   };
 
+  // ── Item consume / restock ───────────────────────────────────────────────────
+  const openConsumir = (item) => {
+    setConsumiTarget({ item, room: detailRoom });
+    setConsumiQty(1);
+  };
+
+  const openRepor = (item) => {
+    setReporTarget({ item, room: detailRoom });
+  };
+
+  const handleConsumir = async () => {
+    if (!consumirTarget) return;
+    const qty = Number(consumirQty);
+    if (!qty || qty < 1) { notify('Informe uma quantidade válida.', 'error'); return; }
+    if (qty > consumirTarget.item.quantidadeAtual) { notify('Quantidade maior que o disponível.', 'error'); return; }
+    setConsumiLoading(true);
+    try {
+      await quartoApi.consumirItem(consumirTarget.room.id, consumirTarget.item.id, qty);
+      notify(`${consumirTarget.item.nome}: ${qty} un. consumida(s).`);
+      setConsumiTarget(null);
+      // Refresh quartos and update detailRoom
+      const updated = await quartoApi.listar();
+      setQuartos(updated);
+      const fresh = updated.find((q) => q.id === consumirTarget.room.id);
+      if (fresh) setDetailRoom(fresh);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally     { setConsumiLoading(false); }
+  };
+
+  const handleRepor = async () => {
+    if (!reporTarget) return;
+    setReporLoading(true);
+    try {
+      await quartoApi.reporItem(reporTarget.room.id, reporTarget.item.id);
+      notify(`${reporTarget.item.nome}: estoque reposto.`);
+      setReporTarget(null);
+      const updated = await quartoApi.listar();
+      setQuartos(updated);
+      const fresh = updated.find((q) => q.id === reporTarget.room.id);
+      if (fresh) setDetailRoom(fresh);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally     { setReporLoading(false); }
+  };
+
   // ── Delete ───────────────────────────────────────────────────────────────────
   const confirmDelete = async () => {
     if (!deleteTarget) return;
@@ -278,7 +338,7 @@ export default function RoomsManagement() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 style={{ width: 148, flexShrink: 0 }}
               >
-                <option value="all">Todos os status</option>
+                <option value="all">Selecione status</option>
                 {Object.values(STATUS).map((s) => <option key={s} value={s}>{s}</option>)}
               </Select>
               <Button variant="primary" onClick={openCreate}><Plus size={15} /> Novo Quarto</Button>
@@ -316,50 +376,51 @@ export default function RoomsManagement() {
                     ) : (
                       <div className={styles.roomGrid}>
                         {cat.rooms.map((room) => {
-                          const sk     = STATUS_KEY[room.status] || 'slate';
-                          const hasBeds = Object.values(room.camas || {}).some((v) => v > 0);
-                          const isDayUse = room.status === STATUS.OCUPADO && room.hospede?.tipo === 'dayuse';
+                          const sk            = STATUS_KEY[room.status] || 'slate';
+                          const isDayUse      = room.status === STATUS.OCUPADO && room.hospede?.tipo === 'dayuse';
+                          const c             = room.camas || {};
+                          const hasEmptyItems = (room.itens || []).some((i) => i.quantidadeAtual === 0);
                           return (
                             <div
                               key={room.id}
                               className={[styles.roomCard, styles[`roomCard_${sk}`]].join(' ')}
                               onClick={() => setDetailRoom(room)}
                             >
+                              {/* Topo: número + status */}
                               <div className={styles.roomCardTop}>
                                 <span className={styles.roomNum}>{room.numero}</span>
                                 <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
                               </div>
 
-                              {/* Tipo de ocupação */}
-                              <span className={styles.tipoOcupacaoBadge}>{room.tipoOcupacao}</span>
-
-                              {/* Disponível: mostrar camas */}
-                              {room.status === STATUS.DISPONIVEL && hasBeds && (
-                                <div className={styles.roomBeds}>
-                                  {Object.entries(room.camas).map(([k, v]) =>
-                                    v > 0 ? <span key={k} className={styles.roomBedPill}>{BEDS_LABELS_SH[k]} {v}</span> : null
-                                  )}
+                              {/* Disponível: tipo de ocupação (esq) + camas com ícones (dir) */}
+                              {room.status === STATUS.DISPONIVEL && (
+                                <div className={styles.roomCardBottom}>
+                                  <span className={styles.tipoOcupacaoBadge}>{room.tipoOcupacao}</span>
+                                  <div className={styles.roomBeds}>
+                                    {c.casal    > 0 && <span className={styles.bedIconRow}><BedDouble size={11} />{c.casal}</span>}
+                                    {c.solteiro > 0 && <span className={styles.bedIconRow}><BedSingle size={11} />{c.solteiro}</span>}
+                                    {c.beliche  > 0 && <span className={styles.bedIconRow}><Layers    size={11} />{c.beliche}</span>}
+                                    {c.rede     > 0 && <span className={styles.bedIconRow}><Waves     size={11} />{c.rede}</span>}
+                                  </div>
                                 </div>
                               )}
 
                               {/* Ocupado / Reservado */}
                               {(room.status === STATUS.OCUPADO || room.status === STATUS.RESERVADO) && room.hospede && (
                                 <div className={styles.roomTimes}>
-                                  <span className={styles.roomGuestName}>{room.hospede.nome}</span>
+                                  <div className={styles.roomGuestRow}>
+                                    <User size={9} /><span className={styles.roomGuestName}>{room.hospede.nome}</span>
+                                  </div>
                                   {isDayUse ? (
                                     <div className={styles.dayUseRow}>
                                       <span className={styles.dayUseLabel}>Day Use</span>
                                       <ElapsedTimer checkin={room.hospede.checkin} />
                                     </div>
                                   ) : (
-                                    <>
-                                      <div className={styles.roomTimeRow}>
-                                        <Clock size={9} /><span>In {fmtDate(room.hospede.checkin)}</span>
-                                      </div>
-                                      <div className={styles.roomTimeRow}>
-                                        <Clock size={9} /><span>Out {fmtDate(room.hospede.checkout)}</span>
-                                      </div>
-                                    </>
+                                    <div className={styles.roomTimeRow}>
+                                      <Calendar size={9} />
+                                      <span>{fmtDay(room.hospede.checkin)} - {fmtDayTime(room.hospede.checkout)}</span>
+                                    </div>
                                   )}
                                 </div>
                               )}
@@ -372,6 +433,13 @@ export default function RoomsManagement() {
                               {/* Manutenção / Fora */}
                               {(room.status === STATUS.MANUTENCAO || room.status === STATUS.FORA_DE_SERVICO) && room.manutencao && (
                                 <div className={styles.roomInfo}><Wrench size={9} /><span>{room.manutencao.responsavel || '—'}</span></div>
+                              )}
+
+                              {/* Itens em falta */}
+                              {hasEmptyItems && (
+                                <div className={styles.itemsWarning}>
+                                  <AlertTriangle size={9} /> Itens em falta
+                                </div>
                               )}
                             </div>
                           );
@@ -392,8 +460,8 @@ export default function RoomsManagement() {
       {detailRoom && (
         <Modal
           open={!!detailRoom}
-          onClose={() => setDetailRoom(null)}
-          size="sm"
+          onClose={() => { setDetailRoom(null); setDetailTab('detalhes'); }}
+          size="md"
           title={<><BedDouble size={15} /> Quarto {detailRoom.numero}</>}
           footer={
             <div className={styles.modalFooterBetween}>
@@ -406,70 +474,199 @@ export default function RoomsManagement() {
             </div>
           }
         >
-          <div className={styles.detailBody}>
-            <div className={styles.infoRow}>
-              <span className={styles.infoLabel}>Status</span>
-              <span className={[styles.statusBadge, styles[`badge_${STATUS_KEY[detailRoom.status]}`]].join(' ')} style={{ fontSize: 11, padding: '3px 8px' }}>
-                {detailRoom.status}
+          {/* ── Tabs ── */}
+          <div className={styles.detailTabs}>
+            <button
+              className={[styles.detailTab, detailTab === 'detalhes' ? styles.detailTabActive : ''].join(' ')}
+              onClick={() => setDetailTab('detalhes')}
+            >
+              Detalhes
+            </button>
+            <button
+              className={[styles.detailTab, detailTab === 'itens' ? styles.detailTabActive : ''].join(' ')}
+              onClick={() => setDetailTab('itens')}
+            >
+              <Package size={12} /> Itens
+              {(detailRoom.itens?.length ?? 0) > 0 && (
+                <span className={styles.detailTabCount}>{detailRoom.itens.length}</span>
+              )}
+            </button>
+          </div>
+
+          {/* ── Tab: Detalhes ── */}
+          {detailTab === 'detalhes' && (
+            <div className={styles.detailBody}>
+              <div className={styles.infoRow}>
+                <span className={styles.infoLabel}>Status</span>
+                <span className={[styles.statusBadge, styles[`badge_${STATUS_KEY[detailRoom.status]}`]].join(' ')} style={{ fontSize: 11, padding: '3px 8px' }}>
+                  {detailRoom.status}
+                </span>
+              </div>
+              <div className={styles.infoRow}>
+                <span className={styles.infoLabel}>Categoria</span>
+                <span className={styles.infoVal}>{ROOM_CATEGORIES.find((c) => c.id === detailRoom.categoriaId)?.tipo || '—'}</span>
+              </div>
+              <div className={styles.infoRow}>
+                <span className={styles.infoLabel}>Tipo de Ocupação</span>
+                <span className={styles.infoVal}>{detailRoom.tipoOcupacao || '—'}</span>
+              </div>
+              {detailRoom.descricao && (
+                <div className={styles.infoRow}>
+                  <span className={styles.infoLabel}>Descrição</span>
+                  <span className={styles.infoVal}>{detailRoom.descricao}</span>
+                </div>
+              )}
+              {Object.entries(detailRoom.camas || {}).some(([, v]) => v > 0) && (
+                <div className={styles.contextSection}>
+                  <span className={styles.sectionTitle}>Camas</span>
+                  <div className={styles.bedsList}>
+                    {Object.entries(detailRoom.camas || {}).map(([k, v]) =>
+                      v > 0 ? <span key={k} className={styles.bedBadge}>{BEDS_LABELS[k]} × {v}</span> : null
+                    )}
+                  </div>
+                </div>
+              )}
+              {(detailRoom.status === STATUS.OCUPADO || detailRoom.status === STATUS.RESERVADO) && detailRoom.hospede && (
+                <div className={styles.contextSection}>
+                  <span className={styles.sectionTitle}><User size={12} /> Hóspede</span>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>Nome</span><span className={styles.infoVal}>{detailRoom.hospede.nome}</span></div>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>Tipo</span><span className={styles.infoVal}>{detailRoom.hospede.tipo === 'dayuse' ? 'Day Use' : 'Pernoite'}</span></div>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>Check-in</span><span className={styles.infoVal}>{detailRoom.hospede.checkin}</span></div>
+                  {detailRoom.hospede.checkout && <div className={styles.infoRow}><span className={styles.infoLabel}>Check-out</span><span className={styles.infoVal}>{detailRoom.hospede.checkout}</span></div>}
+                </div>
+              )}
+              {detailRoom.status === STATUS.LIMPEZA && detailRoom.limpeza && (
+                <div className={styles.contextSection}>
+                  <span className={styles.sectionTitle}><Sparkles size={12} /> Em Limpeza</span>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>Responsável</span><span className={styles.infoVal}>{detailRoom.limpeza.responsavel || 'Não atribuído'}</span></div>
+                </div>
+              )}
+              {(detailRoom.status === STATUS.MANUTENCAO || detailRoom.status === STATUS.FORA_DE_SERVICO) && detailRoom.manutencao && (
+                <div className={styles.contextSection}>
+                  <span className={styles.sectionTitle}><Wrench size={12} /> Manutenção</span>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>Responsável</span><span className={styles.infoVal}>{detailRoom.manutencao.responsavel || '—'}</span></div>
+                  {detailRoom.manutencao.descricao && <div className={styles.infoRow}><span className={styles.infoLabel}>Descrição</span><span className={styles.infoVal}>{detailRoom.manutencao.descricao}</span></div>}
+                  {detailRoom.manutencao.previsaoFim && <div className={styles.infoRow}><span className={styles.infoLabel}>Previsão</span><span className={styles.infoVal}>{detailRoom.manutencao.previsaoFim}</span></div>}
+                </div>
+              )}
+              <StatusActions room={detailRoom} closeFirst="detail" />
+            </div>
+          )}
+
+          {/* ── Tab: Itens ── */}
+          {detailTab === 'itens' && (
+            <div className={styles.itemsList}>
+              {(detailRoom.itens || []).length === 0 ? (
+                <div className={styles.itemsEmpty}><Package size={22} color="var(--text-2)" /><span>Nenhum item configurado.</span></div>
+              ) : (
+                (detailRoom.itens || []).map((item) => (
+                  <div key={item.id} className={styles.itemRow}>
+                    <div className={styles.itemInfo}>
+                      <span className={styles.itemName}>{item.nome}</span>
+                      <span className={styles.itemPrice}>{fmtBRL(item.valorVenda)}</span>
+                    </div>
+                    <div className={styles.itemRowRight}>
+                      <span className={[
+                        styles.itemQty,
+                        item.quantidadeAtual === 0 ? styles.itemQtyEmpty :
+                        item.quantidadeAtual < item.quantidadeConfigurada ? styles.itemQtyLow : '',
+                      ].join(' ')}>
+                        {item.quantidadeAtual}/{item.quantidadeConfigurada}
+                      </span>
+                      <div className={styles.itemActions}>
+                        <button
+                          className={[styles.itemBtn, styles.itemBtnConsumir].join(' ')}
+                          disabled={item.quantidadeAtual === 0}
+                          onClick={() => openConsumir(item)}
+                        >
+                          <Minus size={11} /> Consumir
+                        </button>
+                        <button
+                          className={[styles.itemBtn, styles.itemBtnRepor].join(' ')}
+                          disabled={item.quantidadeAtual >= item.quantidadeConfigurada}
+                          onClick={() => openRepor(item)}
+                        >
+                          <RefreshCw size={11} /> Repor
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Consumir Item
+      ═══════════════════════════════════════════════════════ */}
+      {consumirTarget && (
+        <Modal
+          open={!!consumirTarget}
+          onClose={() => setConsumiTarget(null)}
+          size="sm"
+          title={<><Minus size={15} /> Consumir Item</>}
+          footer={
+            <div className={styles.modalFooter}>
+              <Button variant="secondary" onClick={() => setConsumiTarget(null)}>Cancelar</Button>
+              <Button variant="danger" onClick={handleConsumir} disabled={consumirLoading}>
+                {consumirLoading && <Loader2 size={14} className={styles.spinInline} />}
+                Confirmar Consumo
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.formBody}>
+            <div className={styles.itemInfoBox}>
+              <span className={styles.itemInfoName}>{consumirTarget.item.nome}</span>
+              <span className={styles.itemInfoSub}>
+                Disponível: <strong>{consumirTarget.item.quantidadeAtual}</strong> de {consumirTarget.item.quantidadeConfigurada} un.
               </span>
             </div>
-            <div className={styles.infoRow}>
-              <span className={styles.infoLabel}>Categoria</span>
-              <span className={styles.infoVal}>{ROOM_CATEGORIES.find((c) => c.id === detailRoom.categoriaId)?.tipo || '—'}</span>
+            <FormField label="Quarto">
+              <Input value={`Quarto ${consumirTarget.room.numero}`} disabled />
+            </FormField>
+            <FormField label="Quantidade *">
+              <Input
+                type="number" min="1" max={consumirTarget.item.quantidadeAtual}
+                value={consumirQty}
+                onChange={(e) => setConsumiQty(e.target.value)}
+              />
+            </FormField>
+          </div>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Repor Item
+      ═══════════════════════════════════════════════════════ */}
+      {reporTarget && (
+        <Modal
+          open={!!reporTarget}
+          onClose={() => setReporTarget(null)}
+          size="sm"
+          title={<><RefreshCw size={15} /> Repor Item</>}
+          footer={
+            <div className={styles.modalFooter}>
+              <Button variant="secondary" onClick={() => setReporTarget(null)}>Cancelar</Button>
+              <Button variant="primary" onClick={handleRepor} disabled={reporLoading}>
+                {reporLoading && <Loader2 size={14} className={styles.spinInline} />}
+                Confirmar Reposição
+              </Button>
             </div>
-            <div className={styles.infoRow}>
-              <span className={styles.infoLabel}>Tipo de Ocupação</span>
-              <span className={styles.infoVal}>{detailRoom.tipoOcupacao || '—'}</span>
+          }
+        >
+          <div className={styles.formBody}>
+            <div className={styles.itemInfoBox}>
+              <span className={styles.itemInfoName}>{reporTarget.item.nome}</span>
+              <span className={styles.itemInfoSub}>
+                Atual: <strong>{reporTarget.item.quantidadeAtual}</strong> un. → será reposto para <strong>{reporTarget.item.quantidadeConfigurada}</strong> un.
+              </span>
             </div>
-            {detailRoom.descricao && (
-              <div className={styles.infoRow}>
-                <span className={styles.infoLabel}>Descrição</span>
-                <span className={styles.infoVal}>{detailRoom.descricao}</span>
-              </div>
-            )}
-
-            {/* Beds */}
-            {Object.entries(detailRoom.camas || {}).some(([, v]) => v > 0) && (
-              <div className={styles.contextSection}>
-                <span className={styles.sectionTitle}>Camas</span>
-                <div className={styles.bedsList}>
-                  {Object.entries(detailRoom.camas || {}).map(([k, v]) =>
-                    v > 0 ? <span key={k} className={styles.bedBadge}>{BEDS_LABELS[k]} × {v}</span> : null
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Guest */}
-            {(detailRoom.status === STATUS.OCUPADO || detailRoom.status === STATUS.RESERVADO) && detailRoom.hospede && (
-              <div className={styles.contextSection}>
-                <span className={styles.sectionTitle}><User size={12} /> Hóspede</span>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>Nome</span><span className={styles.infoVal}>{detailRoom.hospede.nome}</span></div>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>Tipo</span><span className={styles.infoVal}>{detailRoom.hospede.tipo === 'dayuse' ? 'Day Use' : 'Pernoite'}</span></div>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>Check-in</span><span className={styles.infoVal}>{detailRoom.hospede.checkin}</span></div>
-                {detailRoom.hospede.checkout && <div className={styles.infoRow}><span className={styles.infoLabel}>Check-out</span><span className={styles.infoVal}>{detailRoom.hospede.checkout}</span></div>}
-              </div>
-            )}
-
-            {/* Cleaning */}
-            {detailRoom.status === STATUS.LIMPEZA && detailRoom.limpeza && (
-              <div className={styles.contextSection}>
-                <span className={styles.sectionTitle}><Sparkles size={12} /> Em Limpeza</span>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>Responsável</span><span className={styles.infoVal}>{detailRoom.limpeza.responsavel || 'Não atribuído'}</span></div>
-              </div>
-            )}
-
-            {/* Maintenance */}
-            {(detailRoom.status === STATUS.MANUTENCAO || detailRoom.status === STATUS.FORA_DE_SERVICO) && detailRoom.manutencao && (
-              <div className={styles.contextSection}>
-                <span className={styles.sectionTitle}><Wrench size={12} /> Manutenção</span>
-                <div className={styles.infoRow}><span className={styles.infoLabel}>Responsável</span><span className={styles.infoVal}>{detailRoom.manutencao.responsavel || '—'}</span></div>
-                {detailRoom.manutencao.descricao && <div className={styles.infoRow}><span className={styles.infoLabel}>Descrição</span><span className={styles.infoVal}>{detailRoom.manutencao.descricao}</span></div>}
-                {detailRoom.manutencao.previsaoFim && <div className={styles.infoRow}><span className={styles.infoLabel}>Previsão</span><span className={styles.infoVal}>{detailRoom.manutencao.previsaoFim}</span></div>}
-              </div>
-            )}
-
-            <StatusActions room={detailRoom} closeFirst="detail" />
+            <FormField label="Quarto">
+              <Input value={`Quarto ${reporTarget.room.numero}`} disabled />
+            </FormField>
           </div>
         </Modal>
       )}
