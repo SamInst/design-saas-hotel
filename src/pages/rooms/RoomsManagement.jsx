@@ -276,7 +276,7 @@ export default function RoomsManagement() {
               <Select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                style={{ minWidth: 148 }}
+                style={{ width: 148, flexShrink: 0 }}
               >
                 <option value="all">Todos os status</option>
                 {Object.values(STATUS).map((s) => <option key={s} value={s}>{s}</option>)}

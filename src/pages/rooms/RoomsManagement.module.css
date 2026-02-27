@@ -17,7 +17,7 @@
 }
 .h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
 .subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
-.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tableTools { display: flex; gap: 8px; align-items: center; }
 
 .clearFilter {
   background: none; border: none; cursor: pointer;
