@@ -1,0 +1,96 @@
+/* Matches FormField layout from Input.module.css */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+
+/* Wrapper that looks exactly like an Input field */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  height: 38px;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  cursor: text;
+}
+
+.field:hover:not(.focused):not(.disabled) {
+  border-color: #c4c9d6;
+}
+
+.field.focused {
+  border-color: var(--violet);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+.field.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.icon {
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+/* The actual text input — invisible borders, fills remaining space */
+.input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--text);
+  min-width: 0;
+  padding: 0;
+}
+
+.input::placeholder {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-2);
+  opacity: 0.5;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+
+.input:disabled {
+  cursor: not-allowed;
+}
+
+/* ── Dark theme ── */
+:root[data-theme="dark"] .field {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .field:hover:not(.focused):not(.disabled) {
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+:root[data-theme="dark"] .input {
+  color: #e5e7eb;
+}
+
+:root[data-theme="dark"] .input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}

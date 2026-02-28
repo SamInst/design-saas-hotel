@@ -5,6 +5,11 @@ let _nextId = 500;
 const nextId = () => ++_nextId;
 const clone  = (v) => JSON.parse(JSON.stringify(v));
 
+// ── Tipos de acomodação ──────────────────────────────────────────────────────
+export const TIPOS_ACOMODACAO = [
+  'Individual', 'Casal', 'Duplo', 'Triplo', 'Quádruplo', 'Quíntuplo',
+];
+
 // ── Status constants ─────────────────────────────────────────────────────────
 export const STATUS = {
   ATIVO:               'ATIVO',
@@ -43,12 +48,12 @@ export const CATEGORIAS_QUARTOS = [
 
 // ── Hóspedes cadastrados (para busca) ────────────────────────────────────────
 export const HOSPEDES_CADASTRADOS = [
-  { id: 1, nome: 'João Silva',     cpf: '123.456.789-00', telefone: '(98) 99999-9999' },
-  { id: 2, nome: 'Maria Silva',    cpf: '987.654.321-00', telefone: '(98) 98888-8888' },
-  { id: 3, nome: 'Ana Costa',      cpf: '111.222.333-44', telefone: '(98) 97777-7777' },
-  { id: 4, nome: 'Carlos Mendes',  cpf: '555.666.777-88', telefone: '(98) 96666-6666' },
-  { id: 5, nome: 'Fernanda Souza', cpf: '999.888.777-66', telefone: '(98) 95555-5555' },
-  { id: 6, nome: 'Roberto Lima',   cpf: '444.333.222-11', telefone: '(98) 94444-4444' },
+  { id: 1, nome: 'João Silva',     cpf: '123.456.789-00', telefone: '(98) 99999-9999', acompanhantes: [2] },
+  { id: 2, nome: 'Maria Silva',    cpf: '987.654.321-00', telefone: '(98) 98888-8888', acompanhantes: [1] },
+  { id: 3, nome: 'Ana Costa',      cpf: '111.222.333-44', telefone: '(98) 97777-7777', acompanhantes: [] },
+  { id: 4, nome: 'Carlos Mendes',  cpf: '555.666.777-88', telefone: '(98) 96666-6666', acompanhantes: [5] },
+  { id: 5, nome: 'Fernanda Souza', cpf: '999.888.777-66', telefone: '(98) 95555-5555', acompanhantes: [4] },
+  { id: 6, nome: 'Roberto Lima',   cpf: '444.333.222-11', telefone: '(98) 94444-4444', acompanhantes: [] },
 ];
 
 // ── Categorias de consumo ────────────────────────────────────────────────────
@@ -103,7 +108,7 @@ export function fmtNum(n) {
 // ── Initial stays data ───────────────────────────────────────────────────────
 let _stays = [
   {
-    id: 1, quarto: 3, categoria: 'Standard', titularNome: 'João Silva',
+    id: 1, quarto: 3, categoria: 'Standard', tipo: 'Casal', titularNome: 'João Silva',
     periodo: '15/02/2026 - 25/02/2026', status: STATUS.ATIVO,
     totalDiarias: 3, chegadaPrevista: '15/02/2026 14:00', saidaPrevista: '18/02/2026 12:00',
     valorTotal: 480, totalPago: 240, pagamentoPendente: 240, diariaAtual: 2,
@@ -148,7 +153,7 @@ let _stays = [
     ],
   },
   {
-    id: 2, quarto: 6, categoria: 'Luxo', titularNome: 'Ana Costa',
+    id: 2, quarto: 6, categoria: 'Luxo', tipo: 'Individual', titularNome: 'Ana Costa',
     periodo: '14/02/2026 - 16/02/2026', status: STATUS.DIARIA_ENCERRADA,
     totalDiarias: 2, chegadaPrevista: '14/02/2026 15:00', saidaPrevista: '16/02/2026 11:00',
     valorTotal: 560, totalPago: 560, pagamentoPendente: 0, diariaAtual: 2,
@@ -181,21 +186,21 @@ let _stays = [
     ],
   },
   {
-    id: 3, quarto: 9, categoria: 'Suíte', titularNome: 'Carlos Mendes',
+    id: 3, quarto: 9, categoria: 'Suíte', tipo: 'Casal', titularNome: 'Carlos Mendes',
     periodo: '10/02/2026 - 13/02/2026', status: STATUS.FINALIZADO,
     totalDiarias: 3, chegadaPrevista: '10/02/2026 14:00', saidaPrevista: '13/02/2026 12:00',
     valorTotal: 1350, totalPago: 1350, pagamentoPendente: 0, diariaAtual: 3,
     diarias: [],
   },
   {
-    id: 4, quarto: 2, categoria: 'Standard', titularNome: 'Fernanda Souza',
+    id: 4, quarto: 2, categoria: 'Standard', tipo: 'Individual', titularNome: 'Fernanda Souza',
     periodo: '12/02/2026 - 14/02/2026', status: STATUS.CANCELADO,
     totalDiarias: 2, chegadaPrevista: '12/02/2026 15:00', saidaPrevista: '14/02/2026 12:00',
     valorTotal: 320, totalPago: 0, pagamentoPendente: 0, diariaAtual: 0,
     diarias: [],
   },
   {
-    id: 5, quarto: 7, categoria: 'Luxo', titularNome: 'Roberto Lima',
+    id: 5, quarto: 7, categoria: 'Luxo', tipo: 'Duplo', titularNome: 'Roberto Lima',
     periodo: '08/02/2026 - 11/02/2026', status: STATUS.FINALIZADO_PENDENTE,
     totalDiarias: 3, chegadaPrevista: '08/02/2026 14:00', saidaPrevista: '11/02/2026 12:00',
     valorTotal: 840, totalPago: 500, pagamentoPendente: 340, diariaAtual: 3,

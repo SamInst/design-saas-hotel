@@ -1,16 +1,18 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   BedDouble, Plus, Search, Calendar, ChevronDown,
   User, CreditCard, ShoppingCart, Edit2, X, Check,
-  ArrowRight, RefreshCw, Trash2,
+  ArrowRight, RefreshCw, Trash2, Paperclip,
   CheckCircle, XCircle, DollarSign, Clock,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
 import { Input, Select, FormField } from '../../components/ui/Input';
+import { DatePicker }               from '../../components/ui/DatePicker';
+import { TimeInput }               from '../../components/ui/TimeInput';
 import { Notification }             from '../../components/ui/Notification';
 import {
-  stayApi, STATUS, FORMAS_PAGAMENTO,
+  stayApi, STATUS, FORMAS_PAGAMENTO, TIPOS_ACOMODACAO,
   CATEGORIAS_QUARTOS, HOSPEDES_CADASTRADOS, CATEGORIAS_CONSUMO,
   getCategoriaDoQuarto, calcPrecoDiaria, diffDays, fmtNum,
 } from './staysMocks';
@@ -20,6 +22,26 @@ import styles from './StaysManagement.module.css';
 const fmtBRL = (v) =>
   v == null ? 'R$ 0,00' :
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+const maskBRL = (v) => {
+  const digits = String(v ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  const num = parseInt(digits, 10) / 100;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+};
+
+const parseBRL = (v) => {
+  const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+};
+
+const dateToIso = (d) => {
+  if (!d) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
 
 function getStatusKey(status) {
   switch (status) {
@@ -54,6 +76,21 @@ function fmtShort(dateTimeStr) {
   return `${d}/${m} ${parts[1]}`;
 }
 
+// Parse "DD/MM/YYYY" part of "DD/MM/YYYY HH:MM" into a Date
+function displayToDate(displayStr) {
+  if (!displayStr) return null;
+  const [dp] = displayStr.split(' ');
+  const [d, m, y] = dp.split('/');
+  if (!d || !m || !y) return null;
+  return new Date(+y, +m - 1, +d);
+}
+
+// Now for today's time string "HH:MM"
+function nowTimeStr() {
+  const n = new Date();
+  return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function StaysManagement() {
   const [stays, setStays]               = useState([]);
@@ -63,6 +100,7 @@ export default function StaysManagement() {
   // Filters
   const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterTipo, setFilterTipo]     = useState('');
 
   // Collapsed category groups
   const [collapsedCats, setCollapsedCats] = useState({});
@@ -77,28 +115,27 @@ export default function StaysManagement() {
   // Gerenciar diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
   const [removingDiariaIdx, setRemovingDiariaIdx]       = useState(null);
-  const [diariaDataInicio, setDiariaDataInicio] = useState('');
+  const [diariaDateInicio, setDiariaDateInicio] = useState(null);   // Date|null
   const [diariaHoraInicio, setDiariaHoraInicio] = useState('14:00');
-  const [diariaDataFim, setDiariaDataFim]       = useState('');
+  const [diariaDateFim, setDiariaDateFim]       = useState(null);   // Date|null
   const [diariaHoraFim, setDiariaHoraFim]       = useState('12:00');
   const [savingDiaria, setSavingDiaria]         = useState(false);
 
   // Edit dados modal
-  const [showEditDados, setShowEditDados]     = useState(false);
-  const [editCheckinData, setEditCheckinData] = useState('');
-  const [editCheckinHora, setEditCheckinHora] = useState('');
-  const [editCheckoutData, setEditCheckoutData] = useState('');
-  const [editCheckoutHora, setEditCheckoutHora] = useState('');
-  const [savingDados, setSavingDados]           = useState(false);
+  const [showEditDados, setShowEditDados]         = useState(false);
+  const [editCheckinDate, setEditCheckinDate]     = useState(null);  // Date|null
+  const [editCheckinHora, setEditCheckinHora]     = useState('');
+  const [editCheckoutDate, setEditCheckoutDate]   = useState(null);  // Date|null
+  const [editCheckoutHora, setEditCheckoutHora]   = useState('');
+  const [savingDados, setSavingDados]             = useState(false);
 
   // Trocar quarto modal
-  const [showTrocarQuarto, setShowTrocarQuarto]     = useState(false);
-  const [tqCategoria, setTqCategoria]               = useState('');
-  const [tqQuarto, setTqQuarto]                     = useState('');
-  const [tqDiariasAplicar, setTqDiariasAplicar]     = useState([]);
-  const [savingTrocar, setSavingTrocar]             = useState(false);
+  const [showTrocarQuarto, setShowTrocarQuarto] = useState(false);
+  const [tqQuarto, setTqQuarto]                 = useState('');
+  const [tqDiariasAplicar, setTqDiariasAplicar] = useState([]);
+  const [savingTrocar, setSavingTrocar]         = useState(false);
 
-  // Add hóspede modal
+  // Add hóspede modal (for existing stays)
   const [showAddHospede, setShowAddHospede]   = useState(false);
   const [hospedeSearch, setHospedeSearch]     = useState('');
   const [hospedeSelected, setHospedeSelected] = useState(null);
@@ -113,11 +150,13 @@ export default function StaysManagement() {
   const [savingConsumo, setSavingConsumo]       = useState(false);
 
   // Add pagamento modal
-  const [showAddPagamento, setShowAddPagamento] = useState(false);
-  const [pagamentoDesc, setPagamentoDesc]       = useState('');
-  const [pagamentoForma, setPagamentoForma]     = useState('');
-  const [pagamentoValor, setPagamentoValor]     = useState('');
-  const [savingPagamento, setSavingPagamento]   = useState(false);
+  const [showAddPagamento, setShowAddPagamento]     = useState(false);
+  const [pagamentoDesc, setPagamentoDesc]           = useState('');
+  const [pagamentoForma, setPagamentoForma]         = useState('');
+  const [pagamentoValor, setPagamentoValor]         = useState('');  // BRL masked
+  const [pagamentoComprovante, setPagamentoComprovante] = useState(null); // File|null
+  const [savingPagamento, setSavingPagamento]       = useState(false);
+  const comprovanteRef = useRef(null);
 
   // Confirm modals
   const [showCancelar, setShowCancelar]   = useState(false);
@@ -125,20 +164,20 @@ export default function StaysManagement() {
   const [confirmLoading, setConfirmLoading] = useState(false);
 
   // Nova hospedagem modal
-  const [showNovaHosp, setShowNovaHosp]     = useState(false);
-  const [nhNome, setNhNome]                 = useState('');
-  const [nhCategoria, setNhCategoria]       = useState('');
-  const [nhQuarto, setNhQuarto]             = useState('');
-  const [nhCheckinData, setNhCheckinData]   = useState('');
-  const [nhCheckinHora, setNhCheckinHora]   = useState('14:00');
-  const [nhCheckoutData, setNhCheckoutData] = useState('');
-  const [nhCheckoutHora, setNhCheckoutHora] = useState('12:00');
-  const [nhPessoas, setNhPessoas]           = useState(1);
-  const [nhPagamentos, setNhPagamentos]     = useState([]);
-  const [nhPagDesc, setNhPagDesc]           = useState('');
-  const [nhPagForma, setNhPagForma]         = useState('');
-  const [nhPagValor, setNhPagValor]         = useState('');
-  const [savingNova, setSavingNova]         = useState(false);
+  const [showNovaHosp, setShowNovaHosp]         = useState(false);
+  const [nhHospedes, setNhHospedes]             = useState([]);    // array of person objects
+  const [nhHospedeSearch, setNhHospedeSearch]   = useState('');
+  const [nhQuarto, setNhQuarto]                 = useState('');
+  const [nhRoomSearch, setNhRoomSearch]         = useState('');
+  const [nhCheckinDate, setNhCheckinDate]       = useState(null);  // Date|null
+  const [nhCheckinHora, setNhCheckinHora]       = useState('14:00');
+  const [nhCheckoutDate, setNhCheckoutDate]     = useState(null);  // Date|null
+  const [nhCheckoutHora, setNhCheckoutHora]     = useState('12:00');
+  const [nhPagamentos, setNhPagamentos]         = useState([]);
+  const [nhPagDesc, setNhPagDesc]               = useState('');
+  const [nhPagForma, setNhPagForma]             = useState('');
+  const [nhPagValor, setNhPagValor]             = useState('');    // BRL masked
+  const [savingNova, setSavingNova]             = useState(false);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   const loadStays = useCallback(async () => {
@@ -164,9 +203,10 @@ export default function StaysManagement() {
     stays.filter((s) => {
       const matchSearch = !search || s.titularNome.toLowerCase().includes(search.toLowerCase());
       const matchStatus = !filterStatus || s.status === filterStatus;
-      return matchSearch && matchStatus;
+      const matchTipo   = !filterTipo   || s.tipo === filterTipo;
+      return matchSearch && matchStatus && matchTipo;
     }),
-    [stays, search, filterStatus]
+    [stays, search, filterStatus, filterTipo]
   );
 
   const staysByCategory = useMemo(() =>
@@ -183,14 +223,11 @@ export default function StaysManagement() {
     : 0;
 
   // ── Nova Hospedagem computed ──────────────────────────────────────────────
-  const nhTotalDias = useMemo(() => {
-    if (!nhCheckinData || !nhCheckoutData) return 0;
-    return diffDays(nhCheckinData, nhCheckoutData);
-  }, [nhCheckinData, nhCheckoutData]);
+  const nhPessoas = nhHospedes.length || 1;
 
   const nhCatQuarto = useMemo(() =>
-    CATEGORIAS_QUARTOS.find((c) => c.id === parseInt(nhCategoria)),
-    [nhCategoria]
+    nhQuarto ? getCategoriaDoQuarto(nhQuarto) : null,
+    [nhQuarto]
   );
 
   const nhPrecoDiaria = useMemo(() => {
@@ -198,24 +235,57 @@ export default function StaysManagement() {
     return calcPrecoDiaria(nhQuarto, nhPessoas);
   }, [nhQuarto, nhPessoas]);
 
+  const nhTotalDias = useMemo(() => {
+    if (!nhCheckinDate || !nhCheckoutDate) return 0;
+    return diffDays(nhCheckinDate, nhCheckoutDate);
+  }, [nhCheckinDate, nhCheckoutDate]);
+
   const nhTotalHosp = nhPrecoDiaria * nhTotalDias;
   const nhTotalPago = nhPagamentos.reduce((s, p) => s + p.valor, 0);
   const nhPendente  = Math.max(0, nhTotalHosp - nhTotalPago);
 
+  // ── Nova Hospedagem person search ─────────────────────────────────────────
+  const nhTitular = nhHospedes[0] || null;
+  const nhPersonResults = useMemo(() => {
+    const selectedIds = new Set(nhHospedes.map((h) => h.id));
+    const acomps = nhTitular
+      ? HOSPEDES_CADASTRADOS.filter(
+          (h) => (nhTitular.acompanhantes || []).includes(h.id) && !selectedIds.has(h.id)
+        )
+      : [];
+    const acompIds = new Set(acomps.map((h) => h.id));
+    const outros = HOSPEDES_CADASTRADOS.filter(
+      (h) => !selectedIds.has(h.id) && !acompIds.has(h.id)
+    );
+    const term = nhHospedeSearch.toLowerCase();
+    const filterFn = (h) =>
+      !term || h.nome.toLowerCase().includes(term) || h.cpf.includes(term);
+    return {
+      acompanhantes: acomps.filter(filterFn),
+      outros: outros.filter(filterFn),
+    };
+  }, [nhHospedes, nhHospedeSearch, nhTitular]);
+
+  // ── Nova Hospedagem room search ───────────────────────────────────────────
+  const nhRoomsFiltered = useMemo(() => {
+    if (!nhRoomSearch) return CATEGORIAS_QUARTOS;
+    return CATEGORIAS_QUARTOS.map((cat) => ({
+      ...cat,
+      quartos: cat.quartos.filter((q) => String(q).includes(nhRoomSearch)),
+    })).filter((cat) => cat.quartos.length > 0);
+  }, [nhRoomSearch]);
+
   // ── Add diária computed ───────────────────────────────────────────────────
   const addDiariaDias = useMemo(() => {
-    if (!diariaDataInicio || !diariaDataFim) return 0;
-    return diffDays(diariaDataInicio, diariaDataFim);
-  }, [diariaDataInicio, diariaDataFim]);
-
-  // ── Trocar quarto computed ────────────────────────────────────────────────
-  const tqCat = CATEGORIAS_QUARTOS.find((c) => c.id === parseInt(tqCategoria));
+    if (!diariaDateInicio || !diariaDateFim) return 0;
+    return diffDays(diariaDateInicio, diariaDateFim);
+  }, [diariaDateInicio, diariaDateFim]);
 
   // ── Consumo computed ──────────────────────────────────────────────────────
   const consumoCatSel     = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(consumoCategoria));
   const consumoProdutoSel = consumoCatSel?.produtos.find((p) => p.id === parseInt(consumoProduto));
 
-  // ── Filtered hóspedes ─────────────────────────────────────────────────────
+  // ── Filtered hóspedes (for add hóspede to existing stay) ─────────────────
   const filteredHospedes = HOSPEDES_CADASTRADOS.filter((h) =>
     !hospedeSearch || h.nome.toLowerCase().includes(hospedeSearch.toLowerCase())
   );
@@ -246,41 +316,43 @@ export default function StaysManagement() {
       const ultima = detailStay.diarias[detailStay.diarias.length - 1];
       const [dp, tp] = ultima.dataFim.split(' ');
       const [d, m, y] = dp.split('/');
-      setDiariaDataInicio(`${y}-${m}-${d}`);
+      setDiariaDateInicio(new Date(+y, +m - 1, +d));
       setDiariaHoraInicio(tp || '12:00');
     } else {
-      setDiariaDataInicio('');
+      setDiariaDateInicio(null);
       setDiariaHoraInicio('14:00');
     }
-    setDiariaDataFim('');
+    setDiariaDateFim(null);
     setDiariaHoraFim('12:00');
     setShowGerenciarDiarias(true);
   };
 
   const handleSaveAddDiaria = async () => {
-    if (!diariaDataInicio || !diariaDataFim) { notify('Preencha as datas.', 'warning'); return; }
+    if (!diariaDateInicio || !diariaDateFim) { notify('Preencha as datas.', 'warning'); return; }
     setSavingDiaria(true);
     try {
+      const inicio = `${isoToDisplay(dateToIso(diariaDateInicio))} ${diariaHoraInicio}`;
+      const fim    = `${isoToDisplay(dateToIso(diariaDateFim))} ${diariaHoraFim}`;
       const nova = {
         quarto: detailStay.quarto,
         valorDiaria: calcPrecoDiaria(detailStay.quarto, 1),
-        dataInicio: `${isoToDisplay(diariaDataInicio)} ${diariaHoraInicio}`,
-        dataFim:    `${isoToDisplay(diariaDataFim)} ${diariaHoraFim}`,
+        dataInicio: inicio,
+        dataFim:    fim,
         hospedes: detailStay.diarias[0]?.hospedes || [],
         consumos: [], pagamentos: [],
       };
       const updated = await stayApi.adicionarDiaria(detailStay.id, nova);
       await reloadAndSync(updated);
       notify(`Diária adicionada. Total: ${updated.totalDiarias} dia(s).`);
-      // Keep modal open; pre-fill next start from the new last diária's end
+      // Pre-fill next start from the new last diária's end
       const newLast = updated.diarias?.[updated.diarias.length - 1];
       if (newLast) {
         const [dp, tp] = newLast.dataFim.split(' ');
         const [d, m, y] = dp.split('/');
-        setDiariaDataInicio(`${y}-${m}-${d}`);
+        setDiariaDateInicio(new Date(+y, +m - 1, +d));
         setDiariaHoraInicio(tp || '12:00');
       }
-      setDiariaDataFim('');
+      setDiariaDateFim(null);
       setDiariaHoraFim('12:00');
     } finally { setSavingDiaria(false); }
   };
@@ -298,10 +370,10 @@ export default function StaysManagement() {
         const newLast = updated.diarias[updated.diarias.length - 1];
         const [dp, tp] = newLast.dataFim.split(' ');
         const [d, m, y] = dp.split('/');
-        setDiariaDataInicio(`${y}-${m}-${d}`);
+        setDiariaDateInicio(new Date(+y, +m - 1, +d));
         setDiariaHoraInicio(tp || '12:00');
       } else {
-        setDiariaDataInicio('');
+        setDiariaDateInicio(null);
         setDiariaHoraInicio('14:00');
       }
       notify('Diária removida.');
@@ -309,28 +381,27 @@ export default function StaysManagement() {
     finally { setRemovingDiariaIdx(null); }
   };
 
-
   // ── Handler: editar dados ─────────────────────────────────────────────────
   const openEditDados = () => {
     if (!detailStay) return;
     const [dc, hc] = detailStay.chegadaPrevista.split(' ');
     const [ds, hs] = detailStay.saidaPrevista.split(' ');
-    setEditCheckinData(displayToIso(dc));
+    setEditCheckinDate(displayToDate(dc));
     setEditCheckinHora(hc || '14:00');
-    setEditCheckoutData(displayToIso(ds));
+    setEditCheckoutDate(displayToDate(ds));
     setEditCheckoutHora(hs || '12:00');
     setShowEditDados(true);
   };
 
   const handleSaveEditDados = async () => {
-    if (!editCheckinData || !editCheckoutData) { notify('Preencha as datas.', 'warning'); return; }
+    if (!editCheckinDate || !editCheckoutDate) { notify('Preencha as datas.', 'warning'); return; }
     setSavingDados(true);
     try {
-      const chegada = `${isoToDisplay(editCheckinData)} ${editCheckinHora}`;
-      const saida   = `${isoToDisplay(editCheckoutData)} ${editCheckoutHora}`;
+      const chegada = `${isoToDisplay(dateToIso(editCheckinDate))} ${editCheckinHora}`;
+      const saida   = `${isoToDisplay(dateToIso(editCheckoutDate))} ${editCheckoutHora}`;
       const updated = await stayApi.atualizar(detailStay.id, {
         chegadaPrevista: chegada, saidaPrevista: saida,
-        periodo: `${isoToDisplay(editCheckinData)} - ${isoToDisplay(editCheckoutData)}`,
+        periodo: `${isoToDisplay(dateToIso(editCheckinDate))} - ${isoToDisplay(dateToIso(editCheckoutDate))}`,
       });
       await reloadAndSync(updated);
       notify('Dados atualizados.');
@@ -340,9 +411,11 @@ export default function StaysManagement() {
 
   // ── Handler: trocar quarto ────────────────────────────────────────────────
   const openTrocarQuarto = () => {
-    setTqCategoria('');
     setTqQuarto('');
-    const diasIds = detailStay?.diarias.map((d) => d.id) || [];
+    const currentIdx = (detailStay?.diariaAtual ?? 1) - 1;
+    const diasIds = detailStay?.diarias
+      .filter((_, i) => i >= currentIdx)
+      .map((d) => d.id) || [];
     setTqDiariasAplicar(diasIds);
     setShowTrocarQuarto(true);
   };
@@ -370,7 +443,7 @@ export default function StaysManagement() {
     } finally { setSavingTrocar(false); }
   };
 
-  // ── Handler: adicionar hóspede ────────────────────────────────────────────
+  // ── Handler: adicionar hóspede (existing stay) ────────────────────────────
   const openAddHospede = () => {
     setHospedeSearch('');
     setHospedeSelected(null);
@@ -429,13 +502,13 @@ export default function StaysManagement() {
     setPagamentoDesc('');
     setPagamentoForma('');
     setPagamentoValor('');
+    setPagamentoComprovante(null);
+    if (comprovanteRef.current) comprovanteRef.current.value = '';
     setShowAddPagamento(true);
   };
 
-  const parsePagValor = () => parseFloat(String(pagamentoValor).replace(',', '.')) || 0;
-
   const handleSavePagamento = async () => {
-    const val = parsePagValor();
+    const val = parseBRL(pagamentoValor);
     if (!pagamentoDesc || !pagamentoForma || val <= 0) {
       notify('Preencha todos os campos.', 'warning'); return;
     }
@@ -446,6 +519,7 @@ export default function StaysManagement() {
         formaPagamento: pagamentoForma,
         valor: val,
         data: new Date().toLocaleString('pt-BR'),
+        comprovante: pagamentoComprovante?.name || null,
       };
       const updated = await stayApi.adicionarPagamento(detailStay.id, selectedDiariaIdx, novo);
       await reloadAndSync(updated);
@@ -480,35 +554,52 @@ export default function StaysManagement() {
 
   // ── Handler: nova hospedagem ──────────────────────────────────────────────
   const openNovaHosp = () => {
-    setNhNome(''); setNhCategoria(''); setNhQuarto('');
-    setNhCheckinData(''); setNhCheckinHora('14:00');
-    setNhCheckoutData(''); setNhCheckoutHora('12:00');
-    setNhPessoas(1); setNhPagamentos([]);
-    setNhPagDesc(''); setNhPagForma(''); setNhPagValor('');
+    setNhHospedes([]);
+    setNhHospedeSearch('');
+    setNhQuarto('');
+    setNhRoomSearch('');
+    setNhCheckinDate(new Date());
+    setNhCheckinHora(nowTimeStr());
+    setNhCheckoutDate(null);
+    setNhCheckoutHora('12:00');
+    setNhPagamentos([]);
+    setNhPagDesc('');
+    setNhPagForma('');
+    setNhPagValor('');
     setShowNovaHosp(true);
   };
 
+  const addNhHospede = (hospede) => {
+    if (!nhHospedes.find((h) => h.id === hospede.id)) {
+      setNhHospedes((prev) => [...prev, hospede]);
+    }
+  };
+
+  const removeNhHospede = (id) => {
+    setNhHospedes((prev) => prev.filter((h) => h.id !== id));
+  };
+
   const addNhPagamento = () => {
-    const val = parseFloat(String(nhPagValor).replace(',', '.'));
+    const val = parseBRL(nhPagValor);
     if (!nhPagDesc || !nhPagForma || !val || val <= 0) { notify('Preencha o pagamento.', 'warning'); return; }
     setNhPagamentos((p) => [...p, { id: Date.now(), descricao: nhPagDesc, formaPagamento: nhPagForma, valor: val }]);
     setNhPagDesc(''); setNhPagForma(''); setNhPagValor('');
   };
 
   const handleSaveNovaHosp = async () => {
-    if (!nhNome || !nhQuarto || !nhCheckinData || !nhCheckoutData) {
+    if (!nhHospedes.length || !nhQuarto || !nhCheckinDate || !nhCheckoutDate) {
       notify('Preencha todos os campos obrigatórios.', 'warning'); return;
     }
     setSavingNova(true);
     try {
-      const cat = getCategoriaDoQuarto(nhQuarto);
-      const checkin  = `${isoToDisplay(nhCheckinData)} ${nhCheckinHora}`;
-      const checkout = `${isoToDisplay(nhCheckoutData)} ${nhCheckoutHora}`;
+      const cat     = getCategoriaDoQuarto(nhQuarto);
+      const checkin = `${isoToDisplay(dateToIso(nhCheckinDate))} ${nhCheckinHora}`;
+      const checkout = `${isoToDisplay(dateToIso(nhCheckoutDate))} ${nhCheckoutHora}`;
       const nova = {
         quarto: Number(nhQuarto),
         categoria: cat?.nome || '',
-        titularNome: nhNome,
-        periodo: `${isoToDisplay(nhCheckinData)} - ${isoToDisplay(nhCheckoutData)}`,
+        titularNome: nhHospedes[0]?.nome || '',
+        periodo: `${isoToDisplay(dateToIso(nhCheckinDate))} - ${isoToDisplay(dateToIso(nhCheckoutDate))}`,
         status: STATUS.ATIVO,
         totalDiarias: nhTotalDias,
         chegadaPrevista: checkin,
@@ -521,7 +612,8 @@ export default function StaysManagement() {
           id: 1, numero: 1, quarto: Number(nhQuarto),
           valorDiaria: nhPrecoDiaria,
           dataInicio: checkin, dataFim: checkout,
-          hospedes: [], consumos: [],
+          hospedes: [...nhHospedes],
+          consumos: [],
           pagamentos: nhPagamentos,
         }],
       };
@@ -547,26 +639,15 @@ export default function StaysManagement() {
         />
       )}
 
-      {/* ── Header ── */}
-      <div className={styles.pageHeader}>
-        <div>
-          <h2 className={styles.h2}>Pernoites</h2>
-          <p className={styles.subtitle}>
-            <BedDouble size={13} /> Gestão de hospedagens e diárias
-          </p>
-        </div>
-        <Button variant="primary" onClick={openNovaHosp}>
-          <Plus size={15} /> Nova Hospedagem
-        </Button>
-      </div>
-
       {/* ── Main card ── */}
       <div className={styles.card}>
         {/* Toolbar */}
         <div className={styles.tableHeader}>
           <div>
-            <div className={styles.tableTitle}>Hospedagens por Categoria</div>
-            <div className={styles.tableSubtitle}>Clique em uma hospedagem para ver detalhes</div>
+            <h2 className={styles.h2}>Pernoites</h2>
+            <p className={styles.subtitle}>
+              <BedDouble size={13} /> Gestão de hospedagens e diárias
+            </p>
           </div>
           <div className={styles.tableTools}>
             <div className={styles.searchWrap}>
@@ -579,15 +660,28 @@ export default function StaysManagement() {
               />
             </div>
             <Select
+              value={filterTipo}
+              onChange={(e) => setFilterTipo(e.target.value)}
+              style={{ width: 148, flexShrink: 0 }}
+            >
+              <option value="">Tipo de acomodação</option>
+              {TIPOS_ACOMODACAO.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </Select>
+            <Select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              style={{ width: 200, flexShrink: 0 }}
+              style={{ width: 160, flexShrink: 0 }}
             >
               <option value="">Todos os status</option>
               {Object.values(STATUS).map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </Select>
+            <Button variant="primary" onClick={openNovaHosp}>
+              <Plus size={15} /> Nova Hospedagem
+            </Button>
           </div>
         </div>
 
@@ -634,9 +728,13 @@ export default function StaysManagement() {
                             <Calendar size={11} />
                             {stay.periodo}
                           </span>
-                          <span className={styles.stayMetaItem}>
-                            {stay.totalDiarias} diária{stay.totalDiarias !== 1 ? 's' : ''}
-                          </span>
+                          {stay.totalDiarias > 0 && (
+                            <span className={styles.diariaBadge}>
+                              Diária{' '}
+                              <span className={styles.diariaNumAtual}>{stay.diariaAtual}</span>
+                              <span className={styles.diariaBadgeSep}>/{stay.totalDiarias}</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -644,9 +742,6 @@ export default function StaysManagement() {
                       <span className={[styles.statusBadge, styles['status_' + getStatusKey(stay.status)]].join(' ')}>
                         {stay.status}
                       </span>
-                      {stay.pagamentoPendente > 0 && (
-                        <span className={styles.pendenteBadge}>{fmtBRL(stay.pagamentoPendente)}</span>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -942,6 +1037,11 @@ export default function StaysManagement() {
                                         <div className={styles.listItemName}>{p.descricao}</div>
                                         <div className={styles.listItemSub}>
                                           {p.formaPagamento} • {p.data}
+                                          {p.comprovante && (
+                                            <span className={styles.comprovanteTag}>
+                                              <Paperclip size={10} /> {p.comprovante}
+                                            </span>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -978,7 +1078,7 @@ export default function StaysManagement() {
             <Button
               variant="primary"
               onClick={handleSaveAddDiaria}
-              disabled={savingDiaria || !diariaDataInicio || !diariaDataFim}
+              disabled={savingDiaria || !diariaDateInicio || !diariaDateFim}
             >
               {savingDiaria ? 'Adicionando...' : 'Adicionar Diária'}
             </Button>
@@ -1016,18 +1116,27 @@ export default function StaysManagement() {
             A data de início é pré-preenchida com o checkout da última diária.
           </div>
           <div className={styles.grid2}>
-            <FormField label="Data início">
-              <Input type="date" value={diariaDataInicio} onChange={(e) => setDiariaDataInicio(e.target.value)} />
-            </FormField>
-            <FormField label="Hora início">
-              <Input type="time" value={diariaHoraInicio} onChange={(e) => setDiariaHoraInicio(e.target.value)} />
-            </FormField>
-            <FormField label="Data fim">
-              <Input type="date" value={diariaDataFim} onChange={(e) => setDiariaDataFim(e.target.value)} />
-            </FormField>
-            <FormField label="Hora fim (checkout)">
-              <Input type="time" value={diariaHoraFim} onChange={(e) => setDiariaHoraFim(e.target.value)} />
-            </FormField>
+            <DatePicker
+              label="Data início"
+              value={diariaDateInicio}
+              onChange={setDiariaDateInicio}
+            />
+            <TimeInput
+              label="Hora início"
+              value={diariaHoraInicio}
+              onChange={setDiariaHoraInicio}
+            />
+            <DatePicker
+              label="Data fim"
+              value={diariaDateFim}
+              onChange={setDiariaDateFim}
+              minDate={diariaDateInicio}
+            />
+            <TimeInput
+              label="Hora fim (checkout)"
+              value={diariaHoraFim}
+              onChange={setDiariaHoraFim}
+            />
           </div>
           {addDiariaDias > 0 && (
             <div className={styles.confirmHint}>
@@ -1056,18 +1165,27 @@ export default function StaysManagement() {
       >
         <div className={styles.formStack}>
           <div className={styles.grid2}>
-            <FormField label="Data check-in">
-              <Input type="date" value={editCheckinData} onChange={(e) => setEditCheckinData(e.target.value)} />
-            </FormField>
-            <FormField label="Hora check-in">
-              <Input type="time" value={editCheckinHora} onChange={(e) => setEditCheckinHora(e.target.value)} />
-            </FormField>
-            <FormField label="Data check-out">
-              <Input type="date" value={editCheckoutData} onChange={(e) => setEditCheckoutData(e.target.value)} />
-            </FormField>
-            <FormField label="Hora check-out">
-              <Input type="time" value={editCheckoutHora} onChange={(e) => setEditCheckoutHora(e.target.value)} />
-            </FormField>
+            <DatePicker
+              label="Check-in"
+              value={editCheckinDate}
+              onChange={setEditCheckinDate}
+            />
+            <TimeInput
+              label="Hora check-in"
+              value={editCheckinHora}
+              onChange={setEditCheckinHora}
+            />
+            <DatePicker
+              label="Check-out"
+              value={editCheckoutDate}
+              onChange={setEditCheckoutDate}
+              minDate={editCheckinDate}
+            />
+            <TimeInput
+              label="Hora check-out"
+              value={editCheckoutHora}
+              onChange={setEditCheckoutHora}
+            />
           </div>
         </div>
       </Modal>
@@ -1092,52 +1210,45 @@ export default function StaysManagement() {
         <div className={styles.formStack}>
           <FormField label="Aplicar troca nas diárias:">
             <div className={styles.pillsRow}>
-              {detailStay?.diarias.map((d) => {
+              {detailStay?.diarias.map((d, idx) => {
+                const currentIdx = (detailStay.diariaAtual ?? 1) - 1;
+                const isPast  = idx < currentIdx;
                 const isAtual = d.numero === detailStay.diariaAtual;
                 const isSel   = tqDiariasAplicar.includes(d.id);
                 return (
                   <button
                     key={d.id}
                     type="button"
-                    onClick={() => toggleTqDiaria(d.id)}
-                    className={[styles.pill, isSel ? styles.pillActive : ''].join(' ')}
+                    disabled={isPast}
+                    onClick={() => !isPast && toggleTqDiaria(d.id)}
+                    className={[
+                      styles.pill,
+                      isSel && !isPast ? styles.pillActive : '',
+                      isPast ? styles.pillDisabled : '',
+                    ].join(' ')}
                   >
                     Diária {d.numero}{isAtual ? ' ★' : ''}
                   </button>
                 );
               })}
             </div>
-            <span className={styles.pillHint}>★ = diária atual</span>
+            <span className={styles.pillHint}>★ = atual · diárias anteriores não podem ser alteradas</span>
           </FormField>
 
-          <FormField label="Categoria">
-            <Select
-              value={tqCategoria}
-              onChange={(e) => { setTqCategoria(e.target.value); setTqQuarto(''); }}
-            >
-              <option value="">Escolha uma categoria</option>
-              {CATEGORIAS_QUARTOS.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
+          <FormField label="Novo quarto">
+            <div className={styles.roomGrid5}>
+              {CATEGORIAS_QUARTOS.flatMap((c) => c.quartos).map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setTqQuarto(q)}
+                  className={[styles.roomPill, tqQuarto === q ? styles.roomPillActive : ''].join(' ')}
+                >
+                  {fmtNum(q)}
+                </button>
               ))}
-            </Select>
+            </div>
           </FormField>
-
-          {tqCategoria && (
-            <FormField label="Novo quarto">
-              <div className={styles.roomGrid5}>
-                {tqCat?.quartos.map((q) => (
-                  <button
-                    key={q}
-                    type="button"
-                    onClick={() => setTqQuarto(q)}
-                    className={[styles.roomPill, tqQuarto === q ? styles.roomPillActive : ''].join(' ')}
-                  >
-                    {fmtNum(q)}
-                  </button>
-                ))}
-              </div>
-            </FormField>
-          )}
 
           {tqQuarto && detailStay && (
             <div className={styles.changeRoomPreview}>
@@ -1154,7 +1265,7 @@ export default function StaysManagement() {
       </Modal>
 
       {/* ══════════════════════════════════════════════════
-          MODAL: Adicionar Hóspede
+          MODAL: Adicionar Hóspede (existing stay)
       ══════════════════════════════════════════════════ */}
       <Modal
         open={showAddHospede}
@@ -1292,10 +1403,26 @@ export default function StaysManagement() {
           <FormField label="Valor (R$)">
             <Input
               type="text"
-              placeholder="0,00"
+              placeholder="R$ 0,00"
               value={pagamentoValor}
-              onChange={(e) => setPagamentoValor(e.target.value)}
+              onChange={(e) => setPagamentoValor(maskBRL(e.target.value))}
             />
+          </FormField>
+          <FormField label="Comprovante (opcional)">
+            <label className={styles.fileInputWrap}>
+              <input
+                ref={comprovanteRef}
+                type="file"
+                accept="image/*,.pdf"
+                className={styles.fileInputHidden}
+                onChange={(e) => setPagamentoComprovante(e.target.files?.[0] || null)}
+              />
+              <Paperclip size={13} className={styles.fileInputIcon} />
+              <span className={styles.fileInputName}>
+                {pagamentoComprovante ? pagamentoComprovante.name : 'Nenhum arquivo selecionado'}
+              </span>
+              <span className={styles.fileInputBtn}>Escolher</span>
+            </label>
           </FormField>
           {detailStay && (
             <div className={styles.pagamentoResume}>
@@ -1305,15 +1432,15 @@ export default function StaysManagement() {
               </div>
               <div className={styles.pagamentoResumeRow}>
                 <span>Este pagamento</span>
-                <span className={styles.valueViolet}>{fmtBRL(parsePagValor())}</span>
+                <span className={styles.valueViolet}>{fmtBRL(parseBRL(pagamentoValor))}</span>
               </div>
               <div className={[styles.pagamentoResumeRow, styles.pagamentoResumeTotal].join(' ')}>
                 <span>Pendente após</span>
                 <span className={
-                  Math.max(0, detailStay.pagamentoPendente - parsePagValor()) > 0
+                  Math.max(0, detailStay.pagamentoPendente - parseBRL(pagamentoValor)) > 0
                     ? styles.valueAmber : styles.valueGreen
                 }>
-                  {fmtBRL(Math.max(0, detailStay.pagamentoPendente - parsePagValor()))}
+                  {fmtBRL(Math.max(0, detailStay.pagamentoPendente - parseBRL(pagamentoValor)))}
                 </span>
               </div>
             </div>
@@ -1389,18 +1516,93 @@ export default function StaysManagement() {
         }
       >
         <div className={styles.formStack}>
-          {/* Titular */}
+
+          {/* Hóspedes */}
           <div className={styles.formSection}>
             <div className={styles.formSectionTitle}>
-              <User size={13} className={styles.formSectionIcon} /> Dados do Titular
+              <User size={13} className={styles.formSectionIcon} /> Hóspedes
             </div>
-            <FormField label="Nome do titular *">
+
+            {/* Chips of selected people */}
+            {nhHospedes.length > 0 && (
+              <div className={styles.hospedeChips}>
+                {nhHospedes.map((h, i) => (
+                  <span key={h.id} className={styles.hospedeChip}>
+                    <span className={styles.hospedeChipName}>
+                      {i === 0 && <span className={styles.hospedeChipTitular}>Titular · </span>}
+                      {h.nome}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.hospedeChipRemove}
+                      onClick={() => removeNhHospede(h.id)}
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Search */}
+            <div className={styles.searchWrap}>
+              <Search size={14} className={styles.searchIcon} />
               <Input
-                placeholder="Nome completo"
-                value={nhNome}
-                onChange={(e) => setNhNome(e.target.value)}
+                className={styles.searchInput}
+                placeholder={nhHospedes.length === 0 ? 'Buscar titular...' : 'Adicionar mais hóspedes...'}
+                value={nhHospedeSearch}
+                onChange={(e) => setNhHospedeSearch(e.target.value)}
               />
-            </FormField>
+            </div>
+
+            {/* Results */}
+            <div className={styles.hospedeResults}>
+              {nhPersonResults.acompanhantes.length > 0 && (
+                <>
+                  <div className={styles.hospedeResultSection}>
+                    Acompanhantes de {nhTitular?.nome}
+                  </div>
+                  {nhPersonResults.acompanhantes.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className={styles.hospedeResult}
+                      onClick={() => addNhHospede(h)}
+                    >
+                      <span className={styles.hospedeResultName}>{h.nome}</span>
+                      <span className={styles.hospedeResultSub}>CPF: {h.cpf} · {h.telefone}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {nhPersonResults.outros.length > 0 && (
+                <>
+                  {nhPersonResults.acompanhantes.length > 0 && (
+                    <div className={styles.hospedeResultSection}>Outros cadastrados</div>
+                  )}
+                  {nhPersonResults.outros.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className={styles.hospedeResult}
+                      onClick={() => addNhHospede(h)}
+                    >
+                      <span className={styles.hospedeResultName}>{h.nome}</span>
+                      <span className={styles.hospedeResultSub}>CPF: {h.cpf} · {h.telefone}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {nhPersonResults.acompanhantes.length === 0 && nhPersonResults.outros.length === 0 && (
+                <div className={styles.hospedeResultEmpty}>
+                  {nhHospedeSearch ? 'Nenhum resultado encontrado.' : 'Todos os cadastros já foram adicionados.'}
+                </div>
+              )}
+            </div>
+
+            {nhHospedes.length === 0 && (
+              <p className={styles.infoHint}>Selecione ao menos uma pessoa. O primeiro será o titular.</p>
+            )}
           </div>
 
           {/* Quarto */}
@@ -1408,53 +1610,75 @@ export default function StaysManagement() {
             <div className={styles.formSectionTitle}>
               <BedDouble size={13} className={styles.formSectionIconBlue} /> Quarto
             </div>
-            <FormField label="Categoria">
-              <Select
-                value={nhCategoria}
-                onChange={(e) => { setNhCategoria(e.target.value); setNhQuarto(''); }}
-              >
-                <option value="">Selecione uma categoria</option>
-                {CATEGORIAS_QUARTOS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nome}</option>
-                ))}
-              </Select>
-            </FormField>
-            {nhCatQuarto && (
-              <FormField label="Quarto *">
-                <div className={styles.pillsRow}>
-                  {nhCatQuarto.quartos.map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => setNhQuarto(q)}
-                      className={[styles.roomPill, nhQuarto === q ? styles.roomPillActive : ''].join(' ')}
-                    >
-                      {fmtNum(q)}
-                    </button>
-                  ))}
+            <div className={styles.searchWrap}>
+              <Search size={14} className={styles.searchIcon} />
+              <Input
+                className={styles.searchInput}
+                placeholder="Buscar quarto pelo número..."
+                value={nhRoomSearch}
+                onChange={(e) => setNhRoomSearch(e.target.value)}
+              />
+            </div>
+            <div className={styles.roomByCatWrap}>
+              {nhRoomsFiltered.map((cat) => (
+                <div key={cat.id} className={styles.roomCatGroup}>
+                  <span className={styles.roomCatLabel}>{cat.nome}</span>
+                  <div className={styles.roomGrid5}>
+                    {cat.quartos.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => setNhQuarto(q)}
+                        className={[styles.roomPill, nhQuarto === q ? styles.roomPillActive : ''].join(' ')}
+                      >
+                        {fmtNum(q)}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </FormField>
+              ))}
+              {nhRoomsFiltered.length === 0 && (
+                <p className={styles.hospedeResultEmpty}>Nenhum quarto encontrado.</p>
+              )}
+            </div>
+            {nhCatQuarto && nhQuarto && (
+              <div className={styles.infoHint}>
+                <strong>{nhCatQuarto.nome}</strong> ·{' '}
+                {nhCatQuarto.modeloCobranca === 'Por quarto (tarifa fixa)'
+                  ? `Tarifa fixa — ${fmtBRL(nhCatQuarto.precoFixo)}/noite`
+                  : `Por ocupação — ${nhPessoas} pessoa(s): ${fmtBRL(nhPrecoDiaria)}/noite`}
+              </div>
             )}
           </div>
 
-          {/* Datas */}
+          {/* Período */}
           <div className={styles.formSection}>
             <div className={styles.formSectionTitle}>
               <Calendar size={13} className={styles.formSectionIconAmber} /> Período
             </div>
             <div className={styles.grid2}>
-              <FormField label="Check-in *">
-                <Input type="date" value={nhCheckinData} onChange={(e) => setNhCheckinData(e.target.value)} />
-              </FormField>
-              <FormField label="Hora check-in">
-                <Input type="time" value={nhCheckinHora} onChange={(e) => setNhCheckinHora(e.target.value)} />
-              </FormField>
-              <FormField label="Check-out *">
-                <Input type="date" value={nhCheckoutData} onChange={(e) => setNhCheckoutData(e.target.value)} />
-              </FormField>
-              <FormField label="Hora check-out">
-                <Input type="time" value={nhCheckoutHora} onChange={(e) => setNhCheckoutHora(e.target.value)} />
-              </FormField>
+              <DatePicker
+                label="Check-in *"
+                value={nhCheckinDate}
+                onChange={setNhCheckinDate}
+              />
+              <TimeInput
+                label="Hora check-in"
+                value={nhCheckinHora}
+                onChange={setNhCheckinHora}
+              />
+              <DatePicker
+                label="Check-out *"
+                value={nhCheckoutDate}
+                onChange={setNhCheckoutDate}
+                minDate={nhCheckinDate}
+                placeholder="A definir"
+              />
+              <TimeInput
+                label="Hora check-out"
+                value={nhCheckoutHora}
+                onChange={setNhCheckoutHora}
+              />
             </div>
             {nhTotalDias > 0 && (
               <div className={styles.daysPreview}>
@@ -1462,37 +1686,6 @@ export default function StaysManagement() {
               </div>
             )}
           </div>
-
-          {/* Pessoas */}
-          {nhCatQuarto && (
-            <div className={styles.formSection}>
-              <div className={styles.formSectionTitle}>
-                <User size={13} className={styles.formSectionIconGreen} /> Hóspedes
-              </div>
-              {nhCatQuarto.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-                <p className={styles.fixedRateNote}>
-                  Tarifa fixa — {fmtBRL(nhCatQuarto.precoFixo)}/noite (independe da quantidade de pessoas)
-                </p>
-              ) : (
-                <div className={styles.pessoasControl}>
-                  <span className={styles.pessoasLabel}>Número de pessoas:</span>
-                  <div className={styles.pessoasStepper}>
-                    <button
-                      type="button"
-                      className={styles.stepperBtn}
-                      onClick={() => setNhPessoas((p) => Math.max(1, p - 1))}
-                    >−</button>
-                    <span className={styles.stepperValue}>{nhPessoas}</span>
-                    <button
-                      type="button"
-                      className={styles.stepperBtn}
-                      onClick={() => setNhPessoas((p) => Math.min(Object.keys(nhCatQuarto.precosOcupacao || {}).length, p + 1))}
-                    >+</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Resumo financeiro */}
           {nhQuarto && nhTotalDias > 0 && (
@@ -1539,9 +1732,9 @@ export default function StaysManagement() {
                 </Select>
                 <Input
                   type="text"
-                  placeholder="Valor (R$)"
+                  placeholder="R$ 0,00"
                   value={nhPagValor}
-                  onChange={(e) => setNhPagValor(e.target.value)}
+                  onChange={(e) => setNhPagValor(maskBRL(e.target.value))}
                 />
               </div>
               <Button variant="secondary" onClick={addNhPagamento}>

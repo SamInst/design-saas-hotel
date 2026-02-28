@@ -1,0 +1,923 @@
+/* ── Page Layout ──────────────────────────────────────────────────────────── */
+.page {
+  min-height: 100%;
+}
+
+.h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Main card ────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.tableHeader {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tableTools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.searchWrap {
+  position: relative;
+  min-width: 200px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-2);
+  pointer-events: none;
+}
+
+.searchInput { padding-left: 30px !important; }
+
+/* ── Category sections ───────────────────────────────────────────────────── */
+.categorySection {
+  border-bottom: 1px solid var(--border);
+}
+.categorySection:last-child {
+  border-bottom: none;
+}
+
+.categoryHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s;
+  color: var(--text);
+}
+.categoryHeader:hover {
+  background: var(--surface-2);
+}
+
+.categoryChevron {
+  transition: transform 0.2s;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.categoryChevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.catIcon {
+  color: var(--violet);
+  flex-shrink: 0;
+}
+
+.categoryName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.categoryCount {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+/* ── Day Use rows ────────────────────────────────────────────────────────── */
+.duRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  transition: background 0.15s;
+  border-left: 3px solid rgba(16, 185, 129, 0.3);
+  gap: 12px;
+}
+.duRow:hover {
+  background: var(--surface-2);
+}
+
+.duLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.duRoomBadge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.10);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: #059669;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .duRoomBadge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.duName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.duNamePending {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.duMeta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.duMetaItem {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.duTimeRange {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+}
+
+.duRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pendenteBadge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 20px;
+  padding: 2px 7px;
+}
+
+/* ── Status badges ───────────────────────────────────────────────────────── */
+.statusBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.status_ativo {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.status_encerrado {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+:root[data-theme="dark"] .status_encerrado {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+:root[data-theme="dark"] .status_ativo {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.status_finalizado {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+:root[data-theme="dark"] .status_finalizado {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.status_cancelado {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+:root[data-theme="dark"] .status_cancelado {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.status_pendente {
+  background: rgba(249, 115, 22, 0.12);
+  color: #ea580c;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+:root[data-theme="dark"] .status_pendente {
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+.status_outro {
+  background: rgba(107, 114, 128, 0.1);
+  color: #6b7280;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.emptyState {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+/* ── Detail modal ─────────────────────────────────────────────────────────── */
+.detailModalTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.detailRoomBadge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgba(16, 185, 129, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: #059669;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .detailRoomBadge {
+  color: #34d399;
+}
+
+.detailTitular {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.detailTitularPending {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.detailMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.detailPeriodo {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.detailFooter {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ── Main tabs ───────────────────────────────────────────────────────────── */
+.detailTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+  margin-bottom: 16px;
+}
+
+.detailTab {
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+}
+.detailTab:hover {
+  color: var(--text);
+}
+.detailTabActive {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+/* ── Tab content ─────────────────────────────────────────────────────────── */
+.tabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Summary cards ───────────────────────────────────────────────────────── */
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.summaryCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.summaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.summaryValueGreen { color: #059669; }
+:root[data-theme="dark"] .summaryValueGreen { color: #34d399; }
+
+.summaryValueAmber { color: #d97706; }
+:root[data-theme="dark"] .summaryValueAmber { color: #fbbf24; }
+
+/* ── Progress bar ────────────────────────────────────────────────────────── */
+.progressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.progressLabel {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  justify-content: space-between;
+}
+.progressBar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: #059669;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+/* ── Info rows ───────────────────────────────────────────────────────────── */
+.infoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+
+.infoRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.infoLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.infoValue {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── Item list ───────────────────────────────────────────────────────────── */
+.itemList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 8px;
+}
+
+.listItemLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.listItemIcon { color: var(--text-2); flex-shrink: 0; }
+.listItemIconGreen { color: #059669; flex-shrink: 0; }
+:root[data-theme="dark"] .listItemIconGreen { color: #34d399; }
+
+.listItemName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.listItemSub {
+  font-size: 11px;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.listItemValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.valueGreen { color: #059669; }
+:root[data-theme="dark"] .valueGreen { color: #34d399; }
+
+.removeBtn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-2);
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.removeBtn:hover { color: #dc2626; background: rgba(239, 68, 68, 0.08); }
+
+/* ── Comprovante tag ─────────────────────────────────────────────────────── */
+.comprovanteTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ── Form helpers ────────────────────────────────────────────────────────── */
+.formStack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.formSection {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.formSectionIcon { color: var(--violet); }
+
+.infoHint {
+  font-size: 11px;
+  color: var(--text-2);
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.confirmHint {
+  font-size: 12px;
+  color: #059669;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modalFooterRow {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+/* ── Pagamentos list in nova modal ──────────────────────────────────────── */
+.pagList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pagItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: 7px;
+  font-size: 12px;
+}
+
+.pagItemLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pagItemName { font-weight: 500; color: var(--text); }
+.pagItemSub  { font-size: 10px; color: var(--text-2); }
+
+.pagItemRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagItemVal { font-weight: 700; color: var(--text); }
+
+.pagTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 7px;
+  font-size: 13px;
+}
+
+.pagTotalLabel { color: var(--text-2); }
+.pagTotalVal   { font-weight: 700; color: var(--text); }
+
+/* ── File input (comprovante) ────────────────────────────────────────────── */
+.fileInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.fileInputWrap:hover { border-color: var(--violet); }
+
+.fileInputHidden {
+  display: none;
+}
+
+.fileInputIcon { color: var(--text-2); flex-shrink: 0; }
+.fileInputName { flex: 1; font-size: 12px; color: var(--text-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fileInputBtn  { font-size: 11px; font-weight: 600; color: var(--violet); flex-shrink: 0; }
+
+/* ── Hóspede chips ───────────────────────────────────────────────────────── */
+.hospedeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hospedeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: var(--text);
+}
+
+.hospedeChipTitular {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.hospedeChipName { font-weight: 500; }
+
+.hospedeChipRemove {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  transition: color 0.15s;
+}
+.hospedeChipRemove:hover { color: #dc2626; }
+
+/* ── Hóspede search results ──────────────────────────────────────────────── */
+.hospedeResults {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.hospedeResultSection {
+  padding: 5px 10px 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+
+.hospedeResult {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  transition: background 0.12s;
+}
+.hospedeResult:hover { background: var(--surface-2); }
+
+.hospedeResultName { font-size: 13px; font-weight: 500; color: var(--text); }
+.hospedeResultSub  { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.hospedeResultEmpty { padding: 12px; text-align: center; font-size: 12px; color: var(--text-2); }
+
+/* ── Room search grid (grouped by category) ──────────────────────────────── */
+.roomByCatWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roomCatGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roomCatLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+
+.roomGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.roomBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.roomBtn:hover { border-color: #059669; color: #059669; }
+.roomBtnActive {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #059669;
+  color: #059669;
+}
+
+/* ── Confirm modal ───────────────────────────────────────────────────────── */
+.confirmText {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.confirmName {
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Tab body (consistent modal height) ─────────────────────────────────── */
+.detailTabBody {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Timer display ───────────────────────────────────────────────────────── */
+.timerLive {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: #059669;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+}
+:root[data-theme="dark"] .timerLive { color: #34d399; }
+
+.timerStatic {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Encerrar summary ────────────────────────────────────────────────────── */
+.encerrarSummary {
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.encerrarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.encerrarLabel {
+  color: var(--text-2);
+  font-size: 12px;
+}
+
+.encerrarVal {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.encerrarValGreen {
+  font-weight: 700;
+  color: #059669;
+  font-size: 15px;
+}
+:root[data-theme="dark"] .encerrarValGreen { color: #34d399; }
+
+/* ── Pricing hint in Nova modal ──────────────────────────────────────────── */
+.pricingHint {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.pricingHintItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pricingHintLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+
+.pricingHintVal {
+  font-size: 14px;
+  font-weight: 700;
+  color: #059669;
+}
+:root[data-theme="dark"] .pricingHintVal { color: #34d399; }
+
+.pricingHintSep {
+  width: 1px;
+  height: 28px;
+  background: rgba(16, 185, 129, 0.25);
+}
+
+/* ── Running clock (Tempo decorrido card for ATIVO records) ──────────────── */
+.clockRunning {
+  font-family: var(--font-mono, monospace);
+  font-size: 20px;
+  font-weight: 400;
+  color: #059669;
+  letter-spacing: 0.06em;
+}
+:root[data-theme="dark"] .clockRunning { color: #34d399; }

@@ -1,20 +1,10 @@
 /* ── Page Layout ──────────────────────────────────────────────────────────── */
 .page {
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.pageHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  min-height: 100%;
 }
 
 .h2 {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--text);
   margin: 0;
@@ -23,7 +13,7 @@
 .subtitle {
   font-size: 12px;
   color: var(--text-2);
-  margin-top: 4px;
+  margin-top: 3px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -38,25 +28,13 @@
 }
 
 .tableHeader {
-  padding: 16px 20px;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.tableTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.tableSubtitle {
-  font-size: 11px;
-  color: var(--text-2);
-  margin-top: 2px;
 }
 
 .tableTools {
@@ -136,12 +114,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 20px 12px 44px;
+  padding: 12px 20px;
   cursor: pointer;
   border-top: 1px solid var(--border);
   transition: background 0.15s;
-  border-left: 2px solid rgba(124, 58, 237, 0.25);
-  margin-left: 0;
+  border-left: 3px solid rgba(124, 58, 237, 0.25);
   gap: 12px;
 }
 .stayRow:hover {
@@ -178,7 +155,7 @@
 .stayMeta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   margin-top: 3px;
   flex-wrap: wrap;
 }
@@ -850,6 +827,12 @@
   display: block;
 }
 
+.pillDisabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .roomGrid5 {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -1116,6 +1099,210 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ── Diária counter in listing ───────────────────────────────────────────── */
+.diariaBadge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.diariaNumAtual {
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 700;
+}
+:root[data-theme="dark"] .diariaNumAtual {
+  color: #f87171;
+}
+
+.diariaBadgeSep {
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── Comprovante tag in payment list ─────────────────────────────────────── */
+.comprovanteTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  color: var(--violet);
+  font-size: 10px;
+}
+
+/* ── File input (comprovante) ────────────────────────────────────────────── */
+.fileInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 7px 12px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color 0.15s;
+  min-height: 36px;
+}
+.fileInputWrap:hover {
+  border-color: var(--violet);
+}
+
+.fileInputHidden {
+  display: none;
+}
+
+.fileInputIcon {
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.fileInputName {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fileInputBtn {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--violet);
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+/* ── Hóspede chips (nova hospedagem) ─────────────────────────────────────── */
+.hospedeChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hospedeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 20px;
+  padding: 4px 10px 4px 12px;
+}
+
+.hospedeChipTitular {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--violet);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hospedeChipName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hospedeChipRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-2);
+  padding: 2px;
+  border-radius: 50%;
+  transition: color 0.15s, background 0.15s;
+}
+.hospedeChipRemove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ── Hóspede search results ──────────────────────────────────────────────── */
+.hospedeResults {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.hospedeResultSection {
+  padding: 6px 14px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.hospedeResult {
+  width: 100%;
+  text-align: left;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hospedeResult:last-child { border-bottom: none; }
+.hospedeResult:hover { background: var(--surface-2); }
+
+.hospedeResultName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hospedeResultSub {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.hospedeResultEmpty {
+  padding: 16px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
+  background: var(--surface);
+}
+
+/* ── Room by category (nova hospedagem) ──────────────────────────────────── */
+.roomByCatWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roomCatGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roomCatLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
 }
 
 /* ── Gerenciar Diárias modal ──────────────────────────────────────────────── */

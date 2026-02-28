@@ -12,6 +12,8 @@ import InventoryManagement from '../pages/inventory/InventoryManagement';
 import RoomsManagement     from '../pages/rooms/RoomsManagement';
 import PricingManagement   from '../pages/pricing/PricingManagement';
 import StaysManagement     from '../pages/stays/StaysManagement';
+import DayUseManagement   from '../pages/dayuse/DayUseManagement';
+import OverviewManagement from '../pages/overview/OverviewManagement';
 // import BookingCalendar     from '../pages/calendar/BookingCalendar';
 
 const PAGE_MAP = {
@@ -23,6 +25,8 @@ const PAGE_MAP = {
   rooms:       <RoomsManagement />,
   pricing:     <PricingManagement />,
   stays:       <StaysManagement />,
+  dayuse:      <DayUseManagement />,
+  reception:   <OverviewManagement />,
   // calendar:    <BookingCalendar />,
 };
 

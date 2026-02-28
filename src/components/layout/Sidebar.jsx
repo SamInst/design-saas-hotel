@@ -1,12 +1,13 @@
 import {
   LayoutGrid, BedDouble, Clock, CalendarDays, Wallet, Package,
   Tag, LogOut, Sun, Moon, ChevronLeft, ChevronRight, MoreVertical,
-  DoorOpen, UserCog, Users, ShieldCheck,
+  DoorOpen, UserCog, Users, ShieldCheck, Building2,
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 
 const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard',    icon: LayoutGrid  },
+  { id: 'reception', label: 'Recepção',     icon: Building2   },
   { id: 'stays',     label: 'Pernoites',    icon: BedDouble   },
   { id: 'rooms',     label: 'Apartamentos', icon: DoorOpen    },
   { id: 'dayuse',    label: 'Day Use',      icon: Clock       },
