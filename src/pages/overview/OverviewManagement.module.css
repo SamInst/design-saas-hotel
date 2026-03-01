@@ -173,10 +173,10 @@
 
 /* Left accent by status */
 .roomRow_disponivel { border-left-color: rgba(16, 185, 129, 0.4); }
-.roomRow_ocupado    { border-left-color: rgba(245, 158, 11, 0.4);  }
+.roomRow_ocupado    { border-left-color: rgba(220, 38, 38, 0.4);   }
 .roomRow_reservado  { border-left-color: rgba(59, 130, 246, 0.4);  }
-.roomRow_limpeza    { border-left-color: rgba(124, 58, 237, 0.4);  }
-.roomRow_manutencao { border-left-color: rgba(249, 115, 22, 0.4);  }
+.roomRow_limpeza    { border-left-color: rgba(37, 99, 235, 0.4);   }
+.roomRow_manutencao { border-left-color: rgba(124, 58, 237, 0.4);  }
 .roomRow_fora       { border-left-color: rgba(239, 68, 68, 0.4);   }
 
 .roomRowLeft {
@@ -202,17 +202,17 @@
   flex-shrink: 0;
 }
 .numBadge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; }
-.numBadge_ocupado    { background: rgba(245, 158, 11, 0.12);  color: #d97706; }
+.numBadge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; }
 .numBadge_reservado  { background: rgba(59, 130, 246, 0.12);  color: #2563eb; }
-.numBadge_limpeza    { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; }
-.numBadge_manutencao { background: rgba(249, 115, 22, 0.12);  color: #ea580c; }
+.numBadge_limpeza    { background: rgba(37, 99, 235, 0.12);   color: #2563eb; }
+.numBadge_manutencao { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; }
 .numBadge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; }
 
 :root[data-theme="dark"] .numBadge_disponivel { color: #34d399; }
-:root[data-theme="dark"] .numBadge_ocupado    { color: #fbbf24; }
+:root[data-theme="dark"] .numBadge_ocupado    { color: #f87171; }
 :root[data-theme="dark"] .numBadge_reservado  { color: #60a5fa; }
-:root[data-theme="dark"] .numBadge_limpeza    { color: #a78bfa; }
-:root[data-theme="dark"] .numBadge_manutencao { color: #fb923c; }
+:root[data-theme="dark"] .numBadge_limpeza    { color: #60a5fa; }
+:root[data-theme="dark"] .numBadge_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .numBadge_fora       { color: #f87171; }
 
 .roomName {
@@ -253,7 +253,7 @@
   color: var(--text-2);
   flex-wrap: wrap;
 }
-.metaPendente { color: #d97706; font-weight: 600; }
+.metaPendente { color: #d97706; font-weight: 500; font-size: 10px; }
 :root[data-theme="dark"] .metaPendente { color: #fbbf24; }
 .metaDesc { color: var(--text-2); }
 .timerLive {
@@ -283,17 +283,17 @@
   white-space: nowrap;
 }
 .badge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
-.badge_ocupado    { background: rgba(245, 158, 11, 0.12);  color: #d97706; border-color: rgba(245, 158, 11, 0.3); }
+.badge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; border-color: rgba(220, 38, 38, 0.3);   }
 .badge_reservado  { background: rgba(59, 130, 246, 0.12);  color: #2563eb; border-color: rgba(59, 130, 246, 0.3); }
-.badge_limpeza    { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; border-color: rgba(124, 58, 237, 0.3); }
-.badge_manutencao { background: rgba(249, 115, 22, 0.12);  color: #ea580c; border-color: rgba(249, 115, 22, 0.3); }
-.badge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; border-color: rgba(239, 68, 68, 0.3); }
+.badge_limpeza    { background: rgba(37, 99, 235, 0.12);   color: #2563eb; border-color: rgba(37, 99, 235, 0.3);   }
+.badge_manutencao { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; border-color: rgba(124, 58, 237, 0.3); }
+.badge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; border-color: rgba(239, 68, 68, 0.3);  }
 :root[data-theme="dark"] .badge_disponivel { color: #34d399; border-color: rgba(16, 185, 129, 0.35); }
-:root[data-theme="dark"] .badge_ocupado    { color: #fbbf24; border-color: rgba(245, 158, 11, 0.35); }
+:root[data-theme="dark"] .badge_ocupado    { color: #f87171; border-color: rgba(220, 38, 38, 0.35);  }
 :root[data-theme="dark"] .badge_reservado  { color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); }
-:root[data-theme="dark"] .badge_limpeza    { color: #a78bfa; border-color: rgba(124, 58, 237, 0.35); }
-:root[data-theme="dark"] .badge_manutencao { color: #fb923c; border-color: rgba(249, 115, 22, 0.35); }
-:root[data-theme="dark"] .badge_fora       { color: #f87171; border-color: rgba(239, 68, 68, 0.35); }
+:root[data-theme="dark"] .badge_limpeza    { color: #60a5fa; border-color: rgba(37, 99, 235, 0.35);  }
+:root[data-theme="dark"] .badge_manutencao { color: #a78bfa; border-color: rgba(124, 58, 237, 0.35); }
+:root[data-theme="dark"] .badge_fora       { color: #f87171; border-color: rgba(239, 68, 68, 0.35);  }
 
 /* Service type badges */
 .pernoiteBadge {
@@ -350,16 +350,16 @@
   flex-shrink: 0;
 }
 .detailBadge_disponivel { background: rgba(16, 185, 129, 0.15); color: #059669; }
-.detailBadge_ocupado    { background: rgba(245, 158, 11, 0.15);  color: #d97706; }
+.detailBadge_ocupado    { background: rgba(220, 38, 38, 0.15);   color: #dc2626; }
 .detailBadge_reservado  { background: rgba(59, 130, 246, 0.15);  color: #2563eb; }
-.detailBadge_limpeza    { background: rgba(124, 58, 237, 0.15);  color: #7c3aed; }
-.detailBadge_manutencao { background: rgba(249, 115, 22, 0.15);  color: #ea580c; }
+.detailBadge_limpeza    { background: rgba(37, 99, 235, 0.15);   color: #2563eb; }
+.detailBadge_manutencao { background: rgba(124, 58, 237, 0.15);  color: #7c3aed; }
 .detailBadge_fora       { background: rgba(239, 68, 68, 0.15);   color: #dc2626; }
 :root[data-theme="dark"] .detailBadge_disponivel { color: #34d399; }
-:root[data-theme="dark"] .detailBadge_ocupado    { color: #fbbf24; }
+:root[data-theme="dark"] .detailBadge_ocupado    { color: #f87171; }
 :root[data-theme="dark"] .detailBadge_reservado  { color: #60a5fa; }
-:root[data-theme="dark"] .detailBadge_limpeza    { color: #a78bfa; }
-:root[data-theme="dark"] .detailBadge_manutencao { color: #fb923c; }
+:root[data-theme="dark"] .detailBadge_limpeza    { color: #60a5fa; }
+:root[data-theme="dark"] .detailBadge_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .detailBadge_fora       { color: #f87171; }
 
 .detailTitular {
@@ -797,3 +797,647 @@
   align-items: center;
 }
 .chipRemove:hover { color: #dc2626; }
+
+/* ── Green button (Marcar Disponível) ───────────────────────────────────────── */
+.btnGreen {
+  background: #16a34a !important;
+  color: #fff !important;
+  border-color: #16a34a !important;
+}
+.btnGreen:hover { background: #15803d !important; border-color: #15803d !important; }
+
+/* ── Filter row 2 (tipo de ocupação + period) ───────────────────────────────── */
+.filterRow2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.filterRow2Label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.periodInputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.periodSep { font-size: 12px; color: var(--text-2); }
+
+/* ── Diária navigation pills ─────────────────────────────────────────────────── */
+.diariaNavRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.diariaPill {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.diariaPill:hover { color: var(--text); background: var(--surface-2); }
+.diariaPillActive {
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.3);
+  font-weight: 600;
+}
+
+/* Diária sub-tabs */
+.diariaTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 2px;
+  margin-bottom: 12px;
+}
+.diariaTab {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 4px 4px 0 0;
+}
+.diariaTab:hover { color: var(--text); }
+.diariaTabActive { color: var(--violet); border-bottom-color: var(--violet); }
+
+/* Diária info block */
+.diariaInfo {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+}
+
+/* ── Items grid (Itens do Quarto tab) ───────────────────────────────────────── */
+.itemsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.itemCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+.itemCardIcon { color: var(--text-2); flex-shrink: 0; }
+.itemCardName { font-size: 12px; font-weight: 500; color: var(--text); }
+.itemCardQty  { font-size: 11px; color: var(--text-2); }
+
+/* ── Pricing tab table ───────────────────────────────────────────────────────── */
+.pricingTabBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pricingTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.pricingTable th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.pricingTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.pricingTable tr:last-child td { border-bottom: none; }
+.pricingTableWrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.pricingDayUseBlock {
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ── 3-column financial grid ─────────────────────────────────────────────────── */
+.financialGrid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+/* ── Nova Hospedagem sections ────────────────────────────────────────────────── */
+.nhSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.nhSection:last-child { border-bottom: none; }
+.nhSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Room picker pills */
+.roomPickerCat { margin-bottom: 10px; }
+.roomPickerCatName {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.roomPillGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.roomPill {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.roomPill:hover { color: var(--text); background: var(--surface-2); }
+.roomPillActive {
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.3);
+  font-weight: 600;
+}
+
+/* ── Confirm / action row ────────────────────────────────────────────────────── */
+.actionRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Hospedegroup header ─────────────────────────────────────────────────────── */
+.hospedeGroupHeader {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  padding: 6px 12px 4px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+.hospedeGroupHeader:first-child { border-top: none; }
+
+/* ── Categoria stat red (ocupado) ────────────────────────────────────────────── */
+.catStatRed { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+
+/* ── Meta service badge (inline, under date/timer) ───────────────────────────── */
+.metaServiceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  width: fit-content;
+}
+
+/* ── StaysManagement-style info boxes ──────────────────────────────────────── */
+.dataGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.infoBox {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.infoBoxHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.infoBoxLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.infoBoxIcon      { color: var(--text-2); flex-shrink: 0; }
+.infoBoxIconGreen { color: #059669; flex-shrink: 0; }
+.infoBoxIconAmber { color: #d97706; flex-shrink: 0; }
+:root[data-theme="dark"] .infoBoxIconGreen { color: #34d399; }
+:root[data-theme="dark"] .infoBoxIconAmber { color: #fbbf24; }
+.infoBoxValue { font-size: 13px; color: var(--text); margin: 0; }
+.infoBoxSub   { font-size: 11px; color: var(--text-2); margin: 0; }
+
+/* ── Financial box ──────────────────────────────────────────────────────────── */
+.financialBox {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.financialGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.financialItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.financialLabel {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.financialValue { font-size: 16px; font-weight: 700; color: var(--text); }
+.valueAmber { color: #d97706; }
+:root[data-theme="dark"] .valueAmber { color: #fbbf24; }
+.valueViolet { color: var(--violet); }
+
+/* ── Progress bar ───────────────────────────────────────────────────────────── */
+.progressWrap { display: flex; flex-direction: column; gap: 4px; }
+.progressLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-2);
+}
+.progressBar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: #059669;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+:root[data-theme="dark"] .progressFill { background: #34d399; }
+
+/* ── Tab body (min height for detail tabs) ──────────────────────────────────── */
+.tabBody { min-height: 260px; }
+
+/* ── Diárias nav (StaysManagement style) ───────────────────────────────────── */
+.diariasNav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diariasNavTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.diariasNavLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.diariaAtualBadge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+.diariasPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.diariaPillAtual {
+  border-color: rgba(124, 58, 237, 0.2);
+  color: var(--text);
+}
+.diariaPillDate {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* ── Sub-tabs (inside diárias) ──────────────────────────────────────────────── */
+.subTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 2px;
+  margin-bottom: 10px;
+}
+.subTab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 4px 4px 0 0;
+}
+.subTab:hover { color: var(--text); }
+.subTabActive { color: var(--violet); border-bottom-color: var(--violet); }
+
+.subTabContent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Diária detail box ──────────────────────────────────────────────────────── */
+.diariaDetailsBox {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.diariaDetailRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.diariaDetailLabel { color: var(--text-2); font-size: 12px; }
+.diariaDetailValue { font-weight: 600; color: var(--text); }
+
+/* ── Item list (same pattern as listItem container) ─────────────────────────── */
+.itemList { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Remove button ──────────────────────────────────────────────────────────── */
+.removeBtn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.removeBtn:hover { color: #dc2626; background: rgba(220, 38, 38, 0.08); }
+
+/* ── Nova Hospedagem: fixed summary + step tabs ──────────────────────────────── */
+.nhFinancialFixed {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.nhStepTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+}
+.nhStepTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+}
+.nhStepTab:hover { color: var(--text); }
+.nhStepTabActive {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
+  background: rgba(124, 58, 237, 0.06);
+}
+.nhStepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.nhStepTabActive .nhStepNum {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: var(--violet);
+}
+.nhStepContent { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Guest list (add hospede modal) ─────────────────────────────────────────── */
+.guestList {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.guestItem {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  background: none;
+  text-align: left;
+  transition: background 0.12s;
+}
+.guestItem:first-child { border-top: none; }
+.guestItem:hover { background: var(--surface-2); }
+.guestItemActive { background: rgba(124, 58, 237, 0.06) !important; }
+.guestName { font-size: 13px; font-weight: 500; color: var(--text); }
+.guestSub  { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+/* ── Total preview (add consumo modal) ──────────────────────────────────────── */
+.totalPreview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+}
+.totalPreviewLabel { font-size: 12px; color: var(--text-2); font-weight: 600; }
+.totalPreviewValue { font-size: 15px; font-weight: 700; color: #059669; }
+:root[data-theme="dark"] .totalPreviewValue { color: #34d399; }
+
+/* ── Pagamento resume (add pagamento modal) ──────────────────────────────────── */
+.pagamentoResume {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pagamentoResumeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.pagamentoResumeTotal {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+/* ── Modal footer row (sub-modals) ──────────────────────────────────────────── */
+.modalFooterRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Detail period text ─────────────────────────────────────────────────────── */
+.detailPeriodo {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* ── diariasNavBox: background container for diária selector ─────────────────── */
+.diariasNavBox {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Contact action buttons ──────────────────────────────────────────────────── */
+.contactActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.quickBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  background: rgba(124, 58, 237, 0.10);
+  color: var(--violet);
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.quickBtn:hover { background: var(--violet); color: #fff; }
+
+/* ── Description block (Disponível dados tab) ────────────────────────────────── */
+.descricaoBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.descricaoText {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Consumo category label ──────────────────────────────────────────────────── */
+.consumoCatLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  padding: 8px 0 4px;
+}

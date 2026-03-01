@@ -64,7 +64,7 @@ let _dayUses = [
   },
   {
     id: 3, quarto: 2, categoria: 'Standard', tipo: 'Individual', titularNome: 'Carlos Mendes',
-    dataUso: '27/02/2026', horaEntrada: '10:00', horaSaida: '12:30',
+    dataUso: '27/02/2026', horaEntrada: '07:00', horaSaida: '12:30',
     status: STATUS_DU.FINALIZADO,
     horasBase: 2, precoBase: 90, precoAdicional: 15, modo: 'padrao',
     valorTotal: 105, totalPago: 105, pagamentoPendente: 0,
@@ -80,7 +80,7 @@ let _dayUses = [
   },
   {
     id: 4, quarto: 9, categoria: 'Suíte', tipo: 'Casal', titularNome: 'Roberto Lima',
-    dataUso: '27/02/2026', horaEntrada: '09:00', horaSaida: '11:00',
+    dataUso: '27/02/2026', horaEntrada: '07:00', horaSaida: '11:00',
     status: STATUS_DU.FINALIZADO_PENDENTE,
     horasBase: 2, precoBase: 200, precoAdicional: 40, modo: 'padrao',
     valorTotal: 200, totalPago: 100, pagamentoPendente: 100,
