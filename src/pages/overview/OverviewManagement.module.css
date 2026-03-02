@@ -14,7 +14,7 @@
   padding: 14px 16px 12px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
@@ -25,6 +25,7 @@
   font-weight: 700;
   color: var(--text);
   margin: 0;
+  white-space: nowrap;
 }
 
 .subtitle {
@@ -34,17 +35,65 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: wrap;
 }
 
-.tableTools { display: flex; align-items: center; gap: 10px; }
+/* ── Tools container (wraps into two rows) ─────────────────────────────────── */
+.tableTools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
 
-.searchWrap { position: relative; min-width: 200px; }
+/* Row 1: search + tipo + date range */
+.toolsRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+/* Row 2: action buttons */
+.toolsRowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.searchWrap {
+  position: relative;
+  flex: 1;
+  min-width: 160px;
+  max-width: 240px;
+}
 .searchIcon {
   position: absolute; left: 10px; top: 50%;
   transform: translateY(-50%);
   color: var(--text-2); pointer-events: none;
 }
 .searchInput { padding-left: 30px !important; }
+
+.tipoSelect { width: 150px; flex-shrink: 0; }
+
+.dateRangeWrap { flex-shrink: 0; min-width: 200px; max-width: 260px; flex: 1; }
+
+/* Responsive: on narrow screens stack title + tools full width */
+@media (max-width: 700px) {
+  .tableHeader { flex-direction: column; align-items: stretch; }
+  .tableTools  { align-items: stretch; }
+  .toolsRow    { justify-content: flex-start; }
+  .toolsRowActions { justify-content: flex-start; }
+  .searchWrap  { max-width: 100%; }
+  .dateRangeWrap { max-width: 100%; }
+  .tipoSelect  { width: 100%; }
+}
 
 /* ── Filter tabs ───────────────────────────────────────────────────────────── */
 .filterTabs {
@@ -277,8 +326,8 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  padding: 2px 7px;
-  border-radius: 20px;
+  padding: 2px 8px;
+  border-radius: 5px;
   border: 1px solid;
   white-space: nowrap;
 }
@@ -1440,4 +1489,441 @@
   letter-spacing: 0.05em;
   color: var(--text-2);
   padding: 8px 0 4px;
+}
+
+/* ── Orange button (Novo Pernoite) ───────────────────────────────────────────── */
+.btnOrange {
+  background: #ea580c !important;
+  color: #fff !important;
+  border-color: #ea580c !important;
+}
+.btnOrange:hover { background: #c2410c !important; border-color: #c2410c !important; }
+
+/* ── Clear filters button (active when filters applied) ──────────────────────── */
+.btnClearFilters {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-2);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.btnClearFilters:hover { color: var(--text); background: var(--surface-2); }
+.btnClearFiltersActive {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.06);
+}
+.btnClearFiltersActive:hover {
+  background: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.5);
+}
+:root[data-theme="dark"] .btnClearFiltersActive { color: #f87171; }
+
+/* ── Guest count badge on room card ─────────────────────────────────────────── */
+.guestCountBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 20px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .guestCountBadge { color: #f87171; }
+
+/* ── Minibar card list ───────────────────────────────────────────────────────── */
+.minibarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.minibarHeaderTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.minibarList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.minibarCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  gap: 10px;
+}
+.minibarCardLow {
+  border-color: rgba(220, 38, 38, 0.3);
+  background: rgba(220, 38, 38, 0.04);
+}
+.minibarCardLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.minibarCardName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.minibarQtyRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.minibarQtyCurrent {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.minibarQtySep { font-size: 12px; color: var(--text-2); }
+.minibarQtyBase {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.minibarQtyLow { color: #dc2626; }
+:root[data-theme="dark"] .minibarQtyLow { color: #f87171; }
+
+.minibarProgressWrap {
+  flex: 1;
+  max-width: 80px;
+}
+.minibarProgressBar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.minibarProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  background: #059669;
+}
+.minibarProgressFillLow { background: #dc2626; }
+:root[data-theme="dark"] .minibarProgressFill { background: #34d399; }
+:root[data-theme="dark"] .minibarProgressFillLow { background: #f87171; }
+
+.minibarCardActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.minibarIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  font-size: 0;
+}
+.minibarIconBtn:hover { background: var(--surface-2); color: var(--text); }
+.minibarIconBtnRed:hover   { background: rgba(220, 38, 38, 0.08);  border-color: rgba(220, 38, 38, 0.3);  color: #dc2626; }
+.minibarIconBtnGreen:hover { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.3); color: #059669; }
+:root[data-theme="dark"] .minibarIconBtnRed:hover   { color: #f87171; }
+:root[data-theme="dark"] .minibarIconBtnGreen:hover { color: #34d399; }
+
+/* ── Payment modal checkbox row ──────────────────────────────────────────────── */
+.payCheckboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.payCheckboxRow input[type="checkbox"] { cursor: pointer; accent-color: var(--violet); }
+
+/* ── Gerenciar Diárias modal ─────────────────────────────────────────────────── */
+.gdDiariaList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.gdDiariaItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 13px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  gap: 10px;
+}
+.gdDiariaItemCurrent {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: rgba(124, 58, 237, 0.04);
+}
+.gdDiariaNum {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 60px;
+}
+.gdDiariaDate { font-size: 12px; color: var(--text-2); flex: 1; }
+.gdDiariaVal  { font-size: 13px; font-weight: 600; color: #059669; }
+:root[data-theme="dark"] .gdDiariaVal { color: #34d399; }
+.gdCurrentTag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.gdAddForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.gdTotalPreview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.gdTotalLabel { color: var(--text-2); font-weight: 500; }
+.gdTotalValue { font-weight: 700; color: #059669; font-size: 15px; }
+:root[data-theme="dark"] .gdTotalValue { color: #34d399; }
+
+/* ── Trocar Quarto modal ──────────────────────────────────────────────────────── */
+.tqDiariaPickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.tqDiariaItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tqDiariaItem:hover { background: var(--surface); }
+.tqDiariaItemSelected {
+  border-color: rgba(124, 58, 237, 0.3);
+  background: rgba(124, 58, 237, 0.05);
+}
+.tqDiariaItemSelected:hover { background: rgba(124, 58, 237, 0.08); }
+.tqDiariaLabel { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
+.tqDiariaDate  { font-size: 11px; color: var(--text-2); }
+.tqSelectAllRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 4px;
+}
+.tqSelectAllRow input[type="checkbox"] { cursor: pointer; accent-color: var(--violet); }
+
+/* ── Collapsed category mini stats ──────────────────────────────────────────── */
+.catStatsMini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.catStatMini {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.catStatMiniGreen { color: #059669; background: rgba(16, 185, 129, 0.1); }
+.catStatMiniAmber { color: #d97706; background: rgba(245, 158, 11, 0.1); }
+.catStatMiniSlate { color: #6b7280; background: rgba(107, 114, 128, 0.1); }
+:root[data-theme="dark"] .catStatMiniGreen { color: #34d399; }
+:root[data-theme="dark"] .catStatMiniAmber { color: #fbbf24; }
+
+/* ── Diária progress chip (e.g. "1/4") in room row ─────────────────────────── */
+.diariaBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 20px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .diariaBadge { color: #a78bfa; }
+
+/* ── Discount badge on room row ─────────────────────────────────────────────── */
+.descontoBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 20px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+:root[data-theme="dark"] .descontoBadge { color: #34d399; }
+
+/* ── Date-sorted group header ────────────────────────────────────────────────── */
+.dateSection {
+  border-bottom: 1px solid var(--border);
+}
+.dateSection:last-child { border-bottom: none; }
+.dateGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 20px;
+  background: var(--surface-2);
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s;
+  gap: 8px;
+}
+.dateGroupHeader:hover { background: var(--surface); }
+.dateGroupHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dateGroupTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dateGroupCount {
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* ── Hospedados counter chip in header ──────────────────────────────────────── */
+.hospedeCountChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 20px;
+  padding: 1px 8px;
+  margin-left: 6px;
+}
+:root[data-theme="dark"] .hospedeCountChip { color: #34d399; }
+
+/* ── Desconto modal ──────────────────────────────────────────────────────────── */
+.descontoScopeRow {
+  display: flex;
+  gap: 8px;
+}
+.descontoScopeBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-2);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.descontoScopeBtn:hover { color: var(--text); background: var(--surface-2); }
+.descontoScopeBtnActive {
+  color: var(--violet);
+  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(124, 58, 237, 0.3);
+  font-weight: 600;
+}
+.descontoTipoRow {
+  display: flex;
+  gap: 8px;
+}
+.descontoTipoBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-2);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.descontoTipoBtn:hover { color: var(--text); background: var(--surface-2); }
+.descontoTipoBtnActive {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.3);
+  font-weight: 600;
 }

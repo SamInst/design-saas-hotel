@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './DatePicker.module.css';
 
@@ -20,7 +21,6 @@ const parseTyped = str => {
 };
 
 const autoFmtDate = (raw) => {
-  // Strip everything except digits, then rebuild dd/mm/yyyy
   const digits = raw.replace(/\D/g,'').slice(0,8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return digits.slice(0,2) + '/' + digits.slice(2);
@@ -31,6 +31,8 @@ const getYearRange = (center) => {
   const start = center - 5;
   return Array.from({ length: 12 }, (_, i) => start + i);
 };
+
+const POP_HEIGHT = 330; // approximate max height of the popup
 
 export function DatePicker({
   mode = 'single',
@@ -53,17 +55,47 @@ export function DatePicker({
   const [viewMode,     setViewMode]     = useState('days');
   const [inputText,    setInputText]    = useState('');
   const [inputFocused, setInputFocused] = useState(false);
-  const ref = useRef(null);
+  const [popStyle,     setPopStyle]     = useState({});
+  const ref    = useRef(null);
+  const popRef = useRef(null);
 
+  // Calculate popup position relative to viewport (for portal/fixed positioning)
+  const updatePopPos = useCallback(() => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const openAbove  = spaceBelow < POP_HEIGHT && rect.top > POP_HEIGHT;
+    setPopStyle({
+      position: 'fixed',
+      zIndex: 9999,
+      width: Math.max(rect.width, 278),
+      left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 278) - 8),
+      top: openAbove ? rect.top - POP_HEIGHT - 6 : rect.bottom + 6,
+    });
+  }, []);
+
+  // Close on outside click (covers both wrap and portal popup)
   useEffect(() => {
     const h = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false); setViewMode('days');
-      }
+      const inWrap = ref.current    && ref.current.contains(e.target);
+      const inPop  = popRef.current && popRef.current.contains(e.target);
+      if (!inWrap && !inPop) { setOpen(false); setViewMode('days'); }
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+
+  // Reposition on scroll/resize while open
+  useEffect(() => {
+    if (!open) return;
+    updatePopPos();
+    window.addEventListener('scroll', updatePopPos, true);
+    window.addEventListener('resize', updatePopPos);
+    return () => {
+      window.removeEventListener('scroll', updatePopPos, true);
+      window.removeEventListener('resize', updatePopPos);
+    };
+  }, [open, updatePopPos]);
 
   // Keep displayed text in sync when not editing
   useEffect(() => {
@@ -122,7 +154,6 @@ export function DatePicker({
 
   const handleInputFocus = () => {
     setInputFocused(true);
-    // Show the raw text value so user can edit
     if (mode === 'single' && value) setInputText(fmtD(value));
     else setInputText('');
     setOpen(true);
@@ -156,6 +187,73 @@ export function DatePicker({
     open   ? styles.open        : '',
     error  ? styles.triggerError : '',
   ].join(' ');
+
+  const popup = open && (
+    <div ref={popRef} className={styles.pop} style={popStyle}>
+      <div className={styles.head}>
+        <button type="button" className={styles.nav} onClick={prevNav}><ChevronLeft size={14}/></button>
+        <button
+          type="button"
+          className={styles.headBtn}
+          onClick={() => setViewMode(vm => vm === 'days' ? 'months' : 'years')}
+        >
+          {headLabel}
+        </button>
+        <button type="button" className={styles.nav} onClick={nextNav}><ChevronRight size={14}/></button>
+      </div>
+
+      {viewMode === 'days' && (
+        <>
+          <div className={styles.wdays}>{DAYS.map(d=><span key={d} className={styles.wday}>{d}</span>)}</div>
+          <div className={styles.grid} onMouseLeave={() => setHoverDate(null)}>
+            {cells.map((d, i) => {
+              if (!d) return <span key={`e${i}`}/>;
+              const dis  = isDisabled(d);
+              const tod  = sameDay(d, today);
+              const sel  = mode==='single' ? sameDay(d,value) : sameDay(d,startDate)||sameDay(d,endDate);
+              const iS   = mode==='range' && sameDay(d,startDate);
+              const iE   = mode==='range' && sameDay(d,rangeEnd);
+              const inR  = mode==='range' && startDate && rangeEnd && between(sod(d),sod(startDate),sod(rangeEnd));
+              const hovE = mode==='range' && !endDate && sameDay(d,hoverDate);
+              return (
+                <button key={d.toISOString()} type="button" disabled={dis}
+                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', dis?styles.dis:''].join(' ')}
+                  onClick={() => handleDayClick(sod(d))}
+                  onMouseEnter={() => { if (mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
+          {mode==='range' && startDate && !endDate && <p className={styles.hint}>Selecione a data final</p>}
+        </>
+      )}
+
+      {viewMode === 'months' && (
+        <div className={styles.smGrid}>
+          {MONTHS_SHORT.map((m, i) => (
+            <button key={m} type="button"
+              className={[styles.smCell, (value && value.getFullYear()===viewYear && value.getMonth()===i) ? styles.smActive : ''].join(' ')}
+              onClick={() => selectMonth(i)}>
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {viewMode === 'years' && (
+        <div className={styles.smGrid}>
+          {getYearRange(viewYear).map(y => (
+            <button key={y} type="button"
+              className={[styles.smCell, (value && value.getFullYear()===y) ? styles.smActive : ''].join(' ')}
+              onClick={() => selectYear(y)}>
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className={styles.wrap} ref={ref}>
@@ -198,72 +296,7 @@ export function DatePicker({
         )}
       </div>
 
-      {open && (
-        <div className={styles.pop}>
-          <div className={styles.head}>
-            <button type="button" className={styles.nav} onClick={prevNav}><ChevronLeft size={14}/></button>
-            <button
-              type="button"
-              className={styles.headBtn}
-              onClick={() => setViewMode(vm => vm === 'days' ? 'months' : 'years')}
-            >
-              {headLabel}
-            </button>
-            <button type="button" className={styles.nav} onClick={nextNav}><ChevronRight size={14}/></button>
-          </div>
-
-          {viewMode === 'days' && (
-            <>
-              <div className={styles.wdays}>{DAYS.map(d=><span key={d} className={styles.wday}>{d}</span>)}</div>
-              <div className={styles.grid} onMouseLeave={() => setHoverDate(null)}>
-                {cells.map((d, i) => {
-                  if (!d) return <span key={`e${i}`}/>;
-                  const dis  = isDisabled(d);
-                  const tod  = sameDay(d, today);
-                  const sel  = mode==='single' ? sameDay(d,value) : sameDay(d,startDate)||sameDay(d,endDate);
-                  const iS   = mode==='range' && sameDay(d,startDate);
-                  const iE   = mode==='range' && sameDay(d,rangeEnd);
-                  const inR  = mode==='range' && startDate && rangeEnd && between(sod(d),sod(startDate),sod(rangeEnd));
-                  const hovE = mode==='range' && !endDate && sameDay(d,hoverDate);
-                  return (
-                    <button key={d.toISOString()} type="button" disabled={dis}
-                      className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', dis?styles.dis:''].join(' ')}
-                      onClick={() => handleDayClick(sod(d))}
-                      onMouseEnter={() => { if (mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
-                      {d.getDate()}
-                    </button>
-                  );
-                })}
-              </div>
-              {mode==='range' && startDate && !endDate && <p className={styles.hint}>Selecione a data final</p>}
-            </>
-          )}
-
-          {viewMode === 'months' && (
-            <div className={styles.smGrid}>
-              {MONTHS_SHORT.map((m, i) => (
-                <button key={m} type="button"
-                  className={[styles.smCell, (value && value.getFullYear()===viewYear && value.getMonth()===i) ? styles.smActive : ''].join(' ')}
-                  onClick={() => selectMonth(i)}>
-                  {m}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {viewMode === 'years' && (
-            <div className={styles.smGrid}>
-              {getYearRange(viewYear).map(y => (
-                <button key={y} type="button"
-                  className={[styles.smCell, (value && value.getFullYear()===y) ? styles.smActive : ''].join(' ')}
-                  onClick={() => selectYear(y)}>
-                  {y}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {createPortal(popup, document.body)}
     </div>
   );
 }

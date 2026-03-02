@@ -4,7 +4,8 @@ import {
   Clock, User, CreditCard, ChevronDown, Wrench, Sparkles,
   CheckCircle, XCircle, DollarSign, Calendar, Square, Loader2,
   AlertTriangle, ShoppingCart, Package, Trash2, Phone, Mail,
-  RefreshCw, ArrowLeftRight,
+  RefreshCw, ArrowLeftRight, Minus, RotateCcw, Users, X,
+  Percent, Tag,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -110,7 +111,7 @@ const FILTER_OPTIONS = [
 const blankNpForm  = () => ({ chegadaDate: new Date(), chegadaHora: '14:00', saidaDate: null, saidaHora: '12:00', tipoAcomodacao: 'Casal', hospedes: [], hospedeSearch: '' });
 const blankNduForm = () => ({ horaEntrada: nowTime(), hospedes: [], hospedeSearch: '' });
 const blankPagForm = () => ({ descricao: '', formaPagamento: 'PIX', valor: '' });
-const blankSvcForm = () => ({ responsavel: '', descricao: '', previsaoFim: '' });
+const blankSvcForm = () => ({ responsavel: '', descricao: '', previsaoFim: '', dataHoraInicio: '', dataHoraFim: '' });
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function OverviewManagement() {
@@ -124,7 +125,17 @@ export default function OverviewManagement() {
 
   // Filters 2
   const [filterTipoOcupacao, setFilterTipoOcupacao] = useState('');
-  const [filterDateSingle, setFilterDateSingle]     = useState(null);
+  const [filterDateStart, setFilterDateStart]       = useState(null);
+  const [filterDateEnd, setFilterDateEnd]           = useState(null);
+  const [dateGroupCollapsed, setDateGroupCollapsed] = useState({});
+
+  // Desconto modal
+  const [showDescontoModal, setShowDescontoModal]   = useState(false);
+  const [descontoScope, setDescontoScope]           = useState('global'); // 'global' | 'diaria'
+  const [descontoTipo, setDescontoTipo]             = useState('percentual'); // 'percentual' | 'fixo'
+  const [descontoValor, setDescontoValor]           = useState('');
+  const [descontoDescricao, setDescontoDescricao]   = useState('');
+  const [descontoSaving, setDescontoSaving]         = useState(false);
 
   // Add Quarto
   const [showAddQuarto, setShowAddQuarto] = useState(false);
@@ -176,13 +187,44 @@ export default function OverviewManagement() {
   const [detailPagForma, setDetailPagForma]                 = useState('');
   const [detailPagValor, setDetailPagValor]                 = useState('');
 
-  // Add payment
+  // Unified payment modal
+  const [payModal, setPayModal]                     = useState(false); // { context } - context info string
+  const [payNomePagador, setPayNomePagador]         = useState('');
+  const [payAutoFill, setPayAutoFill]               = useState(false);
+  const [payDescricao, setPayDescricao]             = useState('');
+  const [payValor, setPayValor]                     = useState('');
+  const [payTipo, setPayTipo]                       = useState('');
+  const [payOnConfirm, setPayOnConfirm]             = useState(null); // callback(pagamento)
+
+  // Add payment (old pagModal - kept for backward compat)
   const [pagModal, setPagModal]         = useState(false);
   const [pagForm, setPagForm]           = useState(blankPagForm());
 
   // Service actions (limpeza/manutencao/fora)
   const [serviceModal, setServiceModal] = useState(null); // { type, room }
   const [svcForm, setSvcForm]           = useState(blankSvcForm());
+
+  // Minibar add item modal
+  const [showAddMinibar, setShowAddMinibar]       = useState(false);
+  const [minibarCat, setMinibarCat]               = useState('');
+  const [minibarProd, setMinibarProd]             = useState('');
+  const [minibarQtyAdd, setMinibarQtyAdd]         = useState(1);
+  const [savingMinibar, setSavingMinibar]         = useState(false);
+
+  // Gerenciar Diárias modal
+  const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
+  const [gdDataInicio, setGdDataInicio]                 = useState(null);
+  const [gdHoraInicio, setGdHoraInicio]                 = useState('14:00');
+  const [gdDataFim, setGdDataFim]                       = useState(null);
+  const [gdHoraFim, setGdHoraFim]                       = useState('12:00');
+  const [gdValor, setGdValor]                           = useState('');
+  const [savingGd, setSavingGd]                         = useState(false);
+
+  // Trocar Quarto modal
+  const [showTrocarQuarto, setShowTrocarQuarto]   = useState(false);
+  const [tqNovoQuartoId, setTqNovoQuartoId]       = useState(null);
+  const [tqDiariasIdxs, setTqDiariasIdxs]         = useState([]);
+  const [savingTq, setSavingTq]                   = useState(false);
 
   // Encerrar day use
   const [encerrarModal, setEncerrarModal] = useState(false);
@@ -258,12 +300,15 @@ export default function OverviewManagement() {
     const term    = search.toLowerCase();
     const matchSearch = !search || q.numero.includes(search) || (q.servico?.titularNome || '').toLowerCase().includes(term);
     const matchTipo = !filterTipoOcupacao || q.tipoOcupacao === filterTipoOcupacao;
-    // Period filter: match pernoite rooms containing the selected date
+    // Period filter: match pernoite rooms overlapping with selected date range
     let matchPeriod = true;
-    if (filterDateSingle && q.servico?.tipo === 'pernoite') {
+    if (filterDateStart && q.servico?.tipo === 'pernoite') {
       const chegada = displayToDate(q.servico.chegadaPrevista?.split(' ')[0]);
       const saida   = displayToDate(q.servico.saidaPrevista?.split(' ')[0]);
-      if (chegada && saida) matchPeriod = chegada <= filterDateSingle && saida >= filterDateSingle;
+      if (chegada && saida) {
+        const fEnd = filterDateEnd || filterDateStart;
+        matchPeriod = chegada <= fEnd && saida >= filterDateStart;
+      }
     }
     return matchFilter && matchSearch && matchTipo && matchPeriod;
   });
@@ -277,6 +322,32 @@ export default function OverviewManagement() {
     emServico:   quartos.filter((q) => q.categoriaId === cat.id && [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(q.status)).length,
   }));
 
+  const isDateFilterActive = !!(filterDateStart);
+
+  // Date-sorted groups (shown when date range filter is active)
+  const dateGroups = useMemo(() => {
+    if (!isDateFilterActive) return [];
+    const pernoiteRooms = filteredQuartos.filter((q) => q.servico?.tipo === 'pernoite');
+    const byDate = {};
+    pernoiteRooms.forEach((r) => {
+      const dateStr = r.servico.chegadaPrevista?.split(' ')[0] || 'Sem data';
+      if (!byDate[dateStr]) byDate[dateStr] = [];
+      byDate[dateStr].push(r);
+    });
+    return Object.entries(byDate)
+      .sort(([a], [b]) => {
+        if (a === 'Sem data') return 1;
+        if (b === 'Sem data') return -1;
+        const [da, ma, ya] = a.split('/'); const [db, mb, yb] = b.split('/');
+        return new Date(+ya, +ma - 1, +da) - new Date(+yb, +mb - 1, +db);
+      })
+      .map(([date, rooms]) => ({ date, rooms }));
+  }, [filteredQuartos, isDateFilterActive]);
+
+  const toggleDateGroup = (date) =>
+    setDateGroupCollapsed((p) => ({ ...p, [date]: p[date] !== false ? false : true }));
+  const isDateGroupCollapsed = (date) => dateGroupCollapsed[date] !== false;
+
   const filterCounts = {
     todos:      quartos.length,
     disponivel: quartos.filter((q) => q.status === ROOM_STATUS.DISPONIVEL).length,
@@ -285,6 +356,20 @@ export default function OverviewManagement() {
     limpeza:    quartos.filter((q) => q.status === ROOM_STATUS.LIMPEZA).length,
     servico:    quartos.filter((q) => [ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(q.status)).length,
   };
+
+  const hasActiveFilters = statusFilter !== 'todos' || !!filterTipoOcupacao || !!filterDateStart || !!search.trim();
+
+  const clearAllFilters = () => {
+    setStatusFilter('todos');
+    setFilterTipoOcupacao('');
+    setFilterDateStart(null);
+    setFilterDateEnd(null);
+    setDateGroupCollapsed({});
+    setSearch('');
+  };
+
+  // ── Total hospedados across all occupied rooms ────────────────────────────────
+  const totalHospedados = quartos.reduce((sum, q) => sum + (q.servico?.hospedes?.length || 0), 0);
 
   // ── Elapsed for selected room (dayuse) ────────────────────────────────────────
   const selElapsedSec = useMemo(() => {
@@ -485,6 +570,160 @@ export default function OverviewManagement() {
     finally { setSaving(false); }
   };
 
+  // ── Open unified payment modal ────────────────────────────────────────────────
+  const openPayModal = (onConfirmCb, titularNome = '') => {
+    setPayNomePagador(titularNome || '');
+    setPayAutoFill(!!titularNome);
+    setPayDescricao('');
+    setPayValor('');
+    setPayTipo('PIX');
+    setPayOnConfirm(() => onConfirmCb);
+    setPayModal(true);
+  };
+
+  const handlePayConfirm = async () => {
+    const valor = parseBRL(payValor);
+    if (!valor || valor <= 0) { notify('Informe um valor válido.', 'error'); return; }
+    if (!payDescricao.trim()) { notify('Informe uma descrição.', 'error'); return; }
+    if (!payNomePagador.trim()) { notify('Informe o nome do pagador.', 'error'); return; }
+    const now = new Date();
+    const dataStr = `${dateToDisplay(now)} ${now.toTimeString().slice(0,5)}`;
+    const pagamento = { descricao: payDescricao, nomePagador: payNomePagador, formaPagamento: payTipo, valor, data: dataStr };
+    if (payOnConfirm) {
+      await payOnConfirm(pagamento);
+    }
+    setPayModal(false);
+  };
+
+  // ── Minibar handlers ──────────────────────────────────────────────────────────
+  const handleMinibarConsumir = async (produtoId) => {
+    if (!selectedRoom) return;
+    try {
+      const updated = await overviewApi.updateMinibarItem(selectedRoom.id, produtoId, -1);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+  };
+
+  const handleMinibarRepor = async (produtoId) => {
+    if (!selectedRoom) return;
+    const item = selectedRoom.minibar?.find((m) => m.produtoId === produtoId);
+    if (!item) return;
+    const delta = item.qtdBase - item.qtdAtual;
+    if (delta <= 0) { notify('Item já está na quantidade base.', 'info'); return; }
+    try {
+      const updated = await overviewApi.updateMinibarItem(selectedRoom.id, produtoId, delta);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`${item.nome} reposto para ${item.qtdBase} unidade(s).`);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+  };
+
+  const handleMinibarReporTudo = async () => {
+    if (!selectedRoom) return;
+    try {
+      const updated = await overviewApi.reporMinibar(selectedRoom.id);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Minibar reposto completamente.');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+  };
+
+  const handleAddMinibarItem = async () => {
+    if (!selectedRoom || !minibarProd) return;
+    const cat = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(minibarCat));
+    const prod = cat?.produtos.find((p) => p.id === parseInt(minibarProd));
+    if (!prod) return;
+    setSavingMinibar(true);
+    try {
+      const updated = await overviewApi.adicionarMinibarItem(selectedRoom.id, { produtoId: prod.id, nome: prod.nome, quantidade: minibarQtyAdd });
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`${prod.nome} adicionado ao minibar.`);
+      setShowAddMinibar(false);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSavingMinibar(false); }
+  };
+
+  // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
+  const openGerenciarDiarias = () => {
+    setGdDataInicio(null); setGdHoraInicio('14:00');
+    setGdDataFim(null); setGdHoraFim('12:00'); setGdValor('');
+    setShowGerenciarDiarias(true);
+  };
+
+  const handleAdicionarDiaria = async () => {
+    if (!selectedRoom || !gdDataInicio || !gdDataFim) { notify('Preencha as datas da nova diária.', 'error'); return; }
+    const valor = parseBRL(gdValor);
+    if (!valor || valor <= 0) { notify('Informe o valor da diária.', 'error'); return; }
+    setSavingGd(true);
+    try {
+      const novaDiaria = {
+        dataInicio: `${dateToDisplay(gdDataInicio)} ${gdHoraInicio}`,
+        dataFim: `${dateToDisplay(gdDataFim)} ${gdHoraFim}`,
+        valor, hospedes: selectedRoom.servico?.hospedes || [], consumos: [], pagamentos: [],
+      };
+      const updated = await overviewApi.adicionarDiaria(selectedRoom.id, novaDiaria);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Diária adicionada.');
+      setGdDataInicio(null); setGdDataFim(null); setGdValor('');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSavingGd(false); }
+  };
+
+  const handleRemoverDiaria = async (diariaIdx) => {
+    if (!selectedRoom) return;
+    const diaria = selectedRoom.servico?.diarias?.[diariaIdx];
+    const atual = selectedRoom.servico?.diariaAtual || 1;
+    if (!diaria) return;
+    if (diaria.num < atual) { notify('Não é possível remover uma diária já encerrada.', 'error'); return; }
+    setSavingGd(true);
+    try {
+      const updated = await overviewApi.removerDiaria(selectedRoom.id, diariaIdx);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`Diária ${diaria.num} removida.`);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSavingGd(false); }
+  };
+
+  // ── Trocar Quarto handlers ─────────────────────────────────────────────────────
+  const openTrocarQuarto = () => {
+    const diarias = selectedRoom?.servico?.diarias || [];
+    const atual   = selectedRoom?.servico?.diariaAtual || 1;
+    // Pre-select all diárias from current forward
+    setTqDiariasIdxs(diarias.filter((d) => d.num >= atual).map((d) => d.idx));
+    setTqNovoQuartoId(null);
+    setShowTrocarQuarto(true);
+  };
+
+  const handleTrocarQuarto = async () => {
+    if (!selectedRoom || !tqNovoQuartoId) { notify('Selecione o quarto destino.', 'error'); return; }
+    setSavingTq(true);
+    try {
+      const updated = await overviewApi.trocarQuarto(selectedRoom.id, tqNovoQuartoId, tqDiariasIdxs);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Quarto alterado com sucesso.');
+      setShowTrocarQuarto(false);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSavingTq(false); }
+  };
+
+  // ── Aplicar Desconto ─────────────────────────────────────────────────────────
+  const handleAplicarDesconto = async () => {
+    const valor = parseBRL(descontoValor) || parseFloat(descontoValor) || 0;
+    if (!valor || valor <= 0) { notify('Informe um valor de desconto válido.', 'error'); return; }
+    if (!descontoDescricao.trim()) { notify('Informe uma descrição para o desconto.', 'error'); return; }
+    setDescontoSaving(true);
+    try {
+      const desconto = { tipo: descontoTipo, valor, descricao: descontoDescricao, scope: descontoScope };
+      const updatedRooms = quartos.map((q) => {
+        if (q.id !== selectedRoom?.id) return q;
+        return { ...q, servico: { ...q.servico, desconto } };
+      });
+      setQuartos(updatedRooms);
+      const label = descontoTipo === 'percentual' ? `${valor}%` : fmtBRL(valor);
+      notify(`Desconto de ${label} aplicado — ${descontoDescricao}.`);
+      setShowDescontoModal(false);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setDescontoSaving(false); }
+  };
+
   // ── Adicionar Pagamento ───────────────────────────────────────────────────────
   const handleAddPagamento = async () => {
     const valor = parseBRL(pagForm.valor);
@@ -594,23 +833,59 @@ export default function OverviewManagement() {
             )}
             {detailTab === 'consumo' && (
               <div className={styles.tabContent}>
-                <div className={styles.sectionTitle}><ShoppingCart size={13} /> Itens disponíveis no quarto</div>
-                <div className={styles.itemList}>
-                  {CATEGORIAS_CONSUMO.map((cat) => (
-                    <div key={cat.id}>
-                      <div className={styles.consumoCatLabel}>{cat.nome}</div>
-                      {cat.produtos.map((p) => (
-                        <div key={p.id} className={styles.listItem}>
-                          <div className={styles.listItemLeft}>
-                            <ShoppingCart size={13} className={styles.listItemIcon} />
-                            <span className={styles.listItemName}>{p.nome}</span>
-                          </div>
-                          <span className={styles.listItemValue}>{fmtBRL(p.preco)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
+                <div className={styles.minibarHeader}>
+                  <span className={styles.minibarHeaderTitle}><ShoppingCart size={13} /> Minibar / Consumo</span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={handleMinibarReporTudo}>
+                      <RotateCcw size={12} /> Repor Tudo
+                    </Button>
+                    <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setMinibarCat(''); setMinibarProd(''); setMinibarQtyAdd(1); setShowAddMinibar(true); }}>
+                      <Plus size={12} /> Adicionar Item
+                    </Button>
+                  </div>
                 </div>
+                {(!s.minibar || s.minibar.length === 0) ? (
+                  <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>Nenhum item no minibar</span></div>
+                ) : (
+                  <div className={styles.minibarList}>
+                    {s.minibar.map((item) => {
+                      const ratio = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
+                      const isLow = ratio < 0.5;
+                      return (
+                        <div key={item.produtoId} className={[styles.minibarCard, isLow ? styles.minibarCardLow : ''].join(' ')}>
+                          <div className={styles.minibarCardLeft}>
+                            <span className={styles.minibarCardName}>{item.nome}</span>
+                            <div className={styles.minibarQtyRow}>
+                              <span className={[styles.minibarQtyCurrent, isLow ? styles.minibarQtyLow : ''].join(' ')}>{item.qtdAtual}</span>
+                              <span className={styles.minibarQtySep}>/</span>
+                              <span className={styles.minibarQtyBase}>{item.qtdBase} base</span>
+                            </div>
+                          </div>
+                          <div className={styles.minibarProgressWrap}>
+                            <div className={styles.minibarProgressBar}>
+                              <div
+                                className={[styles.minibarProgressFill, isLow ? styles.minibarProgressFillLow : ''].join(' ')}
+                                style={{ width: `${Math.min(100, ratio * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          <div className={styles.minibarCardActions}>
+                            <button
+                              className={[styles.minibarIconBtn, styles.minibarIconBtnGreen].join(' ')}
+                              title="Repor item"
+                              onClick={() => handleMinibarRepor(item.produtoId)}
+                            ><RotateCcw size={13} /></button>
+                            <button
+                              className={[styles.minibarIconBtn, styles.minibarIconBtnRed].join(' ')}
+                              title="Consumir"
+                              onClick={() => handleMinibarConsumir(item.produtoId)}
+                            ><Minus size={13} /></button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
             {detailTab === 'itens' && (
@@ -633,49 +908,85 @@ export default function OverviewManagement() {
                 }
               </div>
             )}
-            {detailTab === 'precos' && (
-              <div className={styles.pricingTabBlock}>
-                {/* Pernoite pricing */}
-                <div>
-                  <div className={styles.sectionTitle}><BedDouble size={13} /> Pernoite — {stayPrice.modeloCobranca}</div>
-                  {stayPrice.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-                    <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                      <table className={styles.pricingTable}>
-                        <thead><tr><th>Tipo</th><th>Valor / noite</th></tr></thead>
-                        <tbody><tr><td>Tarifa Fixa (qualquer ocupação)</td><td><strong>{fmtBRL(stayPrice.precoFixo)}</strong></td></tr></tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                      <table className={styles.pricingTable}>
-                        <thead><tr><th>Ocupação</th><th>Valor / noite</th></tr></thead>
-                        <tbody>
-                          {Object.entries(stayPrice.precosOcupacao || {}).map(([n, v]) => (
-                            <tr key={n}><td>{n} {n === '1' ? 'pessoa' : 'pessoas'}</td><td><strong>{fmtBRL(v)}</strong></td></tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-                {/* Day Use pricing */}
-                <div>
-                  <div className={styles.sectionTitle}><Clock size={13} /> Day Use</div>
-                  <div className={styles.pricingDayUseBlock} style={{ marginTop: 10 }}>
-                    <div className={styles.summaryCard}>
-                      <span className={styles.summaryLabel}>Preço Base</span>
-                      <span className={styles.summaryValue}>{fmtBRL(pricing.precoBase)}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{pricing.horasBase}h incluídas</span>
-                    </div>
-                    <div className={styles.summaryCard}>
-                      <span className={styles.summaryLabel}>Hora Adicional</span>
-                      <span className={styles.summaryValue}>{fmtBRL(pricing.precoAdicional)}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-2)' }}>por hora extra</span>
-                    </div>
+            {detailTab === 'precos' && (() => {
+              const po = s.pricingOverride;
+              return (
+                <div className={styles.pricingTabBlock}>
+                  {/* Pernoite pricing */}
+                  <div>
+                    <div className={styles.sectionTitle}><BedDouble size={13} /> Pernoite {po?.pernoite ? `— ${po.pernoite.modeloCobranca}` : `— ${stayPrice.modeloCobranca}`}</div>
+                    {po?.pernoite ? (
+                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
+                        <table className={styles.pricingTable}>
+                          <thead><tr><th>Ocupação</th><th>Valor / noite</th><th>Menor de Idade</th></tr></thead>
+                          <tbody>
+                            {po.pernoite.tiers.map((tier) => (
+                              <tr key={tier.pessoas}>
+                                <td>{tier.pessoas} {tier.pessoas === 1 ? 'pessoa' : 'pessoas'}</td>
+                                <td><strong>{fmtBRL(tier.valor)}</strong></td>
+                                <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{tier.crianca?.label || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : stayPrice.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
+                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
+                        <table className={styles.pricingTable}>
+                          <thead><tr><th>Tipo</th><th>Valor / noite</th></tr></thead>
+                          <tbody><tr><td>Tarifa Fixa (qualquer ocupação)</td><td><strong>{fmtBRL(stayPrice.precoFixo)}</strong></td></tr></tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
+                        <table className={styles.pricingTable}>
+                          <thead><tr><th>Ocupação</th><th>Valor / noite</th></tr></thead>
+                          <tbody>
+                            {Object.entries(stayPrice.precosOcupacao || {}).map(([n, v]) => (
+                              <tr key={n}><td>{n} {n === '1' ? 'pessoa' : 'pessoas'}</td><td><strong>{fmtBRL(v)}</strong></td></tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                  {/* Day Use pricing */}
+                  <div>
+                    <div className={styles.sectionTitle}><Clock size={13} /> Day Use</div>
+                    {po?.dayuse ? (
+                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
+                        <table className={styles.pricingTable}>
+                          <thead><tr><th>Ocupação</th><th>Base ({po.dayuse.tiers[0]?.horasBase}h)</th><th>+Hora extra</th><th>Menor de Idade</th></tr></thead>
+                          <tbody>
+                            {po.dayuse.tiers.map((tier) => (
+                              <tr key={tier.pessoas}>
+                                <td>{tier.pessoas} {tier.pessoas === 1 ? 'pessoa' : 'pessoas'}</td>
+                                <td><strong>{fmtBRL(tier.precoBase)}</strong></td>
+                                <td>{fmtBRL(tier.precoAdicional)}</td>
+                                <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{tier.crianca?.label || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className={styles.pricingDayUseBlock} style={{ marginTop: 10 }}>
+                        <div className={styles.summaryCard}>
+                          <span className={styles.summaryLabel}>Preço Base</span>
+                          <span className={styles.summaryValue}>{fmtBRL(pricing.precoBase)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{pricing.horasBase}h incluídas</span>
+                        </div>
+                        <div className={styles.summaryCard}>
+                          <span className={styles.summaryLabel}>Hora Adicional</span>
+                          <span className={styles.summaryValue}>{fmtBRL(pricing.precoAdicional)}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-2)' }}>por hora extra</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </>
       );
@@ -923,7 +1234,11 @@ export default function OverviewManagement() {
                         )}
                         {diariaTab === 'pagamentos' && (
                           <div className={styles.subTabContent}>
-                            <Button variant="primary" onClick={() => { setDetailPagDesc(''); setDetailPagForma(''); setDetailPagValor(''); setShowDetailAddPag(true); }}>
+                            <Button variant="primary" onClick={() => openPayModal(async (pag) => {
+                              const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+                              setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                              notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                            }, s.servico?.titularNome)}>
                               <Plus size={14} /> Adicionar Pagamento
                             </Button>
                             {(curDiaria.pagamentos || []).length === 0 ? (
@@ -1015,6 +1330,28 @@ export default function OverviewManagement() {
                       </span>
                     </div>
                   </div>
+                  {!isAtivo && (
+                    <div className={styles.financialGrid} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                      <div className={styles.financialItem}>
+                        <span className={styles.financialLabel}>Total Pago</span>
+                        <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(sv.totalPago || 0)}</span>
+                      </div>
+                      <div className={styles.financialItem}>
+                        <span className={styles.financialLabel}>Falta Pagar</span>
+                        <span className={[styles.financialValue, (sv.pagamentoPendente || 0) > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>
+                          {fmtBRL(sv.pagamentoPendente || 0)}
+                        </span>
+                      </div>
+                      {sv.desconto?.valor > 0 && (
+                        <div className={styles.financialItem}>
+                          <span className={styles.financialLabel}>Desconto</span>
+                          <span className={[styles.financialValue, styles.valueGreen].join(' ')}>
+                            {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className={styles.infoGrid2}>
                   <div className={styles.infoRow}><span className={styles.infoLabel}>Titular</span><span className={styles.infoValue}>{sv.titularNome || <em>Sem titular</em>}</span></div>
@@ -1092,7 +1429,11 @@ export default function OverviewManagement() {
             )}
             {detailTab === 'pagamentos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailPagDesc(''); setDetailPagForma(''); setDetailPagValor(''); setShowDetailAddPag(true); }}>
+                <Button variant="primary" size="sm" onClick={() => openPayModal(async (pag) => {
+                  const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+                  setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                  notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                }, s.servico?.titularNome)}>
                   <Plus size={13} /> Adicionar Pagamento
                 </Button>
                 <div className={styles.itemList}>
@@ -1138,7 +1479,7 @@ export default function OverviewManagement() {
             <Button variant="secondary" onClick={() => openService('manutencao', s)}><Wrench size={14} /> Manutenção</Button>
           </div>
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => openNovoServico('pernoite', s)}>
+            <Button variant="secondary" className={styles.btnOrange} onClick={() => openNovoServico('pernoite', s)}>
               <BedDouble size={14} /> Novo Pernoite
             </Button>
             <Button variant="primary" onClick={() => openNovoServico('dayuse', s)}>
@@ -1193,41 +1534,69 @@ export default function OverviewManagement() {
             <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
               <XCircle size={14} /> Cancelar
             </Button>
-            <Button variant="secondary" onClick={() => notify('Em desenvolvimento', 'info')}>
+            <Button variant="secondary" onClick={() => openService('limpeza', s)}>
+              <Sparkles size={14} /> Limpeza
+            </Button>
+            <Button variant="secondary" onClick={openGerenciarDiarias}>
               <RefreshCw size={14} /> Gerenciar Diárias
             </Button>
-            <Button variant="secondary" onClick={() => notify('Em desenvolvimento', 'info')}>
+            <Button variant="secondary" onClick={openTrocarQuarto}>
               <ArrowLeftRight size={14} /> Trocar Quarto
             </Button>
           </div>
-          <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
-            {saving && <Loader2 size={14} className={styles.spin} />}
-            <CheckCircle size={14} /> Finalizar
-          </Button>
+          <div className={styles.footerRight}>
+            <Button variant="secondary" onClick={() => {
+              setDescontoScope('global'); setDescontoTipo('percentual');
+              setDescontoValor(''); setDescontoDescricao('');
+              setShowDescontoModal(true);
+            }}>
+              <Tag size={14} /> Desconto
+            </Button>
+            <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
+              {saving && <Loader2 size={14} className={styles.spin} />}
+              <CheckCircle size={14} /> Finalizar
+            </Button>
+          </div>
         </div>
       );
     }
 
     if (s.servico?.tipo === 'dayuse') {
       const sv = s.servico;
-      const isAtivo = sv.status === DAYUSE_STATUS.ATIVO;
+      const isAtivo     = sv.status === DAYUSE_STATUS.ATIVO;
       const isEncerrado = sv.status === DAYUSE_STATUS.ENCERRADO;
       return (
         <div className={styles.footerBetween}>
-          <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
-            <XCircle size={14} /> Cancelar
-          </Button>
+          <div className={styles.footerLeft}>
+            <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
+              <XCircle size={14} /> Cancelar
+            </Button>
+            {isEncerrado && (
+              <Button variant="secondary" onClick={() => openService('limpeza', s)}>
+                <Sparkles size={14} /> Limpeza
+              </Button>
+            )}
+          </div>
           <div className={styles.footerRight}>
             {isAtivo && (
               <Button variant="primary" onClick={() => setEncerrarModal(true)}>
-                <Square size={14} /> Encerrar
+                <Square size={14} /> Encerrar tempo
               </Button>
             )}
             {isEncerrado && (
-              <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
-                {saving && <Loader2 size={14} className={styles.spin} />}
-                <CheckCircle size={14} /> Finalizar
-              </Button>
+              <>
+                <Button variant="secondary" onClick={() => {
+                  setDescontoScope('global'); setDescontoTipo('percentual');
+                  setDescontoValor(''); setDescontoDescricao('');
+                  setShowDescontoModal(true);
+                }}>
+                  <Tag size={14} /> Desconto
+                </Button>
+                <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
+                  {saving && <Loader2 size={14} className={styles.spin} />}
+                  <CheckCircle size={14} /> Finalizar
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -1273,10 +1642,10 @@ export default function OverviewManagement() {
 
   // ── Room Row ──────────────────────────────────────────────────────────────
   const RoomRow = ({ room }) => {
-    const sk      = roomStatusKey(room.status);
-    const sv      = room.servico;
+    const sk        = roomStatusKey(room.status);
+    const sv        = room.servico;
     const isDuAtivo = sv?.tipo === 'dayuse' && sv.status === DAYUSE_STATUS.ATIVO;
-    const elapsed = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
+    const elapsed   = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
 
     let nameNode;
     if (room.status === ROOM_STATUS.DISPONIVEL) {
@@ -1288,12 +1657,18 @@ export default function OverviewManagement() {
     } else if (room.status === ROOM_STATUS.FORA_DE_SERVICO) {
       nameNode = <span className={styles.roomName}>Fora de Serviço</span>;
     } else if (sv?.tipo === 'dayuse') {
-      nameNode = <span className={sv.titularNome ? styles.roomName : styles.roomNamePending}>{sv.titularNome || 'Day Use em andamento'}</span>;
+      const duName = sv.status === DAYUSE_STATUS.ENCERRADO   ? 'Day use encerrado'
+                   : sv.status === DAYUSE_STATUS.FINALIZADO  ? 'Day use finalizado'
+                   : sv.titularNome || 'Day Use em andamento';
+      nameNode = <span className={sv.status === DAYUSE_STATUS.ATIVO && !sv.titularNome ? styles.roomNamePending : styles.roomName}>{duName}</span>;
     } else if (sv?.titularNome) {
       nameNode = <span className={styles.roomName}>{sv.titularNome}</span>;
     } else {
       nameNode = <span className={styles.roomNamePending}>—</span>;
     }
+
+    const guestCount = sv?.hospedes?.length ?? 0;
+    const hasDesconto = !!(sv?.desconto?.valor);
 
     let metaNode = null;
     if (room.status === ROOM_STATUS.DISPONIVEL) {
@@ -1302,10 +1677,20 @@ export default function OverviewManagement() {
       metaNode = (
         <div>
           <div className={styles.metaRow}>
-            <Calendar size={10} /><span>{sv.periodo}</span>
+            <Calendar size={12} /><span>{sv.periodo}</span>
           </div>
           <div className={styles.metaServiceBadge}>
+            {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={11} />{guestCount}</span>}
+            {sv.totalDiarias > 0 && (
+              <span className={styles.diariaBadge}><Calendar size={10} />{sv.diariaAtual}/{sv.totalDiarias}</span>
+            )}
             <span className={styles.pernoiteBadge}>Pernoite</span>
+            {hasDesconto && (
+              <span className={styles.descontoBadge}>
+                <Tag size={9} />
+                {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
+              </span>
+            )}
             {sv.pagamentoPendente > 0 && <span className={styles.metaPendente}>• {fmtBRL(sv.pagamentoPendente)}</span>}
           </div>
         </div>
@@ -1315,20 +1700,29 @@ export default function OverviewManagement() {
         <div>
           <div className={styles.metaRow}>
             {isDuAtivo
-              ? <><Clock size={10} /><span className={styles.timerLive}>{sv.horaEntrada} · {fmtElapsed(elapsed)}</span></>
-              : <><Clock size={10} /><span>{sv.horaEntrada} → {sv.horaSaida} ({fmtElapsed(calcElapsedMinutes(sv.dataUso, sv.horaEntrada, sv.horaSaida))})</span></>
+              ? <><Clock size={12} /><span className={styles.timerLive}>{sv.horaEntrada} · {fmtElapsed(elapsed)}</span></>
+              : <><Clock size={12} /><span>{sv.horaEntrada}{sv.horaSaida ? ` → ${sv.horaSaida} (${fmtElapsed(calcElapsedMinutes(sv.dataUso, sv.horaEntrada, sv.horaSaida))})` : ''}</span></>
             }
             {sv.pagamentoPendente > 0 && <span className={styles.metaPendente}>• Pendente: {fmtBRL(sv.pagamentoPendente)}</span>}
           </div>
-          <div className={styles.metaServiceBadge}><span className={styles.dayuseBadge}>Day Use</span></div>
+          <div className={styles.metaServiceBadge}>
+            {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={11} />{guestCount}</span>}
+            <span className={styles.dayuseBadge}>Day Use</span>
+            {hasDesconto && (
+              <span className={styles.descontoBadge}>
+                <Tag size={9} />
+                {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
+              </span>
+            )}
+          </div>
         </div>
       );
     } else if (sv?.tipo === 'reserva') {
-      metaNode = <div className={styles.metaRow}><Calendar size={10} /><span>{sv.chegadaPrevista}</span></div>;
+      metaNode = <div className={styles.metaRow}><Calendar size={12} /><span>{sv.chegadaPrevista}</span></div>;
     } else if (room.status === ROOM_STATUS.LIMPEZA && room.limpeza) {
-      metaNode = <div className={styles.metaRow}><User size={10} /><span>{room.limpeza.responsavel || 'Sem responsável'}</span></div>;
+      metaNode = <div className={styles.metaRow}><User size={12} /><span>{room.limpeza.responsavel || 'Sem responsável'}</span></div>;
     } else if ((room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) && room.manutencao) {
-      metaNode = <div className={styles.metaRow}><Wrench size={10} /><span>{room.manutencao.responsavel || '—'}</span><span className={styles.metaDesc}>{room.manutencao.descricao ? ` · ${room.manutencao.descricao.slice(0, 35)}...` : ''}</span></div>;
+      metaNode = <div className={styles.metaRow}><Wrench size={12} /><span>{room.manutencao.responsavel || '—'}</span><span className={styles.metaDesc}>{room.manutencao.descricao ? ` · ${room.manutencao.descricao.slice(0, 35)}` : ''}</span></div>;
     }
 
     return (
@@ -1370,24 +1764,50 @@ export default function OverviewManagement() {
         <div className={styles.tableHeader}>
           <div>
             <h2 className={styles.h2}>Recepção</h2>
-            <p className={styles.subtitle}><Building2 size={13} /> Visão geral de quartos, hóspedes e day use</p>
+            <p className={styles.subtitle}>
+              <Building2 size={13} /> Visão geral de quartos, hóspedes e day use
+              {totalHospedados > 0 && (
+                <span className={styles.hospedeCountChip}><Users size={11} />{totalHospedados} hospedado{totalHospedados !== 1 ? 's' : ''}</span>
+              )}
+            </p>
           </div>
           <div className={styles.tableTools}>
-            <div className={styles.searchWrap}>
-              <Search size={13} className={styles.searchIcon} />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+            <div className={styles.toolsRow}>
+              <div className={styles.searchWrap}>
+                <Search size={13} className={styles.searchIcon} />
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+              </div>
+              <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelect}>
+                <option value="">Tipo de ocupação</option>
+                {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+              <div className={styles.dateRangeWrap}>
+                <DatePicker
+                  mode="range"
+                  startDate={filterDateStart}
+                  endDate={filterDateEnd}
+                  onRangeChange={({ start, end }) => {
+                    setFilterDateStart(start);
+                    setFilterDateEnd(end);
+                    setDateGroupCollapsed({});
+                  }}
+                  placeholder="Período de check-in..."
+                />
+              </div>
             </div>
-            <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} style={{ width: 160, flexShrink: 0 }}>
-              <option value="">Tipo de ocupação</option>
-              {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
-            </Select>
-            <DatePicker mode="single" value={filterDateSingle} onChange={setFilterDateSingle} placeholder="Filtrar por data" />
-            {filterDateSingle && (
-              <Button variant="secondary" onClick={() => setFilterDateSingle(null)} style={{ padding: '0 10px', flexShrink: 0 }}>×</Button>
-            )}
-            <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
-              <Plus size={14} /> Adicionar Quarto
-            </Button>
+            <div className={styles.toolsRowActions}>
+              <Button
+                variant="secondary"
+                className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
+                onClick={clearAllFilters}
+                title="Limpar filtros"
+              >
+                <X size={12} /> Limpar filtros
+              </Button>
+              <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
+                <Plus size={14} /> Adicionar Quarto
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1405,26 +1825,70 @@ export default function OverviewManagement() {
           ))}
         </div>
 
-        {/* ── Category groups ── */}
+        {/* ── Category / Date groups ── */}
         {loading ? (
           <div className={styles.emptyState}><Loader2 size={28} className={styles.spin} /> Carregando...</div>
+        ) : isDateFilterActive ? (
+          /* ── Date-sorted view (when date range active) ── */
+          dateGroups.length === 0
+            ? <div className={styles.emptyState}>Nenhum pernoite encontrado neste período.</div>
+            : dateGroups.map((group) => (
+              <div key={group.date} className={styles.dateSection}>
+                <button className={styles.dateGroupHeader} onClick={() => toggleDateGroup(group.date)}>
+                  <div className={styles.dateGroupHeaderLeft}>
+                    <ChevronDown size={14} className={[styles.catChevron, isDateGroupCollapsed(group.date) ? styles.catChevronClosed : ''].join(' ')} />
+                    <Calendar size={13} style={{ color: 'var(--text-2)' }} />
+                    <span className={styles.dateGroupTitle}>Check-in {group.date}</span>
+                  </div>
+                  <span className={styles.dateGroupCount}>{group.rooms.length} quarto{group.rooms.length !== 1 ? 's' : ''}</span>
+                </button>
+                {!isDateGroupCollapsed(group.date) && (
+                  <div className={styles.catBody}>
+                    {group.rooms.map((room) => <RoomRow key={room.id} room={room} />)}
+                  </div>
+                )}
+              </div>
+            ))
         ) : (
+          /* ── Normal category view ── */
           byCategory.map((cat) => (
             <div key={cat.id} className={styles.catSection}>
               <div className={styles.catHeader} onClick={() => toggleCollapse(cat.id)}>
                 <div className={styles.catHeaderLeft}>
                   <ChevronDown size={15} className={[styles.catChevron, collapsed[cat.id] ? styles.catChevronClosed : ''].join(' ')} />
-                  <div>
-                    <span className={styles.catName}>{cat.nome}</span>
-                    <span className={styles.catDesc}>{cat.descricao}</span>
+                  {collapsed[cat.id] ? (
+                    <span className={styles.catName} style={{ marginRight: 0 }}>{cat.nome}</span>
+                  ) : (
+                    <div>
+                      <span className={styles.catName}>{cat.nome}</span>
+                      <span className={styles.catDesc}>{cat.descricao}</span>
+                    </div>
+                  )}
+                </div>
+                {collapsed[cat.id] ? (
+                  <div className={styles.catStatsMini}>
+                    <span className={[styles.catStatMini, styles.catStatMiniGreen].join(' ')}>
+                      <BedDouble size={12} />{cat.disponiveis}
+                    </span>
+                    {cat.ocupados > 0 && (
+                      <span className={[styles.catStatMini, styles.catStatMiniAmber].join(' ')}>
+                        <Users size={12} />{cat.ocupados}
+                      </span>
+                    )}
+                    {cat.emServico > 0 && (
+                      <span className={[styles.catStatMini, styles.catStatMiniSlate].join(' ')}>
+                        <Wrench size={12} />{cat.emServico}
+                      </span>
+                    )}
                   </div>
-                </div>
-                <div className={styles.catStats}>
-                  <span className={[styles.catStat, styles.catStatGreen].join(' ')}>{cat.disponiveis} disponíveis</span>
-                  <span className={[styles.catStat, styles.catStatAmber].join(' ')}>{cat.ocupados} ocupados/reservados</span>
-                  {cat.emServico > 0 && <span className={[styles.catStat, styles.catStatSlate].join(' ')}>{cat.emServico} em serviço</span>}
-                  <span className={styles.catTotal}>{cat.total} quartos</span>
-                </div>
+                ) : (
+                  <div className={styles.catStats}>
+                    <span className={[styles.catStat, styles.catStatGreen].join(' ')}>{cat.disponiveis} disponíveis</span>
+                    <span className={[styles.catStat, styles.catStatAmber].join(' ')}>{cat.ocupados} ocupados/reservados</span>
+                    {cat.emServico > 0 && <span className={[styles.catStat, styles.catStatSlate].join(' ')}>{cat.emServico} em serviço</span>}
+                    <span className={styles.catTotal}>{cat.total} quartos</span>
+                  </div>
+                )}
               </div>
               {!collapsed[cat.id] && (
                 <div className={styles.catBody}>
@@ -1748,6 +2212,114 @@ export default function OverviewManagement() {
       )}
 
       {/* ═══════════════════════════════════════════════════════
+          MODAL — Minibar: Adicionar Item
+      ═══════════════════════════════════════════════════════ */}
+      {showAddMinibar && selectedRoom && (() => {
+        const minibarCatSel  = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(minibarCat));
+        const minibarProdSel = minibarCatSel?.produtos.find((p) => p.id === parseInt(minibarProd));
+        return (
+          <Modal
+            open
+            onClose={() => setShowAddMinibar(false)}
+            size="sm"
+            title={<><Plus size={15} /> Adicionar ao Minibar — Apt. {selectedRoom.numero}</>}
+            footer={
+              <div className={styles.footerRight}>
+                <Button variant="secondary" onClick={() => setShowAddMinibar(false)}>Cancelar</Button>
+                <Button variant="primary" onClick={handleAddMinibarItem} disabled={savingMinibar || !minibarProdSel}>
+                  {savingMinibar && <Loader2 size={14} className={styles.spin} />}
+                  Adicionar
+                </Button>
+              </div>
+            }
+          >
+            <div className={styles.formStack}>
+              <FormField label="Categoria *">
+                <Select value={minibarCat} onChange={(e) => { setMinibarCat(e.target.value); setMinibarProd(''); }}>
+                  <option value="">Selecione...</option>
+                  {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </Select>
+              </FormField>
+              {minibarCatSel && (
+                <FormField label="Produto *">
+                  <Select value={minibarProd} onChange={(e) => setMinibarProd(e.target.value)}>
+                    <option value="">Selecione...</option>
+                    {minibarCatSel.produtos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {fmtBRL(p.preco)}</option>)}
+                  </Select>
+                </FormField>
+              )}
+              {minibarProdSel && (
+                <>
+                  <FormField label="Quantidade a adicionar *">
+                    <Input type="number" min="1" max="50" value={minibarQtyAdd} onChange={(e) => setMinibarQtyAdd(Math.max(1, parseInt(e.target.value) || 1))} />
+                  </FormField>
+                  <div className={styles.totalPreview}>
+                    <span className={styles.totalPreviewLabel}>{minibarQtyAdd}× {minibarProdSel.nome}</span>
+                    <span className={styles.totalPreviewValue}>{fmtBRL(minibarProdSel.preco * minibarQtyAdd)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Pagamento Unificado
+      ═══════════════════════════════════════════════════════ */}
+      {payModal && (
+        <Modal
+          open
+          onClose={() => setPayModal(false)}
+          size="sm"
+          title={<><CreditCard size={15} /> Registrar Pagamento</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setPayModal(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={handlePayConfirm} disabled={saving}>
+                {saving && <Loader2 size={14} className={styles.spin} />}
+                Confirmar
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.formStack}>
+            {selectedRoom?.servico?.pagamentoPendente > 0 && (
+              <div className={styles.pricingHint}>
+                <span className={styles.pricingHintLabel}>Pendente:</span>
+                <strong className={styles.textAmber}>{fmtBRL(selectedRoom.servico.pagamentoPendente)}</strong>
+              </div>
+            )}
+            <FormField label="Nome do pagador *">
+              <Input value={payNomePagador} onChange={(e) => setPayNomePagador(e.target.value)} placeholder="Nome do responsável pelo pagamento" />
+            </FormField>
+            {selectedRoom?.servico?.titularNome && (
+              <label className={styles.payCheckboxRow}>
+                <input type="checkbox" checked={payAutoFill} onChange={(e) => {
+                  setPayAutoFill(e.target.checked);
+                  if (e.target.checked) setPayNomePagador(selectedRoom.servico.titularNome);
+                  else setPayNomePagador('');
+                }} />
+                Usar nome do titular ({selectedRoom.servico.titularNome})
+              </label>
+            )}
+            <FormField label="Descrição *">
+              <Input value={payDescricao} onChange={(e) => setPayDescricao(e.target.value)} placeholder="Ex: Pagamento final, Entrada 50%..." />
+            </FormField>
+            <FormField label="Forma de Pagamento *">
+              <Select value={payTipo} onChange={(e) => setPayTipo(e.target.value)}>
+                <option value="">Selecione...</option>
+                {FORMAS_PAGAMENTO.map((fp) => <option key={fp} value={fp}>{fp}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Valor *">
+              <Input value={payValor} onChange={(e) => setPayValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
+            </FormField>
+          </div>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
           MODAL — Adicionar Pagamento
       ═══════════════════════════════════════════════════════ */}
       {pagModal && selectedRoom && (
@@ -1815,6 +2387,14 @@ export default function OverviewManagement() {
             <FormField label="Responsável">
               <Input value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
             </FormField>
+            <div className={styles.grid2}>
+              <FormField label="Data/Hora de início">
+                <Input type="datetime-local" value={svcForm.dataHoraInicio} onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
+              </FormField>
+              <FormField label="Data/Hora de fim">
+                <Input type="datetime-local" value={svcForm.dataHoraFim} onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
+              </FormField>
+            </div>
             {serviceModal.type !== 'limpeza' && (<>
               <FormField label="Descrição">
                 <Input value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
@@ -2036,6 +2616,236 @@ export default function OverviewManagement() {
                   <span>Este pagamento</span>
                   <span style={{ color: '#059669' }}>{fmtBRL(parseBRL(detailPagValor))}</span>
                 </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Gerenciar Diárias
+      ═══════════════════════════════════════════════════════ */}
+      {showGerenciarDiarias && selectedRoom?.servico?.tipo === 'pernoite' && (() => {
+        const sv = selectedRoom.servico;
+        const diarias = sv.diarias || [];
+        const atualNum = sv.diariaAtual || 1;
+        const novoTotal = diarias.reduce((s, d) => s + (d.valor || 0), 0) + (parseBRL(gdValor) || 0);
+        return (
+          <Modal
+            open
+            onClose={() => setShowGerenciarDiarias(false)}
+            size="md"
+            title={<><RefreshCw size={15} /> Gerenciar Diárias — Apt. {selectedRoom.numero}</>}
+            footer={
+              <div className={styles.footerRight}>
+                <Button variant="secondary" onClick={() => setShowGerenciarDiarias(false)}>Fechar</Button>
+              </div>
+            }
+          >
+            <div className={styles.formStack}>
+              <div className={styles.sectionTitle}><Calendar size={13} /> Diárias existentes</div>
+              {diarias.length === 0
+                ? <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
+                : (
+                  <div className={styles.gdDiariaList}>
+                    {diarias.map((d) => {
+                      const isCurrent = d.num === atualNum;
+                      const canRemove = d.num >= atualNum;
+                      return (
+                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : ''].join(' ')}>
+                          <span className={styles.gdDiariaNum}>Diária {d.num}</span>
+                          <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
+                          <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
+                          {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
+                          {canRemove && !isCurrent && (
+                            <button className={styles.removeBtn} onClick={() => handleRemoverDiaria(d.idx)} disabled={savingGd} title="Remover diária">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              }
+              <div className={styles.sectionTitle} style={{ marginTop: 8 }}><Plus size={13} /> Adicionar nova diária</div>
+              <div className={styles.gdAddForm}>
+                <div className={styles.grid2}>
+                  <FormField label="Início *"><DatePicker mode="single" value={gdDataInicio} onChange={setGdDataInicio} /></FormField>
+                  <FormField label="Hora"><TimeInput value={gdHoraInicio} onChange={setGdHoraInicio} /></FormField>
+                </div>
+                <div className={styles.grid2}>
+                  <FormField label="Fim *"><DatePicker mode="single" value={gdDataFim} onChange={setGdDataFim} minDate={gdDataInicio} /></FormField>
+                  <FormField label="Hora"><TimeInput value={gdHoraFim} onChange={setGdHoraFim} /></FormField>
+                </div>
+                <FormField label="Valor da diária *">
+                  <Input value={gdValor} onChange={(e) => setGdValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
+                </FormField>
+                {gdValor && (
+                  <div className={styles.gdTotalPreview}>
+                    <span className={styles.gdTotalLabel}>Novo total (com esta diária)</span>
+                    <span className={styles.gdTotalValue}>{fmtBRL(novoTotal)}</span>
+                  </div>
+                )}
+                <Button variant="primary" onClick={handleAdicionarDiaria} disabled={savingGd || !gdDataInicio || !gdDataFim || !gdValor}>
+                  {savingGd && <Loader2 size={14} className={styles.spin} />}
+                  <Plus size={14} /> Adicionar Diária
+                </Button>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Trocar Quarto
+      ═══════════════════════════════════════════════════════ */}
+      {showTrocarQuarto && selectedRoom?.servico?.tipo === 'pernoite' && (() => {
+        const sv = selectedRoom.servico;
+        const diarias = sv.diarias || [];
+        const atualNum = sv.diariaAtual || 1;
+        const futureDiarias = diarias.filter((d) => d.num >= atualNum);
+        const novoQuarto = quartos.find((q) => q.id === tqNovoQuartoId);
+        return (
+          <Modal
+            open
+            onClose={() => setShowTrocarQuarto(false)}
+            size="md"
+            title={<><ArrowLeftRight size={15} /> Trocar Quarto — Apt. {selectedRoom.numero}</>}
+            footer={
+              <div className={styles.footerRight}>
+                <Button variant="secondary" onClick={() => setShowTrocarQuarto(false)}>Cancelar</Button>
+                <Button variant="primary" onClick={handleTrocarQuarto} disabled={savingTq || !tqNovoQuartoId || tqDiariasIdxs.length === 0}>
+                  {savingTq && <Loader2 size={14} className={styles.spin} />}
+                  Confirmar Troca
+                </Button>
+              </div>
+            }
+          >
+            <div className={styles.formStack}>
+              <div className={styles.sectionTitle}><Calendar size={13} /> Diárias afetadas</div>
+              {futureDiarias.length === 0 ? (
+                <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária futura disponível</span></div>
+              ) : (
+                <>
+                  <label className={styles.tqSelectAllRow}>
+                    <input
+                      type="checkbox"
+                      checked={tqDiariasIdxs.length === futureDiarias.length}
+                      onChange={(e) => setTqDiariasIdxs(e.target.checked ? futureDiarias.map((d) => d.idx) : [])}
+                    />
+                    Selecionar todas ({futureDiarias.length})
+                  </label>
+                  <div className={styles.tqDiariaPickerList}>
+                    {futureDiarias.map((d) => {
+                      const sel = tqDiariasIdxs.includes(d.idx);
+                      return (
+                        <div
+                          key={d.idx}
+                          className={[styles.tqDiariaItem, sel ? styles.tqDiariaItemSelected : ''].join(' ')}
+                          onClick={() => setTqDiariasIdxs((prev) => sel ? prev.filter((x) => x !== d.idx) : [...prev, d.idx])}
+                        >
+                          <input type="checkbox" checked={sel} onChange={() => {}} onClick={(e) => e.stopPropagation()} />
+                          <span className={styles.tqDiariaLabel}>Diária {d.num}{d.num === atualNum ? ' (atual)' : ''}</span>
+                          <span className={styles.tqDiariaDate}>{d.dataInicio}</span>
+                          <span style={{ color: '#059669', fontWeight: 600, fontSize: 12 }}>{fmtBRL(d.valor)}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+              <div className={styles.sectionTitle} style={{ marginTop: 8 }}><BedDouble size={13} /> Novo Quarto</div>
+              {OVERVIEW_ROOMS_CATS.map((cat) => (
+                <div key={cat.nome} className={styles.roomPickerCat}>
+                  <div className={styles.roomPickerCatName}>{cat.nome}</div>
+                  <div className={styles.roomPillGroup}>
+                    {cat.quartos.filter((n) => n !== selectedRoom.numero).map((n) => {
+                      const q = quartos.find((r) => r.numero === n);
+                      if (!q || q.status !== ROOM_STATUS.DISPONIVEL) return null;
+                      return (
+                        <button
+                          key={n}
+                          className={[styles.roomPill, tqNovoQuartoId === q.id ? styles.roomPillActive : ''].join(' ')}
+                          onClick={() => setTqNovoQuartoId(q.id)}
+                        >
+                          {n}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              {novoQuarto && (
+                <div className={styles.pricingHint} style={{ marginTop: 4 }}>
+                  <span className={styles.pricingHintLabel}>Destino:</span>
+                  <span>Apt. {novoQuarto.numero} — {novoQuarto.categoria} · {novoQuarto.tipoOcupacao}</span>
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Desconto
+      ═══════════════════════════════════════════════════════ */}
+      {showDescontoModal && selectedRoom && (
+        <Modal
+          open
+          onClose={() => setShowDescontoModal(false)}
+          size="sm"
+          title={<><Tag size={15} /> Aplicar Desconto — Apt. {selectedRoom.numero}</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setShowDescontoModal(false)}>Cancelar</Button>
+              <Button variant="primary" onClick={handleAplicarDesconto} disabled={descontoSaving}>
+                {descontoSaving && <Loader2 size={14} className={styles.spin} />}
+                Aplicar Desconto
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.formStack}>
+            {selectedRoom.servico?.tipo === 'pernoite' && (
+              <FormField label="Escopo do desconto">
+                <div className={styles.descontoScopeRow}>
+                  {[['global', 'Global (toda a hospedagem)'], ['diaria', 'Diária atual']].map(([v, label]) => (
+                    <button key={v} type="button"
+                      className={[styles.descontoScopeBtn, descontoScope === v ? styles.descontoScopeBtnActive : ''].join(' ')}
+                      onClick={() => setDescontoScope(v)}>{label}</button>
+                  ))}
+                </div>
+              </FormField>
+            )}
+            <FormField label="Tipo de desconto">
+              <div className={styles.descontoTipoRow}>
+                {[['percentual', 'Porcentagem (%)'], ['fixo', 'Valor Fixo (R$)']].map(([v, label]) => (
+                  <button key={v} type="button"
+                    className={[styles.descontoTipoBtn, descontoTipo === v ? styles.descontoTipoBtnActive : ''].join(' ')}
+                    onClick={() => setDescontoTipo(v)}>{label}</button>
+                ))}
+              </div>
+            </FormField>
+            <FormField label={descontoTipo === 'percentual' ? 'Percentual (%) *' : 'Valor (R$) *'}>
+              <Input
+                value={descontoValor}
+                onChange={(e) => setDescontoValor(descontoTipo === 'percentual' ? e.target.value.replace(/[^\d.]/g, '') : maskBRL(e.target.value))}
+                placeholder={descontoTipo === 'percentual' ? 'Ex: 10' : 'R$ 0,00'}
+              />
+            </FormField>
+            <FormField label="Descrição *">
+              <Input value={descontoDescricao} onChange={(e) => setDescontoDescricao(e.target.value)} placeholder="Ex: Fidelidade, Cortesia, Convenção..." />
+            </FormField>
+            {selectedRoom.servico?.desconto?.valor > 0 && (
+              <div className={styles.pricingHint}>
+                <span className={styles.pricingHintLabel}>Desconto atual:</span>
+                <span className={styles.textAmber}>
+                  {selectedRoom.servico.desconto.tipo === 'percentual'
+                    ? `${selectedRoom.servico.desconto.valor}%`
+                    : fmtBRL(selectedRoom.servico.desconto.valor)}
+                  {' '}— {selectedRoom.servico.desconto.descricao}
+                </span>
               </div>
             )}
           </div>

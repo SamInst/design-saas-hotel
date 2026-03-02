@@ -115,15 +115,39 @@ export const OVERVIEW_ROOMS_CATS = [
 let _quartos = [
   // ── STANDARD (01–10) ────────────────────────────────────────────────────────
   {
-    id: 1, numero: '01', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto aconchegante com vista para o jardim.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
+    id: 1, numero: '01', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Triplo',
+    descricao: 'Quarto Standard com cama casal e solteiro, com frigobar e vista para o jardim. Aceita menores de idade com tarifas diferenciadas.',
+    camas: { casal: 1, solteiro: 1, beliche: 0, rede: 0 },
     status: ROOM_STATUS.DISPONIVEL,
     servico: null, limpeza: null, manutencao: null,
     itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
+      { nome: 'Cama Casal', qtd: 1 }, { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 32"', qtd: 1 },
+      { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 3 },
+      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 4 },
+      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 1 },
+    ],
+    // Tabela de preços multi-pessoa (exemplo com crianças)
+    pricingOverride: {
+      pernoite: {
+        modeloCobranca: 'Por ocupação',
+        tiers: [
+          { pessoas: 1, valor: 130, crianca: { tipo: 'fixo',       valor: 140,  label: 'R$ 140,00 (fixo)' } },
+          { pessoas: 2, valor: 190, crianca: { tipo: 'percentual', valor: 20,   label: '+20%'              } },
+          { pessoas: 3, valor: 250, crianca: { tipo: 'adicional',  valor: 50,   label: '+R$ 50,00'         } },
+        ],
+      },
+      dayuse: {
+        tiers: [
+          { pessoas: 1, horasBase: 1, precoBase: 30, precoAdicional: 10, crianca: { tipo: 'percentual', valor: 10, label: '+10%'    } },
+          { pessoas: 2, horasBase: 1, precoBase: 40, precoAdicional: 15, crianca: { tipo: 'adicional',  valor: 10, label: '+R$10,00' } },
+          { pessoas: 3, horasBase: 1, precoBase: 50, precoAdicional: 25, crianca: { tipo: 'adicional',  valor: 10, label: '+R$10,00' } },
+        ],
+      },
+    },
   },
   {
     id: 2, numero: '02', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Duplo',
@@ -134,6 +158,11 @@ let _quartos = [
     itens: [
       { nome: 'Cama Solteiro', qtd: 2 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
       { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
+    ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 2, qtdAtual: 2 },
+      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 103, nome: 'Refrigerante',     qtdBase: 2, qtdAtual: 1 },
     ],
   },
   {
@@ -221,6 +250,10 @@ let _quartos = [
       { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 28"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
       { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',  qtdBase: 2, qtdAtual: 2 },
+      { produtoId: 103, nome: 'Refrigerante',  qtdBase: 2, qtdAtual: 2 },
+    ],
   },
   {
     id: 7, numero: '07', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
@@ -256,6 +289,11 @@ let _quartos = [
       { nome: 'Cama Casal', qtd: 1 }, { nome: 'Beliche', qtd: 1 }, { nome: 'TV 32"', qtd: 1 },
       { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 3 },
+      { produtoId: 103, nome: 'Refrigerante',     qtdBase: 4, qtdAtual: 4 },
+    ],
   },
   {
     id: 9, numero: '09', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
@@ -279,6 +317,11 @@ let _quartos = [
       { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 40"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
       { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 2, qtdAtual: 2 },
+      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 104, nome: 'Suco Natural',     qtdBase: 2, qtdAtual: 2 },
+    ],
   },
 
   // ── LUXO (11–16) ─────────────────────────────────────────────────────────────
@@ -292,6 +335,13 @@ let _quartos = [
       { nome: 'Cama King', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
       { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Varanda', qtd: 1 },
       { nome: 'Cofre', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
+    ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 6 },
+      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 2 },
+      { produtoId: 104, nome: 'Suco Natural',      qtdBase: 2, qtdAtual: 2 },
     ],
   },
   {
@@ -350,6 +400,11 @@ let _quartos = [
       { nome: 'Cama King', qtd: 1 }, { nome: 'Rede', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 },
       { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Hidromassagem', qtd: 1 }, { nome: 'Frigobar', qtd: 1 },
       { nome: 'Varanda', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
+    ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 5 },
+      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 3, qtdAtual: 3 },
     ],
   },
   {
@@ -420,6 +475,13 @@ let _quartos = [
       { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 }, { nome: 'Varanda Panorâmica', qtd: 1 },
       { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 6, qtdAtual: 6 },
+      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 8, qtdAtual: 8 },
+      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 6, qtdAtual: 6 },
+      { produtoId: 104, nome: 'Suco Natural',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 3, qtdAtual: 3 },
+    ],
   },
   {
     id: 18, numero: '18', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Casal',
@@ -486,6 +548,11 @@ let _quartos = [
       { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
       { nome: 'Varanda Privativa', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
     ],
+    minibar: [
+      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
+      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 6 },
+      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 2 },
+    ],
   },
   {
     id: 21, numero: '21', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Casal',
@@ -547,7 +614,11 @@ export const overviewApi = {
   async marcarLimpeza(id, data = {}) {
     await delay();
     _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.LIMPEZA, limpeza: { responsavel: data.responsavel || '', inicio: data.inicio || '' }, manutencao: null }
+      q.id !== id ? q : {
+        ...q, status: ROOM_STATUS.LIMPEZA,
+        limpeza: { responsavel: data.responsavel || '', inicio: data.inicio || '', dataHoraInicio: data.dataHoraInicio || '', dataHoraFim: data.dataHoraFim || '' },
+        manutencao: null,
+      }
     );
     return clone(_quartos.find((q) => q.id === id));
   },
@@ -555,7 +626,11 @@ export const overviewApi = {
   async marcarManutencao(id, data = {}) {
     await delay();
     _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.MANUTENCAO, manutencao: { responsavel: data.responsavel || '', descricao: data.descricao || '', previsaoFim: data.previsaoFim || '' }, limpeza: null }
+      q.id !== id ? q : {
+        ...q, status: ROOM_STATUS.MANUTENCAO,
+        manutencao: { responsavel: data.responsavel || '', descricao: data.descricao || '', previsaoFim: data.previsaoFim || '', dataHoraInicio: data.dataHoraInicio || '', dataHoraFim: data.dataHoraFim || '' },
+        limpeza: null,
+      }
     );
     return clone(_quartos.find((q) => q.id === id));
   },
@@ -637,5 +712,89 @@ export const overviewApi = {
       return { ...r, servico };
     });
     return clone(_quartos.find((r) => r.id === id));
+  },
+
+  async adicionarDiaria(id, novaDiaria) {
+    await delay();
+    const q = _quartos.find((r) => r.id === id);
+    if (!q?.servico) throw new Error('Serviço não encontrado');
+    const diarias = clone(q.servico.diarias || []);
+    const idx = diarias.length;
+    diarias.push({ ...clone(novaDiaria), idx, num: idx + 1 });
+    _quartos = _quartos.map((r) => {
+      if (r.id !== id) return r;
+      const totalDiarias = diarias.length;
+      const valorTotal = diarias.reduce((sum, d) => sum + (d.valor || 0), 0);
+      return { ...r, servico: { ...r.servico, diarias, totalDiarias, valorTotal, pagamentoPendente: Math.max(0, valorTotal - r.servico.totalPago) } };
+    });
+    return clone(_quartos.find((r) => r.id === id));
+  },
+
+  async removerDiaria(id, diariaIdx) {
+    await delay();
+    const q = _quartos.find((r) => r.id === id);
+    if (!q?.servico) throw new Error('Serviço não encontrado');
+    let diarias = clone(q.servico.diarias || []).filter((d) => d.idx !== diariaIdx);
+    diarias = diarias.map((d, i) => ({ ...d, idx: i, num: i + 1 }));
+    _quartos = _quartos.map((r) => {
+      if (r.id !== id) return r;
+      const totalDiarias = diarias.length;
+      const valorTotal = diarias.reduce((sum, d) => sum + (d.valor || 0), 0);
+      return { ...r, servico: { ...r.servico, diarias, totalDiarias, valorTotal, pagamentoPendente: Math.max(0, valorTotal - r.servico.totalPago) } };
+    });
+    return clone(_quartos.find((r) => r.id === id));
+  },
+
+  async trocarQuarto(id, novoQuartoId, diariasIdxs) {
+    await delay();
+    // In a real API this would reassign diárias to new room.
+    // Here we just update the room number/category on the servico for display.
+    const novoQuarto = _quartos.find((q) => q.id === novoQuartoId);
+    if (!novoQuarto) throw new Error('Quarto destino não encontrado');
+    _quartos = _quartos.map((r) => {
+      if (r.id !== id || !r.servico) return r;
+      return { ...r, servico: { ...r.servico, quartoDestino: novoQuarto.numero, quartoDestinoCat: novoQuarto.categoria } };
+    });
+    return clone(_quartos.find((r) => r.id === id));
+  },
+
+  async updateMinibarItem(id, produtoId, delta) {
+    await delay();
+    _quartos = _quartos.map((q) => {
+      if (q.id !== id || !q.minibar) return q;
+      return {
+        ...q,
+        minibar: q.minibar.map((item) =>
+          item.produtoId !== produtoId ? item : { ...item, qtdAtual: Math.max(0, item.qtdAtual + delta) }
+        ),
+      };
+    });
+    return clone(_quartos.find((q) => q.id === id));
+  },
+
+  async reporMinibar(id) {
+    await delay();
+    _quartos = _quartos.map((q) => {
+      if (q.id !== id || !q.minibar) return q;
+      return { ...q, minibar: q.minibar.map((item) => ({ ...item, qtdAtual: item.qtdBase })) };
+    });
+    return clone(_quartos.find((q) => q.id === id));
+  },
+
+  async adicionarMinibarItem(id, item) {
+    await delay();
+    _quartos = _quartos.map((q) => {
+      if (q.id !== id) return q;
+      const minibar = clone(q.minibar || []);
+      const existing = minibar.find((m) => m.produtoId === item.produtoId);
+      if (existing) {
+        existing.qtdAtual += item.quantidade;
+        existing.qtdBase  += item.quantidade;
+      } else {
+        minibar.push({ produtoId: item.produtoId, nome: item.nome, qtdBase: item.quantidade, qtdAtual: item.quantidade });
+      }
+      return { ...q, minibar };
+    });
+    return clone(_quartos.find((q) => q.id === id));
   },
 };
