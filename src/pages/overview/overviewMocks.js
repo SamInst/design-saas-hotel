@@ -781,6 +781,26 @@ export const overviewApi = {
     return clone(_quartos.find((q) => q.id === id));
   },
 
+  async adicionarConsumo(id, consumo) {
+    await delay();
+    _quartos = _quartos.map((r) => {
+      if (r.id !== id || !r.servico) return r;
+      const novoConsumo = { ...clone(consumo), id: nextId() };
+      const servico = {
+        ...r.servico,
+        consumos: [...(r.servico.consumos || []), novoConsumo],
+      };
+      // Decrement minibar qty if internal consumo
+      const minibar = consumo.produtoId
+        ? (r.minibar || []).map((item) =>
+            item.produtoId !== consumo.produtoId ? item : { ...item, qtdAtual: Math.max(0, item.qtdAtual - 1) }
+          )
+        : r.minibar;
+      return { ...r, servico, minibar };
+    });
+    return clone(_quartos.find((r) => r.id === id));
+  },
+
   async adicionarMinibarItem(id, item) {
     await delay();
     _quartos = _quartos.map((q) => {

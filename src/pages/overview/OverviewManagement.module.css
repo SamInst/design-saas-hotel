@@ -1,5 +1,63 @@
 /* ── Page ──────────────────────────────────────────────────────────────────── */
-.page { min-height: 100%; }
+.page { min-height: 100%; display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Stats bar (above the card) ─────────────────────────────────────────────── */
+.statsBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.statCards {
+  display: flex;
+  gap: 8px;
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  min-width: 120px;
+  box-shadow: var(--shadow);
+}
+
+.statCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statCardValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.statCardLabel {
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.statCardIconGreen { color: #059669; flex-shrink: 0; }
+.statCardIconAmber { color: #d97706; flex-shrink: 0; }
+
+.statsBarActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tipoSelectBar { width: 160px; flex-shrink: 0; }
 
 /* ── Main card ─────────────────────────────────────────────────────────────── */
 .card {
@@ -9,12 +67,12 @@
   overflow: hidden;
 }
 
-/* ── Header ────────────────────────────────────────────────────────────────── */
+/* ── Header (simplified — only title + search) ────────────────────────────── */
 .tableHeader {
-  padding: 14px 16px 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
@@ -38,25 +96,11 @@
   flex-wrap: wrap;
 }
 
-/* ── Tools container (wraps into two rows) ─────────────────────────────────── */
-.tableTools {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
+/* ── Search wrap (inside simplified header) ─────────────────────────────────── */
+/* .tableTools / .toolsRow / .toolsRowActions kept for backward compat but unused */
+.tableTools { display: flex; align-items: center; gap: 8px; }
+.toolsRow   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* Row 1: search + tipo + date range */
-.toolsRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  width: 100%;
-  justify-content: flex-end;
-}
 
 /* Row 2: action buttons */
 .toolsRowActions {
@@ -223,7 +267,7 @@
 /* Left accent by status */
 .roomRow_disponivel { border-left-color: rgba(16, 185, 129, 0.4); }
 .roomRow_ocupado    { border-left-color: rgba(220, 38, 38, 0.4);   }
-.roomRow_reservado  { border-left-color: rgba(59, 130, 246, 0.4);  }
+.roomRow_reservado  { border-left-color: rgba(249, 115, 22, 0.4);  }
 .roomRow_limpeza    { border-left-color: rgba(37, 99, 235, 0.4);   }
 .roomRow_manutencao { border-left-color: rgba(124, 58, 237, 0.4);  }
 .roomRow_fora       { border-left-color: rgba(239, 68, 68, 0.4);   }
@@ -252,14 +296,14 @@
 }
 .numBadge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; }
 .numBadge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; }
-.numBadge_reservado  { background: rgba(59, 130, 246, 0.12);  color: #2563eb; }
+.numBadge_reservado  { background: rgba(249, 115, 22, 0.12);  color: #ea580c; }
 .numBadge_limpeza    { background: rgba(37, 99, 235, 0.12);   color: #2563eb; }
 .numBadge_manutencao { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; }
 .numBadge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; }
 
 :root[data-theme="dark"] .numBadge_disponivel { color: #34d399; }
 :root[data-theme="dark"] .numBadge_ocupado    { color: #f87171; }
-:root[data-theme="dark"] .numBadge_reservado  { color: #60a5fa; }
+:root[data-theme="dark"] .numBadge_reservado  { color: #fb923c; }
 :root[data-theme="dark"] .numBadge_limpeza    { color: #60a5fa; }
 :root[data-theme="dark"] .numBadge_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .numBadge_fora       { color: #f87171; }
@@ -333,13 +377,13 @@
 }
 .badge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
 .badge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; border-color: rgba(220, 38, 38, 0.3);   }
-.badge_reservado  { background: rgba(59, 130, 246, 0.12);  color: #2563eb; border-color: rgba(59, 130, 246, 0.3); }
+.badge_reservado  { background: rgba(249, 115, 22, 0.12);  color: #ea580c; border-color: rgba(249, 115, 22, 0.3); }
 .badge_limpeza    { background: rgba(37, 99, 235, 0.12);   color: #2563eb; border-color: rgba(37, 99, 235, 0.3);   }
 .badge_manutencao { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; border-color: rgba(124, 58, 237, 0.3); }
 .badge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; border-color: rgba(239, 68, 68, 0.3);  }
 :root[data-theme="dark"] .badge_disponivel { color: #34d399; border-color: rgba(16, 185, 129, 0.35); }
 :root[data-theme="dark"] .badge_ocupado    { color: #f87171; border-color: rgba(220, 38, 38, 0.35);  }
-:root[data-theme="dark"] .badge_reservado  { color: #60a5fa; border-color: rgba(59, 130, 246, 0.35); }
+:root[data-theme="dark"] .badge_reservado  { color: #fb923c; border-color: rgba(249, 115, 22, 0.35); }
 :root[data-theme="dark"] .badge_limpeza    { color: #60a5fa; border-color: rgba(37, 99, 235, 0.35);  }
 :root[data-theme="dark"] .badge_manutencao { color: #a78bfa; border-color: rgba(124, 58, 237, 0.35); }
 :root[data-theme="dark"] .badge_fora       { color: #f87171; border-color: rgba(239, 68, 68, 0.35);  }
@@ -400,13 +444,13 @@
 }
 .detailBadge_disponivel { background: rgba(16, 185, 129, 0.15); color: #059669; }
 .detailBadge_ocupado    { background: rgba(220, 38, 38, 0.15);   color: #dc2626; }
-.detailBadge_reservado  { background: rgba(59, 130, 246, 0.15);  color: #2563eb; }
+.detailBadge_reservado  { background: rgba(249, 115, 22, 0.15);  color: #ea580c; }
 .detailBadge_limpeza    { background: rgba(37, 99, 235, 0.15);   color: #2563eb; }
 .detailBadge_manutencao { background: rgba(124, 58, 237, 0.15);  color: #7c3aed; }
 .detailBadge_fora       { background: rgba(239, 68, 68, 0.15);   color: #dc2626; }
 :root[data-theme="dark"] .detailBadge_disponivel { color: #34d399; }
 :root[data-theme="dark"] .detailBadge_ocupado    { color: #f87171; }
-:root[data-theme="dark"] .detailBadge_reservado  { color: #60a5fa; }
+:root[data-theme="dark"] .detailBadge_reservado  { color: #fb923c; }
 :root[data-theme="dark"] .detailBadge_limpeza    { color: #60a5fa; }
 :root[data-theme="dark"] .detailBadge_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .detailBadge_fora       { color: #f87171; }
@@ -1926,4 +1970,85 @@
   background: rgba(16, 185, 129, 0.08);
   border-color: rgba(16, 185, 129, 0.3);
   font-weight: 600;
+}
+
+/* ── Pernoite action row (inside dados tab body) ─────────────────────────────── */
+.pernoiteActionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+/* ── Consumo interno / externo sections ─────────────────────────────────────── */
+.consumoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+}
+.consumoSection + .consumoSection {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.consumoSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.consumoSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* ── Unified consumo modal ──────────────────────────────────────────────────── */
+.consumoModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.consumoModalSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 0;
+}
+.consumoModalSection:first-child { padding-top: 4px; }
+.consumoModalSection:last-child  { padding-bottom: 4px; }
+
+.consumoModalSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-2);
+}
+
+.consumoModalDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 0;
+}
+
+/* ── Stats bar responsive ───────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .statsBar         { flex-direction: column; align-items: stretch; }
+  .statsBarActions  { justify-content: flex-start; }
+  .tipoSelectBar    { width: 100%; }
+  .statCards        { width: 100%; }
+  .statCard         { flex: 1; }
 }

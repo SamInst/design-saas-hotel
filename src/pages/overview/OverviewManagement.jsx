@@ -175,7 +175,6 @@ export default function OverviewManagement() {
   const [detailHospedeSelected, setDetailHospedeSelected]   = useState(null);
 
   // Detail — Add Consumo (pernoite/dayuse existing)
-  const [showDetailAddConsumo, setShowDetailAddConsumo]     = useState(false);
   const [detailConsumoCat, setDetailConsumoCat]             = useState('');
   const [detailConsumoProd, setDetailConsumoProd]           = useState('');
   const [detailConsumoQty, setDetailConsumoQty]             = useState(1);
@@ -204,12 +203,16 @@ export default function OverviewManagement() {
   const [serviceModal, setServiceModal] = useState(null); // { type, room }
   const [svcForm, setSvcForm]           = useState(blankSvcForm());
 
-  // Minibar add item modal
+  // Minibar add item modal (quarto disponível only)
   const [showAddMinibar, setShowAddMinibar]       = useState(false);
   const [minibarCat, setMinibarCat]               = useState('');
   const [minibarProd, setMinibarProd]             = useState('');
   const [minibarQtyAdd, setMinibarQtyAdd]         = useState(1);
   const [savingMinibar, setSavingMinibar]         = useState(false);
+
+  // Unified add consumo modal (pernoite / dayuse)
+  const [showAddConsumoModal, setShowAddConsumoModal] = useState(false);
+  const [consumoSaving, setConsumoSaving]             = useState(false);
 
   // Gerenciar Diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
@@ -370,6 +373,7 @@ export default function OverviewManagement() {
 
   // ── Total hospedados across all occupied rooms ────────────────────────────────
   const totalHospedados = quartos.reduce((sum, q) => sum + (q.servico?.hospedes?.length || 0), 0);
+  const quartosOcupados = quartos.filter((q) => [ROOM_STATUS.OCUPADO, ROOM_STATUS.RESERVADO].includes(q.status)).length;
 
   // ── Elapsed for selected room (dayuse) ────────────────────────────────────────
   const selElapsedSec = useMemo(() => {
@@ -641,6 +645,51 @@ export default function OverviewManagement() {
     finally { setSavingMinibar(false); }
   };
 
+  // ── Consumo interno (minibar item → consumo list) ─────────────────────────────
+  const handleConsumoInterno = async (item) => {
+    if (!selectedRoom) return;
+    setConsumoSaving(true);
+    try {
+      // Look up price from CATEGORIAS_CONSUMO by produtoId
+      let preco = 0;
+      for (const cat of CATEGORIAS_CONSUMO) {
+        const prod = cat.produtos.find((p) => p.id === item.produtoId);
+        if (prod) { preco = prod.preco; break; }
+      }
+      const consumo = {
+        item: item.nome, categoria: 'Minibar',
+        quantidade: 1, valorUnitario: preco, valorTotal: preco,
+        tipo: 'interno', produtoId: item.produtoId,
+      };
+      const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`${item.nome} consumido.`);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setConsumoSaving(false); }
+  };
+
+  // ── Consumo externo (form → consumo list) ─────────────────────────────────────
+  const handleConsumoExterno = async () => {
+    if (!selectedRoom || !detailConsumoProdSel) { notify('Selecione um produto.', 'error'); return; }
+    setConsumoSaving(true);
+    try {
+      const consumo = {
+        item: detailConsumoProdSel.nome,
+        categoria: detailConsumoCatSel?.nome || '',
+        quantidade: detailConsumoQty,
+        valorUnitario: detailConsumoProdSel.preco,
+        valorTotal: detailConsumoProdSel.preco * detailConsumoQty,
+        formaPagamento: detailConsumoForma,
+        tipo: 'externo',
+      };
+      const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`${consumo.item} adicionado ao consumo.`);
+      setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma('');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setConsumoSaving(false); }
+  };
+
   // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
   const openGerenciarDiarias = () => {
     setGdDataInicio(null); setGdHoraInicio('14:00');
@@ -741,6 +790,7 @@ export default function OverviewManagement() {
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSaving(false); }
   };
+
 
   // ── Render helpers ─────────────────────────────────────────────────────────────
   const BedsRow = ({ camas }) => (
@@ -1110,6 +1160,27 @@ export default function OverviewManagement() {
                     </div>
                   </div>
                 </div>
+                <div className={styles.pernoiteActionsRow}>
+                  <Button variant="secondary" size="sm" onClick={() => openService('limpeza', s)}>
+                    <Sparkles size={13} /> Limpeza
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => openService('manutencao', s)}>
+                    <Wrench size={13} /> Manutenção
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={openGerenciarDiarias}>
+                    <RefreshCw size={13} /> Ger. Diárias
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={openTrocarQuarto}>
+                    <ArrowLeftRight size={13} /> Trocar Quarto
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => {
+                    setDescontoScope('global'); setDescontoTipo('percentual');
+                    setDescontoValor(''); setDescontoDescricao('');
+                    setShowDescontoModal(true);
+                  }}>
+                    <Tag size={13} /> Desconto
+                  </Button>
+                </div>
               </div>
             )}
             {detailTab === 'diarias' && (
@@ -1209,23 +1280,23 @@ export default function OverviewManagement() {
                         )}
                         {diariaTab === 'consumos' && (
                           <div className={styles.subTabContent}>
-                            <Button variant="primary" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowDetailAddConsumo(true); }}>
+                            <Button variant="primary" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
                               <Plus size={14} /> Adicionar Consumo
                             </Button>
-                            {(curDiaria.consumos || []).length === 0 ? (
-                              <div className={styles.emptyList}><ShoppingCart size={20} color="var(--text-2)" /><span>Nenhum consumo nesta diária.</span></div>
+                            {(sv.consumos || []).length === 0 ? (
+                              <div className={styles.emptyList}><ShoppingCart size={20} color="var(--text-2)" /><span>Nenhum consumo registrado.</span></div>
                             ) : (
                               <div className={styles.itemList}>
-                                {(curDiaria.consumos || []).map((c, i) => (
+                                {(sv.consumos || []).map((c, i) => (
                                   <div key={c.id || i} className={styles.listItem}>
                                     <div className={styles.listItemLeft}>
-                                      <ShoppingCart size={14} className={styles.listItemIconGreen} />
+                                      <ShoppingCart size={14} className={c.tipo === 'interno' ? styles.listItemIconGreen : styles.listItemIcon} />
                                       <div>
                                         <div className={styles.listItemName}>{c.item}</div>
-                                        <div className={styles.listItemSub}>{c.categoria} • Qtd: {c.qtd || c.quantidade} • {c.formaPagamento}</div>
+                                        <div className={styles.listItemSub}>{c.categoria} · Qtd: {c.quantidade}{c.formaPagamento ? ` · ${c.formaPagamento}` : ''}</div>
                                       </div>
                                     </div>
-                                    <span className={styles.listItemValue}>{fmtBRL(c.valorTotal || c.valor)}</span>
+                                    <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1330,28 +1401,44 @@ export default function OverviewManagement() {
                       </span>
                     </div>
                   </div>
-                  {!isAtivo && (
-                    <div className={styles.financialGrid} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-                      <div className={styles.financialItem}>
-                        <span className={styles.financialLabel}>Total Pago</span>
-                        <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(sv.totalPago || 0)}</span>
-                      </div>
-                      <div className={styles.financialItem}>
-                        <span className={styles.financialLabel}>Falta Pagar</span>
-                        <span className={[styles.financialValue, (sv.pagamentoPendente || 0) > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>
-                          {fmtBRL(sv.pagamentoPendente || 0)}
-                        </span>
-                      </div>
-                      {sv.desconto?.valor > 0 && (
-                        <div className={styles.financialItem}>
-                          <span className={styles.financialLabel}>Desconto</span>
-                          <span className={[styles.financialValue, styles.valueGreen].join(' ')}>
-                            {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
-                          </span>
+                  {!isAtivo && (() => {
+                    const duTotal = (sv.valorTotal || 0) + selConsumoTotal;
+                    const duPago  = sv.totalPago || 0;
+                    const duPct   = duTotal > 0 ? Math.min(100, (duPago / duTotal) * 100) : 0;
+                    return (
+                      <>
+                        <div className={styles.financialGrid} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                          <div className={styles.financialItem}>
+                            <span className={styles.financialLabel}>Total Pago</span>
+                            <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(sv.totalPago || 0)}</span>
+                          </div>
+                          <div className={styles.financialItem}>
+                            <span className={styles.financialLabel}>Falta Pagar</span>
+                            <span className={[styles.financialValue, (sv.pagamentoPendente || 0) > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>
+                              {fmtBRL(sv.pagamentoPendente || 0)}
+                            </span>
+                          </div>
+                          {sv.desconto?.valor > 0 && (
+                            <div className={styles.financialItem}>
+                              <span className={styles.financialLabel}>Desconto</span>
+                              <span className={[styles.financialValue, styles.valueGreen].join(' ')}>
+                                {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div className={styles.progressWrap} style={{ marginTop: 10 }}>
+                          <div className={styles.progressLabels}>
+                            <span>Progresso de pagamento</span>
+                            <span>{duPct.toFixed(0)}%</span>
+                          </div>
+                          <div className={styles.progressBar}>
+                            <div className={styles.progressFill} style={{ width: `${duPct}%` }} />
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className={styles.infoGrid2}>
                   <div className={styles.infoRow}><span className={styles.infoLabel}>Titular</span><span className={styles.infoValue}>{sv.titularNome || <em>Sem titular</em>}</span></div>
@@ -1402,29 +1489,28 @@ export default function OverviewManagement() {
             )}
             {detailTab === 'consumos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowDetailAddConsumo(true); }}>
+                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
                   <Plus size={13} /> Adicionar Consumo
                 </Button>
-                <div className={styles.itemList}>
-                  {(sv.consumos || []).length === 0
-                    ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
-                    : (sv.consumos || []).map((c) => (
-                      <div key={c.id} className={styles.listItem}>
-                        <div className={styles.listItemLeft}>
-                          <ShoppingCart size={14} className={styles.listItemIcon} />
-                          <div>
-                            <div className={styles.listItemName}>{c.item}</div>
-                            <div className={styles.listItemSub}>{c.categoria} · {c.quantidade}× {fmtBRL(c.valorUnitario)}</div>
+                {(sv.consumos || []).length === 0
+                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+                  : (
+                    <div className={styles.itemList}>
+                      {(sv.consumos || []).map((c, i) => (
+                        <div key={c.id || i} className={styles.listItem}>
+                          <div className={styles.listItemLeft}>
+                            <ShoppingCart size={14} className={c.tipo === 'interno' ? styles.listItemIconGreen : styles.listItemIcon} />
+                            <div>
+                              <div className={styles.listItemName}>{c.item}</div>
+                              <div className={styles.listItemSub}>{c.categoria} · Qtd: {c.quantidade}{c.formaPagamento ? ` · ${c.formaPagamento}` : ''}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
-                          <button className={styles.removeBtn} onClick={() => notify('Em desenvolvimento')}><Trash2 size={13} /></button>
                         </div>
-                      </div>
-                    ))
-                  }
-                </div>
+                      ))}
+                    </div>
+                  )
+                }
               </div>
             )}
             {detailTab === 'pagamentos' && (
@@ -1534,24 +1620,8 @@ export default function OverviewManagement() {
             <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
               <XCircle size={14} /> Cancelar
             </Button>
-            <Button variant="secondary" onClick={() => openService('limpeza', s)}>
-              <Sparkles size={14} /> Limpeza
-            </Button>
-            <Button variant="secondary" onClick={openGerenciarDiarias}>
-              <RefreshCw size={14} /> Gerenciar Diárias
-            </Button>
-            <Button variant="secondary" onClick={openTrocarQuarto}>
-              <ArrowLeftRight size={14} /> Trocar Quarto
-            </Button>
           </div>
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => {
-              setDescontoScope('global'); setDescontoTipo('percentual');
-              setDescontoValor(''); setDescontoDescricao('');
-              setShowDescontoModal(true);
-            }}>
-              <Tag size={14} /> Desconto
-            </Button>
             <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
               {saving && <Loader2 size={14} className={styles.spin} />}
               <CheckCircle size={14} /> Finalizar
@@ -1759,6 +1829,55 @@ export default function OverviewManagement() {
     <div className={styles.page}>
       <Notification notification={notif} />
 
+      {/* ── Stats bar ── */}
+      <div className={styles.statsBar}>
+        <div className={styles.statCards}>
+          <div className={styles.statCard}>
+            <Users size={16} className={styles.statCardIconGreen} />
+            <div className={styles.statCardBody}>
+              <span className={styles.statCardValue}>{totalHospedados}</span>
+              <span className={styles.statCardLabel}>hospedado{totalHospedados !== 1 ? 's' : ''}</span>
+            </div>
+          </div>
+          <div className={styles.statCard}>
+            <BedDouble size={16} className={styles.statCardIconAmber} />
+            <div className={styles.statCardBody}>
+              <span className={styles.statCardValue}>{quartosOcupados}/{quartos.length}</span>
+              <span className={styles.statCardLabel}>ocupação</span>
+            </div>
+          </div>
+        </div>
+        <div className={styles.statsBarActions}>
+          <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelectBar}>
+            <option value="">Tipo de ocupação</option>
+            {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+          </Select>
+          <div className={styles.dateRangeWrap}>
+            <DatePicker
+              mode="range"
+              startDate={filterDateStart}
+              endDate={filterDateEnd}
+              onRangeChange={({ start, end }) => {
+                setFilterDateStart(start);
+                setFilterDateEnd(end);
+                setDateGroupCollapsed({});
+              }}
+              placeholder="Período de check-in..."
+            />
+          </div>
+          <Button
+            variant="secondary"
+            className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
+            onClick={clearAllFilters}
+          >
+            <X size={12} /> Limpar filtros
+          </Button>
+          <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
+            <Plus size={14} /> Adicionar Quarto
+          </Button>
+        </div>
+      </div>
+
       <div className={styles.card}>
         {/* ── Header ── */}
         <div className={styles.tableHeader}>
@@ -1766,48 +1885,11 @@ export default function OverviewManagement() {
             <h2 className={styles.h2}>Recepção</h2>
             <p className={styles.subtitle}>
               <Building2 size={13} /> Visão geral de quartos, hóspedes e day use
-              {totalHospedados > 0 && (
-                <span className={styles.hospedeCountChip}><Users size={11} />{totalHospedados} hospedado{totalHospedados !== 1 ? 's' : ''}</span>
-              )}
             </p>
           </div>
-          <div className={styles.tableTools}>
-            <div className={styles.toolsRow}>
-              <div className={styles.searchWrap}>
-                <Search size={13} className={styles.searchIcon} />
-                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
-              </div>
-              <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelect}>
-                <option value="">Tipo de ocupação</option>
-                {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
-              </Select>
-              <div className={styles.dateRangeWrap}>
-                <DatePicker
-                  mode="range"
-                  startDate={filterDateStart}
-                  endDate={filterDateEnd}
-                  onRangeChange={({ start, end }) => {
-                    setFilterDateStart(start);
-                    setFilterDateEnd(end);
-                    setDateGroupCollapsed({});
-                  }}
-                  placeholder="Período de check-in..."
-                />
-              </div>
-            </div>
-            <div className={styles.toolsRowActions}>
-              <Button
-                variant="secondary"
-                className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
-                onClick={clearAllFilters}
-                title="Limpar filtros"
-              >
-                <X size={12} /> Limpar filtros
-              </Button>
-              <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
-                <Plus size={14} /> Adicionar Quarto
-              </Button>
-            </div>
+          <div className={styles.searchWrap}>
+            <Search size={13} className={styles.searchIcon} />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
           </div>
         </div>
 
@@ -2514,59 +2596,109 @@ export default function OverviewManagement() {
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SUB-MODAL — Adicionar Consumo (detail)
+          SUB-MODAL — Adicionar Consumo unificado (interno + externo)
       ═══════════════════════════════════════════════════════ */}
-      {showDetailAddConsumo && (
+      {showAddConsumoModal && selectedRoom && (
         <Modal
           open
-          onClose={() => setShowDetailAddConsumo(false)}
-          size="sm"
+          onClose={() => setShowAddConsumoModal(false)}
+          size="md"
           title={<><ShoppingCart size={15} /> Adicionar Consumo</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowDetailAddConsumo(false)}>Cancelar</Button>
-              <Button
-                variant="primary"
-                disabled={!detailConsumoProdSel}
-                onClick={() => { notify('Em desenvolvimento'); setShowDetailAddConsumo(false); }}
-              >
-                Adicionar
-              </Button>
+              <Button variant="secondary" onClick={() => setShowAddConsumoModal(false)}>Fechar</Button>
             </div>
           }
         >
-          <div className={styles.formStack}>
-            <FormField label="Categoria">
-              <Select value={detailConsumoCat} onChange={(e) => { setDetailConsumoCat(e.target.value); setDetailConsumoProd(''); }}>
-                <option value="">Selecione...</option>
-                {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-              </Select>
-            </FormField>
-            {detailConsumoCatSel && (
-              <FormField label="Produto">
-                <Select value={detailConsumoProd} onChange={(e) => setDetailConsumoProd(e.target.value)}>
-                  <option value="">Selecione...</option>
-                  {detailConsumoCatSel.produtos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {fmtBRL(p.preco)}</option>)}
-                </Select>
-              </FormField>
-            )}
-            {detailConsumoProdSel && (
-              <>
-                <FormField label="Quantidade">
-                  <Input type="number" min="1" value={detailConsumoQty} onChange={(e) => setDetailConsumoQty(Math.max(1, parseInt(e.target.value) || 1))} />
-                </FormField>
-                <FormField label="Forma de Pagamento">
-                  <Select value={detailConsumoForma} onChange={(e) => setDetailConsumoForma(e.target.value)}>
+          <div className={styles.consumoModalBody}>
+            {/* ── Consumo interno (minibar) ── */}
+            <div className={styles.consumoModalSection}>
+              <div className={styles.consumoModalSectionTitle}><Package size={13} /> Consumo interno</div>
+              {(!selectedRoom.minibar || selectedRoom.minibar.length === 0) ? (
+                <div className={styles.emptyList}><Package size={20} color="var(--text-2)" /><span>Nenhum item no minibar</span></div>
+              ) : (
+                <div className={styles.minibarList}>
+                  {selectedRoom.minibar.map((item) => {
+                    const ratio   = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
+                    const isLow   = ratio < 0.5;
+                    const esgotado = item.qtdAtual === 0;
+                    return (
+                      <div key={item.produtoId} className={[styles.minibarCard, isLow ? styles.minibarCardLow : ''].join(' ')}>
+                        <div className={styles.minibarCardLeft}>
+                          <span className={styles.minibarCardName}>{item.nome}</span>
+                          <div className={styles.minibarQtyRow}>
+                            <span className={[styles.minibarQtyCurrent, isLow ? styles.minibarQtyLow : ''].join(' ')}>{item.qtdAtual}</span>
+                            <span className={styles.minibarQtySep}>/</span>
+                            <span className={styles.minibarQtyBase}>{item.qtdBase} disp.</span>
+                          </div>
+                        </div>
+                        <div className={styles.minibarProgressWrap}>
+                          <div className={styles.minibarProgressBar}>
+                            <div className={[styles.minibarProgressFill, isLow ? styles.minibarProgressFillLow : ''].join(' ')}
+                              style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+                          </div>
+                        </div>
+                        <div className={styles.minibarCardActions}>
+                          <Button
+                            variant="primary"
+                            style={{ padding: '4px 12px', fontSize: 12 }}
+                            disabled={esgotado || consumoSaving}
+                            onClick={() => handleConsumoInterno(item)}
+                          >
+                            {consumoSaving ? <Loader2 size={12} className={styles.spin} /> : <Minus size={12} />}
+                            {esgotado ? 'Esgotado' : 'Consumir'}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className={styles.consumoModalDivider} />
+
+            {/* ── Consumo externo (form) ── */}
+            <div className={styles.consumoModalSection}>
+              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo</div>
+              <div className={styles.formStack}>
+                <FormField label="Categoria">
+                  <Select value={detailConsumoCat} onChange={(e) => { setDetailConsumoCat(e.target.value); setDetailConsumoProd(''); }}>
                     <option value="">Selecione...</option>
-                    {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
+                    {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                   </Select>
                 </FormField>
-                <div className={styles.totalPreview}>
-                  <span className={styles.totalPreviewLabel}>{detailConsumoQty}× {detailConsumoProdSel.nome}</span>
-                  <span className={styles.totalPreviewValue}>{fmtBRL(detailConsumoProdSel.preco * detailConsumoQty)}</span>
-                </div>
-              </>
-            )}
+                {detailConsumoCatSel && (
+                  <FormField label="Produto">
+                    <Select value={detailConsumoProd} onChange={(e) => setDetailConsumoProd(e.target.value)}>
+                      <option value="">Selecione...</option>
+                      {detailConsumoCatSel.produtos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {fmtBRL(p.preco)}</option>)}
+                    </Select>
+                  </FormField>
+                )}
+                {detailConsumoProdSel && (
+                  <>
+                    <FormField label="Quantidade">
+                      <Input type="number" min="1" value={detailConsumoQty} onChange={(e) => setDetailConsumoQty(Math.max(1, parseInt(e.target.value) || 1))} />
+                    </FormField>
+                    <FormField label="Forma de Pagamento">
+                      <Select value={detailConsumoForma} onChange={(e) => setDetailConsumoForma(e.target.value)}>
+                        <option value="">Selecione...</option>
+                        {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
+                      </Select>
+                    </FormField>
+                    <div className={styles.totalPreview}>
+                      <span className={styles.totalPreviewLabel}>{detailConsumoQty}× {detailConsumoProdSel.nome}</span>
+                      <span className={styles.totalPreviewValue}>{fmtBRL(detailConsumoProdSel.preco * detailConsumoQty)}</span>
+                    </div>
+                    <Button variant="primary" disabled={consumoSaving} onClick={handleConsumoExterno}>
+                      {consumoSaving && <Loader2 size={13} className={styles.spin} />}
+                      <Plus size={13} /> Adicionar consumo externo
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </Modal>
       )}
