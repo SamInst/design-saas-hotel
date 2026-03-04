@@ -14,7 +14,7 @@ import PricingManagement   from '../pages/pricing/PricingManagement';
 import StaysManagement     from '../pages/stays/StaysManagement';
 import DayUseManagement   from '../pages/dayuse/DayUseManagement';
 import OverviewManagement from '../pages/overview/OverviewManagement';
-// import BookingCalendar     from '../pages/calendar/BookingCalendar';
+import BookingCalendar    from '../pages/calendar/BookingCalendar';
 
 const PAGE_MAP = {
   financial:   <FinancialDashboard />,
@@ -27,7 +27,7 @@ const PAGE_MAP = {
   stays:       <StaysManagement />,
   dayuse:      <DayUseManagement />,
   reception:   <OverviewManagement />,
-  // calendar:    <BookingCalendar />,
+  bookings:    <BookingCalendar />,
 };
 
 export default function App() {
