@@ -87,8 +87,9 @@ function generateReservations() {
       const isCurrentlyStaying = cursor <= T && fim > T;
       const isPast = fim <= T;
       const status = isCurrentlyStaying ? 'hospedado'
-        : isPast ? 'hospedado'
-        : rng(seed + 2) < 0.25 ? 'solicitada'
+        : isPast && rng(seed + 5) < 0.07 ? 'cancelado'
+        : isPast ? 'finalizado'
+        : rng(seed + 2) < 0.2 ? 'solicitada'
         : 'confirmada';
 
       const acomp = Math.floor(rng(seed + 3) * 4);
@@ -133,6 +134,52 @@ function generateReservations() {
 }
 
 let _reservas = generateReservations();
+
+// ─── Quartos Info (tipo + preco) ──────────────────────────────────────────────
+export const QUARTOS_INFO = (() => {
+  const tiposByIdx = ['DUPLO', 'TRIPLO', 'DUPLO', 'TRIPLO', 'DUPLO', 'TRIPLO', 'DUPLO', 'TRIPLO', 'DUPLO', 'TRIPLO'];
+  const info = {};
+  CATEGORIAS.forEach((cat) => {
+    cat.quartos.forEach((room, i) => {
+      const tipo  = tiposByIdx[i] || 'DUPLO';
+      const preco = cat.nome === 'Premium' ? 650
+        : cat.nome === 'Suíte'   ? 480
+        : cat.nome === 'Luxo'    ? 320
+        : 160;
+      info[room] = { tipo, preco, categoria: cat.nome };
+    });
+  });
+  return info;
+})();
+
+// ─── Hóspedes cadastrados (for search in create modal) ────────────────────────
+export const HOSPEDES_CADASTRADOS = [
+  { id: 2001, nome: 'João Silva',        cpf: '123.456.789-00' },
+  { id: 2002, nome: 'Ana Costa',         cpf: '234.567.890-11' },
+  { id: 2003, nome: 'Carlos Mendes',     cpf: '345.678.901-22' },
+  { id: 2004, nome: 'Roberto Lima',      cpf: '456.789.012-33' },
+  { id: 2005, nome: 'Beatriz Souza',     cpf: '567.890.123-44' },
+  { id: 2006, nome: 'Fernando Alves',    cpf: '678.901.234-55' },
+  { id: 2007, nome: 'Patricia Santos',   cpf: '789.012.345-66' },
+  { id: 2008, nome: 'Gabriel Costa',     cpf: '890.123.456-77' },
+  { id: 2009, nome: 'Marcos Oliveira',   cpf: '901.234.567-88' },
+  { id: 2010, nome: 'Larissa Ferreira',  cpf: '012.345.678-99' },
+  { id: 2011, nome: 'Diego Martins',     cpf: '111.222.333-44' },
+  { id: 2012, nome: 'Camila Rocha',      cpf: '222.333.444-55' },
+  { id: 2013, nome: 'Rafael Almeida',    cpf: '333.444.555-66' },
+  { id: 2014, nome: 'Juliana Nunes',     cpf: '444.555.666-77' },
+  { id: 2015, nome: 'Thiago Carvalho',   cpf: '555.666.777-88' },
+  { id: 2016, nome: 'Isabela Moraes',    cpf: '666.777.888-99' },
+  { id: 2017, nome: 'Lucas Pereira',     cpf: '777.888.999-00' },
+  { id: 2018, nome: 'Amanda Lima',       cpf: '888.999.000-11' },
+  { id: 2019, nome: 'Felipe Gomes',      cpf: '999.000.111-22' },
+  { id: 2020, nome: 'Mariana Silva',     cpf: '000.111.222-33' },
+  { id: 2021, nome: 'Ricardo Ferreira',  cpf: '111.333.555-77' },
+  { id: 2022, nome: 'Priscila Rodrigues',cpf: '222.444.666-88' },
+  { id: 2023, nome: 'Eduardo Nascimento',cpf: '333.555.777-99' },
+  { id: 2024, nome: 'Natalia Araújo',    cpf: '444.666.888-00' },
+  { id: 2025, nome: 'Bruno Ribeiro',     cpf: '555.777.999-11' },
+];
 
 // ─── API (mock) ───────────────────────────────────────────────────────────────
 export const calendarApi = {
