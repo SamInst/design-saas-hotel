@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus,
   ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell,
@@ -15,10 +16,10 @@ import {
 import styles from './BookingCalendar.module.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const DAY_CELL_W   = 56;
+const DAY_CELL_W   = 168;
 const ROOM_H       = 50;
 const CAT_H        = 30;
-const HDR_H        = 50;
+const HDR_H        = 56;
 const LEFT_W       = 110;
 const VISIBLE_DAYS = 31;
 const HALF         = DAY_CELL_W / 2;
@@ -154,7 +155,9 @@ function ReservaModal({ reserva, onClose, onCancel }) {
 function DayModal({ dateStr, reservas, onClose, onNewReserva }) {
   const dayReservas    = reservas.filter((r) => r.dataInicio <= dateStr && r.dataFim > dateStr);
   const occupiedRooms  = new Set(dayReservas.map((r) => r.quarto));
+  const totalRooms     = CATEGORIAS.flatMap((c) => c.quartos).length;
   const availableRooms = CATEGORIAS.flatMap((c) => c.quartos).filter((r) => !occupiedRooms.has(r));
+  const totalPeople    = dayReservas.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
   const dayObj  = new Date(dateStr + 'T00:00:00');
   const weekday = dayObj.toLocaleDateString('pt-BR', { weekday: 'long' });
   const cap     = weekday.charAt(0).toUpperCase() + weekday.slice(1);
@@ -164,7 +167,7 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva }) {
       footer={
         <div className={styles.footerSpread}>
           <span className={styles.footerInfo}>
-            {dayReservas.length} reserva{dayReservas.length !== 1 ? 's' : ''} · {availableRooms.length} disponível{availableRooms.length !== 1 ? 'is' : ''}
+            {availableRooms.length} quarto{availableRooms.length !== 1 ? 's' : ''} disponível{availableRooms.length !== 1 ? 'is' : ''}
           </span>
           <div className={styles.footerRight}>
             <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
@@ -175,6 +178,25 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva }) {
         </div>
       }
     >
+      {/* Stats cards */}
+      <div className={styles.dayStats}>
+        <div className={styles.dayStatBox}>
+          <span className={styles.dayStatLabel}>Quartos Ocupados</span>
+          <span className={styles.dayStatValue}>{occupiedRooms.size}<span className={styles.dayStatOf}>/{totalRooms}</span></span>
+        </div>
+        <div className={styles.dayStatBox}>
+          <span className={styles.dayStatLabel}>Reservas</span>
+          <span className={styles.dayStatValue}>{dayReservas.length}</span>
+        </div>
+        <div className={styles.dayStatBox}>
+          <span className={styles.dayStatLabel}>Total de Pessoas</span>
+          <span className={styles.dayStatValue}>{totalPeople}</span>
+        </div>
+        <div className={styles.dayStatBox}>
+          <span className={styles.dayStatLabel}>Disponíveis</span>
+          <span className={styles.dayStatValue} style={{ color: 'var(--emerald)' }}>{availableRooms.length}</span>
+        </div>
+      </div>
       {dayReservas.length === 0 ? (
         <div className={styles.emptyState}>Nenhuma reserva para este dia.</div>
       ) : (
@@ -374,11 +396,45 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
 
 // ─── Room Multi-Select Combobox ───────────────────────────────────────────────
 function RoomCombobox({ value, onChange, availableRooms }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const [open,     setOpen]     = useState(false);
+  const [filter,   setFilter]   = useState('');
+  const [dropStyle, setDropStyle] = useState({});
+  const triggerRef = useRef(null);
+  const dropRef    = useRef(null);
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropH = Math.min(280, 400);
+    const openAbove = spaceBelow < dropH && rect.top > dropH;
+    setDropStyle({
+      position: 'fixed',
+      zIndex: 9999,
+      width: rect.width,
+      left: rect.left,
+      top: openAbove ? rect.top - dropH - 4 : rect.bottom + 4,
+      maxHeight: openAbove ? rect.top - 8 : spaceBelow - 8,
+    });
+  }, []);
 
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    if (!open) return;
+    updatePos();
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => {
+      window.removeEventListener('scroll', updatePos, true);
+      window.removeEventListener('resize', updatePos);
+    };
+  }, [open, updatePos]);
+
+  useEffect(() => {
+    const h = (e) => {
+      const inTrigger = triggerRef.current && triggerRef.current.contains(e.target);
+      const inDrop    = dropRef.current    && dropRef.current.contains(e.target);
+      if (!inTrigger && !inDrop) setOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
@@ -388,48 +444,70 @@ function RoomCombobox({ value, onChange, availableRooms }) {
     onChange(value.includes(rs) ? value.filter((x) => x !== rs) : [...value, rs]);
   };
 
+  const fl = filter.toLowerCase();
   const label = value.length === 0 ? 'Selecione quarto(s)...'
     : value.length === 1 ? `Quarto ${fmtRoom(parseInt(value[0]))}`
     : `${value.length} quartos selecionados`;
 
+  const dropdown = open && createPortal(
+    <div ref={dropRef} className={styles.comboDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
+      <div className={styles.comboSearchWrap}>
+        <Search size={12} className={styles.comboSearchIcon} />
+        <input
+          className={styles.comboSearchInput}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filtrar quarto..."
+          autoFocus
+        />
+      </div>
+      {CATEGORIAS.map((cat) => {
+        const rows = cat.quartos.filter((r) =>
+          !fl || fmtRoom(r).includes(fl) || cat.nome.toLowerCase().includes(fl) ||
+          (QUARTOS_INFO[r]?.tipo || '').toLowerCase().includes(fl)
+        );
+        if (!rows.length) return null;
+        return (
+          <div key={cat.id}>
+            <div className={styles.comboGroupLabel}>{cat.nome}</div>
+            {rows.map((r) => {
+              const avail = availableRooms.includes(r);
+              const sel   = value.includes(String(r));
+              const info  = QUARTOS_INFO[r];
+              return (
+                <div key={r}
+                  className={[styles.comboItem, sel ? styles.comboItemSel : '', !avail ? styles.comboItemUnavail : ''].join(' ')}
+                  onClick={() => avail && toggle(r)}
+                >
+                  <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
+                  <span className={styles.comboItemNum}>Quarto {fmtRoom(r)}</span>
+                  {info && <span className={styles.comboItemTipo}>{info.tipo}</span>}
+                  <span className={styles.comboItemPreco}>{fmtBRL(info?.preco ?? 0)}/noite</span>
+                  {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>,
+    document.body
+  );
+
   return (
-    <div ref={ref} className={styles.comboWrap}>
-      <button type="button" className={styles.comboTrigger} onClick={() => setOpen((o) => !o)}>
+    <div className={styles.comboWrap}>
+      <button ref={triggerRef} type="button" className={styles.comboTrigger}
+        onClick={() => { setOpen((o) => !o); setFilter(''); }}
+      >
         <span className={value.length === 0 ? styles.comboPlaceholder : ''}>{label}</span>
         <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
       </button>
-      {open && (
-        <div className={styles.comboDropdown}>
-          {CATEGORIAS.map((cat) => (
-            <div key={cat.id} className={styles.comboGroup}>
-              <div className={styles.comboGroupLabel}>{cat.nome}</div>
-              <div className={styles.roomBtnRow}>
-                {cat.quartos.map((r) => {
-                  const avail = availableRooms.includes(r);
-                  const sel   = value.includes(String(r));
-                  const info  = QUARTOS_INFO[r];
-                  return (
-                    <button
-                      key={r} type="button" disabled={!avail}
-                      title={avail ? `${info?.tipo} — ${fmtBRL(info?.preco)}/noite` : 'Ocupado neste período'}
-                      className={[styles.roomBtn, sel ? styles.roomBtnSel : '', !avail ? styles.roomBtnUnavail : ''].join(' ')}
-                      onClick={() => avail && toggle(r)}
-                    >
-                      {fmtRoom(r)}
-                      {info && <span className={styles.roomBtnTipo}>{info.tipo}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {dropdown}
       {value.length > 0 && (
         <div className={styles.comboChips}>
           {value.map((q) => (
             <div key={q} className={styles.hospedeChip}>
-              <span>#{fmtRoom(parseInt(q))}</span>
+              <span>Quarto {fmtRoom(parseInt(q))}</span>
               <button type="button" className={styles.chipRemove} onClick={() => toggle(parseInt(q))}><X size={10} /></button>
             </div>
           ))}
@@ -581,7 +659,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   };
 
   return (
-    <Modal open onClose={onClose} size="lg"
+    <Modal open onClose={onClose} size="xl"
       title={<><Plus size={15} /> Nova Reserva</>}
       footer={
         <div className={styles.footerSpread}>
@@ -600,6 +678,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
         </div>
       }
     >
+      <div style={{ minHeight: '52vh', display: 'flex', flexDirection: 'column' }}>
       {/* Step bar */}
       <div className={styles.stepBar}>
         {STEPS.map((s, i) => (
@@ -675,11 +754,13 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
                 ))}
               </div>
             )}
-            <div className={styles.manualRow}>
-              <input className={styles.formInput} value={manualNome} onChange={(e) => setManualNome(e.target.value)}
-                placeholder="Ou informe o nome do titular..." onKeyDown={(e) => e.key === 'Enter' && addManual()} />
-              <Button variant="secondary" onClick={addManual} disabled={!manualNome.trim()}><Plus size={13} /></Button>
-            </div>
+            {isOrcamento && (
+              <div className={styles.manualRow}>
+                <input className={styles.formInput} value={manualNome} onChange={(e) => setManualNome(e.target.value)}
+                  placeholder="Nome do titular (para orçamento)..." onKeyDown={(e) => e.key === 'Enter' && addManual()} />
+                <Button variant="secondary" onClick={addManual} disabled={!manualNome.trim()}><Plus size={13} /></Button>
+              </div>
+            )}
           </FormField>
         </div>
       )}
@@ -698,18 +779,20 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
           </div>
 
           {periodoMode === 'unico' && (
-            <>
+            <div className={styles.step2Grid}>
               <FormField label="Período de estadia">
-                <DatePicker mode="range" startDate={checkin} endDate={checkout}
-                  onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); }}
-                  placeholder="Selecione check-in → check-out" minDate={new Date()} />
+                <div className={styles.dateCompact}>
+                  <DatePicker mode="range" startDate={checkin} endDate={checkout}
+                    onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); }}
+                    placeholder="Check-in → Check-out" minDate={new Date()} />
+                </div>
               </FormField>
               <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
                 <RoomCombobox value={quartos}
                   onChange={(v) => tipo !== 'grupo' ? setQuartos(v.slice(-1)) : setQuartos(v)}
                   availableRooms={availableRooms} />
               </FormField>
-            </>
+            </div>
           )}
 
           {periodoMode === 'multiplos' && (
@@ -735,9 +818,11 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
                   <RoomCombobox value={mpRooms} onChange={setMpRooms} availableRooms={mpAvailableRooms} />
                 </FormField>
                 <FormField label="Período">
-                  <DatePicker mode="range" startDate={mpCheckin} endDate={mpCheckout}
-                    onRangeChange={({ start, end }) => { setMpCheckin(start); setMpCheckout(end); }}
-                    placeholder="Check-in → Check-out" minDate={new Date()} />
+                  <div className={styles.dateCompact}>
+                    <DatePicker mode="range" startDate={mpCheckin} endDate={mpCheckout}
+                      onRangeChange={({ start, end }) => { setMpCheckin(start); setMpCheckout(end); }}
+                      placeholder="Check-in → Check-out" minDate={new Date()} />
+                  </div>
                 </FormField>
                 <Button variant="secondary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout} onClick={addPeriodo}>
                   <Plus size={13} /> Adicionar Período
@@ -823,6 +908,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
           )}
         </div>
       )}
+      </div>
 
       {/* Payment sub-modal */}
       {showPagModal && (
@@ -1222,7 +1308,7 @@ export default function BookingCalendar() {
                       title={`Ver reservas — ${fmtDateBR(dStr)}`}
                     >
                       <span className={[styles.dayWeekday, isWeekend ? styles.dayWeekdayRed : ''].join(' ')}>
-                        {day.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
+                        {day.toLocaleDateString('pt-BR', { weekday: 'long' })}
                       </span>
                       <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
                         {day.getDate()}
@@ -1250,7 +1336,6 @@ export default function BookingCalendar() {
                         <button className={styles.roomLabel} style={{ width: LEFT_W, height: ROOM_H }}
                           onClick={() => setRoomModal({ room })} title={`Histórico quarto ${fmtRoom(room)}`}>
                           <span className={styles.roomNum}>{fmtRoom(room)}</span>
-                          <span className={styles.roomCatTag}>{cat.nome.slice(0, 3).toUpperCase()}</span>
                         </button>
                         <div className={styles.roomCells} onMouseMove={(e) => handleRoomMouseMove(e, room)}>
                           {days.map((day, idx) => {
