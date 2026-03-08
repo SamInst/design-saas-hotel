@@ -17,10 +17,10 @@ import styles from './BookingCalendar.module.css';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_CELL_W   = 168;
-const ROOM_H       = 50;
+const ROOM_H       = 60;
 const CAT_H        = 30;
 const HDR_H        = 56;
-const LEFT_W       = 110;
+const LEFT_W       = 80;
 const VISIBLE_DAYS = 31;
 const HALF         = DAY_CELL_W / 2;
 const FORMAS_PAG   = ['PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', 'Transferência'];
@@ -659,7 +659,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   };
 
   return (
-    <Modal open onClose={onClose} size="xl"
+    <Modal open onClose={onClose} size="lg"
       title={<><Plus size={15} /> Nova Reserva</>}
       footer={
         <div className={styles.footerSpread}>
@@ -678,7 +678,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
         </div>
       }
     >
-      <div style={{ minHeight: '52vh', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ minHeight: '62vh', display: 'flex', flexDirection: 'column' }}>
       {/* Step bar */}
       <div className={styles.stepBar}>
         {STEPS.map((s, i) => (
@@ -712,7 +712,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
           <FormField label="Tipo de Reserva">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div className={styles.tipoRow}>
-                {[['simples', 'Reserva Simples'], ['grupo', 'Reserva em Grupo']].map(([v, l]) => (
+                {[['simples', 'Reserva Simples'], ['grupo', 'Múltiplas Reservas']].map(([v, l]) => (
                   <button key={v} type="button"
                     className={[styles.tipoBtn, tipo === v ? styles.tipoBtnActive : ''].join(' ')}
                     onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
@@ -721,7 +721,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
               </div>
               <label className={styles.orcamentoToggle}>
                 <input type="checkbox" checked={isOrcamento} onChange={(e) => setIsOrcamento(e.target.checked)} />
-                <span>É orçamento</span>
+                <span>Simular Orçamento</span>
               </label>
             </div>
           </FormField>
