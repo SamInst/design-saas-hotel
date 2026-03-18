@@ -12,7 +12,7 @@ import { Modal }                    from '../../components/ui/Modal';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }             from '../../components/ui/Notification';
 import { DatePicker }               from '../../components/ui/DatePicker';
-import { cadastroApi }              from '../../services/api';
+import { cadastroApi, userStorage } from '../../services/api';
 
 import styles from './RegistersPage.module.css';
 
@@ -70,45 +70,67 @@ const getInitials = (name) => {
 
 // ── Smart search ──────────────────────────────────────────────
 const buildSearchParams = raw => {
-  const c = raw.replace(/[\s.,\-\/]/g,'').toUpperCase();
-  if (!c) return {};
-  if (/^[A-Z]{3}\d{4}$/.test(c) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(c)) return { placaVeiculo: c };
-  if (/^\d+$/.test(c)) {
-    if (c.length === 11) return { cpf: c };
-    if (c.length === 14) return { cnpj: c };
-    return { termo: c };
+  const stripped = raw.replace(/[\s.,\-\/]/g,'').toUpperCase();
+  if (!stripped) return {};
+  if (/^[A-Z]{3}\d{4}$/.test(stripped) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(stripped)) return { placa: stripped };
+  if (/^\d+$/.test(stripped)) {
+    if (stripped.length === 11) return { termo: stripped };
+    if (stripped.length === 14) return { cnpj: stripped };
+    return { termo: stripped };
   }
-  return { termo: c };
+  return { termo: raw.trim().toUpperCase() };
 };
 
-const buildPessoaBody = (p, overrides = {}) => ({
-  nome:               up(p.nome),
-  dataNascimento:     p.dataNascimento instanceof Date
-    ? p.dataNascimento.toISOString().split('T')[0] : (p.dataNascimento ?? ''),
-  cpf:                unmask(p.cpf),
-  rg:                 up(p.rg),
-  email:              (p.email ?? '').trim(),
-  telefone:           unmask(p.telefone),
-  pais:               up(p.pais) || 'BRASIL',
-  estado:             up(p.estado),
-  municipio:          up(p.municipio),
-  endereco:           up(p.endereco),
-  complemento:        up(p.complemento),
-  cep:                unmask(p.cep),
-  bairro:             up(p.bairro),
-  sexo:               Number(p.sexo) || 1,
-  numero:             up(p.numero),
-  status:             p.status ?? 'ATIVO',
-  titularId:          p.titularId ?? null,
-  empresasVinculadas: (p.empresasVinculadas ?? []).map(e => ({ id: e.id })),
-  veiculos:           (p.veiculos ?? []).map(v => ({
-    modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
-    ano: Number(v.ano) || 0,
-    placa: cleanPlaca(v.placa),
-    cor: up(v.cor ?? ''),
-  })),
-  ...overrides,
-});
+const buildPessoaBody = (p, overrides = {}) => {
+  const currentUser = userStorage.get();
+  const titularId = p.titularId ?? p.titular?.id ?? null;
+  // Backend espera dd/MM/yyyy
+  const toApiDate = d => {
+    if (!d) return '';
+    if (d instanceof Date) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${d.getFullYear()}`;
+    }
+    // já em dd/MM/yyyy
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
+    // yyyy-MM-dd → converte
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      const [y, m, day] = d.split('-');
+      return `${day}/${m}/${y}`;
+    }
+    return d;
+  };
+  const rawNasc = toApiDate(p.dataNascimento ?? p.data_nascimento);
+  return {
+    nome:            up(p.nome),
+    data_nascimento: rawNasc,
+    cpf:             unmask(p.cpf),
+    rg:              up(p.rg),
+    email:           (p.email ?? '').trim(),
+    telefone:        unmask(p.telefone),
+    pais:            up(p.pais) || 'BRASIL',
+    estado:          up(p.estado),
+    municipio:       up(p.municipio),
+    endereco:        up(p.endereco),
+    complemento:     up(p.complemento),
+    cep:             unmask(p.cep),
+    bairro:          up(p.bairro),
+    sexo:            Number(p.sexo) || 1,
+    numero:          up(p.numero),
+    status:          p.status ?? 'ATIVO',
+    titular:         titularId ? { id: titularId } : null,
+    empresas:        (p.empresasVinculadas ?? p.empresas_vinculadas ?? []).map(e => ({ id: e.id })),
+    veiculos:        (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+      modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
+      ano: Number(v.ano) || 0,
+      placa: cleanPlaca(v.placa),
+      cor: up(v.cor ?? ''),
+    })),
+    funcionario:     { id: currentUser?.id },
+    ...overrides,
+  };
+};
 
 const dateFromApi = d => {
   if (!d) return '';
@@ -138,7 +160,7 @@ const SEXO_OPTS = [
 
 const blankVeiculo = () => ({ modelo:'', marca:'', ano:'', placa:'', cor:'' });
 const blankPessoa  = () => ({
-  nome:'', dataNascimento: null, cpf:'', rg:'', email:'',
+  nome:'', dataNascimento: null, cpf:'', rg:'', email:'', profissao:'',
   telefone:'', sexo:'', pais:'Brasil', estado:'', municipio:'',
   endereco:'', complemento:'', cep:'', bairro:'', numero:'',
   veiculos:[], status:'ATIVO', titularId: null, empresasVinculadas: [],
@@ -173,7 +195,7 @@ function AvatarCircle({ name, size = 40, className = '' }) {
 function Section({ title, children }) {
   return (
     <div className={styles.section}>
-      <div className={styles.sectionLabel}>{title}</div>
+      <div className={styles.sectionDivider}>{title}</div>
       <div className={styles.kvList}>{children}</div>
     </div>
   );
@@ -239,84 +261,99 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
   return (
     <div className={styles.formBody}>
 
-      {/* Foto isolada no topo */}
-      <div className={styles.photoTop}>
-        <div className={styles.photoBig}>
-          <Camera size={28} className={styles.photoIconBig} />
-          <div className={styles.photoUploadBtn}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="12" height="12">
-              <polyline points="16 16 12 12 8 16"/>
-              <line x1="12" y1="12" x2="12" y2="21"/>
-              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
-            </svg>
+      {/* ── Dados Pessoais ── */}
+      <div className={styles.sectionDivider}><User size={12} /> Dados Pessoais</div>
+
+      {/* Foto + campos principais */}
+      <div className={styles.photoHeaderRow}>
+        <div className={styles.photoSide}>
+          <div className={styles.photoBig}>
+            <Camera size={28} className={styles.photoIconBig} />
+            <div className={styles.photoUploadBtn}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="12" height="12">
+                <polyline points="16 16 12 12 8 16"/>
+                <line x1="12" y1="12" x2="12" y2="21"/>
+                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+              </svg>
+            </div>
           </div>
+          <span className={styles.photoBadgeTop}>Em breve</span>
         </div>
-        <span className={styles.photoBadgeTop}>Em breve</span>
-      </div>
 
-      {/* CPF | Nome | Data Nascimento */}
-      <div className={styles.cpfRow}>
-        <div className={styles.cpfBlock}>
-          <label className={[styles.cpfLabel, hasErr('cpf') && !cpfStatus ? styles.labelErr : ''].join(' ')}>
-            CPF *
-          </label>
-          <div className={styles.cpfWrap}>
-            <Input
-              value={data.cpf}
-              onChange={e => handleCPF(e.target.value)}
-              placeholder="000.000.000-00"
-              className={cpfInputCls}
-            />
-            {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
+        <div className={styles.photoRightCol}>
+          <div className={styles.photoFields}>
+            {/* Row 1: CPF | Nome | Data de Nascimento */}
+            <div className={styles.cpfBlock}>
+              <label className={[styles.fieldLabel, hasErr('cpf') && !cpfStatus ? styles.labelErr : ''].join(' ')}>
+                CPF *
+              </label>
+              <div className={styles.cpfWrap}>
+                <Input
+                  value={data.cpf}
+                  onChange={e => handleCPF(e.target.value)}
+                  placeholder="000.000.000-00"
+                  className={cpfInputCls}
+                />
+                {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
+              </div>
+              {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>CPF inválido</span>}
+              {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>CPF já cadastrado</span>}
+              {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>CPF disponível</span>}
+            </div>
+
+            <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
+              <FormField label="Nome completo *">
+                <Input value={data.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
+              </FormField>
+            </div>
+
+            <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
+              <FormField label="Data de Nascimento *">
+                <DatePicker
+                  mode="single"
+                  value={data.dataNascimento}
+                  onChange={d => set('dataNascimento', d ?? null)}
+                  maxDate={new Date()}
+                  placeholder="dd/mm/aaaa"
+                  error={hasErr('dataNascimento')}
+                />
+              </FormField>
+            </div>
           </div>
-          {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>CPF inválido</span>}
-          {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>CPF já cadastrado</span>}
-          {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>CPF disponível</span>}
-        </div>
 
-        <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Nome completo *">
-            <Input value={data.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
-          </FormField>
-        </div>
+          {/* Row 2: Telefone | Sexo | RG */}
+          <div className={styles.grid3}>
+            <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
+              <FormField label="Telefone *">
+                <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
+              </FormField>
+            </div>
+            <FormField label="Sexo">
+              <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
+                {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="RG">
+              <Input value={data.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
+            </FormField>
+          </div>
 
-        <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Data de Nascimento *">
-            <DatePicker
-              mode="single"
-              value={data.dataNascimento}
-              onChange={d => set('dataNascimento', d ?? null)}
-              maxDate={new Date()}
-              placeholder="dd/mm/aaaa"
-              error={hasErr('dataNascimento')}
-            />
-          </FormField>
         </div>
       </div>
 
-      <div className={styles.grid3}>
-        <FormField label="RG">
-          <Input value={data.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
-        </FormField>
-        <FormField label="Sexo">
-          <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
-            {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-        </FormField>
-        <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Telefone *">
-            <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
+      <div className={styles.grid2}>
+        <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
+          <FormField label="Email *">
+            <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
           </FormField>
         </div>
-      </div>
-
-      <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
-        <FormField label="Email *">
-          <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+        <FormField label="Profissão">
+          <Input value={data.profissao ?? ''} onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
         </FormField>
       </div>
 
-      <div className={styles.formDivider} />
+      {/* ── Endereço ── */}
+      <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
 
       <div className={styles.grid3}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
@@ -356,12 +393,12 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
       </FormField>
 
-      <div className={styles.formDivider} />
-
-      <div className={styles.subHead}>
-        <span className={styles.subHeadTitle}><Car size={13} /> Veículos</span>
+      {/* ── Veículos ── */}
+      <div className={styles.sectionDividerRow}>
+        <div className={styles.sectionDivider}><Car size={12} /> Veículos</div>
         <Button onClick={addVeiculo}><Plus size={12} /> Veículo</Button>
       </div>
+
       {data.veiculos.map((v, i) => (
         <div key={i} className={styles.subFormBlock}>
           <div className={styles.subFormTitle}>
@@ -431,6 +468,7 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
 
   return (
     <div className={styles.formBody}>
+      <div className={styles.sectionDivider}><Building2 size={12} /> Dados Empresariais</div>
       <div className={styles.grid2}>
         <div>
           <label className={styles.fieldLabel}>CNPJ *</label>
@@ -461,7 +499,7 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
         <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="contato@empresa.com" />
       </FormField>
 
-      <div className={styles.formDivider} />
+      <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
 
       <div className={styles.grid3}>
         <div>
@@ -534,6 +572,13 @@ export default function RegistersPage() {
   const [linkLoading, setLinkLoading] = useState(false);
   const [linkEmpresa, setLinkEmpresa] = useState(null);
   const linkDebounce = useRef(null);
+
+  // novo hóspede — empresa / dependentes
+  const [temEmpresa,      setTemEmpresa]      = useState('');   // '' | 'sim' | 'nao'
+  const [temDependentes,  setTemDependentes]  = useState('');   // '' | 'sim' | 'nao'
+  const [numDependentes,  setNumDependentes]  = useState('');
+  const [depFillIdx,      setDepFillIdx]      = useState(-1);
+  const [currentDep,      setCurrentDep]      = useState(null);
 
   // vinculados (detalhe empresa)
   const [vinculSearch,  setVinculSearch]  = useState('');
@@ -638,7 +683,10 @@ export default function RegistersPage() {
         try {
           const res = await cadastroApi.listarEmpresas({ termo: linkSearch, size: 8 });
           setLinkResults(res?.content ?? []);
-        } catch {} finally { setLinkLoading(false); }
+        } catch (e) {
+          setLinkResults([]);
+          showNotif(e.message || 'Erro ao buscar empresa.', 'error');
+        } finally { setLinkLoading(false); }
       }, 400);
     } else { setLinkResults([]); }
     return () => clearTimeout(linkDebounce.current);
@@ -669,16 +717,33 @@ export default function RegistersPage() {
       showNotif('Preencha todos os campos obrigatórios (*).', 'error');
       return;
     }
-    // Validar dependentes
-    for (let i = 0; i < dependentes.length; i++) {
-      const dep = dependentes[i];
-      if (!dep.nome || !dep.cpf || !dep.dataNascimento || !dep.telefone || !dep.email || !dep.cep) {
-        showNotif(`Preencha todos os campos obrigatórios do dependente ${i + 1}.`, 'error');
-        return;
-      }
-    }
     setShowErrors(false);
-    setConfirmStep(true);
+    const n = parseInt(numDependentes) || 0;
+    if (n > 0) {
+      setDependentes([]);
+      setCurrentDep(blankPessoa());
+      setDepFillIdx(0);
+    } else {
+      setConfirmStep(true);
+    }
+  };
+
+  const handleDepSave = () => {
+    if (!currentDep.nome || !currentDep.cpf) {
+      showNotif('Preencha ao menos nome e CPF do dependente.', 'error');
+      return;
+    }
+    const n = parseInt(numDependentes) || 0;
+    const updatedDeps = [...dependentes, currentDep];
+    setDependentes(updatedDeps);
+    if (depFillIdx + 1 < n) {
+      setCurrentDep(blankPessoa());
+      setDepFillIdx(depFillIdx + 1);
+    } else {
+      setDepFillIdx(-1);
+      setCurrentDep(null);
+      setConfirmStep(true);
+    }
   };
 
   const doSavePessoa = async () => {
@@ -686,10 +751,10 @@ export default function RegistersPage() {
     try {
       await cadastroApi.criarPessoa({
         pessoas: [
-          buildPessoaBody(titular, { titularId: null }),
-          ...dependentes.map(d => buildPessoaBody(d, { titularId: null })),
+          buildPessoaBody(titular, { titular: null }),
+          ...dependentes.map(d => buildPessoaBody(d, { titular: null })),
         ],
-        empresasIds: linkEmpresa ? [linkEmpresa.id] : [],
+        empresas: linkEmpresa ? [{ id: linkEmpresa.id }] : [],
       });
       showNotif('Hóspede(s) cadastrado(s) com sucesso!');
       setShowAddPessoa(false);
@@ -725,7 +790,7 @@ export default function RegistersPage() {
         municipio:     up(empresa.municipio),
       };
       if (editMode && detailItem?.id) {
-        await cadastroApi.atualizarEmpresa(detailItem.id, body);
+        await cadastroApi.atualizarEmpresa({ id: detailItem.id, ...body });
         showNotif('Empresa atualizada!');
       } else {
         // Use termo= endpoint for checking duplicates
@@ -775,7 +840,7 @@ export default function RegistersPage() {
   const handleSaveEditPessoa = async () => {
     setIsSubmitting(true);
     try {
-      await cadastroApi.atualizarPessoa(detailItem.id, buildPessoaBody(editPessoa));
+      await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(editPessoa) });
       showNotif('Pessoa atualizada!');
       setShowEdit(false);
       fetchData(searchTerm, filterMode, page);
@@ -787,7 +852,7 @@ export default function RegistersPage() {
     const novoStatus = detailItem.status === 'BLOQUEADO' ? 'ATIVO' : 'BLOQUEADO';
     setIsSubmitting(true);
     try {
-      await cadastroApi.atualizarPessoa(detailItem.id, buildPessoaBody(detailItem, { status: novoStatus }));
+      await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(detailItem, { status: novoStatus }) });
       showNotif(`Status alterado para ${novoStatus}!`);
       setDetailItem(prev => ({ ...prev, status: novoStatus }));
       fetchData(searchTerm, filterMode, page);
@@ -806,14 +871,15 @@ export default function RegistersPage() {
 
   const handleVincular = async pessoaId => {
     try {
-      const vinculadoIds = (detailItem?.pessoasVinculadas ?? detailItem?.pessoas ?? []).map(p => p.id);
+      const vinculadoIds = (detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? []).map(p => p.id);
       if (vinculadoIds.includes(pessoaId)) {
         showNotif('Esta pessoa já está vinculada!', 'error');
         return;
       }
-      await cadastroApi.vincularPessoa(detailItem.id, pessoaId);
+      await cadastroApi.vincularPessoa({ empresa: { id: detailItem.id }, pessoa: { id: pessoaId }, ativo: true });
       showNotif('Pessoa vinculada!');
-      const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
+      const res = await cadastroApi.buscarEmpresaPorId(detailItem.id);
+      const updated = res?.content?.[0] ?? res;
       setDetailItem({ ...updated, _type: 'empresa' });
       setVinculSearch('');
       setVinculResults([]);
@@ -823,9 +889,10 @@ export default function RegistersPage() {
   const handleDesvincular = async pessoaId => {
     if (!window.confirm('Tem certeza que deseja desvincular esta pessoa?')) return;
     try {
-      await cadastroApi.desvincularPessoa(detailItem.id, pessoaId);
+      await cadastroApi.vincularPessoa({ empresa: { id: detailItem.id }, pessoa: { id: pessoaId }, ativo: false });
       showNotif('Pessoa desvinculada!');
-      const updated = await cadastroApi.buscarEmpresaPorId(detailItem.id);
+      const res = await cadastroApi.buscarEmpresaPorId(detailItem.id);
+      const updated = res?.content?.[0] ?? res;
       setDetailItem({ ...updated, _type: 'empresa' });
     } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
   };
@@ -863,7 +930,7 @@ export default function RegistersPage() {
   ];
 
   const totalPessoas   = 1 + dependentes.length;
-  const vinculadosList = detailItem?.pessoasVinculadas ?? detailItem?.pessoas ?? [];
+  const vinculadosList = detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? [];
 
   const nomeListing = item =>
     item._type === 'empresa'
@@ -970,8 +1037,11 @@ export default function RegistersPage() {
                   placeholder="Nome, CPF, CNPJ, placa..."
                   className={styles.searchInput}
                 />
-                {loading && searchTerm.length >= 3 &&
-                  <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
+                {loading && searchTerm.length >= 3
+                  ? <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
+                  : searchTerm.length > 0 &&
+                    <button className={styles.searchClear} onClick={() => setSearchTerm('')}><X size={13} /></button>
+                }
               </div>
               <Button onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
                 <Building2 size={14} /> Empresa
@@ -1033,17 +1103,17 @@ export default function RegistersPage() {
                             (item.nomeFantasia || item.nome_fantasia) !== (item.razaoSocial || item.razao_social) && (
                             <div className={styles.sub}>{item.nomeFantasia ?? item.nome_fantasia}</div>
                           )}
-                          {item._type === 'pessoa' && (item.veiculos ?? [])[0] && (
+                          {item._type === 'pessoa' && (item.veiculos_vinculados ?? [])[0] && (
                             <div className={styles.sub} style={{ display:'flex', alignItems:'center', gap:3 }}>
                               <Car size={10} />
-                              {item.veiculos[0].placa}
-                              {[item.veiculos[0].modelo, item.veiculos[0].marca].filter(Boolean).join(' ') &&
-                                ` · ${[item.veiculos[0].modelo, item.veiculos[0].marca].filter(Boolean).join(' ')}`}
+                              {item.veiculos_vinculados[0].placa}
+                              {[item.veiculos_vinculados[0].modelo, item.veiculos_vinculados[0].marca].filter(Boolean).join(' ') &&
+                                ` · ${[item.veiculos_vinculados[0].modelo, item.veiculos_vinculados[0].marca].filter(Boolean).join(' ')}`}
                             </div>
                           )}
-                          {item._type === 'pessoa' && (item.empresasVinculadas ?? [])[0] && (
+                          {item._type === 'pessoa' && (item.empresas_vinculadas ?? [])[0] && (
                             <div className={styles.sub} style={{ display:'flex', alignItems:'center', gap:3 }}>
-                              <Building2 size={10} /> {empresaNome(item.empresasVinculadas[0])}
+                              <Building2 size={10} /> {empresaNome(item.empresas_vinculadas[0])}
                             </div>
                           )}
                         </td>
@@ -1108,7 +1178,7 @@ export default function RegistersPage() {
                 <Section title="Dados Pessoais">
                   <KV label="CPF"  value={maskCPF(detailItem.cpf ?? '')} />
                   <KV label="RG"   value={detailItem.rg} />
-                  <KV label="Nasc." value={dateFromApi(detailItem.dataNascimento)} />
+                  <KV label="Nasc." value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
                   <KV label="Sexo" value={detailItem.sexo === 1 ? 'Masculino' : detailItem.sexo === 2 ? 'Feminino' : 'Outro'} />
                   <KV label="Telefone" value={
                     <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1141,15 +1211,19 @@ export default function RegistersPage() {
                   <KV label="País"     value={detailItem.pais} />
                   <KV label="Compl."   value={detailItem.complemento} />
                 </Section>
+                <Section title="Registro">
+                  <KV label="Cadastrado em"  value={detailItem.data_hora_registro ?? '—'} />
+                  <KV label="Funcionário"    value={detailItem.funcionario?.nome ?? '—'} />
+                </Section>
               </div>
             )}
 
             {detailTab === 'veiculo' && (
-              (detailItem.veiculos ?? []).length === 0 ? (
+              (detailItem.veiculos_vinculados ?? []).length === 0 ? (
                 <div className={styles.emBreve}><Car size={36} opacity={0.2} /><span>Sem veículos cadastrados.</span></div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {detailItem.veiculos.map((v, i) => (
+                  {detailItem.veiculos_vinculados.map((v, i) => (
                     <div key={i} className={styles.veiculoCard}>
                       <div className={styles.veiculoCardHead}>
                         <Car size={14} className={styles.iconViolet} />
@@ -1169,11 +1243,11 @@ export default function RegistersPage() {
             )}
 
             {detailTab === 'empresa' && (
-              (detailItem.empresasVinculadas ?? []).length === 0 ? (
+              (detailItem.empresas_vinculadas ?? []).length === 0 ? (
                 <div className={styles.emBreve}><Building2 size={36} opacity={0.2} /><span>Sem empresas vinculadas.</span></div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {detailItem.empresasVinculadas.map(e => (
+                  {detailItem.empresas_vinculadas.map(e => (
                     <div key={e.id} className={styles.empresaCard}>
                       <div className={styles.empresaCardHead}>
                         <Building2 size={14} className={styles.iconViolet} />
@@ -1285,34 +1359,50 @@ export default function RegistersPage() {
                   <KV label="Cidade"   value={detailItem.municipio} />
                   <KV label="Estado"   value={detailItem.estado} />
                 </Section>
+                <Section title="Registro">
+                  <KV label="Cadastrado em" value={
+                    detailItem.data_hora_registro
+                      ? String(detailItem.data_hora_registro).replace('T',' ').slice(0,16)
+                      : '—'
+                  } />
+                  <KV label="Funcionário" value={detailItem.funcionario?.nome ?? '—'} />
+                </Section>
               </div>
             )}
             {detailTab === 'vinculados' && (
               <div>
-                <div className={styles.vinculBar}>
-                  <div className={styles.searchWrap} style={{ flex: 1 }}>
+                <div className={styles.linkEmpresaSearch}>
+                  <div className={styles.searchWrap}>
                     <Search size={13} className={styles.searchIcon} />
                     <Input value={vinculSearch} onChange={e => setVinculSearch(e.target.value)}
-                      placeholder="Buscar pessoa por nome ou CPF..."
+                      placeholder="Buscar pessoa por nome ou CPF (mín. 3 caracteres)..."
                       className={styles.searchInput} />
                     {vinculLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                   </div>
+                  {vinculResults.length > 0 && (
+                    <div className={styles.linkDropdown}>
+                      {vinculResults.map(p => {
+                        const jaVinculado = vinculadosList.some(v => v.id === p.id);
+                        return (
+                          <button key={p.id}
+                            className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
+                            onClick={() => { if (!jaVinculado) { handleVincular(p.id); setVinculSearch(''); setVinculResults([]); } }}
+                            disabled={jaVinculado}
+                          >
+                            <AvatarCircle name={p.nome} size={22} />
+                            <span className={styles.nome}>{p.nome}</span>
+                            <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
+                            {jaVinculado
+                              ? <span className={styles.jaVinculadoBadge}>Já vinculado</span>
+                              : <span className={styles.vincularHint}><Plus size={11} /> Vincular</span>
+                            }
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                {vinculResults.length > 0 && (
-                  <div className={styles.vinculResults}>
-                    {vinculResults.map(p => (
-                      <div key={p.id} className={styles.vinculResult}>
-                        <AvatarCircle name={p.nome} size={26} />
-                        <span className={styles.nome}>{p.nome}</span>
-                        <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
-                        <Button variant="primary" onClick={() => handleVincular(p.id)}>
-                          <Plus size={12} /> Vincular
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className={styles.depList}>
+                <div className={styles.depList} style={{ marginTop: 14 }}>
                   {vinculadosList.length === 0
                     ? <div className={styles.emBreve}><Users size={28} opacity={0.2} /><span>Nenhum vinculado.</span></div>
                     : vinculadosList.map(p => (
@@ -1357,7 +1447,13 @@ export default function RegistersPage() {
       {/* ══ MODAL: ADICIONAR HÓSPEDE ══════════════════════════ */}
       <Modal
         open={showAddPessoa}
-        onClose={() => { setShowAddPessoa(false); setConfirmStep(false); setShowErrors(false); }}
+        onClose={() => {
+          setShowAddPessoa(false); setConfirmStep(false); setShowErrors(false);
+          setTemEmpresa(''); setTemDependentes(''); setNumDependentes('');
+          setDepFillIdx(-1); setCurrentDep(null);
+          setTitular(blankPessoa()); setDependentes([]);
+          setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+        }}
         size="xl"
         title={confirmStep ? 'Confirmar Cadastro' : 'Novo Hóspede'}
         footer={
@@ -1384,18 +1480,16 @@ export default function RegistersPage() {
         }>
 
         {!confirmStep ? (
-          <>
-            <div className={styles.addBlock}>
-              <div className={styles.addBlockTitle}><User size={13} /> Titular</div>
+          <div>
+            <div>
               <PessoaForm
                 data={titular} onChange={setTitular}
                 onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
                 showErrors={showErrors}
               />
-            </div>
 
-            <div className={styles.addBlock}>
-              <div className={styles.addBlockTitle}><Building2 size={13} /> Empresa (opcional)</div>
+              {/* EMPRESA section */}
+              <div className={styles.sectionDivider}><Building2 size={12} /> Empresa</div>
               {linkEmpresa ? (
                 <div className={styles.selectedEmpresa}>
                   <Building2 size={13} className={styles.iconViolet} />
@@ -1426,40 +1520,21 @@ export default function RegistersPage() {
                   )}
                 </div>
               )}
-            </div>
 
-            <div className={styles.addBlock}>
-              <div className={styles.addBlockHead}>
-                <span className={styles.addBlockTitle}>
-                  <Users size={13} /> Dependentes
-                  {dependentes.length > 0 && (
-                    <span className={styles.depCountBadge}>{dependentes.length}</span>
-                  )}
-                </span>
-                <Button onClick={() => setDependentes(d => [...d, blankPessoa()])}>
-                  <Plus size={12} /> Adicionar
-                </Button>
-              </div>
-              {dependentes.map((dep, i) => (
-                <div key={i} className={styles.subFormBlock} style={{ marginTop: 12 }}>
-                  <div className={styles.subFormTitle}>
-                    <span>Dependente {i + 1}</span>
-                    <button className={styles.btnRemove}
-                      onClick={() => setDependentes(d => d.filter((_,j) => j !== i))}>
-                      <X size={13} />
-                    </button>
-                  </div>
-                  <PessoaForm
-                    data={dep}
-                    onChange={val => setDependentes(d => d.map((x, j) =>
-                      j === i ? (typeof val === 'function' ? val(x) : val) : x))}
-                    onFetchCEP={fetchCEP}
-                    onCheckCPF={checkCPF}
+              {/* DEPENDENTES section */}
+              <div className={styles.sectionDivider}><Users size={12} /> Dependentes</div>
+              <div style={{ maxWidth: 200 }}>
+                <FormField label="Quantidade">
+                  <Input
+                    type="number" min="1" max="10"
+                    value={numDependentes}
+                    onChange={e => setNumDependentes(e.target.value)}
+                    placeholder="0"
                   />
-                </div>
-              ))}
+                </FormField>
+              </div>
             </div>
-          </>
+          </div>
         ) : (
           <div className={styles.confirmWrap}>
             <p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>
@@ -1488,6 +1563,31 @@ export default function RegistersPage() {
           </div>
         )}
       </Modal>
+
+      {/* ══ MODAL: PREENCHER DEPENDENTE ════════════════════════════ */}
+      {currentDep !== null && (
+        <Modal
+          open={depFillIdx >= 0}
+          onClose={() => { setDepFillIdx(-1); setCurrentDep(null); }}
+          size="xl"
+          title={`Dependente ${depFillIdx + 1} de ${numDependentes}`}
+          footer={
+            <div className={styles.modalFooter}>
+              <Button onClick={() => { setDepFillIdx(-1); setCurrentDep(null); }}>Cancelar</Button>
+              <Button variant="primary" onClick={handleDepSave}>
+                {depFillIdx + 1 < parseInt(numDependentes) ? 'Próximo →' : 'Concluir →'}
+              </Button>
+            </div>
+          }
+        >
+          <PessoaForm
+            data={currentDep}
+            onChange={setCurrentDep}
+            onFetchCEP={fetchCEP}
+            onCheckCPF={checkCPF}
+          />
+        </Modal>
+      )}
 
       {/* ══ MODAL: ADICIONAR / EDITAR EMPRESA ════════════════ */}
       <Modal

@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+// const BASE_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-  // const BASE_URL =
-  // import.meta.env.VITE_API_URL ||
-  // 'http://localhost:8080';
+  const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -142,7 +142,7 @@ async function request(path, { method = 'GET', body, headers = {}, params } = {}
     }
 
     const message =
-      data?.message || data?.error || data?.detail || `Erro ${res.status}`;
+      data?.mensagem || data?.message || data?.error || data?.detail || `Erro ${res.status}`;
     const err = new Error(message);
     err.status = res.status;
     err.data   = data;
@@ -163,17 +163,11 @@ export const authApi = {
    * @returns {{ token: string, user: object }}
    */
   async login(username, senha) {
-    // O backend retorna o Bearer token no header Authorization
-    // e o payload do usuário no body.
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, senha }),
     });
-
-    // Tenta extrair token do header primeiro, depois do body
-    let token = res.headers.get('Authorization') || res.headers.get('authorization');
-    if (token?.startsWith('Bearer ')) token = token.slice(7);
 
     let data;
     try { data = await res.json(); } catch { data = null; }
@@ -185,15 +179,22 @@ export const authApi = {
       throw err;
     }
 
-    // Alguns backends retornam o token no body
-    if (!token && data?.token) token = data.token;
-    if (!token && data?.accessToken) token = data.accessToken;
+    const token = data?.token;
+    if (!token) throw new Error('Token não recebido do servidor');
 
-    // Persiste sessão
-    if (token) tokenStorage.set(token);
-    if (data)  userStorage.set(data);
+    // Decodifica o payload JWT para extrair o objeto funcionario
+    let funcionario;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      funcionario = payload.funcionario;
+    } catch {
+      throw new Error('Erro ao processar autenticação');
+    }
 
-    return { token, user: data };
+    tokenStorage.set(token);
+    userStorage.set(funcionario);
+
+    return { token, user: funcionario };
   },
 
   logout() {
@@ -344,25 +345,25 @@ export const categoriaApi = {
 };
 
 // ─────────────────────────────────────────────────────────────
-//  CADASTROS (pessoas, empresas, veículos)
+//  CADASTROS (pessoas, empresas)
 // ─────────────────────────────────────────────────────────────
 export const cadastroApi = {
-  listarPessoas(params)         { return request('/pessoa',  { params }); },
-  buscarPessoaPorId(id)         { return request(`/pessoa/${id}`); },
-  criarPessoa(body)             { return request('/pessoa',  { method: 'POST', body }); },
-  atualizarPessoa(id, body)     { return request(`/pessoa/${id}`, { method: 'PUT', body }); },
+  // PESSOA – GET/POST/PUT /pessoa
+  listarPessoas(params)     { return request('/pessoa', { params }); },
+  criarPessoa(body)         { return request('/pessoa', { method: 'POST', body }); },
+  atualizarPessoa(body)     { return request('/pessoa', { method: 'PUT', body }); },
+  vincularTitular(body)     { return request('/pessoa/vincular-titular', { method: 'PUT', body }); },
 
-  listarEmpresas(params)        { return request('/empresas', { params }); },
-  buscarEmpresaPorId(id)        { return request(`/empresas?id=${id}`); },
-  criarEmpresa(body)            { return request('/empresas', { method: 'POST', body }); },
-  atualizarEmpresa(id, body)    { return request(`/empresas/${id}`, { method: 'PUT', body }); },
-  vincularPessoa(empresaId, pessoaId)    { return request(`/empresas/${empresaId}/pessoa?pessoaId=${pessoaId}&vinculo=true`, { method: 'PUT' }); },
-  desvincularPessoa(empresaId, pessoaId) { return request(`/empresas/${empresaId}/pessoa?pessoaId=${pessoaId}&vinculo=false`, { method: 'PUT' }); },
+  // EMPRESA – GET/POST/PUT /empresa
+  listarEmpresas(params)    { return request('/empresa', { params }); },
+  buscarEmpresaPorId(id)    { return request('/empresa', { params: { id } }); },
+  criarEmpresa(body)        { return request('/empresa', { method: 'POST', body }); },
+  atualizarEmpresa(body)    { return request('/empresa', { method: 'PUT', body }); },
+  // ativo: true = vincular, false = desvincular
+  vincularPessoa(body)      { return request('/empresa/vincular-pessoa', { method: 'PUT', body }); },
 
-  listarVeiculos(params)        { return request('/veiculos', { params }); },
-
-  buscarCEP(cep)                { return request(`/cep/${cep}`); },
-  buscarCNPJ(cnpj)              { return request(`/cnpj/${cnpj}`); },
+  buscarCEP(cep)            { return request(`/cep/${cep}`); },
+  buscarCNPJ(cnpj)          { return request(`/cnpj/${cnpj}`); },
 };
 
 // ─────────────────────────────────────────────────────────────

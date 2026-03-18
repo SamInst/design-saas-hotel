@@ -27,14 +27,14 @@ export default function LoginPage({ onLogin }) {
       // Monta o objeto de sessão que o App.jsx vai usar
       onLogin({
         id:          user.id,
-        usuarioId:   user.usuarioId,
-        pessoaId:    user.pessoaId,
-        name:        user.nome,          // nome completo
-        username:    user.username,
-        email:       user.email,
-        role:        user.cargo?.nome ?? 'Funcionário',
-        cargo:       user.cargo,         // { id, nome, telas[] }
-        dataAdmissao: user.dataAdmissao,
+        usuarioId:   user.usuario?.id,
+        pessoaId:    user.pessoa?.id,
+        name:        user.pessoa?.nome,
+        username:    user.usuario?.username,
+        email:       user.pessoa?.email,
+        role:        user.cargo?.descricao ?? 'Funcionário',
+        cargo:       user.cargo,
+        dataAdmissao: user.data_admissao,
         avatar:      null,
       });
     } catch (err) {
