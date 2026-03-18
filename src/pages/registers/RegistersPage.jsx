@@ -121,7 +121,8 @@ const buildPessoaBody = (p, overrides = {}) => {
     status:          p.status ?? 'ATIVO',
     titular:         titularId ? { id: titularId } : null,
     empresas:        (p.empresasVinculadas ?? p.empresas_vinculadas ?? []).map(e => ({ id: e.id })),
-    veiculos:        (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+    veiculos_vinculados: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+      ...(v.id ? { id: v.id } : {}),
       modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
       ano: Number(v.ano) || 0,
       placa: cleanPlaca(v.placa),
@@ -810,12 +811,24 @@ export default function RegistersPage() {
 
   const openEditPessoa = p => {
     if (p.status === 'BLOQUEADO') return;
+    // data_nascimento vem da API em dd/mm/yyyy; converte para Date
+    const rawNasc = p.data_nascimento ?? p.dataNascimento;
+    let dataNasc = null;
+    if (rawNasc) {
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawNasc)) {
+        const [dd, mm, yyyy] = rawNasc.split('/');
+        dataNasc = new Date(`${yyyy}-${mm}-${dd}T12:00:00`);
+      } else {
+        dataNasc = new Date(rawNasc + 'T12:00:00');
+      }
+    }
     setEditPessoa({
       nome:               p.nome ?? '',
-      dataNascimento:     p.dataNascimento ? new Date(p.dataNascimento + 'T12:00:00') : null,
+      dataNascimento:     dataNasc,
       cpf:                maskCPF(p.cpf ?? ''),
       rg:                 p.rg ?? '',
       email:              p.email ?? '',
+      profissao:          p.profissao ?? '',
       telefone:           maskPhone(p.telefone ?? ''),
       sexo:               String(p.sexo ?? ''),
       pais:               p.pais ?? 'Brasil',
@@ -828,8 +841,9 @@ export default function RegistersPage() {
       numero:             p.numero ?? '',
       status:             p.status ?? 'ATIVO',
       titularId:          p.titularId ?? null,
-      empresasVinculadas: p.empresasVinculadas ?? [],
-      veiculos:           (p.veiculos ?? []).map(v => ({
+      empresasVinculadas: p.empresas_vinculadas ?? p.empresasVinculadas ?? [],
+      veiculos:           (p.veiculos_vinculados ?? p.veiculos ?? []).map(v => ({
+        ...(v.id ? { id: v.id } : {}),
         modelo: v.modelo ?? '', marca: v.marca ?? '',
         ano: String(v.ano ?? ''), placa: v.placa ?? '', cor: v.cor ?? '',
       })),

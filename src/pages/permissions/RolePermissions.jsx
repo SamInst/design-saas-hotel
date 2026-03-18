@@ -8,7 +8,7 @@ import { Button }                from '../../components/ui/Button';
 import { Modal }                 from '../../components/ui/Modal';
 import { Input, FormField }      from '../../components/ui/Input';
 import { Notification }          from '../../components/ui/Notification';
-import { cargoApi, permissaoApi } from '../../services/api';
+import { cargoApi } from '../../services/api';
 
 import styles from './RolePermissions.module.css';
 
@@ -59,9 +59,9 @@ export default function RolePermissions() {
   const loadCargos = useCallback(async (pageNum = 0, termo = '') => {
     setLoading(true);
     try {
-      const params = { page: pageNum, size: PAGE_SIZE };
-      if (termo) params.termo = termo;
-      const data = await cargoApi.listar(params);
+      const body = { page: pageNum, size: PAGE_SIZE };
+      if (termo) body.termo = termo;
+      const data = await cargoApi.listar(body);
       setCargos(data?.content ?? []);
       setTotalPages(data?.totalPages ?? 0);
       setTotalElements(data?.totalElements ?? 0);
@@ -93,7 +93,7 @@ export default function RolePermissions() {
   const loadSystemData = useCallback(async () => {
     if (systemDataLoaded) return;
     try {
-      const telas = await permissaoApi.listarTelas();
+      const telas = await cargoApi.listarTelas();
       setSystemTelas(telas ?? []);
       setSystemDataLoaded(true);
     } catch { /* silencioso */ }
@@ -103,7 +103,7 @@ export default function RolePermissions() {
     if (systemPerms[telaId] !== undefined) return;
     setLoadingPerms(prev => ({ ...prev, [telaId]: true }));
     try {
-      const perms = await permissaoApi.listarPermissoesPorTela(telaId);
+      const perms = await cargoApi.listarPermissoesPorTela(telaId);
       setSystemPerms(prev => ({ ...prev, [telaId]: perms ?? [] }));
     } catch {
       setSystemPerms(prev => ({ ...prev, [telaId]: [] }));
@@ -131,7 +131,7 @@ export default function RolePermissions() {
   const openEdit = async (cargo) => {
     setIsEditing(true);
     setSelectedCargo(cargo);
-    setFormDescricao(cargo.cargo ?? '');
+    setFormDescricao(cargo.descricao ?? '');
 
     const telaIds = new Set((cargo.telas ?? []).map(t => t.id));
     setFormTelasIds(telaIds);
@@ -209,8 +209,8 @@ export default function RolePermissions() {
     try {
       await cargoApi.criar({
         descricao: desc,
-        telasIds: [...formTelasIds],
-        permissoesIds: [...formPermissoesIds],
+        telas: [...formTelasIds].map(id => ({ id })),
+        permissoes: [...formPermissoesIds].map(id => ({ id })),
       });
       notify('Cargo criado com sucesso!');
       setFormModal(false);
@@ -228,23 +228,12 @@ export default function RolePermissions() {
     if (!desc) { notify('Informe o nome do cargo', 'error'); return; }
     setSaving(true);
     try {
-      const cargo = selectedCargo;
-      if (desc !== up(cargo.cargo)) await cargoApi.atualizar(cargo.id, { descricao: desc });
-
-      const originalTelaIds = new Set((cargo.telas ?? []).map(t => t.id));
-      const telasToAdd      = [...formTelasIds].filter(id => !originalTelaIds.has(id));
-      const telasToRemove   = [...originalTelaIds].filter(id => !formTelasIds.has(id));
-      if (telasToAdd.length)    await cargoApi.vincularTelas(cargo.id, telasToAdd, true);
-      if (telasToRemove.length) await cargoApi.vincularTelas(cargo.id, telasToRemove, false);
-
-      const originalPermIds = new Set(
-        (cargo.telas ?? []).flatMap(t => (t.permissoes ?? []).map(p => p.id))
-      );
-      const permsToAdd    = [...formPermissoesIds].filter(id => !originalPermIds.has(id));
-      const permsToRemove = [...originalPermIds].filter(id => !formPermissoesIds.has(id));
-      if (permsToAdd.length)    await cargoApi.vincularPermissoes(cargo.id, permsToAdd, true);
-      if (permsToRemove.length) await cargoApi.vincularPermissoes(cargo.id, permsToRemove, false);
-
+      await cargoApi.atualizar({
+        id: selectedCargo.id,
+        descricao: desc,
+        telas: [...formTelasIds].map(id => ({ id })),
+        permissoes: [...formPermissoesIds].map(id => ({ id })),
+      });
       notify('Cargo atualizado com sucesso!');
       setFormModal(false);
       loadCargos(page, search);
@@ -322,7 +311,7 @@ export default function RolePermissions() {
                   {cargos.map(cargo => (
                     <tr key={cargo.id} className={styles.row} onClick={() => openDetail(cargo)}>
                       <td><span className={styles.cargoId}>#{cargo.id}</span></td>
-                      <td><span className={styles.cargoName}>{cargo.cargo}</span></td>
+                      <td><span className={styles.cargoName}>{cargo.descricao}</span></td>
                       <td><TelaTags telas={cargo.telas ?? []} /></td>
                     </tr>
                   ))}
@@ -362,7 +351,7 @@ export default function RolePermissions() {
           selectedCargo
             ? <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <ShieldCheck size={15} style={{ color: 'var(--violet)', flexShrink: 0 }} />
-                <span>{selectedCargo.cargo}</span>
+                <span>{selectedCargo.descricao}</span>
                 <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', fontWeight: 400 }}>
                   #{selectedCargo.id}
                 </span>
@@ -431,7 +420,7 @@ export default function RolePermissions() {
       <Modal
         open={formModal}
         onClose={() => setFormModal(false)}
-        title={isEditing ? `Editar: ${selectedCargo?.cargo ?? ''}` : 'Novo Cargo'}
+        title={isEditing ? `Editar: ${selectedCargo?.descricao ?? ''}` : 'Novo Cargo'}
         size="md"
         footer={
           <div className={styles.modalFooter}>

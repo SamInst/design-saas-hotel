@@ -482,17 +482,34 @@ export const usuarioApi = {
 //  CARGOS
 // ─────────────────────────────────────────────────────────────
 export const cargoApi = {
-  listar(params)     { return request('/cargo', { params }); },
-  criar(body)        { return request('/cargo', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/cargo/${id}`, { method: 'PUT', body }); },
-  deletar(id)        { return request(`/cargo/${id}`, { method: 'DELETE' }); },
+  // GET /cargo  — backend usa @RequestBody Cargo.Buscar { id, termo, pessoa, page, size }
+  listar(body)  { return request('/cargo', { body }); },
+  // POST /cargo — Cargo.Request { descricao, telas:[{id}], permissoes:[{id}] }
+  criar(body)   { return request('/cargo', { method: 'POST', body }); },
+  // PUT /cargo  — Cargo.Update { id, descricao, telas:[{id}], permissoes:[{id}] }
+  atualizar(body){ return request('/cargo', { method: 'PUT', body }); },
+  // DELETE /cargo — Cargo.Id { id }
+  deletar(id)   { return request('/cargo', { method: 'DELETE', body: { id } }); },
 
-  vincularTelas(id, ids, vinculo) {
-    return request(`/cargo/${id}/telas?vinculo=${vinculo}`, { method: 'PATCH', body: ids });
+  // PATCH /cargo/vincular/telas — Cargo.Vincular { cargo:{id}, telas:[{id}], ativo }
+  vincularTelas(cargoId, telaIds, ativo) {
+    return request('/cargo/vincular/telas', {
+      method: 'PATCH',
+      body: { cargo: { id: cargoId }, telas: telaIds.map(id => ({ id })), ativo },
+    });
   },
-  vincularPermissoes(id, ids, vinculo) {
-    return request(`/cargo/${id}/permissoes?vinculo=${vinculo}`, { method: 'PATCH', body: ids });
+  // PATCH /cargo/vincular/permissoes — Permissao.Vincular { cargo:{id}, permissoes:[{id}], ativo }
+  vincularPermissoes(cargoId, permIds, ativo) {
+    return request('/cargo/vincular/permissoes', {
+      method: 'PATCH',
+      body: { cargo: { id: cargoId }, permissoes: permIds.map(id => ({ id })), ativo },
+    });
   },
+
+  // GET /cargo/telas → List<Objeto>
+  listarTelas() { return request('/cargo/telas'); },
+  // GET /cargo/permissoes?telaId= → List<Objeto>
+  listarPermissoesPorTela(telaId) { return request('/cargo/permissoes', { params: { telaId } }); },
 };
 
 // ─────────────────────────────────────────────────────────────
