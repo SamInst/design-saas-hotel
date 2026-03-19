@@ -59,9 +59,9 @@ export default function RolePermissions() {
   const loadCargos = useCallback(async (pageNum = 0, termo = '') => {
     setLoading(true);
     try {
-      const body = { page: pageNum, size: PAGE_SIZE };
-      if (termo) body.termo = termo;
-      const data = await cargoApi.listar(body);
+      const params = { page: pageNum, size: PAGE_SIZE };
+      if (termo) params.termo = termo;
+      const data = await cargoApi.listar(params);
       setCargos(data?.content ?? []);
       setTotalPages(data?.totalPages ?? 0);
       setTotalElements(data?.totalElements ?? 0);
@@ -522,7 +522,7 @@ export default function RolePermissions() {
 
                           {/* Lista de permissões (exclui "ACESSO TOTAL" pois já está no toggle) */}
                           <div className={styles.permissoesList}>
-                            {perms.filter(p => (p.descricao ?? '').toUpperCase() !== 'ACESSO TOTAL').map(perm => (
+                            {perms.filter(p => (p.permissao ?? p.descricao ?? '').toUpperCase() !== 'ACESSO TOTAL').map(perm => (
                               <label
                                 key={perm.id}
                                 className={[

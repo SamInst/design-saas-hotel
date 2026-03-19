@@ -401,7 +401,7 @@ export default function EmployeeManagement() {
   useEffect(() => {
     const fetch = async () => {
       try {
-        const res = await cargoApi.listar();
+        const res = await cargoApi.listar({ page: 0, size: 100 });
         setCargos(res?.content ?? []);
 
         const tipos = await enumApi.tipoPagamento();
@@ -532,16 +532,17 @@ export default function EmployeeManagement() {
       }
 
       // 2. Create funcionário with pessoaId
+      const admissao = newFunc.dataAdmissao instanceof Date
+        ? newFunc.dataAdmissao.toISOString().split('T')[0]
+        : newFunc.dataAdmissao;
       const funBody = {
-        pessoaId,
-        dataAdmissao: newFunc.dataAdmissao instanceof Date
-          ? newFunc.dataAdmissao.toISOString().split('T')[0]
-          : newFunc.dataAdmissao,
-        salario: cleanSalary(newFunc.salario),
-        cargoId: Number(newFunc.cargoId),
+        pessoa:        { id: pessoaId },
+        data_admissao: admissao,
+        cargo:         { id: Number(newFunc.cargoId) },
+        salario:       cleanSalary(newFunc.salario),
         usuario: {
           username: newFunc.usuario.username.trim(),
-          senha: newFunc.usuario.senha,
+          senha:    newFunc.usuario.senha,
         },
       };
 
@@ -621,15 +622,17 @@ export default function EmployeeManagement() {
     setIsSubmitting(true);
     try {
       // Update pessoa
-      await cadastroApi.atualizarPessoa(detailItem.pessoa.id, buildPessoaBody(editFunc.pessoa));
+      await cadastroApi.atualizarPessoa({ id: detailItem.pessoa.id, ...buildPessoaBody(editFunc.pessoa) });
 
       // Update funcionário
+      const admissao = editFunc.dataAdmissao instanceof Date
+        ? editFunc.dataAdmissao.toISOString().split('T')[0]
+        : editFunc.dataAdmissao;
       const funBody = {
-        cargoId: Number(editFunc.cargoId),
-        dataAdmissao: editFunc.dataAdmissao instanceof Date
-          ? editFunc.dataAdmissao.toISOString().split('T')[0]
-          : editFunc.dataAdmissao,
-        salario: cleanSalary(editFunc.salario),
+        id:            detailItem.id,
+        data_admissao: admissao,
+        cargo:         { id: Number(editFunc.cargoId) },
+        salario:       cleanSalary(editFunc.salario),
       };
       await funcionarioApi.atualizar(detailItem.id, funBody);
       showNotif('Funcionário atualizado!');
@@ -652,9 +655,8 @@ export default function EmployeeManagement() {
       await usuarioApi.bloquear(detailItem.usuario.id, true);
 
       // Atualizar status do funcionário para DEMITIDO
-      const pessoaBody = buildPessoaBody(detailItem.pessoa);
-      pessoaBody.status = 'DEMITIDO';
-      await cadastroApi.atualizarPessoa(detailItem.pessoa.id, pessoaBody);
+      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'DEMITIDO' };
+      await cadastroApi.atualizarPessoa(pessoaBody);
 
       showNotif('Funcionário demitido e usuário bloqueado!');
       setShowDetail(false);
@@ -1227,7 +1229,7 @@ export default function EmployeeManagement() {
             <FormField label="Cargo *">
               <Select value={editFunc.cargoId} onChange={e => setEditFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
                 <option value="">Selecione um cargo</option>
-                {cargos.map(c => <option key={c.id} value={c.id}>{c.cargo}</option>)}
+                {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
               </Select>
             </FormField>
           </div>
@@ -1280,7 +1282,7 @@ export default function EmployeeManagement() {
             <FormField label="Cargo *">
               <Select value={newFunc.cargoId} onChange={e => setNewFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
                 <option value="">Selecione um cargo</option>
-                {cargos.map(c => <option key={c.id} value={c.id}>{c.cargo}</option>)}
+                {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
               </Select>
             </FormField>
           </div>

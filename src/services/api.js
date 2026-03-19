@@ -482,8 +482,8 @@ export const usuarioApi = {
 //  CARGOS
 // ─────────────────────────────────────────────────────────────
 export const cargoApi = {
-  // GET /cargo  — backend usa @RequestBody Cargo.Buscar { id, termo, pessoa, page, size }
-  listar(body)  { return request('/cargo', { body }); },
+  // GET /cargo  — parâmetros como query string
+  listar(params) { return request('/cargo', { params }); },
   // POST /cargo — Cargo.Request { descricao, telas:[{id}], permissoes:[{id}] }
   criar(body)   { return request('/cargo', { method: 'POST', body }); },
   // PUT /cargo  — Cargo.Update { id, descricao, telas:[{id}], permissoes:[{id}] }
