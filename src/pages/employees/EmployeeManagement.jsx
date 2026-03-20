@@ -29,24 +29,36 @@ const maskPhone = v => {
 };
 
 const maskCEP = v => v.replace(/\D/g,'').slice(0,8).replace(/(\d{5})(\d{1,3})$/,'$1-$2');
-const maskSalary = v => {
-  if (!v) return '';
-  const n = v.replace(/\D/g,'');
-  if (!n) return '';
-  const inteiros = n.slice(0, -2) || '0';
-  const decimais = (n.slice(-2) || '00').padStart(2, '0');
-  return `${inteiros.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${decimais}`;
+const maskBRL = v => {
+  const digits = String(v ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  const num = parseInt(digits, 10) / 100;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
 };
-const unmaskSalary = v => v.replace(/\D/g,'');
+const parseBRL = v => {
+  const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+};
+const fmtBRL = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0);
 
 const unmask = v => (v ?? '').replace(/\D/g,'');
-const up = v => (v ?? '').toUpperCase().trim();
-const cleanSalary = v => {
-  const n = unmaskSalary(v);
-  if (!n) return 0;
-  const inteiros = n.slice(0, -2) || '0';
-  const decimais = (n.slice(-2) || '00').padStart(2, '0');
-  return parseInt(inteiros) + parseInt(decimais) / 100;
+
+const parseDateDMY = str => {
+  if (!str) return null;
+  const [d, m, y] = str.split('/');
+  if (!d || !m || !y) return null;
+  return new Date(Number(y), Number(m) - 1, Number(d));
+};
+
+const formatDateDMY = d => {
+  if (!d) return '';
+  if (d instanceof Date) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${d.getFullYear()}`;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
+  return '';
 };
 
 // ── Avatar helpers ────────────────────────────────────────────
@@ -199,6 +211,7 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
 
   return (
     <div className={styles.formBody}>
+      <div className={styles.sectionLabel}>Dados Pessoais</div>
       {/* CPF | Nome | Data Nascimento */}
       <div className={styles.cpfRow}>
         <div className={styles.cpfBlock}>
@@ -264,7 +277,7 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
         </FormField>
       </div>
 
-      <div className={styles.formDivider} />
+      <div className={styles.sectionLabel}>Endereço</div>
 
       <div className={styles.grid3}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
@@ -439,23 +452,22 @@ export default function EmployeeManagement() {
   };
 
   const buildPessoaBody = (p) => ({
-    nome:           up(p.nome),
-    dataNascimento: p.dataNascimento instanceof Date
-      ? p.dataNascimento.toISOString().split('T')[0] : (p.dataNascimento ?? ''),
-    cpf:            unmask(p.cpf),
-    rg:             up(p.rg),
-    email:          (p.email ?? '').trim(),
-    telefone:       unmask(p.telefone),
-    pais:           up(p.pais) || 'BRASIL',
-    estado:         up(p.estado),
-    municipio:      up(p.municipio),
-    endereco:       up(p.endereco),
-    complemento:    up(p.complemento),
-    cep:            unmask(p.cep),
-    bairro:         up(p.bairro),
-    sexo:           Number(p.sexo) || 1,
-    numero:         up(p.numero),
-    status:         p.status ?? 'ATIVO',
+    nome:            (p.nome ?? '').trim(),
+    data_nascimento: formatDateDMY(p.dataNascimento),
+    cpf:             unmask(p.cpf),
+    rg:              (p.rg ?? '').trim(),
+    email:           (p.email ?? '').trim(),
+    telefone:        p.telefone ?? '',
+    pais:            p.pais || 'Brasil',
+    estado:          p.estado ?? '',
+    municipio:       p.municipio ?? '',
+    endereco:        p.endereco ?? '',
+    complemento:     p.complemento ?? '',
+    cep:             p.cep ?? '',
+    bairro:          p.bairro ?? '',
+    sexo:            Number(p.sexo) || 1,
+    numero:          p.numero ?? '',
+    status:          p.status ?? 'ATIVO',
   });
 
   const fetchData = useCallback(async (term = '', pg = 0) => {
@@ -474,8 +486,6 @@ export default function EmployeeManagement() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => { fetchData('', 0); }, [fetchData]);
 
   useEffect(() => {
     clearTimeout(searchDebounce.current);
@@ -507,11 +517,7 @@ export default function EmployeeManagement() {
       showNotif('Defina a data de admissão.', 'error');
       return;
     }
-    if (!newFunc.usuario.username || !newFunc.usuario.senha || !newFunc.senhaConfirma) {
-      showNotif('Defina username e senha para o acesso.', 'error');
-      return;
-    }
-    if (newFunc.usuario.senha !== newFunc.senhaConfirma) {
+    if (newFunc.usuario.username && newFunc.usuario.senha !== newFunc.senhaConfirma) {
       showNotif('As senhas não conferem.', 'error');
       return;
     }
@@ -539,11 +545,10 @@ export default function EmployeeManagement() {
         pessoa:        { id: pessoaId },
         data_admissao: admissao,
         cargo:         { id: Number(newFunc.cargoId) },
-        salario:       cleanSalary(newFunc.salario),
-        usuario: {
-          username: newFunc.usuario.username.trim(),
-          senha:    newFunc.usuario.senha,
-        },
+        salario:       parseBRL(newFunc.salario),
+        ...(newFunc.usuario.username.trim() ? {
+          usuario: { username: newFunc.usuario.username.trim(), senha: newFunc.usuario.senha },
+        } : {}),
       };
 
       await funcionarioApi.criar(funBody);
@@ -586,7 +591,7 @@ export default function EmployeeManagement() {
     setEditFunc({
       pessoa: {
         nome: item.pessoa?.nome ?? '',
-        dataNascimento: item.pessoa?.dataNascimento ? new Date(item.pessoa.dataNascimento) : null,
+        dataNascimento: parseDateDMY(item.pessoa?.data_nascimento ?? item.pessoa?.dataNascimento),
         cpf: maskCPF(item.pessoa?.cpf ?? ''),
         rg: item.pessoa?.rg ?? '',
         email: item.pessoa?.email ?? '',
@@ -602,8 +607,8 @@ export default function EmployeeManagement() {
         numero: item.pessoa?.numero ?? '',
         status: item.pessoa?.status ?? 'ATIVO',
       },
-      dataAdmissao: item.dataAdmissao ? new Date(item.dataAdmissao) : null,
-      salario: maskSalary(String(Math.round(item.salario * 100))),
+      dataAdmissao: parseDateDMY(item.data_admissao ?? item.dataAdmissao),
+      salario: maskBRL(String(Math.round(item.salario * 100))),
       cargoId: String(item.cargo?.id ?? ''),
       usuario: {
         username: item.usuario?.username ?? '',
@@ -632,9 +637,9 @@ export default function EmployeeManagement() {
         id:            detailItem.id,
         data_admissao: admissao,
         cargo:         { id: Number(editFunc.cargoId) },
-        salario:       cleanSalary(editFunc.salario),
+        salario:       parseBRL(editFunc.salario),
       };
-      await funcionarioApi.atualizar(detailItem.id, funBody);
+      await funcionarioApi.atualizar(funBody);
       showNotif('Funcionário atualizado!');
       setShowEdit(false);
       fetchData(searchTerm, page);
@@ -703,7 +708,7 @@ export default function EmployeeManagement() {
       await funcionarioApi.atualizarHistorico(editHistoryItem.id, {
         cargoId: Number(historyForm.cargoId),
         funcionarioId: detailItem.id,
-        salario: cleanSalary(historyForm.salario),
+        salario: parseBRL(historyForm.salario),
       });
       showNotif('Histórico atualizado!');
       setShowEditHistory(false);
@@ -742,7 +747,7 @@ export default function EmployeeManagement() {
     try {
       const recebidoData = {
         historicoFuncionarioId: editHistoryItem.id,
-        valorRecebido: cleanSalary(addRecebidoForm.valorRecebido),
+        valorRecebido: parseBRL(addRecebidoForm.valorRecebido),
         dataHoraInicio: addRecebidoForm.dataHoraInicio instanceof Date
           ? addRecebidoForm.dataHoraInicio.toISOString()
           : addRecebidoForm.dataHoraInicio,
@@ -788,7 +793,7 @@ export default function EmployeeManagement() {
     try {
       const recebidoData = {
         historicoFuncionarioId: editRecebidoItem.historicoFuncionario?.id,
-        valorRecebido: cleanSalary(editRecebidoForm.valorRecebido),
+        valorRecebido: parseBRL(editRecebidoForm.valorRecebido),
         dataHoraInicio: editRecebidoForm.dataHoraInicio instanceof Date
           ? editRecebidoForm.dataHoraInicio.toISOString()
           : editRecebidoForm.dataHoraInicio,
@@ -920,8 +925,8 @@ export default function EmployeeManagement() {
                           <div className={styles.nome}>{name}</div>
                           <div className={styles.sub}>{item.usuario?.username || '—'}</div>
                         </td>
-                        <td className={styles.nome}>{item.cargo?.cargo || '—'}</td>
-                        <td className={styles.mono}>{dateFromApi(item.dataAdmissao ?? '')}</td>
+                        <td className={styles.nome}>{item.cargo?.descricao || '—'}</td>
+                        <td className={styles.mono}>{dateFromApi(item.data_admissao ?? '')}</td>
                         <td><StatusBadge status={item.pessoa?.status} /></td>
                       </tr>
                     );
@@ -988,7 +993,7 @@ export default function EmployeeManagement() {
               <Section title="Dados Pessoais">
                 <KV label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} />
                 <KV label="RG" value={detailItem.pessoa?.rg} />
-                <KV label="Nasc." value={dateFromApi(detailItem.pessoa?.dataNascimento)} />
+                <KV label="Nasc." value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
                 <KV label="Sexo" value={detailItem.pessoa?.sexo === 1 ? 'Masculino' : detailItem.pessoa?.sexo === 2 ? 'Feminino' : 'Outro'} />
                 <KV label="Telefone" value={
                   <div style={{ display:'flex', alignItems:'center', gap:6 }}>
@@ -1027,9 +1032,9 @@ export default function EmployeeManagement() {
           {detailTab === 'profissional' && (
             <div className={styles.detailGrid}>
               <Section title="Profissional">
-                <KV label="Cargo" value={detailItem.cargo?.cargo} />
-                <KV label="Data Admissão" value={dateFromApi(detailItem.dataAdmissao ?? '')} />
-                <KV label="Salário" value={`R$ ${maskSalary(String(Math.round(detailItem.salario * 100)))}`} />
+                <KV label="Cargo" value={detailItem.cargo?.descricao} />
+                <KV label="Data Admissão" value={dateFromApi(detailItem.data_admissao ?? '')} />
+                <KV label="Salário" value={fmtBRL(detailItem.salario)} />
                 <KV label="Usuário" value={detailItem.usuario?.username} />
                 <KV label="Status Acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Ativo'} />
               </Section>
@@ -1064,7 +1069,7 @@ export default function EmployeeManagement() {
                              setEditHistoryItem(h);
                              setHistoryForm({
                                cargoId: String(h.cargo?.id ?? ''),
-                               salario: maskSalary(String(Math.round(h.salario * 100)))
+                               salario: maskBRL(String(Math.round(h.salario * 100)))
                              });
                              loadRecebidos(h.id);
                            }
@@ -1072,7 +1077,7 @@ export default function EmployeeManagement() {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div>
                             <div className={styles.nome}>{h.cargo?.descricao}</div>
-                            <div className={styles.sub}>R$ {maskSalary(String(Math.round(h.salario * 100)))}</div>
+                            <div className={styles.sub}>R$ {maskBRL(String(Math.round(h.salario * 100)))}</div>
                           </div>
                           <ChevRight size={14} className={styles.iconMuted} style={{ transform: editHistoryItem?.id === h.id ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                         </div>
@@ -1114,7 +1119,7 @@ export default function EmployeeManagement() {
                                   e.stopPropagation();
                                   setHistoryForm({
                                     cargoId: String(h.cargo?.id ?? ''),
-                                    salario: maskSalary(String(Math.round(h.salario * 100)))
+                                    salario: maskBRL(String(Math.round(h.salario * 100)))
                                   });
                                   setShowEditHistory(true);
                                 }}
@@ -1146,7 +1151,7 @@ export default function EmployeeManagement() {
                                 }}>
                                   <div>
                                     <div style={{ color: 'var(--text)', fontWeight: '500' }}>
-                                      R$ {maskSalary(String(Math.round(r.valorRecebido * 100)))}
+                                      R$ {maskBRL(String(Math.round(r.valorRecebido * 100)))}
                                     </div>
                                     <div style={{ color: 'var(--text-2)', fontSize: '11px' }}>
                                       {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)} {r.descricao && `• ${r.descricao.toUpperCase()}`}
@@ -1169,7 +1174,7 @@ export default function EmployeeManagement() {
                                       setEditRecebidoItem(r);
                                       setEditRecebidoForm({
                                         historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
-                                        valorRecebido: maskSalary(String(Math.round(r.valorRecebido * 100))),
+                                        valorRecebido: maskBRL(String(Math.round(r.valorRecebido * 100))),
                                         dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
                                         dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
                                         dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
@@ -1215,7 +1220,7 @@ export default function EmployeeManagement() {
         <div className={styles.formBody}>
           <PessoaFormEmployee data={editFunc} onChange={setEditFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
 
-          <div className={styles.formDivider} />
+          <div className={styles.sectionLabel}>Dados Profissionais</div>
 
           <div className={styles.grid2}>
             <FormField label="Data de Admissão *">
@@ -1237,11 +1242,11 @@ export default function EmployeeManagement() {
           <FormField label="Salário">
             <div className={styles.currencyWrapper}>
               <span className={styles.currencyPrefix}>R$</span>
-              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="" />
+              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
-          <div className={styles.formDivider} />
+          <div className={styles.sectionLabel}>Acesso ao Sistema</div>
 
           <div className={styles.grid2}>
             <FormField label="Usuário para Acesso">
@@ -1268,7 +1273,7 @@ export default function EmployeeManagement() {
         <div className={styles.formBody}>
           <PessoaFormEmployee data={newFunc} onChange={setNewFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} showErrors={showErrors} />
 
-          <div className={styles.formDivider} />
+          <div className={styles.sectionLabel}>Dados Profissionais</div>
 
           <div className={styles.grid2}>
             <FormField label="Data de Admissão *">
@@ -1290,13 +1295,13 @@ export default function EmployeeManagement() {
           <FormField label="Salário">
             <div className={styles.currencyWrapper}>
               <span className={styles.currencyPrefix}>R$</span>
-              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskSalary(e.target.value) }))} placeholder="" />
+              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
-          <div className={styles.formDivider} />
+          <div className={styles.sectionLabel}>Acesso ao Sistema</div>
 
-          <FormField label="Usuário para Acesso *">
+          <FormField label="Usuário para Acesso">
             <Input value={newFunc.usuario.username} onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" />
           </FormField>
 
@@ -1402,7 +1407,7 @@ export default function EmployeeManagement() {
               <span className={styles.currencyPrefix}>R$</span>
               <Input
                 value={historyForm.salario}
-                onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskSalary(e.target.value) }))}
+                onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskBRL(e.target.value) }))}
                 placeholder=""
               />
             </div>
@@ -1431,7 +1436,7 @@ export default function EmployeeManagement() {
               <span className={styles.currencyPrefix}>R$</span>
               <Input
                 value={addRecebidoForm.valorRecebido}
-                onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+                onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskBRL(e.target.value) }))}
                 placeholder=""
               />
             </div>
@@ -1522,7 +1527,7 @@ export default function EmployeeManagement() {
               <span className={styles.currencyPrefix}>R$</span>
               <Input
                 value={editRecebidoForm.valorRecebido}
-                onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskSalary(e.target.value) }))}
+                onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskBRL(e.target.value) }))}
                 placeholder=""
               />
             </div>

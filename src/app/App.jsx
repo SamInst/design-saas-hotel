@@ -93,7 +93,7 @@ export default function App() {
       onToggleTheme={toggleTheme}
       onLogout={handleLogout}
     >
-      {PAGE_MAP[currentPage]}
+      {PAGE_MAP[currentPage] ?? null}
     </AppLayout>
   );
 }

@@ -1,23 +1,25 @@
 import {
-  LayoutGrid, BedDouble, Clock, CalendarDays, Wallet, Package,
+  BedDouble, Clock, CalendarDays, Wallet, Package,
   Tag, LogOut, Sun, Moon, ChevronLeft, ChevronRight, MoreVertical,
   DoorOpen, UserCog, Users, ShieldCheck, Building2,
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
+import { usePermissions } from '../../hooks/usePermissions';
 
+// tela: nome exato da tela no backend (cargo.telas[].nome)
+// tela: 'ADMIN' = tela de administrador total (vê tudo)
 const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard',    icon: LayoutGrid  },
-  { id: 'reception', label: 'Recepção',     icon: Building2   },
-  { id: 'stays',     label: 'Pernoites',    icon: BedDouble   },
-  { id: 'rooms',     label: 'Apartamentos', icon: DoorOpen    },
-  { id: 'dayuse',    label: 'Day Use',      icon: Clock       },
-  { id: 'bookings',  label: 'Reservas',     icon: CalendarDays},
-  { id: 'financial', label: 'Financeiro',   icon: Wallet      },
-  { id: 'inventory', label: 'Itens',        icon: Package     },
-  { id: 'registers', label: 'Cadastros',    icon: Users       },
-  { id: 'pricing',   label: 'Preços',       icon: Tag         },
-  { id: 'employees', label: 'Funcionários', icon: UserCog     },
-  { id: 'permissions', label: 'Cargos e Permissões', icon: ShieldCheck },
+  { id: 'reception',   label: 'Recepção',            icon: Building2,  tela: 'DASHBOARD'          },
+  { id: 'stays',       label: 'Pernoites',            icon: BedDouble,  tela: 'PERNOITES'          },
+  { id: 'rooms',       label: 'Apartamentos',         icon: DoorOpen,   tela: 'APARTAMENTOS'       },
+  { id: 'dayuse',      label: 'Day Use',              icon: Clock,      tela: 'DAY USE'            },
+  { id: 'bookings',    label: 'Reservas',             icon: CalendarDays,tela: 'RESERVAS'          },
+  { id: 'financial',   label: 'Financeiro',           icon: Wallet,     tela: 'FINANCEIRO'         },
+  { id: 'inventory',   label: 'Itens',                icon: Package,    tela: 'ITENS'              },
+  { id: 'registers',   label: 'Cadastros',            icon: Users,      tela: 'CADASTRO'           },
+  { id: 'pricing',     label: 'Preços',               icon: Tag,        tela: 'PRECOS'             },
+  { id: 'employees',   label: 'Funcionários',         icon: UserCog,    tela: 'FUNCIONARIOS'       },
+  { id: 'permissions', label: 'Cargos e Permissões',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES'},
 ];
 
 export default function Sidebar({
@@ -31,6 +33,22 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
 }) {
+  const { hasTela, loggedUser } = usePermissions();
+  const isAdmin = hasTela('ADMIN');
+
+  const rawNome = loggedUser?.pessoa?.nome ?? user?.name ?? '';
+  const parts   = rawNome.trim().split(/\s+/);
+  const displayName = parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0] || 'Usuário';
+  const displayRole = loggedUser?.cargo?.descricao ?? user?.role ?? 'Perfil';
+
+  const visibleItems = NAV_ITEMS.filter(item => isAdmin || hasTela(item.tela));
+
+  // Se a página atual não está acessível, redireciona para a primeira disponível
+  const firstAvailable = visibleItems[0]?.id;
+  if (firstAvailable && !visibleItems.some(i => i.id === currentPage)) {
+    onNavigate(firstAvailable);
+  }
+
   return (
     <aside className={[styles.sidebar, collapsed ? styles.collapsed : ''].join(' ')}>
 
@@ -68,7 +86,7 @@ export default function Sidebar({
       <nav className={styles.nav}>
         {!collapsed && <span className={styles.navSection}>Menu</span>}
 
-        {NAV_ITEMS.map(({ id, label, icon: Icon }, i) => {
+        {visibleItems.map(({ id, label, icon: Icon }, i) => {
           const active = currentPage === id;
           return (
             <button
@@ -125,14 +143,14 @@ export default function Sidebar({
 
         <div className={styles.profile}>
           <div className={styles.avatar}>
-            {(user?.name?.charAt(0) || 'U').toUpperCase()}
+            {(displayName.charAt(0) || 'U').toUpperCase()}
           </div>
 
           {!collapsed && (
             <>
               <div className={styles.profileText}>
-                <div className={styles.profileName}>{user?.name || 'Usuário'}</div>
-                <div className={styles.profileRole}>{user?.role || 'Perfil'}</div>
+                <div className={styles.profileName}>{displayName}</div>
+                <div className={styles.profileRole}>{displayRole}</div>
               </div>
               <button type="button" className={styles.moreBtn} aria-label="Opções">
                 <MoreVertical size={16} />

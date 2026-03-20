@@ -383,7 +383,7 @@ export const funcionarioApi = {
   listar(params)     { return request('/funcionario', { params }); },
   buscarPorId(id)    { return request(`/funcionario/${id}`); },
   criar(body)        { return request('/funcionario', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/funcionario/${id}`, { method: 'PUT', body }); },
+  atualizar(body)    { return request('/funcionario', { method: 'PUT', body }); },
 
   listarHistorico(funcionarioId) { return request(`/historico-funcionario?funcionarioId=${funcionarioId}`); },
   atualizarHistorico(id, body)   { return request(`/historico-funcionario/${id}`, { method: 'PUT', body }); },

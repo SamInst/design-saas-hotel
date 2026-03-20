@@ -13,6 +13,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }             from '../../components/ui/Notification';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { cadastroApi, userStorage } from '../../services/api';
+import { usePermissions }           from '../../hooks/usePermissions';
 
 import styles from './RegistersPage.module.css';
 
@@ -532,6 +533,12 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
 
 // ─────────────────────────────────────────────────────────────
 export default function RegistersPage() {
+  const { can, loggedUser } = usePermissions();
+  const canCadastrar  = can('CADASTRO', 'CADASTRO');
+  const canAtualizar  = can('CADASTRO', 'ATUALIZAR');
+  const canBloquear   = can('CADASTRO', 'BLOQUEIO');
+  const canHistorico  = can('CADASTRO', 'ACESSO HISTORICO');
+
   const [items,          setItems]          = useState([]);
   const [loading,        setLoading]        = useState(false);
   const [notification,   setNotification]   = useState(null);
@@ -1007,12 +1014,16 @@ export default function RegistersPage() {
       {isBloqueado && (
         <span className={styles.blockedNotice}><Shield size={13} /> Bloqueado — edição desativada</span>
       )}
-      <Button onClick={() => openEditPessoa(detailItem)} disabled={isBloqueado}>
-        <Edit2 size={13} /> Editar
-      </Button>
-      <Button variant={isBloqueado ? 'primary' : 'danger'} onClick={handleToggleStatus} disabled={isSubmitting}>
-        {isBloqueado ? <><UserCheck size={13} /> Desbloquear</> : <><Shield size={13} /> Bloquear</>}
-      </Button>
+      {canAtualizar && (
+        <Button onClick={() => openEditPessoa(detailItem)} disabled={isBloqueado}>
+          <Edit2 size={13} /> Editar
+        </Button>
+      )}
+      {canBloquear && (
+        <Button variant={isBloqueado ? 'primary' : 'danger'} onClick={handleToggleStatus} disabled={isSubmitting}>
+          {isBloqueado ? <><UserCheck size={13} /> Desbloquear</> : <><Shield size={13} /> Bloquear</>}
+        </Button>
+      )}
     </div>
   ) : null;
 
@@ -1021,12 +1032,16 @@ export default function RegistersPage() {
       {isBloqueado && (
         <span className={styles.blockedNotice}><Shield size={13} /> Bloqueada — edição desativada</span>
       )}
-      <Button onClick={openEditEmpresa} disabled={isBloqueado}>
-        <Edit2 size={13} /> Editar
-      </Button>
-      <Button variant={isBloqueado ? 'primary' : 'danger'}>
-        {isBloqueado ? <><UserCheck size={13} /> Desbloquear</> : <><Shield size={13} /> Bloquear</>}
-      </Button>
+      {canAtualizar && (
+        <Button onClick={openEditEmpresa} disabled={isBloqueado}>
+          <Edit2 size={13} /> Editar
+        </Button>
+      )}
+      {canBloquear && (
+        <Button variant={isBloqueado ? 'primary' : 'danger'}>
+          {isBloqueado ? <><UserCheck size={13} /> Desbloquear</> : <><Shield size={13} /> Bloquear</>}
+        </Button>
+      )}
     </div>
   ) : null;
 
@@ -1057,17 +1072,21 @@ export default function RegistersPage() {
                     <button className={styles.searchClear} onClick={() => setSearchTerm('')}><X size={13} /></button>
                 }
               </div>
-              <Button onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
-                <Building2 size={14} /> Empresa
-              </Button>
-              <Button variant="primary" onClick={() => {
-                setTitular(blankPessoa()); setDependentes([]);
-                setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
-                setShowErrors(false); setConfirmStep(false);
-                setShowAddPessoa(true);
-              }}>
-                <Plus size={14} /> Hóspede
-              </Button>
+              {canCadastrar && (
+                <Button onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
+                  <Building2 size={14} /> Empresa
+                </Button>
+              )}
+              {canCadastrar && (
+                <Button variant="primary" onClick={() => {
+                  setTitular(blankPessoa()); setDependentes([]);
+                  setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+                  setShowErrors(false); setConfirmStep(false);
+                  setShowAddPessoa(true);
+                }}>
+                  <Plus size={14} /> Hóspede
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1175,12 +1194,12 @@ export default function RegistersPage() {
         >
           <div className={styles.tabs}>
             {[
-              ['cadastro',    'Cadastro'],
-              ['veiculo',     'Veículo'],
-              ['empresa',     'Empresa'],
-              ['historico',   'Histórico de Hospedagens'],
-              ['dependentes', 'Dependentes'],
-            ].map(([id, label]) => (
+              ['cadastro',    'Cadastro',                  true],
+              ['veiculo',     'Veículo',                   true],
+              ['empresa',     'Empresa',                   true],
+              ['historico',   'Histórico de Hospedagens',  canHistorico],
+              ['dependentes', 'Dependentes',               true],
+            ].filter(([,, visible]) => visible).map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
                 onClick={() => setDetailTab(id)}>{label}</button>
             ))}
@@ -1329,7 +1348,8 @@ export default function RegistersPage() {
           style={{ maxHeight: '90vh' }}
         >
           <div className={styles.tabs}>
-            {[['informacoes','Informações'],['vinculados','Vinculados'],['historico','Histórico de Hospedagens']].map(([id, label]) => (
+            {[['informacoes','Informações',true],['vinculados','Vinculados',true],['historico','Histórico de Hospedagens',canHistorico]]
+              .filter(([,,v]) => v).map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
                 onClick={() => setDetailTab(id)}>{label}</button>
             ))}
