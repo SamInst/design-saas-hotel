@@ -100,6 +100,50 @@
 }
 .addDesconto:hover { border-color: var(--violet); color: var(--violet); }
 
+/* ── Arquivo atual (edição) ────────────────────────────────── */
+.arquivoAtual {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  margin-bottom: 6px;
+}
+.arquivoNome {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arquivoBtn {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.arquivoBtn:hover { color: var(--violet); border-color: var(--violet); }
+.arquivoBtnRemove {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.arquivoBtnRemove:hover { color: #f43f5e; }
+
 /* ── File upload label ─────────────────────────────────────── */
 .fileLabel {
   display: flex;

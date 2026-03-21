@@ -124,6 +124,11 @@
   font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
   background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.20);
 }
+.descontoBadge {
+  color: #d97706;
+  flex-shrink: 0;
+}
+.moneyDesconto { color: #d97706; font-weight: 700; }
 
 .quartoNum { font-size: 11px; font-weight: 700; color: var(--text-2); }
 .balance { display: inline-flex; align-items: center; gap: 5px; }
@@ -201,12 +206,25 @@
 .checkRow input { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; }
 
 /* ── DETALHE ── */
+.detailSection {
+  display: flex; align-items: center; gap: 8px;
+  color: #1d4ed8; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  margin: 14px 0 4px;
+}
+.detailSection::before {
+  content: ''; width: 3px; height: 14px;
+  background: #1d4ed8; border-radius: 2px; flex-shrink: 0;
+}
+.detailSection::after {
+  content: ''; flex: 1; height: 1px; background: rgba(29,78,216,0.2);
+}
+
 .detailGrid { display: grid; gap: 0; }
 .detailRow {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 2px; border-bottom: 1px solid var(--border); gap: 12px;
+  padding: 10px 2px; gap: 12px;
 }
-.detailRow:last-child { border-bottom: none; }
 .detailLabel { font-size: 12px; color: var(--text-2); font-weight: 500; flex-shrink: 0; }
 .detailVal {
   font-size: 13px; font-weight: 600; color: var(--text);
@@ -250,12 +268,24 @@
 
 /* ── Pagamento chip (nos formulários add/edit) ─────────────── */
 .arquivoLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--violet);
+  background: rgba(139,92,246,.08);
   color: var(--violet);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
   text-decoration: none;
-  font-weight: 500;
 }
-.arquivoLink:hover { text-decoration: underline; }
+.arquivoLink:hover {
+  background: rgba(139,92,246,.18);
+  text-decoration: none;
+}
 
 .pagamentoChip {
   display: flex;

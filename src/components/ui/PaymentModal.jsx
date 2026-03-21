@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Percent, DollarSign, FileUp, Tag, X, Loader2 } from 'lucide-react';
+import { Percent, DollarSign, FileUp, Tag, X, Loader2, Eye, Trash2 } from 'lucide-react';
+import { arquivoApi } from '../../services/api';
 import { Modal }            from './Modal';
 import { Button }           from './Button';
 import { Input, Select, FormField } from './Input';
@@ -116,35 +117,44 @@ export function PaymentModal({
   initialPayment = null,
   defaultValor   = 0,
   isSubmitting   = false,
+  tipoRegistro   = '',
 }) {
   const [tipoPagId,   setTipoPagId]   = useState('');
   const [nomePagador, setNomePagador] = useState('');
   const [descricao,   setDescricao]   = useState('');
   const [valor,       setValor]       = useState('');
-  const [arquivo,     setArquivo]     = useState(null);
-  const [desconto,    setDesconto]    = useState(null);
-  const [showDesc,    setShowDesc]    = useState(false);
+  const [arquivo,       setArquivo]       = useState(null);   // novo arquivo
+  const [arquivoAtual,  setArquivoAtual]  = useState(null);   // path do arquivo existente
+  const [arquivoRemov,  setArquivoRemov]  = useState(false);  // usuario quer remover
+  const [desconto,      setDesconto]      = useState(null);
+  const [showDesc,      setShowDesc]      = useState(false);
+  const [descontoOrigUuid, setDescontoOrigUuid] = useState(null);
 
   // Inicializa ao abrir
   useEffect(() => {
     if (!open) return;
     if (initialPayment) {
       setTipoPagId(String(initialPayment.tipo_pagamento?.id ?? ''));
-      setNomePagador(initialPayment.nome_pagador ?? '');
-      setDescricao(initialPayment.descricao ?? '');
+      setNomePagador((initialPayment.nome_pagador ?? '').toUpperCase());
+      setDescricao((initialPayment.descricao ?? '').toUpperCase());
       const v = initialPayment.valor ?? defaultValor;
       setValor(v ? maskBRL(String(Math.round(v * 100))) : '');
+      const origUuid = initialPayment.desconto?.uuid ?? initialPayment.desconto?._uuid ?? null;
+      setDescontoOrigUuid(origUuid);
       setDesconto(initialPayment.desconto
-        ? { porcentagem: initialPayment.desconto.porcentagem, valor: initialPayment.desconto.valor }
+        ? { _uuid: origUuid, porcentagem: initialPayment.desconto.porcentagem, valor: initialPayment.desconto.valor }
         : null);
+      setArquivoAtual(initialPayment.path_arquivo ?? null);
     } else {
       setTipoPagId('');
       setNomePagador('');
       setDescricao('');
       setValor(defaultValor ? maskBRL(String(Math.round(defaultValor * 100))) : '');
       setDesconto(null);
+      setArquivoAtual(null);
     }
     setArquivo(null);
+    setArquivoRemov(false);
   }, [open]);
 
   const valorNum   = parseBRL(valor);
@@ -158,15 +168,19 @@ export function PaymentModal({
     if (!tipoPagId || !nomePagador || !valor) {
       return; // campos obrigatórios incompletos
     }
+    const descontoFinal = desconto
+      ? { ...desconto, ...(descontoOrigUuid ? { _uuid: descontoOrigUuid } : {}) }
+      : undefined;
     const payment = {
       tipo_pagamento: { id: Number(tipoPagId) },
       nome_pagador:   nomePagador.trim(),
       descricao:      descricao.trim() || undefined,
       valor:          valorNum,
-      ...(desconto ? { desconto } : {}),
+      ...(descontoFinal ? { desconto: descontoFinal } : {}),
       ...(initialPayment?.uuid ? { uuid: initialPayment.uuid } : {}),
     };
-    if (arquivo) payment._arquivo = arquivo;
+    if (arquivo)      payment._arquivo       = arquivo;
+    if (arquivoRemov) payment._arquivoRemov  = true;
     onConfirm(payment);
   };
 
@@ -195,17 +209,23 @@ export function PaymentModal({
 
         <FormField label="Nome do Pagador *">
           <Input placeholder="Nome completo"
-            value={nomePagador} onChange={e => setNomePagador(e.target.value)} />
+            value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
         </FormField>
 
         <FormField label="Descrição">
           <Input placeholder="Descrição do pagamento"
-            value={descricao} onChange={e => setDescricao(e.target.value)} />
+            value={descricao} onChange={e => setDescricao(e.target.value.toUpperCase())} />
         </FormField>
 
         <FormField label="Valor *">
           <Input type="text" placeholder="R$ 0,00"
-            value={valor} onChange={e => setValor(maskBRL(e.target.value))} />
+            value={valor} onChange={e => setValor(maskBRL(e.target.value))}
+            style={tipoRegistro === 'SAIDA'
+              ? { borderColor: '#f43f5e', color: '#f43f5e' }
+              : tipoRegistro === 'ENTRADA'
+                ? { borderColor: '#10b981', color: '#10b981' }
+                : undefined}
+          />
         </FormField>
 
         {/* Desconto */}
@@ -231,13 +251,44 @@ export function PaymentModal({
 
         {/* Comprovante */}
         <FormField label="Comprovante (opcional)">
-          <label className={styles.fileLabel}>
-            <FileUp size={13} />
-            <span>{arquivo ? arquivo.name : 'Selecionar arquivo...'}</span>
-            <input type="file" style={{ display: 'none' }}
-              accept="image/*,application/pdf"
-              onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
-          </label>
+          {/* arquivo existente (edição) */}
+          {arquivoAtual && !arquivoRemov && !arquivo && (
+            <div className={styles.arquivoAtual}>
+              <span className={styles.arquivoNome}>
+                {arquivoAtual.split(/[\\/]/).pop()}
+              </span>
+              <button className={styles.arquivoBtn} title="Ver"
+                onClick={() => arquivoApi.abrir(arquivoAtual)}>
+                <Eye size={13} />
+              </button>
+              <button className={styles.arquivoBtnRemove} title="Remover"
+                onClick={() => setArquivoRemov(true)}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* novo arquivo selecionado */}
+          {arquivo && (
+            <div className={styles.arquivoAtual}>
+              <span className={styles.arquivoNome}>{arquivo.name}</span>
+              <button className={styles.arquivoBtnRemove} title="Cancelar"
+                onClick={() => { setArquivo(null); }}>
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* input para selecionar novo arquivo */}
+          {(!arquivoAtual || arquivoRemov || arquivo) && !arquivo && (
+            <label className={styles.fileLabel}>
+              <FileUp size={13} />
+              <span>{arquivoRemov ? 'Selecionar novo arquivo...' : 'Selecionar arquivo...'}</span>
+              <input type="file" style={{ display: 'none' }}
+                accept="image/*,application/pdf"
+                onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+            </label>
+          )}
         </FormField>
       </Modal>
 

@@ -3,7 +3,7 @@ import {
   CreditCard, Calendar, Filter, Search, ChevronDown, Plus, Edit2,
   Wallet, Banknote, Smartphone, Building2, Clock, TrendingUp,
   TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Minus,
-  Loader2, AlertCircle,
+  Loader2, AlertCircle, Download, Tag,
 } from 'lucide-react';
 
 import { Button }           from '../../components/ui/Button';
@@ -12,7 +12,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }     from '../../components/ui/Notification';
 import { DatePicker }       from '../../components/ui/DatePicker';
 import { PaymentModal }     from '../../components/ui/PaymentModal';
-import { relatorioApi, enumApi, quartoApi, funcionarioApi, userStorage } from '../../services/api';
+import { relatorioApi, enumApi, quartoApi, funcionarioApi, arquivoApi, userStorage } from '../../services/api';
 
 import styles from './FinancialDashboard.module.css';
 
@@ -137,19 +137,25 @@ export default function FinancialDashboard() {
     try {
       const sign  = addForm.tipoRegistro === 'SAIDA' ? -1 : 1;
       const valor = Math.abs(addPagamento.valor) * sign;
-      // Remove _arquivo (File object) — não é JSON serializável
-      const { _arquivo, ...pagamentoBody } = addPagamento;
-      const relatorio = (pagamentoBody.descricao || pagamentoBody.nome_pagador || '').trim() || null;
+      const { _arquivo, _arquivoRemov, ...pagamentoBody } = addPagamento;
+      const relatorio = pagamentoBody.descricao?.trim() || null;
+      const desconto  = pagamentoBody.desconto
+        ? {
+            ...(pagamentoBody.desconto._uuid ? { id: pagamentoBody.desconto._uuid } : {}),
+            funcionario: { id: loggedUser?.id },
+            porcentagem: pagamentoBody.desconto.porcentagem,
+            valor:       pagamentoBody.desconto.valor,
+          }
+        : undefined;
       const body = {
         funcionario:     { id: loggedUser?.id },
         relatorio,
-        valor,
         tipo_registro:   addForm.tipoRegistro,
         despesa_pessoal: addForm.pessoal,
-        pagamento:       { ...pagamentoBody, valor, funcionario: { id: loggedUser?.id } },
+        pagamento:       { ...pagamentoBody, valor, funcionario: { id: loggedUser?.id }, desconto },
         ...(addForm.quarto ? { quarto: { id: Number(addForm.quarto) } } : {}),
       };
-      await relatorioApi.criar(body);
+      await relatorioApi.criar(body, _arquivo ?? null);
       setShowAdd(false);
       setAddForm(blankAdd());
       setAddPagamento(null);
@@ -167,21 +173,28 @@ export default function FinancialDashboard() {
     try {
       const sign  = editTipoRegistro === 'SAIDA' ? -1 : 1;
       const valor = Math.abs(editPagamento?.valor ?? 0) * sign;
-      const { _arquivo: _arqEdit, ...editPagamentoBody } = editPagamento ?? {};
-      const relatorio = (editPagamentoBody.descricao || editPagamentoBody.nome_pagador || '').trim() || null;
+      const { _arquivo: _arqEdit, _arquivoRemov: _remov, ...editPagamentoBody } = editPagamento ?? {};
+      const descricao = editPagamentoBody.descricao?.trim() || null;
+      const descontoId = editPagamentoBody.desconto?._uuid ?? editPagamentoBody.desconto?.uuid;
+      const desconto  = editPagamentoBody.desconto
+        ? {
+            ...(descontoId ? { uuid: descontoId } : {}),
+            pagamento:   { uuid: editPagamentoBody.uuid },
+            funcionario: { id: loggedUser?.id },
+            porcentagem: editPagamentoBody.desconto.porcentagem,
+            valor:       editPagamentoBody.desconto.valor,
+          }
+        : undefined;
       const body = {
         id:              item.id,
-        funcionario:     { id: loggedUser?.id },
-        relatorio,
-        valor,
-        tipo_registro:   editTipoRegistro,
+        descricao,
         despesa_pessoal: editPessoal,
         pagamento:       editPagamento
-          ? { ...editPagamentoBody, valor, funcionario: { id: loggedUser?.id } }
+          ? { ...editPagamentoBody, valor, funcionario: { id: loggedUser?.id }, desconto }
           : undefined,
         ...(editQuarto ? { quarto: { id: Number(editQuarto) } } : {}),
       };
-      await relatorioApi.atualizar(body);
+      await relatorioApi.atualizar(body, _arqEdit ?? null);
       setShowEdit(false);
       showNotif('Lançamento editado!');
       fetchData(activeFilters);
@@ -191,12 +204,14 @@ export default function FinancialDashboard() {
   };
 
   const openDetail = (t) => { setItem(t); setShowDetail(true); };
-  const openEdit   = () => {
+  const openEdit   = async () => {
     if (!item) return;
-    setEditTipoRegistro(item.valor >= 0 ? 'ENTRADA' : 'SAIDA');
-    setEditQuarto(String(item.quarto?.id ?? ''));
-    setEditPessoal(item.despesa_pessoal ?? false);
-    setEditPagamento(item.pagamento ?? null);
+    let full = item;
+    try { full = await relatorioApi.buscar(item.id); } catch (_) { /* usa item parcial */ }
+    setEditTipoRegistro(full.valor >= 0 ? 'ENTRADA' : 'SAIDA');
+    setEditQuarto(String(full.quarto?.id ?? ''));
+    setEditPessoal(full.despesa_pessoal ?? false);
+    setEditPagamento(full.pagamento ?? null);
     setShowDetail(false);
     setShowEdit(true);
   };
@@ -357,8 +372,16 @@ export default function FinancialDashboard() {
                                       </div>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
-                                      <b className={isExp ? styles.moneyMinus : styles[`money_${ak}`]}>
-                                        {isExp ? '−' : '+'}{fmt(Math.abs(t.valor))}
+                                      <b className={t.pagamento?.desconto ? styles.moneyDesconto : isExp ? styles.moneyMinus : styles[`money_${ak}`]} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                        {(() => {
+                                          const bruto = Math.abs(t.pagamento?.valor ?? t.valor);
+                                          const d = t.pagamento?.desconto;
+                                          const final = d
+                                            ? bruto - (d.porcentagem > 0 ? bruto * (d.porcentagem / 100) : (d.valor ?? 0))
+                                            : bruto;
+                                          return <>{isExp ? '−' : '+'}{fmt(final)}</>;
+                                        })()}
+                                        {t.pagamento?.desconto && <Tag size={13} className={styles.descontoBadge} />}
                                       </b>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
@@ -451,54 +474,100 @@ export default function FinancialDashboard() {
         }>
         {item && (
           <div className={styles.detailGrid}>
+
+            {/* ── Lançamento ── */}
+            <div className={styles.detailSection}>Lançamento</div>
             {[
-              ['Descrição',     item.relatorio ?? '—'],
-              ['Data / Hora',   item.data_hora_registro ?? '—'],
-              ['Pagador',       item.pagamento?.nome_pagador ?? '—'],
-              ['Pagamento',     item.pagamento?.tipo_pagamento?.descricao ?? '—'],
-              ['Quarto',        item.quarto ? fmtQuarto(item.quarto) : '—'],
-              ['Funcionário',   item.funcionario?.nome ?? '—'],
-              ['Saldo Dinheiro',fmt(item.valor_historico_dinheiro ?? 0)],
+              ['Descrição',   item.relatorio ?? '—'],
+              ['Data / Hora', item.data_hora_registro ?? '—'],
+              ['Funcionário', item.funcionario?.nome ?? '—'],
+              ['Quarto',      item.quarto ? fmtQuarto(item.quarto) : '—'],
             ].map(([label, val]) => (
               <div key={label} className={styles.detailRow}>
                 <span className={styles.detailLabel}>{label}</span>
                 <span className={styles.detailVal}>{val}</span>
               </div>
             ))}
-            <div className={styles.detailRow}>
-              <span className={styles.detailLabel}>Valor</span>
-              <span className={item.valor >= 0 ? styles.detailPlus : styles.detailMinus}>
-                {item.valor >= 0 ? '+' : '−'}{fmt(Math.abs(item.valor))}
-              </span>
-            </div>
-            {item.pagamento?.desconto && (
-              <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Desconto</span>
-                <span className={styles.detailMinus}>
-                  {item.pagamento.desconto.porcentagem != null
-                    ? `${item.pagamento.desconto.porcentagem}%`
-                    : fmt(item.pagamento.desconto.valor ?? 0)}
-                </span>
-              </div>
-            )}
             {item.despesa_pessoal && (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Tipo</span>
                 <span className={styles.pessoalTag}>Despesa Pessoal</span>
               </div>
             )}
+
+            {/* ── Pagamento ── */}
+            <div className={styles.detailSection}>Pagamento</div>
+            {[
+              ['Pagador',       item.pagamento?.nome_pagador ?? '—'],
+              ['Forma',         item.pagamento?.tipo_pagamento?.descricao ?? '—'],
+            ].map(([label, val]) => (
+              <div key={label} className={styles.detailRow}>
+                <span className={styles.detailLabel}>{label}</span>
+                <span className={styles.detailVal}>{val}</span>
+              </div>
+            ))}
             {item.pagamento?.path_arquivo && (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Comprovante</span>
-                <a
-                  href={item.pagamento.path_arquivo}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={styles.arquivoLink}>
-                  Ver arquivo
-                </a>
+                <button className={styles.arquivoLink}
+                  onClick={() => arquivoApi.abrir(item.pagamento.path_arquivo)}>
+                  <Download size={13} /> Ver comprovante
+                </button>
               </div>
             )}
+
+            {/* ── Valor ── */}
+            <div className={styles.detailSection}>Valor</div>
+            {item.pagamento?.desconto ? (() => {
+              const d     = item.pagamento.desconto;
+              const bruto = Math.abs(item.pagamento?.valor ?? item.valor);
+              const desc  = d.porcentagem > 0 ? bruto * (d.porcentagem / 100) : (d.valor ?? 0);
+              const final = bruto - desc;
+              const sign  = item.valor >= 0 ? '+' : '−';
+              return (<>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Valor bruto</span>
+                  <span className={styles.detailVal}>{sign}{fmt(bruto)}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Desconto</span>
+                  <span className={styles.detailMinus} style={{ fontSize: 13 }}>
+                    −{fmt(desc)}{d.porcentagem > 0 ? ` (${d.porcentagem}%)` : ''}
+                  </span>
+                </div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Valor final</span>
+                  <span className={item.valor >= 0 ? styles.detailPlus : styles.detailMinus}>
+                    {sign}{fmt(final)}
+                  </span>
+                </div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Saldo Dinheiro</span>
+                  <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
+                </div>
+                <div className={styles.detailSection}>Desconto</div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Autorizado por</span>
+                  <span className={styles.detailVal}>{d.funcionario?.nome ?? '—'}</span>
+                </div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Data / Hora</span>
+                  <span className={styles.detailVal}>{d.data_hora_registro ?? '—'}</span>
+                </div>
+              </>);
+            })() : (<>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Valor</span>
+                <span className={item.valor >= 0 ? styles.detailPlus : styles.detailMinus}>
+                  {item.valor >= 0 ? '+' : '−'}{fmt(Math.abs(item.valor))}
+                </span>
+              </div>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Saldo Dinheiro</span>
+                <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
+              </div>
+            </>)}
+
           </div>
         )}
       </Modal>
@@ -642,6 +711,7 @@ export default function FinancialDashboard() {
         onConfirm={pag => { setAddPagamento(pag); setShowPaymentAdd(false); }}
         tiposPagamento={tiposPagamento}
         defaultValor={parseBRL(addForm.valor)}
+        tipoRegistro={addForm.tipoRegistro}
       />
       <PaymentModal
         open={showPaymentEdit}
@@ -650,6 +720,7 @@ export default function FinancialDashboard() {
         tiposPagamento={tiposPagamento}
         initialPayment={editPagamento}
         defaultValor={Math.abs(editPagamento?.valor ?? 0)}
+        tipoRegistro={editTipoRegistro}
       />
 
       <Notification notification={notification} />

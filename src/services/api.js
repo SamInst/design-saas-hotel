@@ -106,7 +106,7 @@ export function getAllowedRoutes(user) {
  * - Injeta Bearer token automaticamente quando disponível.
  * - Lança ApiError com { status, message, data } em caso de erro HTTP.
  */
-async function request(path, { method = 'GET', body, headers = {}, params } = {}) {
+async function request(path, { method = 'GET', body, headers = {}, params, formData } = {}) {
   const token = tokenStorage.get();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -120,11 +120,9 @@ async function request(path, { method = 'GET', body, headers = {}, params } = {}
 
   const res = await fetch(url, {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    // FormData: browser define Content-Type com boundary automaticamente
+    headers: formData ? headers : { 'Content-Type': 'application/json', ...headers },
+    body: formData ?? (body !== undefined ? JSON.stringify(body) : undefined),
   });
 
   // sem conteúdo (ex: 204 No Content)
@@ -235,11 +233,66 @@ export const relatorioApi = {
     return request('/relatorio', { params });
   },
 
-  /** POST /relatorio */
-  criar(body) { return request('/relatorio', { method: 'POST', body }); },
+  /** POST /relatorio — sempre multipart/form-data */
+  criar(body, arquivo) {
+    const fd = new FormData();
+    fd.append('relatorio', new Blob([JSON.stringify(body)], { type: 'application/json' }), 'relatorio.json');
+    if (arquivo) fd.append('arquivo', arquivo);
+    return request('/relatorio', { method: 'POST', formData: fd });
+  },
 
-  /** PUT /relatorio — id no body */
-  atualizar(body) { return request('/relatorio', { method: 'PUT', body }); },
+  /** GET /relatorio/{id} — busca completo (inclui desconto.uuid) */
+  buscar(id) {
+    return request(`/relatorio/${id}`);
+  },
+
+  /** PUT /relatorio — sempre multipart/form-data */
+  atualizar(body, arquivo) {
+    const fd = new FormData();
+    fd.append('relatorio', new Blob([JSON.stringify(body)], { type: 'application/json' }), 'relatorio.json');
+    if (arquivo) fd.append('arquivo', arquivo);
+    return request('/relatorio', { method: 'PUT', formData: fd });
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  ARQUIVO
+// ─────────────────────────────────────────────────────────────
+export const arquivoApi = {
+  /** Retorna a URL autenticada para download de um arquivo pelo path */
+  downloadUrl(path) {
+    const token = tokenStorage.get();
+    const encoded = encodeURIComponent(path);
+    return `${BASE_URL}/arquivo/download?path=${encoded}${token ? `&token=${token}` : ''}`;
+  },
+
+  /** Faz o download do arquivo como blob e abre em nova aba */
+  async abrir(path) {
+    const token = tokenStorage.get();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(
+      `${BASE_URL}/arquivo/download?path=${encodeURIComponent(path)}`,
+      { headers },
+    );
+    if (!res.ok) throw new Error('Erro ao baixar arquivo');
+    const contentType = res.headers.get('Content-Type') || 'application/octet-stream';
+    const buffer = await res.arrayBuffer();
+    const blob   = new Blob([buffer], { type: contentType });
+    const url    = URL.createObjectURL(blob);
+    const a      = document.createElement('a');
+    a.href       = url;
+    a.target     = '_blank';
+    a.rel        = 'noreferrer';
+    // Para PDFs abre no browser; para outros formatos força download
+    if (!contentType.includes('pdf') && !contentType.includes('image')) {
+      a.download = path.split(/[\\/]/).pop();
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  },
 };
 
 // ─────────────────────────────────────────────────────────────
