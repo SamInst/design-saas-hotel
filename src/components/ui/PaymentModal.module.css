@@ -1,0 +1,120 @@
+/* ── Discount type toggle ──────────────────────────────────── */
+.tipoRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tipoBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+}
+.tipoBtn:hover { border-color: var(--violet); color: var(--violet); }
+.tipoBtnActive {
+  background: rgba(139,92,246,.1);
+  border-color: var(--violet);
+  color: var(--violet);
+  font-weight: 600;
+}
+
+/* ── Discount preview ──────────────────────────────────────── */
+.discountPreview {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.discountRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.discountRow b { color: var(--text); }
+.discountDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+.discountMinus { color: #f43f5e !important; }
+.discountFinal { color: #10b981 !important; font-size: 13px !important; }
+
+/* ── Discount applied chip ─────────────────────────────────── */
+.descontoApplied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  background: rgba(16,185,129,.08);
+  border: 1px solid rgba(16,185,129,.25);
+  color: #10b981;
+  font-size: 12px;
+  margin-top: 4px;
+}
+.descontoApplied b { color: #10b981; }
+.removeDesconto {
+  margin-left: auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #10b981;
+  opacity: .7;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+}
+.removeDesconto:hover { opacity: 1; }
+
+/* ── Add discount button ───────────────────────────────────── */
+.addDesconto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 12px;
+  padding: 8px 12px;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 4px;
+  transition: all .15s;
+}
+.addDesconto:hover { border-color: var(--violet); color: var(--violet); }
+
+/* ── File upload label ─────────────────────────────────────── */
+.fileLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color .15s;
+}
+.fileLabel:hover { border-color: var(--violet); color: var(--violet); }
+
+/* ── Spinner ───────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .7s linear infinite; }

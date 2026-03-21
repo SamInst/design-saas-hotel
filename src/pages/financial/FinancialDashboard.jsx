@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   CreditCard, Calendar, Filter, Search, ChevronDown, Plus, Edit2,
   Wallet, Banknote, Smartphone, Building2, Clock, TrendingUp,
@@ -6,20 +6,26 @@ import {
   Loader2, AlertCircle,
 } from 'lucide-react';
 
-import { Button }                           from '../../components/ui/Button';
-import { Modal }                            from '../../components/ui/Modal';
-import { Input, Select, FormField }         from '../../components/ui/Input';
-import { Notification }                     from '../../components/ui/Notification';
-import { DatePicker }                       from '../../components/ui/DatePicker';
-import { relatorioApi, enumApi, quartoApi } from '../../services/api';
+import { Button }           from '../../components/ui/Button';
+import { Modal }            from '../../components/ui/Modal';
+import { Input, Select, FormField } from '../../components/ui/Input';
+import { Notification }     from '../../components/ui/Notification';
+import { DatePicker }       from '../../components/ui/DatePicker';
+import { PaymentModal }     from '../../components/ui/PaymentModal';
+import { relatorioApi, enumApi, quartoApi, funcionarioApi, userStorage } from '../../services/api';
 
 import styles from './FinancialDashboard.module.css';
 
-// ─── Formata valor como moeda BRL corretamente (centavos) ─────
+// ─── Money helpers ─────────────────────────────────────────────
+
+const parseBRL = (v) => {
+  const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+};
 const fmt = (v) =>
   Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// ─── Ícone por forma de pagamento (sem emoji) ─────────────────
+// ─── Icon por forma de pagamento ───────────────────────────────
 function PayMethodIcon({ descricao = '', size = 15, className = '' }) {
   const d = (descricao ?? '').toUpperCase();
   const p = { size, className };
@@ -33,7 +39,6 @@ function PayMethodIcon({ descricao = '', size = 15, className = '' }) {
   return <Wallet {...p} />;
 }
 
-// ─── Chave de cor por método ──────────────────────────────────
 const accentOf = (d = '') => {
   const u = (d ?? '').toUpperCase();
   if (u.includes('PIX'))      return 'sky';
@@ -46,15 +51,21 @@ const accentOf = (d = '') => {
   return 'violet';
 };
 
+const fmtQuarto = (q) => `Quarto ${q.id} - ${q.descricao}`;
+
+const blankAdd = () => ({
+  tipoRegistro: 'ENTRADA', quarto: '', pessoal: false,
+});
+
 // ─────────────────────────────────────────────────────────────
 export default function FinancialDashboard() {
-  // ── dados da API ──────────────────────────────────────────
-  // grupos = [ { data, totalDia, content: [relatorio, ...] } ]
+  const loggedUser = useMemo(() => userStorage.get(), []);
+
   const [grupos,         setGrupos]         = useState([]);
   const [pagamentos,     setPagamentos]     = useState({});
   const [tiposPagamento, setTiposPagamento] = useState([]);
   const [quartos,        setQuartos]        = useState([]);
-
+  const [funcionarios,   setFuncionarios]   = useState([]);
   const [loadingData,    setLoadingData]    = useState(true);
   const [isSubmitting,   setIsSubmitting]   = useState(false);
   const [notification,   setNotification]   = useState(null);
@@ -62,54 +73,49 @@ export default function FinancialDashboard() {
   const [expanded,       setExpanded]       = useState({});
   const [activeFilters,  setActiveFilters]  = useState({});
 
-  // ── modais ────────────────────────────────────────────────
-  const [showAdd,    setShowAdd]    = useState(false);
-  const [showFilter, setShowFilter] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
-  const [showEdit,   setShowEdit]   = useState(false);
-  const [item,       setItem]       = useState(null);
+  // modais
+  const [showAdd,         setShowAdd]         = useState(false);
+  const [showPaymentAdd,  setShowPaymentAdd]  = useState(false);
+  const [showFilter,      setShowFilter]      = useState(false);
+  const [showDetail,      setShowDetail]      = useState(false);
+  const [showEdit,        setShowEdit]        = useState(false);
+  const [showPaymentEdit, setShowPaymentEdit] = useState(false);
+  const [item,            setItem]            = useState(null);
 
-  // ── form add ──────────────────────────────────────────────
-  const [addDesc,    setAddDesc]    = useState('');
-  const [addValor,   setAddValor]   = useState('');
-  const [addTipo,    setAddTipo]    = useState('income');
-  const [addPagId,   setAddPagId]   = useState('');
-  const [addQuarto,  setAddQuarto]  = useState('');
-  const [addPessoal, setAddPessoal] = useState(false);
+  // form add
+  const [addForm,     setAddForm]     = useState(blankAdd());
+  const [addPagamento, setAddPagamento] = useState(null);
 
-  // ── form edit ─────────────────────────────────────────────
-  const [editDesc,    setEditDesc]    = useState('');
-  const [editValor,   setEditValor]   = useState('');
-  const [editPagId,   setEditPagId]   = useState('');
-  const [editQuarto,  setEditQuarto]  = useState('');
-  const [editPessoal, setEditPessoal] = useState(false);
+  // form edit
+  const [editTipoRegistro, setEditTipoRegistro] = useState('ENTRADA');
+  const [editQuarto,       setEditQuarto]       = useState('');
+  const [editPessoal,      setEditPessoal]      = useState(false);
+  const [editPagamento,    setEditPagamento]    = useState(null);
 
-  // ── filtros ───────────────────────────────────────────────
+  // filtros
   const [fStart,   setFStart]   = useState(null);
   const [fEnd,     setFEnd]     = useState(null);
   const [fValores, setFValores] = useState('');
   const [fPagId,   setFPagId]   = useState('');
   const [fQuarto,  setFQuarto]  = useState('');
+  const [fFuncId,  setFFuncId]  = useState('');
 
   const showNotif = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 3000);
   };
-
   const toApiDate = (d) => d ? d.toISOString().split('T')[0] : undefined;
 
-  // ── carregar enums ────────────────────────────────────────
   useEffect(() => {
     enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
     quartoApi.listar({ size: 900 }).then(r => setQuartos(r?.content ?? [])).catch(() => {});
+    funcionarioApi.listar({ size: 200, page: 0 }).then(r => setFuncionarios(r?.content ?? [])).catch(() => {});
   }, []);
 
-  // ── fetch relatórios ──────────────────────────────────────
   const fetchData = async (filters = {}) => {
     setLoadingData(true);
     try {
       const res = await relatorioApi.listar({ size: 200, ...filters });
-      // Estrutura real: { pagamentos: {...}, page: { content: [{data, totalDia, content:[]}] } }
       setGrupos(res?.page?.content ?? []);
       setPagamentos(res?.pagamentos ?? {});
     } catch {
@@ -121,26 +127,32 @@ export default function FinancialDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // ── adicionar ─────────────────────────────────────────────
+  // ── ADD ───────────────────────────────────────────────────
   const handleAdd = async () => {
-    if (!addDesc || !addValor || !addPagId) {
-      showNotif('Preencha descrição, valor e tipo de pagamento.', 'error');
+    if (!addPagamento) {
+      showNotif('Defina o pagamento antes de salvar.', 'error');
       return;
     }
     setIsSubmitting(true);
     try {
-      const valor = addTipo === 'expense'
-        ? -Math.abs(parseFloat(String(addValor).replace(',', '.')))
-        :  Math.abs(parseFloat(String(addValor).replace(',', '.')));
-      await relatorioApi.criar({
-        relatorio: addDesc, valor,
-        tipoPagamentoId: Number(addPagId),
-        quartoId: addQuarto ? Number(addQuarto) : undefined,
-        despesaPessoal: addPessoal,
-      });
+      const sign  = addForm.tipoRegistro === 'SAIDA' ? -1 : 1;
+      const valor = Math.abs(addPagamento.valor) * sign;
+      // Remove _arquivo (File object) — não é JSON serializável
+      const { _arquivo, ...pagamentoBody } = addPagamento;
+      const relatorio = (pagamentoBody.descricao || pagamentoBody.nome_pagador || '').trim() || null;
+      const body = {
+        funcionario:     { id: loggedUser?.id },
+        relatorio,
+        valor,
+        tipo_registro:   addForm.tipoRegistro,
+        despesa_pessoal: addForm.pessoal,
+        pagamento:       { ...pagamentoBody, valor, funcionario: { id: loggedUser?.id } },
+        ...(addForm.quarto ? { quarto: { id: Number(addForm.quarto) } } : {}),
+      };
+      await relatorioApi.criar(body);
       setShowAdd(false);
-      setAddDesc(''); setAddValor(''); setAddTipo('income');
-      setAddPagId(''); setAddQuarto(''); setAddPessoal(false);
+      setAddForm(blankAdd());
+      setAddPagamento(null);
       showNotif('Lançamento adicionado!');
       fetchData(activeFilters);
     } catch (e) {
@@ -148,17 +160,28 @@ export default function FinancialDashboard() {
     } finally { setIsSubmitting(false); }
   };
 
-  // ── editar ────────────────────────────────────────────────
+  // ── EDIT ──────────────────────────────────────────────────
   const handleEdit = async () => {
     if (!item) return;
     setIsSubmitting(true);
     try {
-      await relatorioApi.atualizar(item.id, {
-        relatorio: editDesc, valor: parseFloat(String(editValor).replace(',', '.')),
-        tipoPagamentoId: Number(editPagId),
-        quartoId: editQuarto ? Number(editQuarto) : undefined,
-        despesaPessoal: editPessoal,
-      });
+      const sign  = editTipoRegistro === 'SAIDA' ? -1 : 1;
+      const valor = Math.abs(editPagamento?.valor ?? 0) * sign;
+      const { _arquivo: _arqEdit, ...editPagamentoBody } = editPagamento ?? {};
+      const relatorio = (editPagamentoBody.descricao || editPagamentoBody.nome_pagador || '').trim() || null;
+      const body = {
+        id:              item.id,
+        funcionario:     { id: loggedUser?.id },
+        relatorio,
+        valor,
+        tipo_registro:   editTipoRegistro,
+        despesa_pessoal: editPessoal,
+        pagamento:       editPagamento
+          ? { ...editPagamentoBody, valor, funcionario: { id: loggedUser?.id } }
+          : undefined,
+        ...(editQuarto ? { quarto: { id: Number(editQuarto) } } : {}),
+      };
+      await relatorioApi.atualizar(body);
       setShowEdit(false);
       showNotif('Lançamento editado!');
       fetchData(activeFilters);
@@ -170,60 +193,74 @@ export default function FinancialDashboard() {
   const openDetail = (t) => { setItem(t); setShowDetail(true); };
   const openEdit   = () => {
     if (!item) return;
-    setEditDesc(item.relatorio ?? '');
-    setEditValor(Number(item.valor ?? 0).toFixed(2).replace('.', ','));
-    setEditPagId(String(item.tipoPagamentoId ?? ''));
-    setEditQuarto(String(item.quartoId ?? ''));
-    setEditPessoal(item.despesaPessoal ?? false);
+    setEditTipoRegistro(item.valor >= 0 ? 'ENTRADA' : 'SAIDA');
+    setEditQuarto(String(item.quarto?.id ?? ''));
+    setEditPessoal(item.despesa_pessoal ?? false);
+    setEditPagamento(item.pagamento ?? null);
     setShowDetail(false);
     setShowEdit(true);
   };
 
-  // ── filtros ───────────────────────────────────────────────
+  // ── FILTROS ───────────────────────────────────────────────
   const applyFilter = () => {
     const f = {};
-    if (fStart)   f.dataInicio      = toApiDate(fStart);
-    if (fEnd)     f.dataFim         = toApiDate(fEnd);
-    if (fValores) f.valores         = fValores;
-    if (fPagId)   f.tipoPagamentoId = Number(fPagId);
-    if (fQuarto)  f.quartoId        = Number(fQuarto);
+    if (fStart)   f.data_inicio       = toApiDate(fStart);
+    if (fEnd)     f.data_fim          = toApiDate(fEnd);
+    if (fValores) f.registro          = fValores;
+    if (fPagId)   f.tipo_pagamento_id = Number(fPagId);
+    if (fQuarto)  f.quarto_id         = Number(fQuarto);
+    if (fFuncId)  f.funcionario_id    = Number(fFuncId);
     setActiveFilters(f);
     setExpanded({});
     setShowFilter(false);
     fetchData(f);
-    showNotif('Filtros aplicados!', 'info');
   };
 
   const clearFilter = () => {
-    setFStart(null); setFEnd(null); setFValores(''); setFPagId(''); setFQuarto('');
+    setFStart(null); setFEnd(null); setFValores(''); setFPagId(''); setFQuarto(''); setFFuncId('');
     setActiveFilters({});
     setExpanded({});
     setShowFilter(false);
     fetchData();
   };
 
-  // ── resumo ────────────────────────────────────────────────
+  const closeAdd = () => { setShowAdd(false); setAddForm(blankAdd()); setAddPagamento(null); };
+
+  // ── RESUMO ────────────────────────────────────────────────
   const total = pagamentos?.TOTAL ?? { receitas: 0, despesas: 0, lucro: 0 };
   const methodEntries = Object.entries(pagamentos).filter(([k]) => k !== 'TOTAL');
 
   const summaryCards = [
-    { key: 'r', title: 'Receita Total',       icon: TrendingUp,   color: 'emerald',
+    { key: 'r', title: 'Receita Total',        icon: TrendingUp,   color: 'emerald',
       r: total.receitas, d: 0,             l: total.receitas },
-    { key: 'd', title: 'Despesa Total',        icon: TrendingDown, color: 'rose',
+    { key: 'd', title: 'Despesa Total',         icon: TrendingDown, color: 'rose',
       r: 0,             d: total.despesas, l: -total.despesas },
-    { key: 'l', title: 'Resultado do Período', icon: DollarSign,   color: 'violet',
+    { key: 'l', title: 'Resultado do Período',  icon: DollarSign,   color: 'violet',
       r: total.receitas, d: total.despesas, l: total.lucro },
   ];
 
-  // ── busca local ───────────────────────────────────────────
+  // ── BUSCA LOCAL ───────────────────────────────────────────
   const visibleGrupos = grupos.map(g => ({
     ...g,
-    content: g.content.filter(t =>
-      !searchTerm || (t.relatorio ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+    _items: (g.relatorios ?? []).filter(t =>
+      !searchTerm ||
+      (t.relatorio ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.pagamento?.nome_pagador ?? '').toLowerCase().includes(searchTerm.toLowerCase())
     ),
-  })).filter(g => g.content.length > 0);
+  })).filter(g => g._items.length > 0);
 
   const nFilters = Object.keys(activeFilters).length;
+
+  // Helpers para exibir pagamento chips nos formulários
+  const descPag = (pag) => {
+    if (!pag) return null;
+    const desc = tiposPagamento.find(t => t.id === pag.tipo_pagamento?.id)?.descricao
+      ?? pag.tipo_pagamento?.descricao ?? '—';
+    return `${desc} · ${pag.nome_pagador ?? '—'} · ${fmt(pag.valor ?? 0)}`;
+  };
+  const iconPag = (pag) =>
+    tiposPagamento.find(t => t.id === pag?.tipo_pagamento?.id)?.descricao
+    ?? pag?.tipo_pagamento?.descricao;
 
   // ─────────────────────────────────────────────────────────
   return (
@@ -242,7 +279,7 @@ export default function FinancialDashboard() {
                 <div className={styles.searchWrap}>
                   <Search size={13} className={styles.searchIcon} />
                   <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                    placeholder="Buscar descrição..." className={styles.searchInput} />
+                    placeholder="Buscar lançamento..." className={styles.searchInput} />
                 </div>
                 <Button onClick={() => setShowFilter(true)}>
                   <Filter size={14} /> Filtros
@@ -265,11 +302,9 @@ export default function FinancialDashboard() {
               </div>
             ) : (
               <div className={styles.groupList}>
-                {visibleGrupos.map(({ data, content }) => {
+                {visibleGrupos.map(({ data, total_entrada_dia, total_saida_dia, lucro_total_dia, _items }) => {
                   const isOpen = !!expanded[data];
-                  const dayR  = content.filter(t => t.valor >= 0).reduce((s,t) => s + t.valor, 0);
-                  const dayD  = content.filter(t => t.valor <  0).reduce((s,t) => s + Math.abs(t.valor), 0);
-                  const dayL  = dayR - dayD;
+                  const dayL   = lucro_total_dia ?? 0;
 
                   return (
                     <div key={data} className={styles.group}>
@@ -279,13 +314,13 @@ export default function FinancialDashboard() {
                           <ChevronDown size={14} className={[styles.chev, isOpen ? '' : styles.chevCollapsed].join(' ')} />
                           <Calendar size={13} className={styles.iconViolet} />
                           <span className={styles.groupDate}>{data}</span>
-                          <span className={styles.badge}>{content.length} {content.length === 1 ? 'lançamento' : 'lançamentos'}</span>
+                          <span className={styles.badge}>{_items.length} {_items.length === 1 ? 'lançamento' : 'lançamentos'}</span>
                         </div>
                         <div className={styles.groupRight}>
                           <span className={styles.dotPlus} />
-                          <b className={styles.moneyPlus}>{fmt(dayR)}</b>
+                          <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
                           <span className={styles.dotMinus} />
-                          <b className={styles.moneyMinus}>{fmt(dayD)}</b>
+                          <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
                           <span className={styles.dotViolet} />
                           <b className={dayL >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(dayL)}</b>
                         </div>
@@ -301,23 +336,24 @@ export default function FinancialDashboard() {
                               <th style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>
                             </tr></thead>
                             <tbody>
-                              {content.map(t => {
-                                const isExp = t.valor < 0;
-                                const ak    = accentOf(t.tipoPagamentoDescricao);
-                                const saldo = t.valorHistoricoDinheiro ?? 0;
+                              {_items.map(t => {
+                                const isExp   = t.valor < 0;
+                                const metDesc = t.pagamento?.tipo_pagamento?.descricao;
+                                const ak      = accentOf(metDesc);
+                                const saldo   = t.valor_historico_dinheiro ?? 0;
 
                                 return (
                                   <tr key={t.id} className={styles.row} onClick={() => openDetail(t)}>
                                     <td>
                                       <span className={[styles.methodIcon, styles[`accent_${ak}`]].join(' ')}>
-                                        <PayMethodIcon descricao={t.tipoPagamentoDescricao} size={14} />
+                                        <PayMethodIcon descricao={metDesc} size={14} />
                                       </span>
                                     </td>
                                     <td>
-                                      <div className={styles.desc}>{t.relatorio}</div>
+                                      <div className={styles.desc}>{t.relatorio ?? '—'}</div>
                                       <div className={styles.subdesc}>
-                                        {t.dataHora} · {t.tipoPagamentoDescricao ?? '—'}
-                                        {t.despesaPessoal && <span className={styles.pessoalTag}>pessoal</span>}
+                                        {t.data_hora_registro} · {metDesc ?? '—'}
+                                        {t.despesa_pessoal && <span className={styles.pessoalTag}>pessoal</span>}
                                       </div>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
@@ -416,12 +452,13 @@ export default function FinancialDashboard() {
         {item && (
           <div className={styles.detailGrid}>
             {[
-              ['Descrição',      item.relatorio],
-              ['Data / Hora',    `${item.data ?? '—'} às ${item.dataHora ?? '—'}`],
-              ['Pagamento',      item.tipoPagamentoDescricao ?? '—'],
-              ['Quarto',         item.quartoDescricao ?? '—'],
-              ['Funcionário',    item.funcionario?.nome ?? '—'],
-              ['Saldo Dinheiro', fmt(item.valorHistoricoDinheiro ?? 0)],
+              ['Descrição',     item.relatorio ?? '—'],
+              ['Data / Hora',   item.data_hora_registro ?? '—'],
+              ['Pagador',       item.pagamento?.nome_pagador ?? '—'],
+              ['Pagamento',     item.pagamento?.tipo_pagamento?.descricao ?? '—'],
+              ['Quarto',        item.quarto ? fmtQuarto(item.quarto) : '—'],
+              ['Funcionário',   item.funcionario?.nome ?? '—'],
+              ['Saldo Dinheiro',fmt(item.valor_historico_dinheiro ?? 0)],
             ].map(([label, val]) => (
               <div key={label} className={styles.detailRow}>
                 <span className={styles.detailLabel}>{label}</span>
@@ -434,13 +471,81 @@ export default function FinancialDashboard() {
                 {item.valor >= 0 ? '+' : '−'}{fmt(Math.abs(item.valor))}
               </span>
             </div>
-            {item.despesaPessoal && (
+            {item.pagamento?.desconto && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Desconto</span>
+                <span className={styles.detailMinus}>
+                  {item.pagamento.desconto.porcentagem != null
+                    ? `${item.pagamento.desconto.porcentagem}%`
+                    : fmt(item.pagamento.desconto.valor ?? 0)}
+                </span>
+              </div>
+            )}
+            {item.despesa_pessoal && (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Tipo</span>
                 <span className={styles.pessoalTag}>Despesa Pessoal</span>
               </div>
             )}
+            {item.pagamento?.path_arquivo && (
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Comprovante</span>
+                <a
+                  href={item.pagamento.path_arquivo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.arquivoLink}>
+                  Ver arquivo
+                </a>
+              </div>
+            )}
           </div>
+        )}
+      </Modal>
+
+      {/* ══ MODAL: ADICIONAR ════════════════════════════════ */}
+      <Modal open={showAdd} onClose={closeAdd} title="Novo Lançamento"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={closeAdd} className={styles.full}>Cancelar</Button>
+            <Button variant="primary" onClick={handleAdd}
+              disabled={isSubmitting || !addPagamento} className={styles.full}>
+              {isSubmitting ? <><Loader2 size={13} className={styles.spinnerInline} /> Salvando...</> : 'Salvar'}
+            </Button>
+          </div>
+        }>
+        <FormField label="Tipo">
+          <Select value={addForm.tipoRegistro}
+            onChange={e => setAddForm(f => ({ ...f, tipoRegistro: e.target.value }))}>
+            <option value="ENTRADA">Receita (+)</option>
+            <option value="SAIDA">Despesa (−)</option>
+          </Select>
+        </FormField>
+        <FormField label="Quarto">
+          <Select value={addForm.quarto}
+            onChange={e => setAddForm(f => ({ ...f, quarto: e.target.value }))}>
+            <option value="">Nenhum</option>
+            {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
+          </Select>
+        </FormField>
+        <label className={styles.checkRow}>
+          <input type="checkbox" checked={addForm.pessoal}
+            onChange={e => setAddForm(f => ({ ...f, pessoal: e.target.checked }))} />
+          <span>Despesa pessoal do funcionário</span>
+        </label>
+
+        {addPagamento ? (
+          <div className={styles.pagamentoChip}>
+            <PayMethodIcon descricao={iconPag(addPagamento)} size={13} />
+            <span>{descPag(addPagamento)}</span>
+            <button className={styles.pagamentoEdit} onClick={() => setShowPaymentAdd(true)}>
+              Alterar
+            </button>
+          </div>
+        ) : (
+          <button className={styles.definePagamento} onClick={() => setShowPaymentAdd(true)}>
+            <CreditCard size={13} /> Definir Pagamento *
+          </button>
         )}
       </Modal>
 
@@ -454,72 +559,37 @@ export default function FinancialDashboard() {
             </Button>
           </div>
         }>
-        <FormField label="Descrição">
-          <Input value={editDesc} onChange={e => setEditDesc(e.target.value)} />
+        <FormField label="Tipo">
+          <Select value={editTipoRegistro} onChange={e => setEditTipoRegistro(e.target.value)}>
+            <option value="ENTRADA">Receita (+)</option>
+            <option value="SAIDA">Despesa (−)</option>
+          </Select>
         </FormField>
-        <div className={styles.grid2}>
-          <FormField label="Valor (R$)">
-            <Input type="text" placeholder="0,00" value={editValor} onChange={e => setEditValor(e.target.value)} />
-          </FormField>
-          <FormField label="Tipo de Pagamento">
-            <Select value={editPagId} onChange={e => setEditPagId(e.target.value)}>
-              <option value="">Selecione...</option>
-              {tiposPagamento.map(tp => <option key={tp.id} value={tp.id}>{tp.descricao}</option>)}
-            </Select>
-          </FormField>
-        </div>
         <FormField label="Quarto">
           <Select value={editQuarto} onChange={e => setEditQuarto(e.target.value)}>
             <option value="">Nenhum</option>
-            {quartos.map(q => <option key={q.id} value={q.id}>{q.descricao}</option>)}
+            {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
           </Select>
         </FormField>
         <label className={styles.checkRow}>
-          <input type="checkbox" checked={editPessoal} onChange={e => setEditPessoal(e.target.checked)} />
+          <input type="checkbox" checked={editPessoal}
+            onChange={e => setEditPessoal(e.target.checked)} />
           <span>Despesa pessoal do funcionário</span>
         </label>
-      </Modal>
 
-      {/* ══ MODAL: ADICIONAR ════════════════════════════════ */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Novo Lançamento"
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={() => setShowAdd(false)} className={styles.full}>Cancelar</Button>
-            <Button variant="primary" onClick={handleAdd} disabled={isSubmitting} className={styles.full}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinnerInline} /> Salvando...</> : 'Salvar'}
-            </Button>
+        {editPagamento ? (
+          <div className={styles.pagamentoChip}>
+            <PayMethodIcon descricao={editPagamento.tipo_pagamento?.descricao} size={13} />
+            <span>{descPag(editPagamento)}</span>
+            <button className={styles.pagamentoEdit} onClick={() => setShowPaymentEdit(true)}>
+              Alterar
+            </button>
           </div>
-        }>
-        <FormField label="Descrição">
-          <Input placeholder="Ex: Pagamento de diária" value={addDesc} onChange={e => setAddDesc(e.target.value)} />
-        </FormField>
-        <div className={styles.grid2}>
-          <FormField label="Tipo">
-            <Select value={addTipo} onChange={e => setAddTipo(e.target.value)}>
-              <option value="income">Receita (+)</option>
-              <option value="expense">Despesa (−)</option>
-            </Select>
-          </FormField>
-          <FormField label="Tipo de Pagamento">
-            <Select value={addPagId} onChange={e => setAddPagId(e.target.value)}>
-              <option value="">Selecione...</option>
-              {tiposPagamento.map(tp => <option key={tp.id} value={tp.id}>{tp.descricao}</option>)}
-            </Select>
-          </FormField>
-        </div>
-        <FormField label="Valor (R$)">
-          <Input type="text" placeholder="0,00" value={addValor} onChange={e => setAddValor(e.target.value)} />
-        </FormField>
-        <FormField label="Quarto">
-          <Select value={addQuarto} onChange={e => setAddQuarto(e.target.value)}>
-            <option value="">Nenhum</option>
-            {quartos.map(q => <option key={q.id} value={q.id}>{q.descricao}</option>)}
-          </Select>
-        </FormField>
-        <label className={styles.checkRow}>
-          <input type="checkbox" checked={addPessoal} onChange={e => setAddPessoal(e.target.checked)} />
-          <span>Despesa pessoal do funcionário</span>
-        </label>
+        ) : (
+          <button className={styles.definePagamento} onClick={() => setShowPaymentEdit(true)}>
+            <CreditCard size={13} /> Definir Pagamento
+          </button>
+        )}
       </Modal>
 
       {/* ══ MODAL: FILTROS ══════════════════════════════════ */}
@@ -552,10 +622,35 @@ export default function FinancialDashboard() {
         <FormField label="Quarto">
           <Select value={fQuarto} onChange={e => setFQuarto(e.target.value)}>
             <option value="">Selecione</option>
-            {quartos.map(q => <option key={q.id} value={q.id}>{q.descricao}</option>)}
+            {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
+          </Select>
+        </FormField>
+        <FormField label="Funcionário">
+          <Select value={fFuncId} onChange={e => setFFuncId(e.target.value)}>
+            <option value="">Selecione</option>
+            {funcionarios.map(f => (
+              <option key={f.id} value={f.id}>{f.pessoa?.nome}</option>
+            ))}
           </Select>
         </FormField>
       </Modal>
+
+      {/* ══ PAYMENT MODALS ══════════════════════════════════ */}
+      <PaymentModal
+        open={showPaymentAdd}
+        onClose={() => setShowPaymentAdd(false)}
+        onConfirm={pag => { setAddPagamento(pag); setShowPaymentAdd(false); }}
+        tiposPagamento={tiposPagamento}
+        defaultValor={parseBRL(addForm.valor)}
+      />
+      <PaymentModal
+        open={showPaymentEdit}
+        onClose={() => setShowPaymentEdit(false)}
+        onConfirm={pag => { setEditPagamento(pag); setShowPaymentEdit(false); }}
+        tiposPagamento={tiposPagamento}
+        initialPayment={editPagamento}
+        defaultValor={Math.abs(editPagamento?.valor ?? 0)}
+      />
 
       <Notification notification={notification} />
     </div>

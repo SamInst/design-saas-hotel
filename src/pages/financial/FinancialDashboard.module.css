@@ -248,6 +248,59 @@
 :root[data-theme="dark"] .summaryCard { box-shadow: none; }
 :root[data-theme="dark"] .card        { box-shadow: none; }
 
+/* ── Pagamento chip (nos formulários add/edit) ─────────────── */
+.arquivoLink {
+  color: var(--violet);
+  font-size: 12px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.arquivoLink:hover { text-decoration: underline; }
+
+.pagamentoChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
+  background: rgba(139,92,246,.07);
+  border: 1px solid rgba(139,92,246,.25);
+  color: var(--text);
+  font-size: 12px;
+  margin-top: 10px;
+}
+.pagamentoChip span { flex: 1; }
+.pagamentoEdit {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--text-2);
+  font-size: 11px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all .15s;
+}
+.pagamentoEdit:hover { border-color: var(--violet); color: var(--violet); }
+
+.definePagamento {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 10px;
+  margin-top: 10px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.definePagamento:hover { border-color: var(--violet); color: var(--violet); }
+
 @media (max-width: 1024px) {
   .summaryCol { width: 100%; padding-left: 0; }
   .summaryList { flex-direction: row; flex-wrap: wrap; }

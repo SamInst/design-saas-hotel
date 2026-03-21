@@ -216,39 +216,30 @@ export const authApi = {
 // ─────────────────────────────────────────────────────────────
 export const relatorioApi = {
   /**
-   * GET /relatorios
-   * Todos os parâmetros são opcionais.
+   * GET /relatorio — parâmetros via query string (browser bloqueia GET+body)
    */
   listar({
-    id,
-    dataInicio,
-    dataFim,
-    funcionarioId,
-    quartoId,
-    tipoPagamentoId,
-    valores,       // 'ENTRADA' | 'SAIDA'
-    despesaPessoal,
-    page = 0,
-    size = 10,
+    id, data_inicio, data_fim, funcionario_id, quarto_id,
+    tipo_pagamento_id, registro, despesa_pessoal,
+    page = 0, size = 10,
   } = {}) {
-    return request('/relatorios', {
-      params: {
-        id, dataInicio, dataFim, funcionarioId,
-        quartoId, tipoPagamentoId, valores, despesaPessoal,
-        page, size,
-      },
-    });
+    const params = { page, size };
+    if (id              !== undefined) params.id                = id;
+    if (data_inicio)                   params.data_inicio       = data_inicio;
+    if (data_fim)                      params.data_fim          = data_fim;
+    if (funcionario_id)                params.funcionario_id    = funcionario_id;
+    if (quarto_id)                     params.quarto_id         = quarto_id;
+    if (tipo_pagamento_id)             params.tipo_pagamento_id = tipo_pagamento_id;
+    if (registro)                      params.registro          = registro;
+    if (despesa_pessoal !== undefined)  params.despesa_pessoal  = despesa_pessoal;
+    return request('/relatorio', { params });
   },
 
-  /** POST /relatorios */
-  criar(body) {
-    return request('/relatorios', { method: 'POST', body });
-  },
+  /** POST /relatorio */
+  criar(body) { return request('/relatorio', { method: 'POST', body }); },
 
-  /** PUT /relatorios/:id */
-  atualizar(id, body) {
-    return request(`/relatorios/${id}`, { method: 'PUT', body });
-  },
+  /** PUT /relatorio — id no body */
+  atualizar(body) { return request('/relatorio', { method: 'PUT', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────
