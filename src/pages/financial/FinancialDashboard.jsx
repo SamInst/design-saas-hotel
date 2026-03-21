@@ -368,7 +368,7 @@ export default function FinancialDashboard() {
                                       <div className={styles.desc}>{t.relatorio ?? '—'}</div>
                                       <div className={styles.subdesc}>
                                         {t.data_hora_registro} · {metDesc ?? '—'}
-                                        {t.despesa_pessoal && <span className={styles.pessoalTag}>pessoal</span>}
+                                        {t.despesa_pessoal && <span className={styles.pessoalTag}>Despesa Interna</span>}
                                       </div>
                                     </td>
                                     <td style={{ textAlign: 'right' }}>
@@ -491,7 +491,7 @@ export default function FinancialDashboard() {
             {item.despesa_pessoal && (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Tipo</span>
-                <span className={styles.pessoalTag}>Despesa Pessoal</span>
+                <span className={styles.pessoalTag}>Despesa Interna</span>
               </div>
             )}
 
@@ -600,7 +600,7 @@ export default function FinancialDashboard() {
         <label className={styles.checkRow}>
           <input type="checkbox" checked={addForm.pessoal}
             onChange={e => setAddForm(f => ({ ...f, pessoal: e.target.checked }))} />
-          <span>Despesa pessoal do funcionário</span>
+          <span>Despesa interna do Hotel</span>
         </label>
 
         {addPagamento ? (
@@ -643,7 +643,7 @@ export default function FinancialDashboard() {
         <label className={styles.checkRow}>
           <input type="checkbox" checked={editPessoal}
             onChange={e => setEditPessoal(e.target.checked)} />
-          <span>Despesa pessoal do funcionário</span>
+          <span>Despesa interna do Hotel</span>
         </label>
 
         {editPagamento ? (
@@ -712,6 +712,7 @@ export default function FinancialDashboard() {
         tiposPagamento={tiposPagamento}
         defaultValor={parseBRL(addForm.valor)}
         tipoRegistro={addForm.tipoRegistro}
+        loggedUser={loggedUser}
       />
       <PaymentModal
         open={showPaymentEdit}
@@ -721,6 +722,7 @@ export default function FinancialDashboard() {
         initialPayment={editPagamento}
         defaultValor={Math.abs(editPagamento?.valor ?? 0)}
         tipoRegistro={editTipoRegistro}
+        loggedUser={loggedUser}
       />
 
       <Notification notification={notification} />

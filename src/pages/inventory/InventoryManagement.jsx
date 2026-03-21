@@ -861,7 +861,7 @@ export default function InventoryManagement() {
                 onChange={(e) => setConsumiForm((f) => ({ ...f, despesaPessoal: e.target.checked }))}
               />
               <div>
-                <span className={styles.checkboxLabel}>Despesa Pessoal</span>
+                <span className={styles.checkboxLabel}>Despesa Interna</span>
                 <span className={styles.checkboxSub}>Marque se este consumo é de uso pessoal e não do hotel</span>
               </div>
             </label>

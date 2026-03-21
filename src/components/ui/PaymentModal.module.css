@@ -100,6 +100,13 @@
 }
 .addDesconto:hover { border-color: var(--violet); color: var(--violet); }
 
+/* ── Usar meu nome ─────────────────────────────────────────── */
+.checkRow {
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+  color: var(--text); cursor: pointer; user-select: none; margin-top: 4px;
+}
+.checkRow input { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; }
+
 /* ── Arquivo atual (edição) ────────────────────────────────── */
 .arquivoAtual {
   display: flex;

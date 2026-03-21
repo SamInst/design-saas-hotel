@@ -519,7 +519,7 @@ export const funcionarioApi = {
 // ─────────────────────────────────────────────────────────────
 export const usuarioApi = {
   bloquear(id, bloqueado) { return request(`/usuario/${id}/bloqueio`, { method: 'PATCH', body: { bloqueado } }); },
-  atualizarCredenciais(id, body) { return request(`/usuario/${id}/credenciais`, { method: 'PATCH', body }); },
+  atualizarCredenciais(id, body) { return request('/usuario/credenciais', { method: 'PATCH', body: { id, ...body } }); },
 };
 
 // ─────────────────────────────────────────────────────────────
