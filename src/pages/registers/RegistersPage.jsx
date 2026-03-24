@@ -17,6 +17,96 @@ import { usePermissions }           from '../../hooks/usePermissions';
 
 import styles from './RegistersPage.module.css';
 
+// ── Listas de veículos ────────────────────────────────────────
+const MARCAS_VEICULO = [
+  // Populares no Brasil
+  'Fiat','Volkswagen','Chevrolet','Toyota','Hyundai','Honda','Jeep','Renault','Nissan','Ford',
+  'Peugeot','Citroën',
+  // Globais
+  'BMW','Mercedes-Benz','Audi','Kia','Volvo','Subaru','Mazda','Mitsubishi','Suzuki',
+  'Land Rover','Jaguar','Porsche',
+  // Luxo
+  'Ferrari','Lamborghini','Bugatti','Rolls-Royce','Bentley','Maserati','Aston Martin','McLaren',
+  // Elétricas
+  'Tesla','BYD','Rivian','Lucid Motors','NIO','XPeng',
+  // Chinesas
+  'Chery','Great Wall Motors','Geely','JAC Motors',
+  // Brasileiras
+  'Troller','Agrale',
+  // Outras
+  'Alfa Romeo','Dodge','Chrysler','Cadillac','Infiniti','Acura','Genesis',
+];
+
+const CORES_VEICULO = [
+  // Mais comuns
+  'Branco','Preto','Prata','Cinza',
+  // Comuns
+  'Vermelho','Azul','Bege','Marrom','Verde',
+  // Menos comuns
+  'Amarelo','Laranja','Azul Claro','Verde Claro','Vinho','Roxo',
+  // Esportivas
+  'Amarelo Neon','Verde Limão','Azul Elétrico','Laranja Metálico',
+  // Premium
+  'Preto Perolizado','Branco Perolizado','Cinza Fosco','Azul Marinho','Verde Britânico',
+  // Raras
+  'Dourado','Cromado','Camaleão','Rosa','Turquesa','Roxo Metálico','Verde Neon',
+];
+
+const currentYear = new Date().getFullYear();
+const ANOS_VEICULO = Array.from({ length: currentYear - 1999 }, (_, i) => String(currentYear - i));
+
+// ── SearchableCombobox ────────────────────────────────────────
+function SearchableCombobox({ value, onChange, options, placeholder }) {
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState('');
+  const ref               = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = query
+    ? options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  const handleInput = (e) => {
+    setQuery(e.target.value);
+    onChange(e.target.value);
+    setOpen(true);
+  };
+
+  const handleSelect = (opt) => {
+    onChange(opt);
+    setQuery('');
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <input
+        className={styles.comboInput}
+        value={open ? query : value}
+        onChange={handleInput}
+        onFocus={() => { setQuery(''); setOpen(true); }}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <div className={styles.comboDropdown}>
+          {filtered.map(opt => (
+            <button key={opt} type="button" className={styles.comboItem}
+              onMouseDown={() => handleSelect(opt)}>
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Máscaras ──────────────────────────────────────────────────
 const maskCPF = v =>
   v.replace(/\D/g,'').slice(0,11)
@@ -413,10 +503,10 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
               <Input value={v.modelo} onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
             </FormField>
             <FormField label="Marca">
-              <Input value={v.marca} onChange={e => setVeiculo(i,'marca',e.target.value)} placeholder="Ex: Honda" />
+              <SearchableCombobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)} options={MARCAS_VEICULO} placeholder="Ex: Honda" />
             </FormField>
             <FormField label="Ano">
-              <Input type="number" value={v.ano} onChange={e => setVeiculo(i,'ano',e.target.value)} placeholder="2024" />
+              <SearchableCombobox value={v.ano} onChange={val => setVeiculo(i,'ano',val)} options={ANOS_VEICULO} placeholder="Ex: 2024" />
             </FormField>
           </div>
           <div className={styles.grid2}>
@@ -424,7 +514,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
               <Input value={v.placa} onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))} placeholder="AAA0A00" />
             </FormField>
             <FormField label="Cor">
-              <Input value={v.cor} onChange={e => setVeiculo(i,'cor',e.target.value)} placeholder="Preto" />
+              <SearchableCombobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)} options={CORES_VEICULO} placeholder="Ex: Preto" />
             </FormField>
           </div>
         </div>

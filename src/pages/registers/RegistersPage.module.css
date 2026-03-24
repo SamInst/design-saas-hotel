@@ -310,6 +310,27 @@
 .subFormBlock { border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface-2); margin-top:6px; }
 .subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
 
+/* ── Searchable Combobox ── */
+.comboInput {
+  width: 100%; padding: 9px 12px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--card-border);
+  color: var(--text); font-family: var(--font); font-size: 13px;
+  outline: none; transition: box-shadow .15s, border-color .15s;
+  box-shadow: 0 1px 2px rgba(15,23,42,.05); box-sizing: border-box;
+}
+.comboInput::placeholder { color: var(--text-2); opacity: .6; }
+.comboInput:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
+.comboDropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto;
+}
+.comboItem {
+  display: block; width: 100%; padding: 8px 12px; background: none; border: none;
+  text-align: left; font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s;
+}
+.comboItem:hover { background: var(--surface-2); }
+
 /* ── Empresa link ── */
 .linkEmpresaSearch { display:flex; flex-direction:column; gap:4px; position:relative; }
 .linkDropdown {
