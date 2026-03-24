@@ -498,6 +498,7 @@ export default function FinancialDashboard() {
             {/* ── Pagamento ── */}
             <div className={styles.detailSection}>Pagamento</div>
             {[
+              ['UUID',          item.pagamento?.uuid ?? '—'],
               ['Pagador',       item.pagamento?.nome_pagador ?? '—'],
               ['Forma',         item.pagamento?.tipo_pagamento?.descricao ?? '—'],
             ].map(([label, val]) => (
@@ -546,6 +547,10 @@ export default function FinancialDashboard() {
                   <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
                 </div>
                 <div className={styles.detailSection}>Desconto</div>
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>UUID</span>
+                  <span className={styles.detailVal}>{d.uuid ?? '—'}</span>
+                </div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Autorizado por</span>
                   <span className={styles.detailVal}>{d.funcionario?.nome ?? '—'}</span>
