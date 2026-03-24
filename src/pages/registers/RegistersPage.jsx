@@ -1165,7 +1165,7 @@ export default function RegistersPage() {
               </div>
               {canCadastrar && (
                 <Button onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
-                  <Building2 size={14} /> Empresa
+                  <Building2 size={14} /> Cadastrar Empresa
                 </Button>
               )}
               {canCadastrar && (
@@ -1175,7 +1175,7 @@ export default function RegistersPage() {
                   setShowErrors(false); setConfirmStep(false);
                   setShowAddPessoa(true);
                 }}>
-                  <Plus size={14} /> Hóspede
+                  <Plus size={14} /> Cadastrar Hóspede
                 </Button>
               )}
             </div>
