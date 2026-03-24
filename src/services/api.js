@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-// const BASE_URL =
-//   import.meta.env.VITE_API_URL ||
-//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
-
-  const BASE_URL =
+const BASE_URL =
   import.meta.env.VITE_API_URL ||
-  'http://localhost:8080';
+  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+
+  // const BASE_URL =
+  // import.meta.env.VITE_API_URL ||
+  // 'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
