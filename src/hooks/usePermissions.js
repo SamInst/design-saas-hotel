@@ -20,23 +20,26 @@ import { userStorage } from '../services/api';
 export function usePermissions() {
   const rawUser = userStorage.get();
 
-  const telaMap = useMemo(() => {
+  const { telaMap, isAdmin } = useMemo(() => {
     const telas = rawUser?.cargo?.telas ?? [];
     const map = {};
+    let admin = false;
     for (const tela of telas) {
+      if (tela.nome === 'ADMIN') { admin = true; break; }
       map[tela.nome] = new Set((tela.permissoes ?? []).map(p => p.permissao));
     }
-    return map;
+    return { telaMap: map, isAdmin: admin };
   }, [rawUser?.id, rawUser?.cargo?.id]);
 
   /** Verifica se o usuário tem acesso à tela (independente de permissão). */
-  const hasTela = (nome) => !!telaMap[nome];
+  const hasTela = (nome) => isAdmin || !!telaMap[nome];
 
   /**
    * Verifica se o usuário pode executar uma ação na tela.
    * ACESSO TOTAL na tela libera qualquer permissão.
    */
   const can = (tela, permissao) => {
+    if (isAdmin) return true;
     const set = telaMap[tela];
     if (!set) return false;
     return set.has('ACESSO TOTAL') || set.has(permissao);
