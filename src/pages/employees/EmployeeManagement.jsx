@@ -3,7 +3,7 @@ import {
   Search, Plus, Loader2, AlertCircle, Calendar, Edit2, X,
   Phone, Mail, Trash2, Eye, EyeOff, Lock, Building,
   Users, ChevronLeft, ChevronRight as ChevRight,
-  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download, Upload,
+  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download, Upload, UserCheck,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
@@ -656,18 +656,33 @@ export default function EmployeeManagement() {
 
     setFireLoading(true);
     try {
-      // Bloquear usuário
       await usuarioApi.bloquear(detailItem.usuario.id, true);
-
-      // Atualizar status do funcionário para DEMITIDO
       const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'DEMITIDO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
-
       showNotif('Funcionário demitido e usuário bloqueado!');
       setShowDetail(false);
       fetchData(searchTerm, page);
     } catch (e) {
       showNotif(e.message || 'Erro ao desligar funcionário.', 'error');
+    } finally {
+      setFireLoading(false);
+    }
+  };
+
+  const handleReativarEmployee = async () => {
+    if (!detailItem || !detailItem.usuario?.id) return;
+    if (!window.confirm('Tem certeza que deseja reativar este funcionário?')) return;
+
+    setFireLoading(true);
+    try {
+      await usuarioApi.bloquear(detailItem.usuario.id, false);
+      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'CONTRATADO' };
+      await cadastroApi.atualizarPessoa(pessoaBody);
+      showNotif('Funcionário reativado com sucesso!');
+      setShowDetail(false);
+      fetchData(searchTerm, page);
+    } catch (e) {
+      showNotif(e.message || 'Erro ao reativar funcionário.', 'error');
     } finally {
       setFireLoading(false);
     }
@@ -853,9 +868,15 @@ export default function EmployeeManagement() {
       <Button onClick={openEditEmployee}>
         <Edit2 size={13} /> Editar
       </Button>
-      <Button variant="danger" onClick={handleFireEmployee} disabled={fireLoading}>
-        <Trash2 size={13} /> Desligar
-      </Button>
+      {detailItem?.pessoa?.status === 'DEMITIDO' ? (
+        <Button variant="primary" onClick={handleReativarEmployee} disabled={fireLoading}>
+          <UserCheck size={13} /> Reativar
+        </Button>
+      ) : (
+        <Button variant="danger" onClick={handleFireEmployee} disabled={fireLoading}>
+          <Trash2 size={13} /> Desligar
+        </Button>
+      )}
     </div>
   ) : null;
 
