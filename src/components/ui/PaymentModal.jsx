@@ -211,11 +211,11 @@ export function PaymentModal({
         <FormField label="Nome do Pagador *">
           <Input placeholder="Nome completo"
             value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
-          {loggedUser?.nome && (
+          {loggedUser?.pessoa?.nome && (
             <label className={styles.checkRow}>
               <input type="checkbox"
-                checked={nomePagador === loggedUser.nome.toUpperCase()}
-                onChange={e => setNomePagador(e.target.checked ? loggedUser.nome.toUpperCase() : '')} />
+                checked={nomePagador === loggedUser.pessoa.nome.toUpperCase()}
+                onChange={e => setNomePagador(e.target.checked ? loggedUser.pessoa.nome.toUpperCase() : '')} />
               <span>Nome do funcionário</span>
             </label>
           )}

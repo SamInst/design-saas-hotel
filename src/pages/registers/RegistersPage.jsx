@@ -109,6 +109,7 @@ const buildPessoaBody = (p, overrides = {}) => {
     cpf:             unmask(p.cpf),
     rg:              up(p.rg),
     email:           (p.email ?? '').trim(),
+    profissao:       up(p.profissao),
     telefone:        unmask(p.telefone),
     pais:            up(p.pais) || 'BRASIL',
     estado:          up(p.estado),
@@ -122,7 +123,7 @@ const buildPessoaBody = (p, overrides = {}) => {
     status:          p.status ?? 'ATIVO',
     titular:         titularId ? { id: titularId } : null,
     empresas:        (p.empresasVinculadas ?? p.empresas_vinculadas ?? []).map(e => ({ id: e.id })),
-    veiculos_vinculados: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+    veiculos: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
       ...(v.id ? { id: v.id } : {}),
       modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
       ano: Number(v.ano) || 0,
@@ -1211,6 +1212,7 @@ export default function RegistersPage() {
                 <Section title="Dados Pessoais">
                   <KV label="CPF"  value={maskCPF(detailItem.cpf ?? '')} />
                   <KV label="RG"   value={detailItem.rg} />
+                  <KV label="Profissão" value={detailItem.profissao || '—'} />
                   <KV label="Nasc." value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
                   <KV label="Sexo" value={detailItem.sexo === 1 ? 'Masculino' : detailItem.sexo === 2 ? 'Feminino' : 'Outro'} />
                   <KV label="Telefone" value={
@@ -1242,11 +1244,11 @@ export default function RegistersPage() {
                   <KV label="Bairro"   value={detailItem.bairro} />
                   <KV label="Cidade"   value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' - ')} />
                   <KV label="País"     value={detailItem.pais} />
-                  <KV label="Compl."   value={detailItem.complemento} />
+                  <KV label="Complemento"   value={detailItem.complemento} />
                 </Section>
                 <Section title="Registro">
                   <KV label="Cadastrado em"  value={detailItem.data_hora_registro ?? '—'} />
-                  <KV label="Funcionário"    value={detailItem.funcionario?.nome ?? '—'} />
+                  <KV label="Registrado por" value={detailItem.funcionario?.nome ?? '—'} />
                 </Section>
               </div>
             )}
@@ -1469,7 +1471,7 @@ export default function RegistersPage() {
       <Modal open={showEdit} onClose={() => setShowEdit(false)} size="lg" title="Editar Hóspede"
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEdit(false)} className={styles.full}>Cancelar</Button>
+            <Button onClick={() => setEditPessoa(blankPessoa())} className={styles.full}>Limpar</Button>
             <Button variant="primary" onClick={handleSaveEditPessoa} disabled={isSubmitting} className={styles.full}>
               {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
             </Button>
@@ -1499,7 +1501,7 @@ export default function RegistersPage() {
                   <span>{totalPessoas}</span>
                   pessoa{totalPessoas !== 1 ? 's' : ''}
                 </div>
-                <Button onClick={() => setShowAddPessoa(false)}>Cancelar</Button>
+                <Button onClick={() => { setTitular(blankPessoa()); setDependentes([]); }}>Limpar</Button>
                 <Button variant="primary" onClick={handleAddPessoa}>Próximo →</Button>
               </>
             ) : (
@@ -1607,7 +1609,7 @@ export default function RegistersPage() {
           title={`Dependente ${depFillIdx + 1} de ${numDependentes}`}
           footer={
             <div className={styles.modalFooter}>
-              <Button onClick={() => { setDepFillIdx(-1); setCurrentDep(null); }}>Cancelar</Button>
+              <Button onClick={() => setCurrentDep(blankPessoa())}>Limpar</Button>
               <Button variant="primary" onClick={handleDepSave}>
                 {depFillIdx + 1 < parseInt(numDependentes) ? 'Próximo →' : 'Concluir →'}
               </Button>
@@ -1631,7 +1633,7 @@ export default function RegistersPage() {
         title={editMode ? 'Editar Empresa' : 'Nova Empresa'}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}>Cancelar</Button>
+            <Button onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
             <Button variant="primary" onClick={handleSaveEmpresa} disabled={isSubmitting}>
               {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
             </Button>
