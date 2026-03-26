@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
   CreditCard, Calendar, Filter, Search, ChevronDown, Plus, Edit2,
-  Wallet, Banknote, Smartphone, Building2, Clock, TrendingUp,
-  TrendingDown, DollarSign, ArrowUpRight, ArrowDownRight, Minus,
+  Wallet, Banknote, Smartphone, Building2, Clock,
+  ArrowUpRight, ArrowDownRight, Minus,
   Loader2, AlertCircle, Download, Tag,
 } from 'lucide-react';
 
@@ -264,14 +264,6 @@ export default function FinancialDashboard() {
   const total = pagamentos?.TOTAL ?? { receitas: 0, despesas: 0, lucro: 0 };
   const methodEntries = Object.entries(pagamentos).filter(([k]) => k !== 'TOTAL');
 
-  const summaryCards = [
-    { key: 'r', title: 'Receita Total',        icon: TrendingUp,   color: 'emerald',
-      r: total.receitas, d: 0,             l: total.receitas },
-    { key: 'd', title: 'Despesa Total',         icon: TrendingDown, color: 'rose',
-      r: 0,             d: total.despesas, l: -total.despesas },
-    { key: 'l', title: 'Resultado do Período',  icon: DollarSign,   color: 'violet',
-      r: total.receitas, d: total.despesas, l: total.lucro },
-  ];
 
   // ── BUSCA LOCAL ───────────────────────────────────────────
   const visibleGrupos = grupos.map(g => ({
@@ -445,25 +437,25 @@ export default function FinancialDashboard() {
           {(canDashboard || canValorParcial) && (
             <aside className={[styles.summaryCol, !canDashboard && canValorParcial ? styles.summaryColSolo : ''].join(' ')}>
               <div className={styles.summaryList}>
-                {canDashboard && summaryCards.map(({ key, title, icon: Icon, color, r, d, l }) => (
-                  <div key={key} className={styles.summaryCard}>
+                {canDashboard && (
+                  <div className={styles.summaryCard}>
                     <div className={styles.summaryHead}>
-                      <div className={[styles.summaryIcon, styles[`summaryIcon_${color}`]].join(' ')}>
-                        <Icon size={14} />
+                      <div className={[styles.summaryIcon, styles.summaryIcon_violet].join(' ')}>
+                        <Wallet size={14} />
                       </div>
-                      <span className={styles.summaryTitle}>{title}</span>
+                      <span className={styles.summaryTitle}>Total</span>
                     </div>
                     <div className={styles.kv}>
-                      <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(r)}</b></div>
-                      <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(d)}</b></div>
+                      <div className={styles.kvRow}><span>Receita total</span><b className={styles.moneyPlus}>{fmt(total.receitas)}</b></div>
+                      <div className={styles.kvRow}><span>Despesa total</span><b className={styles.moneyMinus}>{fmt(total.despesas)}</b></div>
                       <div className={styles.divider} />
                       <div className={styles.kvRow}>
-                        <span>Total</span>
-                        <b className={l >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(l)}</b>
+                        <span>Lucro</span>
+                        <b className={total.lucro >= 0 ? styles.money_emerald : styles.moneyMinus}>{fmt(total.lucro)}</b>
                       </div>
                     </div>
                   </div>
-                ))}
+                )}
 
                 {methodEntries
                   .filter(([method]) => canDashboard || (canValorParcial && method.toUpperCase().includes('DINHEIRO')))
