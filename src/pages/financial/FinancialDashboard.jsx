@@ -62,14 +62,14 @@ const blankAdd = () => ({
 export default function FinancialDashboard() {
   const { can, loggedUser } = usePermissions();
 
-  const canNovoLancamento  = can('FINANCEIRO', 'NOVO LANCAMENTO');
-  const canEditar          = can('FINANCEIRO', 'EDITAR');
+  const canNovoLancamento  = can('FINANCEIRO', 'NOVO RELATORIO');
+  const canEditar          = can('FINANCEIRO', 'EDITAR RELATORIO');
   const canEditarPagamento = can('FINANCEIRO', 'EDITAR PAGAMENTO');
   const canFiltros         = can('FINANCEIRO', 'FILTROS');
-  const canHistoricoSaldo  = can('FINANCEIRO', 'HISTORICO SALDO');
+  const canHistoricoSaldo  = can('FINANCEIRO', 'HISTORICO DO FLUXO DE CAIXA');
   const canDashboard       = can('FINANCEIRO', 'DASHBOARD');
-  const canValorParcial    = can('FINANCEIRO', 'VALOR PARCIAL');
-  const canValorTotalDia   = can('FINANCEIRO', 'VALOR TOTAL DIA');
+  const canValorParcial    = can('FINANCEIRO', 'ACESSO AO CARD DE DINHEIRO');
+  const canValorTotalDia   = can('FINANCEIRO', 'RECEITAS DO DIA');
   const canAplicarDesconto = can('FINANCEIRO', 'APLICAR DESCONTO');
 
   const [grupos,         setGrupos]         = useState([]);
@@ -118,9 +118,17 @@ export default function FinancialDashboard() {
   const toApiDate = (d) => d ? d.toISOString().split('T')[0] : undefined;
 
   useEffect(() => {
-    enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
-    quartoApi.listar({ size: 900 }).then(r => setQuartos(r?.content ?? [])).catch(() => {});
-    funcionarioApi.listar({ size: 200, page: 0 }).then(r => setFuncionarios(r?.content ?? [])).catch(() => {});
+    // só carrega dados auxiliares quando o usuário tem permissão de usá-los
+    if (canNovoLancamento || canEditar || canEditarPagamento || canFiltros) {
+      enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
+    }
+    if (canNovoLancamento || canEditar || canFiltros) {
+      quartoApi.listar({ size: 900 }).then(r => setQuartos(r?.content ?? [])).catch(() => {});
+    }
+    if (canFiltros) {
+      funcionarioApi.listar({ size: 200, page: 0 }).then(r => setFuncionarios(r?.content ?? [])).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async (filters = {}) => {
@@ -348,12 +356,18 @@ export default function FinancialDashboard() {
                         </div>
                         {canValorTotalDia && (
                           <div className={styles.groupRight}>
-                            <span className={styles.dotPlus} />
-                            <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
-                            <span className={styles.dotMinus} />
-                            <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
-                            <span className={styles.dotViolet} />
-                            <b className={dayL >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(dayL)}</b>
+                            <span className={styles.groupRightItem}>
+                              <span className={styles.groupRightLabel}>Receita total do dia:</span>
+                              <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
+                            </span>
+                            <span className={styles.groupRightItem}>
+                              <span className={styles.groupRightLabel}>Total de despesas:</span>
+                              <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
+                            </span>
+                            <span className={styles.groupRightItem}>
+                              <span className={styles.groupRightLabel}>Lucro do dia:</span>
+                              <b className={dayL >= 0 ? styles.money_emerald : styles.moneyMinus}>{fmt(dayL)}</b>
+                            </span>
                           </div>
                         )}
                       </div>
@@ -365,7 +379,7 @@ export default function FinancialDashboard() {
                               <th style={{ width: 36 }}></th>
                               <th>Descrição</th>
                               <th style={{ width: 140, textAlign: 'right' }}>Valor</th>
-                              {canHistoricoSaldo && <th style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>}
+                              {canHistoricoSaldo && <th className={styles.colSaldo} style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>}
                             </tr></thead>
                             <tbody>
                               {_items.map(t => {
@@ -388,7 +402,7 @@ export default function FinancialDashboard() {
                                         {t.despesa_pessoal && <span className={styles.pessoalTag}>Despesa Interna</span>}
                                       </div>
                                     </td>
-                                    <td style={{ textAlign: 'right' }}>
+                                    <td className={styles.valorCell}>
                                       <b className={t.pagamento?.desconto ? styles.moneyDesconto : isExp ? styles.moneyMinus : styles[`money_${ak}`]} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                         {(() => {
                                           const bruto = Math.abs(t.pagamento?.valor ?? t.valor);
@@ -402,7 +416,7 @@ export default function FinancialDashboard() {
                                       </b>
                                     </td>
                                     {canHistoricoSaldo && (
-                                      <td style={{ textAlign: 'right' }}>
+                                      <td className={styles.colSaldo}>
                                         <span className={styles.balance}>
                                           <b>{fmt(saldo)}</b>
                                           {saldo > 0
@@ -429,11 +443,7 @@ export default function FinancialDashboard() {
 
           {/* ══ COLUNA DIREITA: RESUMO ══════════════════════ */}
           {(canDashboard || canValorParcial) && (
-            <aside className={styles.summaryCol}>
-              <div className={styles.sectionTitle}>
-                <CreditCard size={12} className={styles.iconViolet} />
-                <h2>Resumo</h2>
-              </div>
+            <aside className={[styles.summaryCol, !canDashboard && canValorParcial ? styles.summaryColSolo : ''].join(' ')}>
               <div className={styles.summaryList}>
                 {canDashboard && summaryCards.map(({ key, title, icon: Icon, color, r, d, l }) => (
                   <div key={key} className={styles.summaryCard}>
@@ -448,7 +458,7 @@ export default function FinancialDashboard() {
                       <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(d)}</b></div>
                       <div className={styles.divider} />
                       <div className={styles.kvRow}>
-                        <span>Resultado</span>
+                        <span>Total</span>
                         <b className={l >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(l)}</b>
                       </div>
                     </div>
@@ -456,23 +466,23 @@ export default function FinancialDashboard() {
                 ))}
 
                 {methodEntries
-                  .filter(([method]) => canDashboard || method.toUpperCase().includes('DINHEIRO'))
+                  .filter(([method]) => canDashboard || (canValorParcial && method.toUpperCase().includes('DINHEIRO')))
                   .map(([method, values]) => {
                     const ak = accentOf(method);
                     return (
                       <div key={method} className={styles.summaryCard}>
                         <div className={styles.summaryHead}>
                           <div className={[styles.summaryIcon, styles[`summaryIcon_${ak}`]].join(' ')}>
-                            <PayMethodIcon descricao={method} size={14} />
+                            <PayMethodIcon descricao={method} size={!canDashboard && canValorParcial ? 24 : 14} />
                           </div>
-                          <span className={styles.summaryTitle}>{method}</span>
+                          <span className={styles.summaryTitle}>{!canDashboard && canValorParcial ? 'Saldo do Caixa' : method}</span>
                         </div>
                         <div className={styles.kv}>
                           <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(values.receitas)}</b></div>
                           <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(values.despesas)}</b></div>
                           <div className={styles.divider} />
                           <div className={styles.kvRow}>
-                            <span>Resultado</span>
+                            <span>Total</span>
                             <b className={values.lucro >= 0 ? styles[`money_${ak}`] : styles.moneyMinus}>{fmt(values.lucro)}</b>
                           </div>
                         </div>

@@ -99,6 +99,7 @@
 .telaCheckbox { width: 16px; height: 16px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
 .telaInfo     { flex: 1; min-width: 0; }
 .telaNome     { font-size: 13px; font-weight: 600; color: var(--text); }
+.telaDesc     { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 
 /* ── Acesso Total row ── */
 .acessoTotalRow {

@@ -15,6 +15,16 @@ import styles from './RolePermissions.module.css';
 const PAGE_SIZE = 10;
 const up = v => (v ?? '').toUpperCase().trim();
 
+// ── FINANCEIRO: cascade rules (checking A also checks B,C…) ──
+const FINANCEIRO_CASCADES = {
+  'APLICAR DESCONTO': ['EDITAR PAGAMENTO', 'EDITAR RELATORIO', 'NOVO RELATORIO'],
+  'EDITAR RELATORIO': ['NOVO RELATORIO'],
+  'EDITAR PAGAMENTO': ['NOVO RELATORIO'],
+};
+// permission auto-selected when FINANCEIRO tela is first enabled
+const FINANCEIRO_AUTO = 'HISTORICO DO FLUXO DE CAIXA';
+const isFinanceiro = tela => (tela?.nome ?? tela?.descricao ?? '').toUpperCase() === 'FINANCEIRO';
+
 // ── main component ───────────────────────────────────────────
 export default function RolePermissions() {
 
@@ -30,7 +40,6 @@ export default function RolePermissions() {
   // ── system data ───────────────────────────────────────────
   const [systemTelas, setSystemTelas]           = useState([]);
   const [systemPerms, setSystemPerms]           = useState({});   // { telaId: [perm] }
-  const [loadingPerms, setLoadingPerms]         = useState({});   // { telaId: bool }
   const [systemDataLoaded, setSystemDataLoaded] = useState(false);
   const [permDescMap, setPermDescMap]           = useState({});   // { permId: descricao }
 
@@ -103,28 +112,23 @@ export default function RolePermissions() {
     try {
       const telas = await cargoApi.listarTelas();
       setSystemTelas(telas ?? []);
+      // pré-popula systemPerms e permDescMap de uma vez
+      const permsMap = {};
+      const descMap  = {};
+      (telas ?? []).forEach(t => {
+        permsMap[t.id] = t.permissoes ?? [];
+        (t.permissoes ?? []).forEach(p => { if (p.descricao) descMap[p.id] = p.descricao; });
+      });
+      setSystemPerms(prev => ({ ...prev, ...permsMap }));
+      setPermDescMap(prev => ({ ...prev, ...descMap }));
       setSystemDataLoaded(true);
     } catch { /* silencioso */ }
   }, [systemDataLoaded]);
 
-  const loadPermsForTela = useCallback(async (telaId) => {
-    if (systemPerms[telaId] !== undefined) return;
-    setLoadingPerms(prev => ({ ...prev, [telaId]: true }));
-    try {
-      const perms = await cargoApi.listarPermissoesPorTela(telaId);
-      setSystemPerms(prev => ({ ...prev, [telaId]: perms ?? [] }));
-      // atualiza o mapa de descrições com qualquer nova descrição da API
-      setPermDescMap(prev => {
-        const map = { ...prev };
-        (perms ?? []).forEach(p => { if (p.descricao) map[p.id] = p.descricao; });
-        return map;
-      });
-    } catch {
-      setSystemPerms(prev => ({ ...prev, [telaId]: [] }));
-    } finally {
-      setLoadingPerms(prev => ({ ...prev, [telaId]: false }));
-    }
-  }, [systemPerms]);
+  // mantido por compatibilidade (toggleTela ainda chama, mas retorna imediatamente pois já carregado)
+  const loadPermsForTela = useCallback((telaId) => {
+    void telaId; // systemPerms já preenchido em loadSystemData
+  }, []);
 
   // ── open detail ───────────────────────────────────────────
   const openDetail = (cargo) => { setSelectedCargo(cargo); setDetailModal(true); };
@@ -180,6 +184,15 @@ export default function RolePermissions() {
       } else {
         next.add(telaId);
         loadPermsForTela(telaId);
+        // auto-select HISTORICO DO FLUXO DE CAIXA when FINANCEIRO is enabled
+        const tela = systemTelas.find(t => t.id === telaId);
+        if (isFinanceiro(tela)) {
+          const perms = systemPerms[telaId] ?? [];
+          const autoId = perms.find(p => p.permissao === FINANCEIRO_AUTO)?.id;
+          if (autoId) {
+            setFormPermissoesIds(pp => { const np = new Set(pp); np.add(autoId); return np; });
+          }
+        }
       }
       return next;
     });
@@ -207,10 +220,22 @@ export default function RolePermissions() {
   };
 
   // ── toggle permissao ──────────────────────────────────────
-  const togglePermissao = (permId) => {
+  const togglePermissao = (permId, tela) => {
     setFormPermissoesIds(prev => {
       const next = new Set(prev);
-      next.has(permId) ? next.delete(permId) : next.add(permId);
+      const adding = !next.has(permId);
+      adding ? next.add(permId) : next.delete(permId);
+
+      // cascade rules only when checking a permission in FINANCEIRO
+      if (adding && isFinanceiro(tela)) {
+        const perms = systemPerms[tela.id] ?? [];
+        const code  = perms.find(p => p.id === permId)?.permissao ?? '';
+        (FINANCEIRO_CASCADES[code] ?? []).forEach(cascadeCode => {
+          const target = perms.find(p => p.permissao === cascadeCode);
+          if (target) next.add(target.id);
+        });
+      }
+
       return next;
     });
   };
@@ -482,8 +507,7 @@ export default function RolePermissions() {
               systemTelas.map(tela => {
                 const isChecked    = formTelasIds.has(tela.id);
                 const hasTotal     = formAcessoTotal.has(tela.id);
-                const perms        = systemPerms[tela.id];
-                const permsLoading = loadingPerms[tela.id];
+                const perms = systemPerms[tela.id];
 
                 return (
                   <div key={tela.id} className={[styles.telaItem, isChecked ? styles.telaItemActive : ''].join(' ')}>
@@ -501,18 +525,16 @@ export default function RolePermissions() {
                         onClick={e => e.stopPropagation()}
                       />
                       <div className={styles.telaInfo}>
-                        <div className={styles.telaNome}>{tela.descricao}</div>
+                        <div className={styles.telaNome}>{tela.nome ?? tela.descricao}</div>
+                        {tela.nome && tela.descricao && (
+                          <div className={styles.telaDesc}>{tela.descricao}</div>
+                        )}
                       </div>
                     </div>
 
                     {/* permissões (só quando a tela está ativa) */}
                     {isChecked && (
-                      permsLoading ? (
-                        <div className={styles.permissaoLoading}>
-                          <Loader2 size={13} className={styles.spin} />
-                          Carregando permissões…
-                        </div>
-                      ) : !perms || perms.length === 0 ? (
+                      !perms || perms.length === 0 ? (
                         <div className={styles.permissaoEmpty}>Nenhuma permissão disponível para esta tela</div>
                       ) : (
                         <>
@@ -548,12 +570,21 @@ export default function RolePermissions() {
                                   type="checkbox"
                                   className={styles.permissaoCheckbox}
                                   checked={formPermissoesIds.has(perm.id)}
-                                  onChange={() => !hasTotal && togglePermissao(perm.id)}
+                                  onChange={() => !hasTotal && togglePermissao(perm.id, tela)}
                                   disabled={hasTotal}
                                 />
                                 <div className={styles.permissaoTexts}>
-                                  <span className={styles.permissaoNome}>{perm.permissao}</span>
-                                  <span className={styles.permissaoDesc}>{perm.descricao ?? permDescMap[perm.id] ?? ''}</span>
+                                  {(() => {
+                                    const title = perm.permissao ?? perm.descricao;
+                                    const desc  = perm.descricao || permDescMap[perm.id];
+                                    const showDesc = desc && desc !== title;
+                                    return (
+                                      <>
+                                        <span className={styles.permissaoNome}>{title}</span>
+                                        {showDesc && <span className={styles.permissaoDesc}>{desc}</span>}
+                                      </>
+                                    );
+                                  })()}
                                 </div>
                               </label>
                             ))}

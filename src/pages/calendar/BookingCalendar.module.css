@@ -142,10 +142,11 @@
 .dayHeaderWeekend { background: color-mix(in srgb, #ef4444 7%, transparent); }
 .dayHeaderWeekend:hover { background: color-mix(in srgb, #ef4444 13%, transparent); }
 .dayHeaderToday {
-  background: color-mix(in srgb, var(--violet) 12%, transparent);
-  border-bottom: 2px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 14%, transparent);
+  border-top: 3px solid var(--violet) !important;
+  border-left: 2px solid color-mix(in srgb, var(--violet) 60%, transparent) !important;
 }
-.dayHeaderToday:hover { background: color-mix(in srgb, var(--violet) 18%, transparent); }
+.dayHeaderToday:hover { background: color-mix(in srgb, var(--violet) 20%, transparent); }
 
 .dayWeekday {
   font-size: 9px; font-weight: 700; color: var(--text-2); text-transform: uppercase;
@@ -153,7 +154,8 @@
   max-width: 100%; text-align: center;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
-.dayWeekdayRed { color: #ef4444; }
+.dayWeekdayRed   { color: #ef4444; }
+.dayWeekdayToday { color: var(--violet) !important; font-weight: 800; font-size: 10px; letter-spacing: .08em; }
 
 .dayNum {
   font-size: 15px; font-weight: 800; color: var(--text); line-height: 1;
@@ -208,8 +210,9 @@
 .cell { flex-shrink: 0; border-right: 1px solid var(--border); }
 .cellWeekend  { background: color-mix(in srgb, #ef4444 5%, transparent); }
 .cellToday    {
-  background: color-mix(in srgb, var(--violet) 9%, transparent);
-  border-right: 1px solid color-mix(in srgb, var(--violet) 30%, transparent);
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--violet) 40%, transparent) !important;
+  border-right: 1px solid color-mix(in srgb, var(--violet) 20%, transparent);
 }
 .cellSelected {
   background: color-mix(in srgb, var(--violet) 18%, transparent) !important;

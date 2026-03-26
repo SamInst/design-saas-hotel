@@ -1307,8 +1307,8 @@ export default function BookingCalendar() {
                       onClick={() => setDayModal({ dateStr: dStr })}
                       title={`Ver reservas — ${fmtDateBR(dStr)}`}
                     >
-                      <span className={[styles.dayWeekday, isWeekend ? styles.dayWeekdayRed : ''].join(' ')}>
-                        {day.toLocaleDateString('pt-BR', { weekday: 'long' })}
+                      <span className={[styles.dayWeekday, isWeekend ? styles.dayWeekdayRed : '', isToday ? styles.dayWeekdayToday : ''].join(' ')}>
+                        {isToday ? 'HOJE' : day.toLocaleDateString('pt-BR', { weekday: 'long' })}
                       </span>
                       <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
                         {day.getDate()}
