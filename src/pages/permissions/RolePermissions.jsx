@@ -32,6 +32,7 @@ export default function RolePermissions() {
   const [systemPerms, setSystemPerms]           = useState({});   // { telaId: [perm] }
   const [loadingPerms, setLoadingPerms]         = useState({});   // { telaId: bool }
   const [systemDataLoaded, setSystemDataLoaded] = useState(false);
+  const [permDescMap, setPermDescMap]           = useState({});   // { permId: descricao }
 
   // ── modals ────────────────────────────────────────────────
   const [detailModal,   setDetailModal]   = useState(false);
@@ -62,9 +63,16 @@ export default function RolePermissions() {
       const params = { page: pageNum, size: PAGE_SIZE };
       if (termo) params.termo = termo;
       const data = await cargoApi.listar(params);
-      setCargos(data?.content ?? []);
+      const content = data?.content ?? [];
+      setCargos(content);
       setTotalPages(data?.totalPages ?? 0);
       setTotalElements(data?.totalElements ?? 0);
+      // extrai descrições de permissões conhecidas
+      const map = {};
+      content.forEach(c => (c.telas ?? []).forEach(t =>
+        (t.permissoes ?? []).forEach(p => { if (p.descricao) map[p.id] = p.descricao; })
+      ));
+      if (Object.keys(map).length) setPermDescMap(prev => ({ ...prev, ...map }));
     } catch (err) {
       notify(err.message || 'Erro ao carregar cargos', 'error');
     } finally {
@@ -105,6 +113,12 @@ export default function RolePermissions() {
     try {
       const perms = await cargoApi.listarPermissoesPorTela(telaId);
       setSystemPerms(prev => ({ ...prev, [telaId]: perms ?? [] }));
+      // atualiza o mapa de descrições com qualquer nova descrição da API
+      setPermDescMap(prev => {
+        const map = { ...prev };
+        (perms ?? []).forEach(p => { if (p.descricao) map[p.id] = p.descricao; });
+        return map;
+      });
     } catch {
       setSystemPerms(prev => ({ ...prev, [telaId]: [] }));
     } finally {
@@ -537,7 +551,10 @@ export default function RolePermissions() {
                                   onChange={() => !hasTotal && togglePermissao(perm.id)}
                                   disabled={hasTotal}
                                 />
-                                <span className={styles.permissaoLabel}>{perm.descricao}</span>
+                                <div className={styles.permissaoTexts}>
+                                  <span className={styles.permissaoNome}>{perm.permissao}</span>
+                                  <span className={styles.permissaoDesc}>{perm.descricao ?? permDescMap[perm.id] ?? ''}</span>
+                                </div>
                               </label>
                             ))}
                           </div>

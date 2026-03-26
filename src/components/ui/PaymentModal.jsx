@@ -38,8 +38,13 @@ function DiscountModal({ open, onClose, onConfirm, valorBase = 0 }) {
   })();
 
   const handleConfirm = () => {
-    if (tipo === 'porcentagem' && !pct) return;
-    if (tipo === 'fixo'        && !fixo) return;
+    if (tipo === 'porcentagem') {
+      const p = parseFloat(pct) || 0;
+      if (!pct || p <= 0 || p > 100) return;
+    }
+    if (tipo === 'fixo') {
+      if (!fixo || parseBRL(fixo) <= 0) return;
+    }
     onConfirm({
       porcentagem: tipo === 'porcentagem' ? parseInt(pct, 10)  : undefined,
       valor:       tipo === 'fixo'        ? parseBRL(fixo)     : undefined,
@@ -69,8 +74,8 @@ function DiscountModal({ open, onClose, onConfirm, valorBase = 0 }) {
 
       {tipo === 'porcentagem' ? (
         <FormField label="Porcentagem (%)">
-          <Input type="number" min="0" max="100" placeholder="Ex: 10"
-            value={pct} onChange={e => setPct(e.target.value)} />
+          <Input type="number" min="1" max="100" placeholder="Ex: 10"
+            value={pct} onChange={e => setPct(e.target.value.replace(/[^0-9]/g, ''))} />
         </FormField>
       ) : (
         <FormField label="Valor do Desconto (R$)">
@@ -117,8 +122,9 @@ export function PaymentModal({
   initialPayment = null,
   defaultValor   = 0,
   isSubmitting   = false,
-  tipoRegistro   = '',
-  loggedUser     = null,
+  tipoRegistro       = '',
+  loggedUser         = null,
+  canAplicarDesconto = true,
 }) {
   const [tipoPagId,   setTipoPagId]   = useState('');
   const [nomePagador, setNomePagador] = useState('');
@@ -238,7 +244,7 @@ export function PaymentModal({
         </FormField>
 
         {/* Desconto */}
-        {desconto ? (
+        {tipoRegistro !== 'SAIDA' && canAplicarDesconto && (desconto ? (
           <div className={styles.descontoApplied}>
             <Tag size={12} />
             <span>
@@ -256,7 +262,7 @@ export function PaymentModal({
           <button className={styles.addDesconto} onClick={() => setShowDesc(true)}>
             <Tag size={12} /> Aplicar desconto
           </button>
-        )}
+        ))}
 
         {/* Comprovante */}
         <FormField label="Comprovante (opcional)">

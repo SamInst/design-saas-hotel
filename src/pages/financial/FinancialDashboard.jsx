@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CreditCard, Calendar, Filter, Search, ChevronDown, Plus, Edit2,
   Wallet, Banknote, Smartphone, Building2, Clock, TrendingUp,
@@ -12,7 +12,8 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }     from '../../components/ui/Notification';
 import { DatePicker }       from '../../components/ui/DatePicker';
 import { PaymentModal }     from '../../components/ui/PaymentModal';
-import { relatorioApi, enumApi, quartoApi, funcionarioApi, arquivoApi, userStorage } from '../../services/api';
+import { relatorioApi, enumApi, quartoApi, funcionarioApi, arquivoApi } from '../../services/api';
+import { usePermissions } from '../../hooks/usePermissions';
 
 import styles from './FinancialDashboard.module.css';
 
@@ -59,7 +60,17 @@ const blankAdd = () => ({
 
 // ─────────────────────────────────────────────────────────────
 export default function FinancialDashboard() {
-  const loggedUser = useMemo(() => userStorage.get(), []);
+  const { can, loggedUser } = usePermissions();
+
+  const canNovoLancamento  = can('FINANCEIRO', 'NOVO LANCAMENTO');
+  const canEditar          = can('FINANCEIRO', 'EDITAR');
+  const canEditarPagamento = can('FINANCEIRO', 'EDITAR PAGAMENTO');
+  const canFiltros         = can('FINANCEIRO', 'FILTROS');
+  const canHistoricoSaldo  = can('FINANCEIRO', 'HISTORICO SALDO');
+  const canDashboard       = can('FINANCEIRO', 'DASHBOARD');
+  const canValorParcial    = can('FINANCEIRO', 'VALOR PARCIAL');
+  const canValorTotalDia   = can('FINANCEIRO', 'VALOR TOTAL DIA');
+  const canAplicarDesconto = can('FINANCEIRO', 'APLICAR DESCONTO');
 
   const [grupos,         setGrupos]         = useState([]);
   const [pagamentos,     setPagamentos]     = useState({});
@@ -296,13 +307,17 @@ export default function FinancialDashboard() {
                   <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Buscar lançamento..." className={styles.searchInput} />
                 </div>
-                <Button onClick={() => setShowFilter(true)}>
-                  <Filter size={14} /> Filtros
-                  {nFilters > 0 && <span className={styles.filterBadge}>{nFilters}</span>}
-                </Button>
-                <Button variant="primary" onClick={() => setShowAdd(true)}>
-                  <Plus size={14} /> Adicionar
-                </Button>
+                {canFiltros && (
+                  <Button onClick={() => setShowFilter(true)}>
+                    <Filter size={14} /> Filtros
+                    {nFilters > 0 && <span className={styles.filterBadge}>{nFilters}</span>}
+                  </Button>
+                )}
+                {canNovoLancamento && (
+                  <Button variant="primary" onClick={() => setShowAdd(true)}>
+                    <Plus size={14} /> Adicionar
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -331,14 +346,16 @@ export default function FinancialDashboard() {
                           <span className={styles.groupDate}>{data}</span>
                           <span className={styles.badge}>{_items.length} {_items.length === 1 ? 'lançamento' : 'lançamentos'}</span>
                         </div>
-                        <div className={styles.groupRight}>
-                          <span className={styles.dotPlus} />
-                          <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
-                          <span className={styles.dotMinus} />
-                          <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
-                          <span className={styles.dotViolet} />
-                          <b className={dayL >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(dayL)}</b>
-                        </div>
+                        {canValorTotalDia && (
+                          <div className={styles.groupRight}>
+                            <span className={styles.dotPlus} />
+                            <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
+                            <span className={styles.dotMinus} />
+                            <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
+                            <span className={styles.dotViolet} />
+                            <b className={dayL >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(dayL)}</b>
+                          </div>
+                        )}
                       </div>
 
                       {isOpen && (
@@ -348,7 +365,7 @@ export default function FinancialDashboard() {
                               <th style={{ width: 36 }}></th>
                               <th>Descrição</th>
                               <th style={{ width: 140, textAlign: 'right' }}>Valor</th>
-                              <th style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>
+                              {canHistoricoSaldo && <th style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>}
                             </tr></thead>
                             <tbody>
                               {_items.map(t => {
@@ -384,16 +401,18 @@ export default function FinancialDashboard() {
                                         {t.pagamento?.desconto && <Tag size={13} className={styles.descontoBadge} />}
                                       </b>
                                     </td>
-                                    <td style={{ textAlign: 'right' }}>
-                                      <span className={styles.balance}>
-                                        <b>{fmt(saldo)}</b>
-                                        {saldo > 0
-                                          ? <ArrowUpRight   size={12} className={styles.iconEmerald} />
-                                          : saldo < 0
-                                          ? <ArrowDownRight size={12} className={styles.iconRose} />
-                                          : <Minus         size={12} className={styles.iconMuted} />}
-                                      </span>
-                                    </td>
+                                    {canHistoricoSaldo && (
+                                      <td style={{ textAlign: 'right' }}>
+                                        <span className={styles.balance}>
+                                          <b>{fmt(saldo)}</b>
+                                          {saldo > 0
+                                            ? <ArrowUpRight   size={12} className={styles.iconEmerald} />
+                                            : saldo < 0
+                                            ? <ArrowDownRight size={12} className={styles.iconRose} />
+                                            : <Minus         size={12} className={styles.iconMuted} />}
+                                        </span>
+                                      </td>
+                                    )}
                                   </tr>
                                 );
                               })}
@@ -409,56 +428,60 @@ export default function FinancialDashboard() {
           </section>
 
           {/* ══ COLUNA DIREITA: RESUMO ══════════════════════ */}
-          <aside className={styles.summaryCol}>
-            <div className={styles.sectionTitle}>
-              <CreditCard size={12} className={styles.iconViolet} />
-              <h2>Resumo</h2>
-            </div>
-            <div className={styles.summaryList}>
-              {summaryCards.map(({ key, title, icon: Icon, color, r, d, l }) => (
-                <div key={key} className={styles.summaryCard}>
-                  <div className={styles.summaryHead}>
-                    <div className={[styles.summaryIcon, styles[`summaryIcon_${color}`]].join(' ')}>
-                      <Icon size={14} />
-                    </div>
-                    <span className={styles.summaryTitle}>{title}</span>
-                  </div>
-                  <div className={styles.kv}>
-                    <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(r)}</b></div>
-                    <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(d)}</b></div>
-                    <div className={styles.divider} />
-                    <div className={styles.kvRow}>
-                      <span>Resultado</span>
-                      <b className={l >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(l)}</b>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {methodEntries.map(([method, values]) => {
-                const ak = accentOf(method);
-                return (
-                  <div key={method} className={styles.summaryCard}>
+          {(canDashboard || canValorParcial) && (
+            <aside className={styles.summaryCol}>
+              <div className={styles.sectionTitle}>
+                <CreditCard size={12} className={styles.iconViolet} />
+                <h2>Resumo</h2>
+              </div>
+              <div className={styles.summaryList}>
+                {canDashboard && summaryCards.map(({ key, title, icon: Icon, color, r, d, l }) => (
+                  <div key={key} className={styles.summaryCard}>
                     <div className={styles.summaryHead}>
-                      <div className={[styles.summaryIcon, styles[`summaryIcon_${ak}`]].join(' ')}>
-                        <PayMethodIcon descricao={method} size={14} />
+                      <div className={[styles.summaryIcon, styles[`summaryIcon_${color}`]].join(' ')}>
+                        <Icon size={14} />
                       </div>
-                      <span className={styles.summaryTitle}>{method}</span>
+                      <span className={styles.summaryTitle}>{title}</span>
                     </div>
                     <div className={styles.kv}>
-                      <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(values.receitas)}</b></div>
-                      <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(values.despesas)}</b></div>
+                      <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(r)}</b></div>
+                      <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(d)}</b></div>
                       <div className={styles.divider} />
                       <div className={styles.kvRow}>
                         <span>Resultado</span>
-                        <b className={values.lucro >= 0 ? styles[`money_${ak}`] : styles.moneyMinus}>{fmt(values.lucro)}</b>
+                        <b className={l >= 0 ? styles.moneyViolet : styles.moneyMinus}>{fmt(l)}</b>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </aside>
+                ))}
+
+                {methodEntries
+                  .filter(([method]) => canDashboard || method.toUpperCase().includes('DINHEIRO'))
+                  .map(([method, values]) => {
+                    const ak = accentOf(method);
+                    return (
+                      <div key={method} className={styles.summaryCard}>
+                        <div className={styles.summaryHead}>
+                          <div className={[styles.summaryIcon, styles[`summaryIcon_${ak}`]].join(' ')}>
+                            <PayMethodIcon descricao={method} size={14} />
+                          </div>
+                          <span className={styles.summaryTitle}>{method}</span>
+                        </div>
+                        <div className={styles.kv}>
+                          <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(values.receitas)}</b></div>
+                          <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(values.despesas)}</b></div>
+                          <div className={styles.divider} />
+                          <div className={styles.kvRow}>
+                            <span>Resultado</span>
+                            <b className={values.lucro >= 0 ? styles[`money_${ak}`] : styles.moneyMinus}>{fmt(values.lucro)}</b>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </aside>
+          )}
         </div>
       </div>
 
@@ -467,9 +490,11 @@ export default function FinancialDashboard() {
         footer={
           <div className={styles.modalFooter}>
             <Button onClick={() => setShowDetail(false)} className={styles.full}>Fechar</Button>
-            <Button variant="primary" onClick={openEdit} className={styles.full}>
-              <Edit2 size={13} /> Editar
-            </Button>
+            {canEditar && (
+              <Button variant="primary" onClick={openEdit} className={styles.full}>
+                <Edit2 size={13} /> Editar
+              </Button>
+            )}
           </div>
         }>
         {item && (
@@ -542,10 +567,12 @@ export default function FinancialDashboard() {
                     {sign}{fmt(final)}
                   </span>
                 </div>
-                <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Saldo Dinheiro</span>
-                  <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
-                </div>
+                {canHistoricoSaldo && (
+                  <div className={styles.detailRow}>
+                    <span className={styles.detailLabel}>Saldo Dinheiro</span>
+                    <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
+                  </div>
+                )}
                 <div className={styles.detailSection}>Desconto</div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>UUID</span>
@@ -655,11 +682,13 @@ export default function FinancialDashboard() {
           <div className={styles.pagamentoChip}>
             <PayMethodIcon descricao={editPagamento.tipo_pagamento?.descricao} size={13} />
             <span>{descPag(editPagamento)}</span>
-            <button className={styles.pagamentoEdit} onClick={() => setShowPaymentEdit(true)}>
-              Alterar
-            </button>
+            {canEditarPagamento && (
+              <button className={styles.pagamentoEdit} onClick={() => setShowPaymentEdit(true)}>
+                Alterar
+              </button>
+            )}
           </div>
-        ) : (
+        ) : canEditarPagamento && (
           <button className={styles.definePagamento} onClick={() => setShowPaymentEdit(true)}>
             <CreditCard size={13} /> Definir Pagamento
           </button>
@@ -718,6 +747,7 @@ export default function FinancialDashboard() {
         defaultValor={parseBRL(addForm.valor)}
         tipoRegistro={addForm.tipoRegistro}
         loggedUser={loggedUser}
+        canAplicarDesconto={canAplicarDesconto}
       />
       <PaymentModal
         open={showPaymentEdit}
@@ -728,6 +758,7 @@ export default function FinancialDashboard() {
         defaultValor={Math.abs(editPagamento?.valor ?? 0)}
         tipoRegistro={editTipoRegistro}
         loggedUser={loggedUser}
+        canAplicarDesconto={canAplicarDesconto}
       />
 
       <Notification notification={notification} />
