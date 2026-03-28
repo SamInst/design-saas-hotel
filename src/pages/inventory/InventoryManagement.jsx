@@ -47,6 +47,17 @@ export default function InventoryManagement() {
   const { loggedUser, can } = usePermissions();
   const canAplicarDesconto  = can('FINANCEIRO', 'APLICAR DESCONTO');
 
+  // ── Permissões da tela de itens ─────────────────────────────
+  const canAcessoTotal        = can('ITENS', 'ACESSO TOTAL');
+  const canHistReposicoes     = canAcessoTotal || can('ITENS', 'HISTORICO DE REPOSIÇÕES');
+  const canDashboardCategoria = canAcessoTotal || can('ITENS', 'DASHBOARD DA CATEGORIA');
+  const canAdicionarCategoria = canAcessoTotal || can('ITENS', 'ADICIONAR CATEGORIA');
+  const canHistoricoConsumo   = canAcessoTotal || can('ITENS', 'HISTORICO CONSUMO');
+  const canAdicionarItem      = canAcessoTotal || can('ITENS', 'ADICIONAR ITEM');
+  const canConsumirItem       = canAcessoTotal || can('ITENS', 'CONSUMIR ITEM');
+  const canReporItem          = canAcessoTotal || can('ITENS', 'REPOR ITEM');
+  const canEditarCategoria    = canAcessoTotal || can('ITENS', 'EDITAR CATEGORIA');
+
   // ── Sections (category + its items) ────────────────────────
   const [sections, setSections]   = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -444,12 +455,16 @@ export default function InventoryManagement() {
                   onChange={handleSearch}
                 />
               </div>
-              <Button variant="secondary" onClick={openConsumos}>
-                <History size={14} /> Consumos
-              </Button>
-              <Button variant="secondary" onClick={openCreateCat}>
-                <Tag size={14} /> Nova Categoria
-              </Button>
+              {canHistoricoConsumo && (
+                <Button variant="secondary" onClick={openConsumos}>
+                  <History size={14} /> Consumos
+                </Button>
+              )}
+              {canAdicionarCategoria && (
+                <Button variant="secondary" onClick={openCreateCat}>
+                  <Tag size={14} /> Nova Categoria
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -496,17 +511,21 @@ export default function InventoryManagement() {
                           <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(itemVenda(item))}</td>
                           <td className={styles.tdRight} onClick={(e) => e.stopPropagation()}>
                             <div className={styles.actionBtns}>
-                              {qty > 0 && (
+                              {canConsumirItem && qty > 0 && (
                                 <button type="button" className={[styles.actionBtn, styles.actionBtnConsumir].join(' ')} onClick={(e) => openConsumir(item, e)}>
                                   <Minus size={11} /> Consumir
                                 </button>
                               )}
-                              <button type="button" className={[styles.actionBtn, styles.actionBtnRepor].join(' ')} onClick={(e) => openRepor(item, e)}>
-                                <RefreshCw size={11} /> Repor
-                              </button>
-                              <button type="button" className={[styles.actionBtn, styles.actionBtnHist].join(' ')} onClick={(e) => openHistorico(item, e)}>
-                                <History size={11} /> Histórico
-                              </button>
+                              {canReporItem && (
+                                <button type="button" className={[styles.actionBtn, styles.actionBtnRepor].join(' ')} onClick={(e) => openRepor(item, e)}>
+                                  <RefreshCw size={11} /> Repor
+                                </button>
+                              )}
+                              {canHistReposicoes && (
+                                <button type="button" className={[styles.actionBtn, styles.actionBtnHist].join(' ')} onClick={(e) => openHistorico(item, e)}>
+                                  <History size={11} /> Histórico
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -551,12 +570,16 @@ export default function InventoryManagement() {
                         </div>
                       </div>
                       <div className={styles.catSectionActions}>
-                        <Button variant="secondary" onClick={() => openEditCat(section)}>
-                          <Edit2 size={13} /> Editar Categoria
-                        </Button>
-                        <Button variant="primary" onClick={() => openCreateItem(section)}>
-                          <Plus size={13} /> Novo Item
-                        </Button>
+                        {canEditarCategoria && (
+                          <Button variant="secondary" onClick={() => openEditCat(section)}>
+                            <Edit2 size={13} /> Editar Categoria
+                          </Button>
+                        )}
+                        {canAdicionarItem && (
+                          <Button variant="primary" onClick={() => openCreateItem(section)}>
+                            <Plus size={13} /> Novo Item
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -566,14 +589,18 @@ export default function InventoryManagement() {
                         <span className={styles.catStatLabel}>Itens</span>
                         <span className={styles.catStatValue}>{quantidade_itens}</span>
                       </span>
-                      <span className={styles.catStat}>
-                        <span className={styles.catStatLabel}>Investido</span>
-                        <span className={[styles.catStatValue, styles.catStatRose].join(' ')}>{fmtBRL(valor_investido)}</span>
-                      </span>
-                      <span className={styles.catStat}>
-                        <span className={styles.catStatLabel}>Lucro potencial</span>
-                        <span className={[styles.catStatValue, styles.catStatViolet].join(' ')}>{fmtBRL(lucro_potencial)}</span>
-                      </span>
+                      {canDashboardCategoria && (
+                        <>
+                          <span className={styles.catStat}>
+                            <span className={styles.catStatLabel}>Investido</span>
+                            <span className={[styles.catStatValue, styles.catStatRose].join(' ')}>{fmtBRL(valor_investido)}</span>
+                          </span>
+                          <span className={styles.catStat}>
+                            <span className={styles.catStatLabel}>Lucro potencial</span>
+                            <span className={[styles.catStatValue, styles.catStatViolet].join(' ')}>{fmtBRL(lucro_potencial)}</span>
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     {/* Items */}
@@ -605,17 +632,21 @@ export default function InventoryManagement() {
                                   <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(itemVenda(item))}</td>
                                   <td className={styles.tdRight} onClick={(e) => e.stopPropagation()}>
                                     <div className={styles.actionBtns}>
-                                      {qty > 0 && (
+                                      {canConsumirItem && qty > 0 && (
                                         <button type="button" className={[styles.actionBtn, styles.actionBtnConsumir].join(' ')} onClick={(e) => openConsumir(item, e)}>
                                           <Minus size={11} /> Consumir
                                         </button>
                                       )}
-                                      <button type="button" className={[styles.actionBtn, styles.actionBtnRepor].join(' ')} onClick={(e) => openRepor(item, e)}>
-                                        <RefreshCw size={11} /> Repor
-                                      </button>
-                                      <button type="button" className={[styles.actionBtn, styles.actionBtnHist].join(' ')} onClick={(e) => openHistorico(item, e)}>
-                                        <History size={11} /> Histórico
-                                      </button>
+                                      {canReporItem && (
+                                        <button type="button" className={[styles.actionBtn, styles.actionBtnRepor].join(' ')} onClick={(e) => openRepor(item, e)}>
+                                          <RefreshCw size={11} /> Repor
+                                        </button>
+                                      )}
+                                      {canHistReposicoes && (
+                                        <button type="button" className={[styles.actionBtn, styles.actionBtnHist].join(' ')} onClick={(e) => openHistorico(item, e)}>
+                                          <History size={11} /> Histórico
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                 </tr>

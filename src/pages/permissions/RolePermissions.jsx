@@ -158,7 +158,14 @@ export default function RolePermissions() {
       (cargo.telas ?? []).flatMap(t => (t.permissoes ?? []).map(p => p.id))
     );
     setFormPermissoesIds(permIds);
-    setFormAcessoTotal(new Set());
+
+    // restaura o estado do toggle de Acesso Total por tela
+    const acessoTotalTelaIds = new Set(
+      (cargo.telas ?? []).filter(t =>
+        (t.permissoes ?? []).some(p => (p.permissao ?? '').toUpperCase() === 'ACESSO TOTAL')
+      ).map(t => t.id)
+    );
+    setFormAcessoTotal(acessoTotalTelaIds);
 
     await loadSystemData();
     for (const tela of (cargo.telas ?? [])) loadPermsForTela(tela.id);
@@ -205,13 +212,28 @@ export default function RolePermissions() {
       const next = new Set(prev);
       if (next.has(telaId)) {
         next.delete(telaId);
-        // mantém permissões selecionadas (usuário decide quais manter)
+        // remove a permissão ACESSO TOTAL da lista (as demais o usuário decide)
+        const acessoTotalPerm = (systemPerms[telaId] ?? []).find(
+          p => (p.permissao ?? '').toUpperCase() === 'ACESSO TOTAL'
+        );
+        if (acessoTotalPerm) {
+          setFormPermissoesIds(pp => {
+            const np = new Set(pp);
+            np.delete(acessoTotalPerm.id);
+            return np;
+          });
+        }
       } else {
         next.add(telaId);
-        // seleciona todas as permissões da tela
+        // remove todas as permissões desta tela e adiciona só ACESSO TOTAL
+        const allPermIds     = perms.map(p => p.id);
+        const acessoTotalPerm = perms.find(
+          p => (p.permissao ?? '').toUpperCase() === 'ACESSO TOTAL'
+        );
         setFormPermissoesIds(pp => {
           const np = new Set(pp);
-          perms.forEach(p => np.add(p.id));
+          allPermIds.forEach(id => np.delete(id));
+          if (acessoTotalPerm) np.add(acessoTotalPerm.id);
           return np;
         });
       }
@@ -539,16 +561,12 @@ export default function RolePermissions() {
                       ) : (
                         <>
                           {/* Acesso Total */}
-                          <label
-                            className={styles.acessoTotalRow}
-                            onClick={() => toggleAcessoTotal(tela.id)}
-                          >
+                          <label className={styles.acessoTotalRow}>
                             <input
                               type="checkbox"
                               className={styles.acessoTotalCheckbox}
                               checked={hasTotal}
                               onChange={() => toggleAcessoTotal(tela.id)}
-                              onClick={e => e.stopPropagation()}
                             />
                             <span className={styles.acessoTotalLabel}>Acesso Total</span>
                             {hasTotal && (

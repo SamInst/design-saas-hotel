@@ -29,7 +29,8 @@ export function usePermissions() {
       map[tela.nome] = new Set((tela.permissoes ?? []).map(p => p.permissao));
     }
     return { telaMap: map, isAdmin: admin };
-  }, [rawUser?.id, rawUser?.cargo?.id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawUser?.id, rawUser?.cargo?.id, JSON.stringify(rawUser?.cargo?.telas)]);
 
   /** Verifica se o usuário tem acesso à tela (independente de permissão). */
   const hasTela = (nome) => isAdmin || !!telaMap[nome];
