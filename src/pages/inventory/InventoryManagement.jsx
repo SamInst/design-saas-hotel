@@ -49,7 +49,7 @@ export default function InventoryManagement() {
 
   // ── Permissões da tela de itens ─────────────────────────────
   const canAcessoTotal        = can('ITENS', 'ACESSO TOTAL');
-  const canHistReposicoes     = canAcessoTotal || can('ITENS', 'HISTORICO DE REPOSIÇÕES');
+  const canHistReposicoes     = canAcessoTotal || can('ITENS', 'HISTORICO DE REPOSICOES');
   const canDashboardCategoria = canAcessoTotal || can('ITENS', 'DASHBOARD DA CATEGORIA');
   const canAdicionarCategoria = canAcessoTotal || can('ITENS', 'ADICIONAR CATEGORIA');
   const canHistoricoConsumo   = canAcessoTotal || can('ITENS', 'HISTORICO CONSUMO');

@@ -17,6 +17,9 @@ import { userStorage } from '../services/api';
  *
  * ACESSO TOTAL libera qualquer permissão da tela.
  */
+
+const norm = s => (s ?? '').trim().toUpperCase();
+
 export function usePermissions() {
   const rawUser = userStorage.get();
 
@@ -25,15 +28,15 @@ export function usePermissions() {
     const map = {};
     let admin = false;
     for (const tela of telas) {
-      if (tela.nome === 'ADMIN') { admin = true; break; }
-      map[tela.nome] = new Set((tela.permissoes ?? []).map(p => p.permissao));
+      if (norm(tela.nome) === 'ADMIN') { admin = true; break; }
+      map[norm(tela.nome)] = new Set((tela.permissoes ?? []).map(p => norm(p.permissao)));
     }
     return { telaMap: map, isAdmin: admin };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rawUser?.id, rawUser?.cargo?.id, JSON.stringify(rawUser?.cargo?.telas)]);
 
   /** Verifica se o usuário tem acesso à tela (independente de permissão). */
-  const hasTela = (nome) => isAdmin || !!telaMap[nome];
+  const hasTela = (nome) => isAdmin || !!telaMap[norm(nome)];
 
   /**
    * Verifica se o usuário pode executar uma ação na tela.
@@ -41,9 +44,9 @@ export function usePermissions() {
    */
   const can = (tela, permissao) => {
     if (isAdmin) return true;
-    const set = telaMap[tela];
+    const set = telaMap[norm(tela)];
     if (!set) return false;
-    return set.has('ACESSO TOTAL') || set.has(permissao);
+    return set.has('ACESSO TOTAL') || set.has(norm(permissao));
   };
 
   return {
