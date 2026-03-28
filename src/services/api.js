@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+// const BASE_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-  // const BASE_URL =
-  // import.meta.env.VITE_API_URL ||
-  // 'http://localhost:8080';
+  const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -310,6 +310,8 @@ export const quartoApi = {
   listar(params)     { return request('/quarto', { params }); },
   buscarPorId(id)    { return request(`/quarto/${id}`); },
   atualizar(id, body){ return request(`/quarto/${id}`, { method: 'PUT', body }); },
+  // GET /quarto/{id}/itens → [{ id, item:{id,descricao}, quantidade_atual, quantidade_padrao }]
+  itens(id)          { return request(`/quarto/${id}/itens`); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -358,34 +360,41 @@ export const reservaApi = {
 //  ITENS / INVENTÁRIO
 // ─────────────────────────────────────────────────────────────
 export const itemApi = {
-  dashboard()            { return request('/item/dashboard'); },
+  // GET /item/estoque → { categorias: [{ id, nome, descricao, dashboard, itens }] }
+  estoque()              { return request('/item/estoque'); },
+  // GET /item/buscar?id=&termo=&categoria_id=&page=&size=
   buscar(params)         { return request('/item/buscar', { params }); },
+  // PATCH /item/{id}/consumir?quantidade=X
+  // POST /item/consumo — Item.Consumo.Request { pagamento, item:{id}, fk_funcionario, quantidade, despesa_pessoal? }
+  consumir(body)         { return request('/item/consumo', { method: 'POST', body }); },
+  // GET /item/consumo → List<Item.Consumo>
+  listarConsumos()       { return request('/item/consumo'); },
+  // PATCH /item/consumo/{id}/cancelar → 204
+  cancelarConsumo(id)    { return request(`/item/consumo/${id}/cancelar`, { method: 'PATCH' }); },
+  // POST /item — Item.Request { categoria_item: {id}, descricao }
   criar(body)            { return request('/item', { method: 'POST', body }); },
-  atualizar(id, body)    { return request(`/item/${id}`, { method: 'PUT', body }); },
-  // POST /item/{id}/repor?quantidade=10&valorCompraUnidade=2.5&valorVendaUnidade=5&fornecedor=COCA
-  repor(id, { quantidade, valorCompraUnidade, valorVendaUnidade, fornecedor }) {
-    return request(`/item/${id}/repor`, { method: 'POST', params: { quantidade, valorCompraUnidade, valorVendaUnidade, fornecedor } });
-  },
-  // POST /item/{id}/consumir?quantidade=4
-  consumir(id, { quantidade, quartoId, tipoPagamentoId, despesaPessoal }) {
-    return request(`/item/${id}/consumir`, { method: 'POST', params: { quantidade, quartoId, tipoPagamentoId, despesaPessoal } });
-  },
+  // PUT /item — Item.Update { id, categoria_item: {id}, descricao }
+  atualizar(body)        { return request('/item', { method: 'PUT', body }); },
+  // GET /item/{id}/historico-reposicao
   historicoReposicao(id) { return request(`/item/${id}/historico-reposicao`); },
-  historicoPreco(id)     { return request(`/item/${id}/historico-preco`); },
+  // POST /item/historico-reposicao — { item:{id}, fornecedor, quantidade_unidades, valor_compra_unidade, valor_venda_unidade }
+  criarHistoricoReposicao(body) { return request('/item/historico-reposicao', { method: 'POST', body }); },
+  // PUT /item/historico-reposicao — { id, quantidade_unidades, fornecedor }
+  atualizarHistoricoReposicao(body) { return request('/item/historico-reposicao', { method: 'PUT', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────
 //  CATEGORIAS
 // ─────────────────────────────────────────────────────────────
 export const categoriaApi = {
-  // POST /categoria?categoria=nome&descricao=desc
-  criar({ categoria, descricao }) {
-    return request('/categoria', { method: 'POST', params: { categoria, descricao } });
-  },
-  // PUT /categoria/{id}?categoria=nome&descricao=desc
-  atualizar(id, { categoria, descricao }) {
-    return request(`/categoria/${id}`, { method: 'PUT', params: { categoria, descricao } });
-  },
+  // GET /categorias
+  listar()            { return request('/categorias'); },
+  // GET /categoria/{id}
+  buscarPorId(id)     { return request(`/categoria/${id}`); },
+  // POST /categoria — { nome, descricao }
+  criar(body)         { return request('/categoria', { method: 'POST', body }); },
+  // PUT /categoria/{id} — { id, nome, descricao }
+  atualizar(id, body) { return request(`/categoria/${id}`, { method: 'PUT', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────
