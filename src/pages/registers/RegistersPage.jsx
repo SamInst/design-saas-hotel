@@ -435,8 +435,8 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       </div>
 
       <div className={styles.grid2}>
-        <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Email *">
+        <div>
+          <FormField label="Email">
             <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
           </FormField>
         </div>
@@ -811,7 +811,7 @@ export default function RegistersPage() {
 
   const handleAddPessoa = () => {
     if (!titular.nome || !titular.cpf || !titular.dataNascimento ||
-        !titular.telefone || !titular.email || !titular.cep) {
+        !titular.telefone || !titular.cep) {
       setShowErrors(true);
       showNotif('Preencha todos os campos obrigatórios (*).', 'error');
       return;
