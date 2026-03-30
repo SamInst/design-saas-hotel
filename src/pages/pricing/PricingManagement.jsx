@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  BedDouble, Calendar, DollarSign, Users, Clock, Tag,
-  Plus, Edit2, ChevronRight, Trash2, RefreshCw, Loader2,
+  BedDouble, Calendar, DollarSign, Tag,
+  Plus, Edit2, Trash2, Loader2,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -62,21 +62,42 @@ function describeSchedule(s) {
 }
 
 // ── Tab constants ─────────────────────────────────────────────────────────────
-const CAT_FORM_TABS   = ['precos', 'dayuse', 'vinculos'];
-const CAT_FORM_LABELS = ['Preços', 'Day Use', 'Quartos & Sazonais'];
+const CAT_FORM_TABS   = ['precos', 'dayuse', 'vinculos', 'criancas'];
+const CAT_FORM_LABELS = ['Preços', 'Day Use', 'Quartos & Sazonais', 'Menores de Idade'];
 const SEA_FORM_TABS   = ['agenda', 'precos', 'dayuse'];
 const SEA_FORM_LABELS = ['Agendamento', 'Preços', 'Day Use'];
 
-const CAT_DETAIL_LABELS = ['Hospedagem', 'Day Use', 'Quartos & Sazonais'];
+const CAT_DETAIL_LABELS = ['Hospedagem', 'Day Use', 'Quartos & Sazonais', 'Menores de Idade'];
 const SEA_DETAIL_LABELS = ['Agendamento', 'Preços', 'Day Use'];
 
+const CRIANCAS_MODO_LABEL = {
+  'taxa-fixa':             'Taxa adicional fixa',
+  'taxa-quantidade':       'Taxa por quantidade',
+  'taxa-faixa':            'Taxa por faixa etária',
+  'porcentagem-quantidade':'Porcentagem por quantidade',
+};
+
 // ── Blank form factories ──────────────────────────────────────────────────────
+const blankCriancas = () => ({
+  ativo: false,
+  modo: 'taxa-fixa',
+  idadeMaxima: '',
+  valorFixo: '',
+  entradas: [],
+  faixas: [],
+  porcentagem: '',
+  maxCriancas: '',
+  gratuidadeAtiva: false,
+  gratuidadeMax: '',
+});
+
 const blankCat = () => ({
   nome: '', descricao: '', maxPessoas: 5,
   modeloCobranca: 'Por ocupação',
   precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' },
   quartos: [], sazonaisAtivas: [],
-  dayUse: { ativo: false, modo: 'padrao', precoFixo: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
+  dayUse: { ativo: false, modo: 'padrao', precoFixo: '', horasBase: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
+  criancas: blankCriancas(),
 });
 
 const blankSea = () => ({
@@ -88,7 +109,7 @@ const blankSea = () => ({
   diasSemana: [], diasMes: [], meses: [],
   modeloCobranca: 'Por ocupação', maxPessoas: 5,
   precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' },
-  dayUse: { ativo: false, modo: 'padrao', precoFixo: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
+  dayUse: { ativo: false, modo: 'padrao', precoFixo: '', horasBase: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
 });
 
 function normOcc(occ, max) {
@@ -152,7 +173,7 @@ function OccInputs({ occ, maxPessoas, onChange }) {
     <div className={styles.occGrid}>
       {Array.from({ length: maxPessoas }, (_, i) => i + 1).map((q) => (
         <div key={q} className={styles.occCell}>
-          <span className={styles.occLabel}>{q} pax</span>
+          <span className={styles.occLabel}>{q} pessoas</span>
           <Input placeholder="R$ 0,00" value={occ?.[q] ?? ''} onChange={(e) => onChange(q, maskBRL(e.target.value))} />
         </div>
       ))}
@@ -160,20 +181,7 @@ function OccInputs({ occ, maxPessoas, onChange }) {
   );
 }
 
-function DayUseDisplay({ du, maxPessoas }) {
-  if (!du?.ativo) return <div className={styles.duInactive}>Não habilitado para esta categoria.</div>;
-  return du.modo === 'padrao' ? (
-    <>
-      <div className={styles.duRow}><span className={styles.duLabel}>Preço base</span><span className={styles.duVal}>{fmtBRL(du.precoFixo)}</span></div>
-      <div className={styles.duRow}><span className={styles.duLabel}>Hora adicional</span><span className={styles.duVal}>{fmtBRL(du.precoAdicional)}</span></div>
-    </>
-  ) : (
-    <>
-      <div className={styles.duRow}><span className={styles.duLabel}>Hora ad./pessoa</span><span className={styles.duVal}>{fmtBRL(du.horaAdicionalPorPessoa)}</span></div>
-      <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={maxPessoas} />
-    </>
-  );
-}
+
 
 function ScheduleFields({ form, onChange }) {
   const mode = form.modoOperacao;
@@ -323,7 +331,7 @@ function DayUseFields({ du, maxPessoas, onChange }) {
         <input type="checkbox" className={styles.checkbox} checked={du.ativo} onChange={(e) => setDu('ativo', e.target.checked)} />
         <div>
           <span className={styles.checkboxLabel}>Habilitar Day Use</span>
-          <span className={styles.checkboxSub}>Permite uso do quarto por período (sem pernoite)</span>
+          <span className={styles.checkboxSub}>Permite uso do quarto por quantidade de horas</span>
         </div>
       </label>
       {du.ativo && (
@@ -335,10 +343,15 @@ function DayUseFields({ du, maxPessoas, onChange }) {
             </Select>
           </FormField>
           {du.modo === 'padrao' ? (
-            <div className={styles.formRow}>
-              <FormField label="Preço base"><Input placeholder="R$ 0,00" value={du.precoFixo} onChange={(e) => setDu('precoFixo', maskBRL(e.target.value))} /></FormField>
-              <FormField label="Hora adicional"><Input placeholder="R$ 0,00" value={du.precoAdicional} onChange={(e) => setDu('precoAdicional', maskBRL(e.target.value))} /></FormField>
-            </div>
+            <>
+              <div className={styles.formRow}>
+                <FormField label="Preço base"><Input placeholder="R$ 0,00" value={du.precoFixo} onChange={(e) => setDu('precoFixo', maskBRL(e.target.value))} /></FormField>
+                <FormField label="Horas (Preço Base)"><Input type="number" min="1" placeholder="Ex: 4" value={du.horasBase} onChange={(e) => setDu('horasBase', e.target.value)} /></FormField>
+              </div>
+              <div className={styles.formRow}>
+                <FormField label="Valor da Hora adicional"><Input placeholder="R$ 0,00" value={du.precoAdicional} onChange={(e) => setDu('precoAdicional', maskBRL(e.target.value))} /></FormField>
+              </div>
+            </>
           ) : (
             <>
               <FormField label="Hora adicional por pessoa">
@@ -353,6 +366,220 @@ function DayUseFields({ du, maxPessoas, onChange }) {
         </>
       )}
     </>
+  );
+}
+
+// ── ChildPricingFields ────────────────────────────────────────────────────────
+function ChildPricingFields({ criancas, onChange }) {
+  const set = (key, val) => onChange({ ...criancas, [key]: val });
+
+  const addEntrada = () =>
+    set('entradas', [...criancas.entradas, { quantidade: criancas.entradas.length + 1, valor: '' }]);
+  const removeEntrada = (i) =>
+    set('entradas', criancas.entradas.filter((_, idx) => idx !== i));
+  const setEntrada = (i, field, val) =>
+    set('entradas', criancas.entradas.map((e, idx) => idx === i ? { ...e, [field]: val } : e));
+
+  const addFaixa = () =>
+    set('faixas', [...criancas.faixas, { idadeMin: '', idadeMax: '', valor: '' }]);
+  const removeFaixa = (i) =>
+    set('faixas', criancas.faixas.filter((_, idx) => idx !== i));
+  const setFaixa = (i, field, val) =>
+    set('faixas', criancas.faixas.map((f, idx) => idx === i ? { ...f, [field]: val } : f));
+
+  const handleModoChange = (modo) => onChange({ ...criancas, modo, entradas: [], faixas: [] });
+
+  return (
+    <>
+      <label className={styles.checkboxRow}>
+        <input type="checkbox" className={styles.checkbox} checked={criancas.ativo} onChange={(e) => set('ativo', e.target.checked)} />
+        <div>
+          <span className={styles.checkboxLabel}>Habilitar cobrança de menores de idade</span>
+          <span className={styles.checkboxSub}>Define tarifas específicas para crianças</span>
+        </div>
+      </label>
+
+      {criancas.ativo && (
+        <>
+          <div className={styles.gratuidadeBox}>
+            <label className={styles.checkboxRow} style={{ marginBottom: 0 }}>
+              <input type="checkbox" className={styles.checkbox}
+                checked={criancas.gratuidadeAtiva}
+                onChange={(e) => set('gratuidadeAtiva', e.target.checked)} />
+              <div>
+                <span className={styles.checkboxLabel}>Faixa de gratuidade</span>
+                <span className={styles.checkboxSub}>Crianças nessa faixa etária não pagam, independente do modelo de cobrança</span>
+              </div>
+            </label>
+            {criancas.gratuidadeAtiva && (
+              <div style={{ marginTop: 12 }}>
+                <FormField label="Gratuito até (anos)">
+                  <Input type="number" min="0" max="17" placeholder="Ex: 5"
+                    value={criancas.gratuidadeMax}
+                    onChange={(e) => set('gratuidadeMax', e.target.value)} />
+                </FormField>
+              </div>
+            )}
+          </div>
+
+          <FormField label="Modelo de cobrança">
+            <Select value={criancas.modo} onChange={(e) => handleModoChange(e.target.value)}>
+              {Object.entries(CRIANCAS_MODO_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </Select>
+          </FormField>
+
+          {/* ── Taxa adicional fixa ── */}
+          {criancas.modo === 'taxa-fixa' && (
+            <div className={styles.formRow}>
+              <FormField label="Idade máxima (anos)">
+                <Input type="number" min="0" max="17" placeholder="Ex: 12"
+                  value={criancas.idadeMaxima}
+                  onChange={(e) => set('idadeMaxima', e.target.value)} />
+              </FormField>
+              <FormField label="Valor fixo por criança">
+                <Input placeholder="R$ 0,00"
+                  value={criancas.valorFixo}
+                  onChange={(e) => set('valorFixo', maskBRL(e.target.value))} />
+              </FormField>
+            </div>
+          )}
+
+          {/* ── Taxa por quantidade ── */}
+          {criancas.modo === 'taxa-quantidade' && (
+            <>
+              <span className={styles.sectionTitle}>Valores por quantidade de crianças</span>
+              {criancas.entradas.map((e, i) => (
+                <div key={i} className={styles.childRow}>
+                  <span className={styles.childQtdLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
+                  <Input placeholder="R$ 0,00"
+                    value={e.valor}
+                    onChange={(ev) => setEntrada(i, 'valor', maskBRL(ev.target.value))} />
+                  <button type="button" className={styles.childRemoveBtn} onClick={() => removeEntrada(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <Button variant="secondary" onClick={addEntrada}>
+                <Plus size={13} /> Adicionar linha
+              </Button>
+            </>
+          )}
+
+          {/* ── Taxa por faixa etária ── */}
+          {criancas.modo === 'taxa-faixa' && (
+            <>
+              <span className={styles.sectionTitle}>Faixas etárias</span>
+              {criancas.faixas.map((f, i) => (
+                <div key={i} className={styles.childRow}>
+                  <Input type="number" min="0" max="17" placeholder="De"
+                    value={f.idadeMin}
+                    onChange={(ev) => setFaixa(i, 'idadeMin', ev.target.value)} />
+                  <span className={styles.childSep}>–</span>
+                  <Input type="number" min="0" max="17" placeholder="Até"
+                    value={f.idadeMax}
+                    onChange={(ev) => setFaixa(i, 'idadeMax', ev.target.value)} />
+                  <span className={styles.childSep}>anos</span>
+                  <Input placeholder="R$ 0,00"
+                    value={f.valor}
+                    onChange={(ev) => setFaixa(i, 'valor', maskBRL(ev.target.value))} />
+                  <button type="button" className={styles.childRemoveBtn} onClick={() => removeFaixa(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <Button variant="secondary" onClick={addFaixa}>
+                <Plus size={13} /> Adicionar faixa
+              </Button>
+            </>
+          )}
+
+          {/* ── Porcentagem por quantidade ── */}
+          {criancas.modo === 'porcentagem-quantidade' && (
+            <>
+              <span className={styles.sectionTitle}>Porcentagem por quantidade de crianças</span>
+              {criancas.entradas.map((e, i) => (
+                <div key={i} className={styles.childRow}>
+                  <span className={styles.childQtdLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
+                  <Input type="number" min="0" max="100" placeholder="% da diária"
+                    value={e.valor}
+                    onChange={(ev) => setEntrada(i, 'valor', ev.target.value)} />
+                  <span className={styles.childSep}>%</span>
+                  <button type="button" className={styles.childRemoveBtn} onClick={() => removeEntrada(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ))}
+              <Button variant="secondary" onClick={addEntrada}>
+                <Plus size={13} /> Adicionar linha
+              </Button>
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
+// ── ChildPricingDisplay ───────────────────────────────────────────────────────
+function ChildPricingDisplay({ criancas }) {
+  const modo = criancas?.modo;
+  return (
+    <div>
+      {criancas?.gratuidadeAtiva && (
+        <div className={styles.gratuidadeDisplay}>
+          <span className={styles.gratuidadeDisplayLabel}>Gratuidade</span>
+          <span className={styles.gratuidadeDisplayVal}>
+            0–{criancas.gratuidadeMax} anos (isento de cobrança)
+          </span>
+        </div>
+      )}
+      {!criancas?.ativo ? (
+        <div className={styles.duInactive}>Cobrança de menores não configurada.</div>
+      ) : (
+      <>
+      <div className={styles.duRow}>
+        <span className={styles.duLabel}>Modelo</span>
+        <span className={styles.duVal}>{CRIANCAS_MODO_LABEL[modo] ?? modo}</span>
+      </div>
+      {modo === 'taxa-fixa' && (
+        <>
+          <div className={styles.duRow}><span className={styles.duLabel}>Idade máxima</span><span className={styles.duVal}>{criancas.idadeMaxima} anos</span></div>
+          <div className={styles.duRow}><span className={styles.duLabel}>Valor por criança</span><span className={styles.duVal}>{fmtBRL(parseBRL(criancas.valorFixo))}</span></div>
+        </>
+      )}
+      {(modo === 'taxa-quantidade' || modo === 'porcentagem-quantidade') && (
+        <table className={styles.miniTable}>
+          <thead><tr><th>Qtd</th><th>{modo === 'taxa-quantidade' ? 'Valor' : '%'}</th></tr></thead>
+          <tbody>
+            {(criancas.entradas ?? []).map((e, i) => (
+              <tr key={i}>
+                <td>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</td>
+                <td className={styles.miniPrice}>
+                  {modo === 'taxa-quantidade' ? fmtBRL(parseBRL(e.valor)) : `${e.valor}%`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {modo === 'taxa-faixa' && (
+        <table className={styles.miniTable}>
+          <thead><tr><th>Faixa</th><th>Valor</th></tr></thead>
+          <tbody>
+            {(criancas.faixas ?? []).map((f, i) => (
+              <tr key={i}>
+                <td>{f.idadeMin}–{f.idadeMax} anos</td>
+                <td className={styles.miniPrice}>{fmtBRL(parseBRL(f.valor))}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      </>
+      )}
+    </div>
   );
 }
 
@@ -411,13 +638,6 @@ export default function PricingManagement() {
   const { categorias, sazonalidades } = data;
 
   // ── KPIs ──────────────────────────────────────────────────────────────────
-  const kpis = [
-    { label: 'Categorias',   sub: 'Tipos de quarto',        value: categorias.length,                                             color: 'blue',    icon: <Tag size={18} /> },
-    { label: 'Com Day Use',  sub: 'Categorias habilitadas', value: categorias.filter((c) => c.dayUse?.ativo).length,              color: 'amber',   icon: <Clock size={18} /> },
-    { label: 'Sazonalidades',sub: 'Períodos cadastrados',   value: sazonalidades.length,                                          color: 'violet',  icon: <Calendar size={18} /> },
-    { label: 'Com Sazonais', sub: 'Categorias vinculadas',  value: categorias.filter((c) => c.sazonaisAtivas?.length > 0).length, color: 'emerald', icon: <Users size={18} /> },
-  ];
-
   // ── Detail modal ──────────────────────────────────────────────────────────
   const openDetail = (item, type) => { setDetailItem(item); setDetailType(type); setDetailTab(0); };
   const closeDetail = () => setDetailItem(null);
@@ -442,10 +662,26 @@ export default function PricingManagement() {
       precosOcupacao: Object.fromEntries(Object.entries(occ).map(([k, v]) => [k, v != null ? maskBRL(String(Math.round(v * 100))) : ''])),
       quartos:        cat.quartos ?? [],
       sazonaisAtivas: cat.sazonaisAtivas ?? [],
+      criancas: cat.criancas ? {
+        ...blankCriancas(),
+        ...cat.criancas,
+        valorFixo:   cat.criancas.valorFixo   != null ? maskBRL(String(Math.round(cat.criancas.valorFixo * 100)))   : '',
+        entradas:   (cat.criancas.entradas ?? []).map(e => ({
+          ...e,
+          valor: e.valor != null
+            ? (cat.criancas.modo === 'porcentagem-quantidade' ? String(e.valor) : maskBRL(String(Math.round(e.valor * 100))))
+            : '',
+        })),
+        faixas: (cat.criancas.faixas ?? []).map(f => ({
+          ...f,
+          valor: f.valor != null ? maskBRL(String(Math.round(f.valor * 100))) : '',
+        })),
+      } : blankCriancas(),
       dayUse: {
         ativo:                du.ativo ?? false,
         modo:                 du.modo ?? 'padrao',
         precoFixo:            du.precoFixo != null ? maskBRL(String(Math.round(du.precoFixo * 100))) : '',
+        horasBase:            du.horasBase != null ? String(du.horasBase) : '',
         precoAdicional:       du.precoAdicional != null ? maskBRL(String(Math.round(du.precoAdicional * 100))) : '',
         horaAdicionalPorPessoa: du.horaAdicionalPorPessoa != null ? maskBRL(String(Math.round(du.horaAdicionalPorPessoa * 100))) : '',
         precosOcupacao:       Object.fromEntries(
@@ -482,12 +718,30 @@ export default function PricingManagement() {
           ativo:                catForm.dayUse.ativo,
           modo:                 catForm.dayUse.modo,
           precoFixo:            parseBRL(catForm.dayUse.precoFixo),
+          horasBase:            Number(catForm.dayUse.horasBase) || null,
           precoAdicional:       parseBRL(catForm.dayUse.precoAdicional),
           horaAdicionalPorPessoa: parseBRL(catForm.dayUse.horaAdicionalPorPessoa),
           precosOcupacao:       catForm.dayUse.modo === 'ocupacao'
             ? Object.fromEntries(Object.entries(catForm.dayUse.precosOcupacao).map(([k, v]) => [k, parseBRL(v)]))
             : {},
         },
+        criancas: (() => {
+          const c = catForm.criancas;
+          const gratuidade = c.gratuidadeAtiva
+            ? { gratuidadeAtiva: true, gratuidadeMax: Number(c.gratuidadeMax) || 0 }
+            : { gratuidadeAtiva: false };
+          if (!c.ativo) return { ativo: false, ...gratuidade };
+          const base = { ativo: true, modo: c.modo, ...gratuidade };
+          if (c.modo === 'taxa-fixa')
+            return { ...base, idadeMaxima: Number(c.idadeMaxima) || 0, valorFixo: parseBRL(c.valorFixo) };
+          if (c.modo === 'taxa-quantidade')
+            return { ...base, entradas: c.entradas.map(e => ({ quantidade: e.quantidade, valor: parseBRL(e.valor) })) };
+          if (c.modo === 'taxa-faixa')
+            return { ...base, faixas: c.faixas.map(f => ({ idadeMin: Number(f.idadeMin), idadeMax: Number(f.idadeMax), valor: parseBRL(f.valor) })) };
+          if (c.modo === 'porcentagem-quantidade')
+            return { ...base, entradas: c.entradas.map(e => ({ quantidade: e.quantidade, valor: Number(e.valor) || 0 })) };
+          return base;
+        })(),
       };
       if (catModal === 'create') { await pricingApi.criarCategoria(payload);          notify('Categoria criada com sucesso!'); }
       else                       { await pricingApi.atualizarCategoria(editingCat.id, payload); notify('Categoria atualizada com sucesso!'); }
@@ -527,6 +781,7 @@ export default function PricingManagement() {
       dayUse: {
         ativo:                du.ativo ?? false, modo: du.modo ?? 'padrao',
         precoFixo:            du.precoFixo != null ? maskBRL(String(Math.round(du.precoFixo * 100))) : '',
+        horasBase:            du.horasBase != null ? String(du.horasBase) : '',
         precoAdicional:       du.precoAdicional != null ? maskBRL(String(Math.round(du.precoAdicional * 100))) : '',
         horaAdicionalPorPessoa: du.horaAdicionalPorPessoa != null ? maskBRL(String(Math.round(du.horaAdicionalPorPessoa * 100))) : '',
         precosOcupacao:       Object.fromEntries(
@@ -563,6 +818,7 @@ export default function PricingManagement() {
         dayUse: {
           ativo:                seaForm.dayUse.ativo, modo: seaForm.dayUse.modo,
           precoFixo:            parseBRL(seaForm.dayUse.precoFixo),
+          horasBase:            Number(seaForm.dayUse.horasBase) || null,
           precoAdicional:       parseBRL(seaForm.dayUse.precoAdicional),
           horaAdicionalPorPessoa: parseBRL(seaForm.dayUse.horaAdicionalPorPessoa),
           precosOcupacao:       seaForm.dayUse.modo === 'ocupacao'
@@ -598,52 +854,80 @@ export default function PricingManagement() {
   };
 
   // ── Detail modal content helpers ──────────────────────────────────────────
+  const DR = ({ label, children }) => (
+    <div className={styles.detailRow}>
+      <span className={styles.detailRowLabel}>{label}</span>
+      <span className={styles.detailRowVal}>{children}</span>
+    </div>
+  );
+
   const renderCatDetail = (cat, tab) => {
     const du = cat.dayUse ?? {};
     const seaNomes = (cat.sazonaisAtivas ?? [])
       .map((sid) => sazonalidades.find((s) => s.id === sid)?.nome).filter(Boolean);
 
     if (tab === 0) return (
-      <div className={styles.detailSection}>
-        <div className={styles.duRow}><span className={styles.duLabel}>Modelo</span><span className={styles.duVal}>{cat.modeloCobranca}</span></div>
-        <div className={styles.duRow}><span className={styles.duLabel}>Máx. pessoas</span><span className={styles.duVal}>{cat.maxPessoas} pax</span></div>
+      <div className={styles.detailBody}>
+        <DR label="Modelo de cobrança">{cat.modeloCobranca}</DR>
+        <DR label="Máx. de pessoas">{cat.maxPessoas} pessoas</DR>
+        <div className={styles.detailDivider} />
         {cat.modeloCobranca === 'Por quarto (tarifa fixa)'
-          ? <div className={styles.fixedPrice}>{fmtBRL(cat.precoFixo)}</div>
+          ? <DR label="Tarifa fixa"><span className={styles.detailPrice}>{fmtBRL(cat.precoFixo)}</span></DR>
           : <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
         }
       </div>
     );
 
     if (tab === 1) return (
-      <div className={styles.detailSection}>
-        <div className={styles.duRow}>
-          <span className={styles.duLabel}>Status</span>
-          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>{du.ativo ? 'Ativo' : 'Inativo'}</span>
-        </div>
-        {du.ativo && <div className={styles.duRow}><span className={styles.duLabel}>Modo</span><span className={styles.duVal}>{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</span></div>}
-        <DayUseDisplay du={du} maxPessoas={cat.maxPessoas} />
+      <div className={styles.detailBody}>
+        <DR label="Day Use">
+          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>
+            {du.ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        </DR>
+        {du.ativo && <>
+          <div className={styles.detailDivider} />
+          <DR label="Modo">{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</DR>
+          {du.modo === 'padrao' ? <>
+            <DR label="Preço base"><span className={styles.detailPrice}>{fmtBRL(du.precoFixo)}</span></DR>
+            {du.horasBase && <DR label="Horas incluídas">{du.horasBase}h</DR>}
+            <DR label="Hora adicional">{fmtBRL(du.precoAdicional)}</DR>
+          </> : <>
+            <DR label="Hora adicional/pessoa">{fmtBRL(du.horaAdicionalPorPessoa)}</DR>
+            <div className={styles.detailDivider} />
+            <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
+          </>}
+        </>}
       </div>
     );
 
     if (tab === 2) return (
-      <div className={styles.detailSection}>
-        <span className={styles.sectionTitle}>Quartos vinculados</span>
+      <div className={styles.detailBody}>
+        <span className={styles.detailGroupLabel}>Quartos vinculados</span>
         <div className={styles.pillWrap}>
           {(cat.quartos ?? []).length === 0
-            ? <div className={styles.pillEmpty}>Nenhum quarto vinculado.</div>
+            ? <span className={styles.detailEmpty}>Nenhum quarto vinculado</span>
             : (cat.quartos ?? []).map((qid) => {
                 const q = quartos.find((x) => x.id === qid);
                 return q ? <span key={qid} className={styles.pill}>Quarto {q.numero} · {q.tipo}</span> : null;
               })}
         </div>
-        <span className={styles.sectionTitle} style={{ marginTop: 12 }}>Sazonalidades ativas</span>
+        <div className={styles.detailDivider} />
+        <span className={styles.detailGroupLabel}>Sazonalidades ativas</span>
         <div className={styles.pillWrap}>
           {seaNomes.length === 0
-            ? <div className={styles.pillEmpty}>Nenhuma sazonalidade ativa.</div>
+            ? <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
             : seaNomes.map((n, i) => <span key={i} className={[styles.pill, styles.badgeViolet].join(' ')} style={{ border: 'none' }}>{n}</span>)}
         </div>
       </div>
     );
+
+    if (tab === 3) return (
+      <div className={styles.detailBody}>
+        <ChildPricingDisplay criancas={cat.criancas} />
+      </div>
+    );
+
     return null;
   };
 
@@ -651,49 +935,65 @@ export default function PricingManagement() {
     const du = s.dayUse ?? {};
 
     if (tab === 0) return (
-      <div className={styles.detailSection}>
-        <div className={styles.duRow}><span className={styles.duLabel}>Modo</span><span className={styles.duVal}>{MODO_LABEL[s.modoOperacao]}</span></div>
-        {s.modoOperacao === 'data-especifica' && (<>
-          <div className={styles.duRow}><span className={styles.duLabel}>Início</span><span className={styles.duVal}>{s.dataInicio || '—'} {s.horaInicio}</span></div>
-          <div className={styles.duRow}><span className={styles.duLabel}>Fim</span><span className={styles.duVal}>{s.dataFim || '—'} {s.horaFim}</span></div>
-        </>)}
+      <div className={styles.detailBody}>
+        <DR label="Modo de operação">{MODO_LABEL[s.modoOperacao]}</DR>
+        <div className={styles.detailDivider} />
+        {s.modoOperacao === 'data-especifica' && <>
+          <DR label="Início">{s.dataInicio || '—'} {s.horaInicio}</DR>
+          <DR label="Fim">{s.dataFim || '—'} {s.horaFim}</DR>
+        </>}
         {s.modoOperacao === 'semanal' && (
-          <div className={styles.duRow}><span className={styles.duLabel}>Dias</span><span className={styles.duVal}>{(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—'}</span></div>
+          <DR label="Dias">{(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—'}</DR>
         )}
         {s.modoOperacao === 'mensal' && (
-          <div className={styles.duRow}><span className={styles.duLabel}>Dias do mês</span><span className={styles.duVal}>{(s.diasMes || []).join(', ') || '—'}</span></div>
+          <DR label="Dias do mês">{(s.diasMes || []).join(', ') || '—'}</DR>
         )}
         {s.modoOperacao === 'anual' && (
-          <div className={styles.duRow}><span className={styles.duLabel}>Meses</span><span className={styles.duVal}>{(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}</span></div>
+          <DR label="Meses">{(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}</DR>
         )}
         {s.modoOperacao === 'diario' && (
-          <div className={styles.duRow}><span className={styles.duLabel}>Ciclo</span><span className={styles.duVal}>{s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}</span></div>
+          <DR label="Ciclo">{s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}</DR>
         )}
-        {(s.horaCheckin || s.horaCheckout) && (<>
-          <div className={styles.duRow}><span className={styles.duLabel}>Check-in</span><span className={styles.duVal}>{s.horaCheckin || '—'}</span></div>
-          <div className={styles.duRow}><span className={styles.duLabel}>Check-out</span><span className={styles.duVal}>{s.horaCheckout || '—'}</span></div>
-        </>)}
+        {(s.horaCheckin || s.horaCheckout) && <>
+          <div className={styles.detailDivider} />
+          <DR label="Check-in">{s.horaCheckin || '—'}</DR>
+          <DR label="Check-out">{s.horaCheckout || '—'}</DR>
+        </>}
       </div>
     );
 
     if (tab === 1) return (
-      <div className={styles.detailSection}>
-        <div className={styles.duRow}><span className={styles.duLabel}>Modelo</span><span className={styles.duVal}>{s.modeloCobranca}</span></div>
+      <div className={styles.detailBody}>
+        <DR label="Modelo de cobrança">{s.modeloCobranca}</DR>
+        <DR label="Máx. de pessoas">{s.maxPessoas} pessoas</DR>
+        <div className={styles.detailDivider} />
         {s.modeloCobranca === 'Por quarto (tarifa fixa)'
-          ? <div className={styles.fixedPrice}>{fmtBRL(s.precoFixo)}</div>
+          ? <DR label="Tarifa fixa"><span className={styles.detailPrice}>{fmtBRL(s.precoFixo)}</span></DR>
           : <OccTable label="Preço/noite" occ={s.precosOcupacao} maxPessoas={s.maxPessoas} />
         }
       </div>
     );
 
     if (tab === 2) return (
-      <div className={styles.detailSection}>
-        <div className={styles.duRow}>
-          <span className={styles.duLabel}>Status</span>
-          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>{du.ativo ? 'Ativo' : 'Inativo'}</span>
-        </div>
-        {du.ativo && <div className={styles.duRow}><span className={styles.duLabel}>Modo</span><span className={styles.duVal}>{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</span></div>}
-        <DayUseDisplay du={du} maxPessoas={s.maxPessoas} />
+      <div className={styles.detailBody}>
+        <DR label="Day Use">
+          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>
+            {du.ativo ? 'Ativo' : 'Inativo'}
+          </span>
+        </DR>
+        {du.ativo && <>
+          <div className={styles.detailDivider} />
+          <DR label="Modo">{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</DR>
+          {du.modo === 'padrao' ? <>
+            <DR label="Preço base"><span className={styles.detailPrice}>{fmtBRL(du.precoFixo)}</span></DR>
+            {du.horasBase && <DR label="Horas incluídas">{du.horasBase}h</DR>}
+            <DR label="Hora adicional">{fmtBRL(du.precoAdicional)}</DR>
+          </> : <>
+            <DR label="Hora adicional/pessoa">{fmtBRL(du.horaAdicionalPorPessoa)}</DR>
+            <div className={styles.detailDivider} />
+            <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={s.maxPessoas} />
+          </>}
+        </>}
       </div>
     );
     return null;
@@ -704,22 +1004,6 @@ export default function PricingManagement() {
     <div className={styles.page}>
       <Notification notification={notification} />
       <div className={styles.container}>
-
-        {/* KPIs */}
-        {!loading && (
-          <div className={styles.kpiGrid}>
-            {kpis.map((k) => (
-              <div key={k.label} className={[styles.kpiCard, styles[`kpi_${k.color}`]].join(' ')}>
-                <div className={styles.kpiIcon}>{k.icon}</div>
-                <div className={styles.kpiBody}>
-                  <span className={styles.kpiLabel}>{k.label}</span>
-                  <span className={styles.kpiValue}>{k.value}</span>
-                  <span className={styles.kpiSub}>{k.sub}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
 
         {/* ── Categorias de Preço ── */}
         <div className={styles.card}>
@@ -740,23 +1024,16 @@ export default function PricingManagement() {
             <div className={styles.empty}><Tag size={32} color="var(--text-2)" /><span>Nenhuma categoria cadastrada</span></div>
           ) : categorias.map((cat) => {
             const du = cat.dayUse ?? {};
-            const seaNomes = (cat.sazonaisAtivas ?? [])
-              .map((sid) => sazonalidades.find((s) => s.id === sid)?.nome).filter(Boolean);
             return (
               <div key={cat.id} className={styles.listRow} onClick={() => openDetail(cat, 'cat')}>
-                <div className={styles.expandLeft}>
-                  <div>
-                    <div className={styles.rowName}>{cat.nome}</div>
-                    {cat.descricao && <div className={styles.rowDesc}>{cat.descricao}</div>}
-                    <div className={styles.badges}>
-                      <span className={styles.badge}>{cat.modeloCobranca}</span>
-                      {du.ativo && <span className={[styles.badge, styles.badgeAmber].join(' ')}>Day Use</span>}
-                      {seaNomes.length > 0 && <span className={[styles.badge, styles.badgeViolet].join(' ')}>{seaNomes.length} sazonalidade{seaNomes.length !== 1 ? 's' : ''}</span>}
-                      <span className={styles.badge}>{(cat.quartos ?? []).length} quartos</span>
-                    </div>
+                <div className={styles.listRowLeft}>
+                  <span className={styles.rowName}>{cat.nome}</span>
+                  <div className={styles.listRowTags}>
+                    {du.ativo && <span className={[styles.listTag, styles.listTagAmber].join(' ')}>Day Use</span>}
+                    {(cat.sazonaisAtivas ?? []).length > 0 && <span className={[styles.listTag, styles.listTagViolet].join(' ')}>{cat.sazonaisAtivas.length} sazonalidade{cat.sazonaisAtivas.length !== 1 ? 's' : ''}</span>}
+                    <span className={styles.listTag}>{(cat.quartos ?? []).length} quarto{(cat.quartos ?? []).length !== 1 ? 's' : ''}</span>
                   </div>
                 </div>
-                <ChevronRight size={15} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
               </div>
             );
           })}
@@ -779,19 +1056,17 @@ export default function PricingManagement() {
             const du = s.dayUse ?? {};
             return (
               <div key={s.id} className={styles.listRow} onClick={() => openDetail(s, 'sea')}>
-                <div className={styles.expandLeft}>
-                  <div>
-                    <div className={styles.rowName}>{s.nome}</div>
-                    {s.descricao && <div className={styles.rowDesc}>{s.descricao}</div>}
-                    <div className={styles.rowMeta}>{describeSchedule(s)}</div>
-                    <div className={styles.badges}>
-                      <span className={styles.badge}>{MODO_LABEL[s.modoOperacao] || s.modoOperacao}</span>
-                      <span className={styles.badge}>{s.modeloCobranca}</span>
-                      {du.ativo && <span className={[styles.badge, styles.badgeAmber].join(' ')}>Day Use</span>}
-                    </div>
+                <div className={styles.listRowLeft}>
+                  <span className={styles.rowName}>{s.nome}</span>
+                  <div className={styles.listRowTags}>
+                    <span className={styles.listTag}>{MODO_LABEL[s.modoOperacao] || s.modoOperacao}</span>
+                    <span className={styles.listTag}>{s.modeloCobranca}</span>
+                    {du.ativo && <span className={[styles.listTag, styles.listTagAmber].join(' ')}>Day Use</span>}
                   </div>
                 </div>
-                <ChevronRight size={15} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+                <div className={styles.listRowRight}>
+                  <span className={styles.listPriceSub} style={{ textAlign: 'right' }}>{describeSchedule(s)}</span>
+                </div>
               </div>
             );
           })}
@@ -848,7 +1123,7 @@ export default function PricingManagement() {
       <Modal
         open={!!catModal}
         onClose={() => setCatModal(null)}
-        size="lg"
+        size="md"
         title={catModal === 'create' ? <><Tag size={15} /> Nova Categoria</> : <><Edit2 size={15} /> Editar Categoria</>}
         footer={
           <div className={styles.modalFooter}>
@@ -891,6 +1166,14 @@ export default function PricingManagement() {
           {catTab === 'dayuse' && (
             <div className={styles.formBody}>
               <DayUseFields du={catForm.dayUse} maxPessoas={catForm.maxPessoas} onChange={(du) => setCatField('dayUse', du)} />
+            </div>
+          )}
+          {catTab === 'criancas' && (
+            <div className={styles.formBody}>
+              <ChildPricingFields
+                criancas={catForm.criancas}
+                onChange={(c) => setCatField('criancas', c)}
+              />
             </div>
           )}
           {catTab === 'vinculos' && (
