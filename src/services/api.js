@@ -3,13 +3,13 @@
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
 // ─────────────────────────────────────────────────────────────
 
-const BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
+// const BASE_URL =
+//   import.meta.env.VITE_API_URL ||
+//   'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-  // const BASE_URL =
-  // import.meta.env.VITE_API_URL ||
-  // 'http://localhost:8080';
+  const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:8080';
 
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
@@ -417,6 +417,18 @@ export const cadastroApi = {
 
   buscarCEP(cep)            { return request(`/cep/${cep}`); },
   buscarCNPJ(cnpj)          { return request(`/cnpj/${cnpj}`); },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  QUARTO-CATEGORIA  (tela de preços)
+//  GET    /quarto-categoria?size=900
+//  POST   /quarto-categoria   body: Categoria.Request
+//  PUT    /quarto-categoria   body: Categoria.Update (inclui id)
+// ─────────────────────────────────────────────────────────────
+export const quartoCategoriApi = {
+  listar(params)  { return request('/quarto-categoria', { params }); },
+  criar(body)     { return request('/quarto-categoria', { method: 'POST', body }); },
+  atualizar(body) { return request('/quarto-categoria', { method: 'PUT',  body }); },
 };
 
 // ─────────────────────────────────────────────────────────────

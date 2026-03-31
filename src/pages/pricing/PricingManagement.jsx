@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  BedDouble, Calendar, DollarSign, Tag,
+  BedDouble, Calendar, DollarSign, Tag, Users, Clock,
   Plus, Edit2, Trash2, Loader2,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
 import { Input, Select, FormField } from '../../components/ui/Input';
+import { TimePicker }               from '../../components/ui/TimePicker';
 import { Notification }             from '../../components/ui/Notification';
-import { pricingApi }               from './pricingMocks';
+import { pricingApi }               from './pricingMocks'; // sazonalidades ainda sem endpoint backend
+import { quartoCategoriApi, quartoApi } from '../../services/api';
 import styles from './PricingManagement.module.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -24,6 +26,80 @@ const parseBRL = (v) => {
   const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
   return parseFloat(s) || 0;
 };
+
+// ── Backend → Frontend transformer ───────────────────────────────────────────
+const MENOR_MODO_MAP = {
+  TAXA_ADICIONAL_FIXA:      'taxa-fixa',
+  TAXA_POR_QUANTIDADE:      'taxa-quantidade',
+  TAXA_POR_FAIXA_ETARIA:    'taxa-faixa',
+  PORCENTAGEM_POR_QUANTIDADE: 'porcentagem-quantidade',
+};
+
+function catFromBackend(cat) {
+  const baseOcc  = (cat.modelos_ocupacao ?? []).filter(m => !m.sazonalidade);
+  const baseFixo = (cat.modelos_fixo    ?? []).filter(m => !m.sazonalidade);
+  const isFixo   = baseFixo.length > 0;
+
+  const precosOcupacao = {};
+  baseOcc.forEach(m => { precosOcupacao[m.quantidade] = m.valor; });
+  const maxPessoas = baseOcc.length ? Math.max(...baseOcc.map(m => m.quantidade)) : 5;
+
+  const baseDu = (cat.day_use ?? []).find(d => !d.sazonalidade);
+  const du = baseDu ? {
+    ativo:                baseDu.ativo,
+    modo:                 baseDu.padrao ? 'padrao' : 'ocupacao',
+    precoFixo:            baseDu.padrao?.preco_base ?? 0,
+    horasBase:            baseDu.padrao?.hora_preco_base ?? null,
+    precoAdicional:       baseDu.padrao?.valor_hora_adicional ?? 0,
+    precosOcupacao: baseDu.padrao ? {} : Object.fromEntries(
+      (baseDu.ocupacoes ?? []).map(o => [o.quantidade_pessoa, o.quantidades?.[0]?.valor ?? 0])
+    ),
+    horaAdicionalPorPessoa: baseDu.padrao ? 0 : (baseDu.ocupacoes?.[0]?.quantidades?.[0]?.valor_hora_adicional_por_pessoa ?? 0),
+  } : { ativo: false, modo: 'padrao', precoFixo: 0, horasBase: null, precoAdicional: 0, precosOcupacao: {}, horaAdicionalPorPessoa: 0 };
+
+  const baseMenor = (cat.menores_idade ?? []).find(m => !m.sazonalidade);
+  let criancas = null;
+  if (baseMenor) {
+    const modo = MENOR_MODO_MAP[baseMenor.modelo] ?? 'taxa-fixa';
+    criancas = {
+      ativo: true,
+      gratuidadeAtiva: baseMenor.idade_gratuidade != null,
+      gratuidadeMax:   baseMenor.idade_gratuidade ?? '',
+      modo,
+      idadeMaxima: baseMenor.taxas_fixas?.[0]?.idade_maxima ?? '',
+      valorFixo:   baseMenor.taxas_fixas?.[0]?.valor_por_crianca ?? '',
+      entradas: modo === 'taxa-quantidade'
+        ? (baseMenor.taxas_por_quantidade ?? []).map(e => ({ quantidade: e.quantidade_crianca, valor: e.valor }))
+        : modo === 'porcentagem-quantidade'
+        ? (baseMenor.porcentagens_por_quantidade ?? []).map(e => ({ quantidade: e.quantidade, valor: e.porcentagem }))
+        : [],
+      faixas: (baseMenor.faixas_etarias ?? []).map(f => ({
+        idadeMin: f.faixa_etaria?.[0] ?? 0,
+        idadeMax: f.faixa_etaria?.[1] ?? 0,
+        valor: f.valor,
+      })),
+      porcentagem: '',
+      maxCriancas: '',
+    };
+  }
+
+  return {
+    id:             cat.id,
+    nome:           cat.nome,
+    descricao:      cat.descricao ?? '',
+    hora_checkin:   cat.hora_checkin,
+    hora_checkout:  cat.hora_checkout,
+    maxPessoas,
+    modeloCobranca: isFixo ? 'Por quarto (tarifa fixa)' : 'Por ocupação',
+    precoFixo:      isFixo ? baseFixo[0].valor : null,
+    precosOcupacao,
+    dayUse: du,
+    quartosObj:     (cat.quartos     ?? []),
+    quartos:        (cat.quartos     ?? []).map(q => q.id),
+    sazonaisAtivas: (cat.sazonalidades ?? []).map(s => s.id),
+    criancas,
+  };
+}
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES_NOME  = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -93,6 +169,7 @@ const blankCriancas = () => ({
 
 const blankCat = () => ({
   nome: '', descricao: '', maxPessoas: 5,
+  hora_checkin: '14:00', hora_checkout: '12:00',
   modeloCobranca: 'Por ocupação',
   precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' },
   quartos: [], sazonaisAtivas: [],
@@ -623,9 +700,16 @@ export default function PricingManagement() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, q] = await Promise.all([pricingApi.listar(), pricingApi.listarQuartos()]);
-      setData(d);
-      setQuartos(q);
+      const [catPage, quartoPage, mockData] = await Promise.all([
+        quartoCategoriApi.listar({ size: 900 }),
+        quartoApi.listar(),
+        pricingApi.listar(), // sazonalidades: ainda sem endpoint próprio no backend
+      ]);
+      setData({
+        categorias:    (Array.isArray(catPage) ? catPage : (catPage.content ?? [])).map(catFromBackend),
+        sazonalidades: mockData.sazonalidades,
+      });
+      setQuartos(Array.isArray(quartoPage) ? quartoPage : (quartoPage.content ?? []));
     } catch (e) {
       notify('Erro ao carregar dados: ' + e.message, 'error');
     } finally {
@@ -656,6 +740,8 @@ export default function PricingManagement() {
     setCatForm({
       nome:           cat.nome,
       descricao:      cat.descricao,
+      hora_checkin:   cat.hora_checkin  ?? '14:00',
+      hora_checkout:  cat.hora_checkout ?? '12:00',
       maxPessoas:     cat.maxPessoas,
       modeloCobranca: cat.modeloCobranca,
       precoFixo:      cat.precoFixo != null ? maskBRL(String(Math.round(cat.precoFixo * 100))) : '',
@@ -703,48 +789,80 @@ export default function PricingManagement() {
   const handleSaveCat = async () => {
     setCatSaving(true);
     try {
-      const payload = {
-        nome:           catForm.nome.trim(),
-        descricao:      catForm.descricao.trim(),
-        maxPessoas:     catForm.maxPessoas,
-        modeloCobranca: catForm.modeloCobranca,
-        quartos:        catForm.quartos,
-        sazonaisAtivas: catForm.sazonaisAtivas,
-        precoFixo:      catForm.modeloCobranca === 'Por quarto (tarifa fixa)' ? parseBRL(catForm.precoFixo) : null,
-        precosOcupacao: catForm.modeloCobranca === 'Por ocupação'
-          ? Object.fromEntries(Object.entries(catForm.precosOcupacao).map(([k, v]) => [k, parseBRL(v)]))
-          : null,
-        dayUse: {
-          ativo:                catForm.dayUse.ativo,
-          modo:                 catForm.dayUse.modo,
-          precoFixo:            parseBRL(catForm.dayUse.precoFixo),
-          horasBase:            Number(catForm.dayUse.horasBase) || null,
-          precoAdicional:       parseBRL(catForm.dayUse.precoAdicional),
-          horaAdicionalPorPessoa: parseBRL(catForm.dayUse.horaAdicionalPorPessoa),
-          precosOcupacao:       catForm.dayUse.modo === 'ocupacao'
-            ? Object.fromEntries(Object.entries(catForm.dayUse.precosOcupacao).map(([k, v]) => [k, parseBRL(v)]))
-            : {},
-        },
-        criancas: (() => {
-          const c = catForm.criancas;
-          const gratuidade = c.gratuidadeAtiva
-            ? { gratuidadeAtiva: true, gratuidadeMax: Number(c.gratuidadeMax) || 0 }
-            : { gratuidadeAtiva: false };
-          if (!c.ativo) return { ativo: false, ...gratuidade };
-          const base = { ativo: true, modo: c.modo, ...gratuidade };
-          if (c.modo === 'taxa-fixa')
-            return { ...base, idadeMaxima: Number(c.idadeMaxima) || 0, valorFixo: parseBRL(c.valorFixo) };
-          if (c.modo === 'taxa-quantidade')
-            return { ...base, entradas: c.entradas.map(e => ({ quantidade: e.quantidade, valor: parseBRL(e.valor) })) };
-          if (c.modo === 'taxa-faixa')
-            return { ...base, faixas: c.faixas.map(f => ({ idadeMin: Number(f.idadeMin), idadeMax: Number(f.idadeMax), valor: parseBRL(f.valor) })) };
-          if (c.modo === 'porcentagem-quantidade')
-            return { ...base, entradas: c.entradas.map(e => ({ quantidade: e.quantidade, valor: Number(e.valor) || 0 })) };
-          return base;
-        })(),
+      const f      = catForm;
+      const isFixo = f.modeloCobranca === 'Por quarto (tarifa fixa)';
+      const maxPax = Number(f.maxPessoas) || 5;
+
+      const modelos_ocupacao = isFixo ? [] :
+        Array.from({ length: maxPax }, (_, i) => ({
+          quantidade: i + 1,
+          valor: parseBRL(f.precosOcupacao[i + 1] ?? ''),
+        }));
+
+      const modelos_fixo = isFixo ? [{ valor: parseBRL(f.precoFixo) }] : [];
+
+      const du = f.dayUse;
+      const day_use = du.ativo ? [{
+        ativo: true,
+        padrao: du.modo !== 'ocupacao' ? {
+          preco_base:            parseBRL(du.precoFixo ?? ''),
+          hora_preco_base:       Number(du.horasBase) || 0,
+          valor_hora_adicional:  parseBRL(du.precoAdicional ?? '') || null,
+        } : null,
+        ocupacoes: du.modo === 'ocupacao'
+          ? Object.entries(du.precosOcupacao)
+              .filter(([, v]) => parseBRL(v) > 0)
+              .map(([k, v]) => ({
+                quantidade_pessoa: Number(k),
+                quantidades: [{ quantidade: 1, valor: parseBRL(v), valor_hora_adicional_por_pessoa: parseBRL(du.horaAdicionalPorPessoa) || null }],
+              }))
+          : [],
+      }] : null;
+
+      const MODO_ENUM = {
+        'taxa-fixa':              'TAXA_ADICIONAL_FIXA',
+        'taxa-quantidade':        'TAXA_POR_QUANTIDADE',
+        'taxa-faixa':             'TAXA_POR_FAIXA_ETARIA',
+        'porcentagem-quantidade': 'PORCENTAGEM_POR_QUANTIDADE',
       };
-      if (catModal === 'create') { await pricingApi.criarCategoria(payload);          notify('Categoria criada com sucesso!'); }
-      else                       { await pricingApi.atualizarCategoria(editingCat.id, payload); notify('Categoria atualizada com sucesso!'); }
+      const c = f.criancas;
+      const menores_idade = c.ativo ? [{
+        idade_gratuidade: c.gratuidadeAtiva ? Number(c.gratuidadeMax) || null : null,
+        modelo: MODO_ENUM[c.modo],
+        taxas_fixas: c.modo === 'taxa-fixa'
+          ? [{ idade_maxima: Number(c.idadeMaxima) || 0, valor_por_crianca: parseBRL(c.valorFixo) }]
+          : [],
+        taxas_por_quantidade: c.modo === 'taxa-quantidade'
+          ? c.entradas.map(e => ({ quantidade_crianca: e.quantidade, valor: parseBRL(e.valor) }))
+          : [],
+        faixas_etarias: c.modo === 'taxa-faixa'
+          ? c.faixas.map(fi => ({ faixa_etaria: [Number(fi.idadeMin), Number(fi.idadeMax)], valor: parseBRL(fi.valor) }))
+          : [],
+        porcentagens_por_quantidade: c.modo === 'porcentagem-quantidade'
+          ? c.entradas.map(e => ({ quantidade: e.quantidade, porcentagem: Number(e.valor) || 0 }))
+          : [],
+      }] : [];
+
+      const payload = {
+        nome:             f.nome.trim(),
+        descricao:        f.descricao.trim() || null,
+        hora_checkin:     f.hora_checkin  || null,
+        hora_checkout:    f.hora_checkout || null,
+        modelos_ocupacao,
+        modelos_fixo,
+        day_use,
+        fk_quartos:       f.quartos,
+        fk_sazonalidades: f.sazonaisAtivas,
+        menores_idade,
+      };
+
+      if (catModal === 'create') {
+        await quartoCategoriApi.criar(payload);
+        notify('Categoria criada com sucesso!');
+      } else {
+        await quartoCategoriApi.atualizar({ id: editingCat.id, ...payload });
+        notify('Categoria atualizada com sucesso!');
+      }
       setCatModal(null);
       load();
     } catch (e) {
@@ -842,8 +960,13 @@ export default function PricingManagement() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      if (deleteTarget.type === 'cat') { await pricingApi.excluirCategoria(deleteTarget.id);    notify('Categoria removida.'); }
-      else                              { await pricingApi.excluirSazonalidade(deleteTarget.id); notify('Sazonalidade removida.'); }
+      if (deleteTarget.type === 'cat') {
+        notify('Exclusão de categoria não disponível no momento.', 'error');
+        setDeleteTarget(null);
+        return;
+      }
+      await pricingApi.excluirSazonalidade(deleteTarget.id);
+      notify('Sazonalidade removida.');
       setDeleteTarget(null);
       load();
     } catch (e) {
@@ -854,10 +977,12 @@ export default function PricingManagement() {
   };
 
   // ── Detail modal content helpers ──────────────────────────────────────────
-  const DR = ({ label, children }) => (
-    <div className={styles.detailRow}>
-      <span className={styles.detailRowLabel}>{label}</span>
-      <span className={styles.detailRowVal}>{children}</span>
+  const IB = ({ icon, label, children, span2 }) => (
+    <div className={[styles.infoBox, span2 ? styles.infoBoxSpan2 : ''].join(' ')}>
+      <div className={styles.infoBoxHeader}>
+        {icon}<span className={styles.infoBoxLabel}>{label}</span>
+      </div>
+      <div className={styles.infoBoxValue}>{children}</div>
     </div>
   );
 
@@ -867,63 +992,118 @@ export default function PricingManagement() {
       .map((sid) => sazonalidades.find((s) => s.id === sid)?.nome).filter(Boolean);
 
     if (tab === 0) return (
-      <div className={styles.detailBody}>
-        <DR label="Modelo de cobrança">{cat.modeloCobranca}</DR>
-        <DR label="Máx. de pessoas">{cat.maxPessoas} pessoas</DR>
-        <div className={styles.detailDivider} />
-        {cat.modeloCobranca === 'Por quarto (tarifa fixa)'
-          ? <DR label="Tarifa fixa"><span className={styles.detailPrice}>{fmtBRL(cat.precoFixo)}</span></DR>
-          : <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
-        }
+      <div className={styles.detailSection}>
+        <div className={styles.infoGrid}>
+          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">
+            {cat.modeloCobranca}
+          </IB>
+          <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
+            {cat.maxPessoas} pessoa{cat.maxPessoas !== 1 ? 's' : ''}
+          </IB>
+        </div>
+        {(cat.hora_checkin || cat.hora_checkout) && (
+          <div className={styles.infoGrid}>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">
+              {cat.hora_checkin || '—'}
+            </IB>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">
+              {cat.hora_checkout || '—'}
+            </IB>
+          </div>
+        )}
+        {cat.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
+          <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
+            <span className={styles.infoBoxValueLg}>{fmtBRL(cat.precoFixo)}</span>
+          </IB>
+        ) : (
+          <div className={styles.infoBox}>
+            <div className={styles.infoBoxHeader}>
+              <DollarSign size={13} color="var(--violet)" />
+              <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+            </div>
+            <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
+          </div>
+        )}
       </div>
     );
 
-    if (tab === 1) return (
-      <div className={styles.detailBody}>
-        <DR label="Day Use">
-          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>
-            {du.ativo ? 'Ativo' : 'Inativo'}
-          </span>
-        </DR>
-        {du.ativo && <>
-          <div className={styles.detailDivider} />
-          <DR label="Modo">{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</DR>
-          {du.modo === 'padrao' ? <>
-            <DR label="Preço base"><span className={styles.detailPrice}>{fmtBRL(du.precoFixo)}</span></DR>
-            {du.horasBase && <DR label="Horas incluídas">{du.horasBase}h</DR>}
-            <DR label="Hora adicional">{fmtBRL(du.precoAdicional)}</DR>
-          </> : <>
-            <DR label="Hora adicional/pessoa">{fmtBRL(du.horaAdicionalPorPessoa)}</DR>
-            <div className={styles.detailDivider} />
-            <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
-          </>}
-        </>}
-      </div>
-    );
+    if (tab === 1) {
+      if (!du.ativo) return (
+        <div className={styles.detailSection}>
+          <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
+            <span className={styles.badge}>Inativo</span>
+          </IB>
+        </div>
+      );
+      return (
+        <div className={styles.detailSection}>
+          <div className={styles.infoGrid}>
+            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
+              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
+            </IB>
+            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
+              {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
+            </IB>
+          </div>
+          {du.modo === 'padrao' ? (
+            <div className={styles.infoGrid}>
+              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
+                <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
+              </IB>
+              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
+                {du.horasBase ? `${du.horasBase}h` : '—'}
+              </IB>
+              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
+                {fmtBRL(du.precoAdicional)}
+              </IB>
+            </div>
+          ) : (
+            <div className={styles.infoBox}>
+              <div className={styles.infoBoxHeader}>
+                <DollarSign size={13} color="var(--violet)" />
+                <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+              </div>
+              <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
+            </div>
+          )}
+        </div>
+      );
+    }
 
     if (tab === 2) return (
-      <div className={styles.detailBody}>
-        <span className={styles.detailGroupLabel}>Quartos vinculados</span>
-        <div className={styles.pillWrap}>
-          {(cat.quartos ?? []).length === 0
-            ? <span className={styles.detailEmpty}>Nenhum quarto vinculado</span>
-            : (cat.quartos ?? []).map((qid) => {
-                const q = quartos.find((x) => x.id === qid);
-                return q ? <span key={qid} className={styles.pill}>Quarto {q.numero} · {q.tipo}</span> : null;
-              })}
+      <div className={styles.detailSection}>
+        <div className={styles.infoBox}>
+          <div className={styles.infoBoxHeader}>
+            <BedDouble size={13} color="var(--violet)" />
+            <span className={styles.infoBoxLabel}>Quartos vinculados</span>
+          </div>
+          <div className={styles.pillWrap} style={{ marginTop: 8 }}>
+            {(cat.quartosObj ?? []).length === 0
+              ? <span className={styles.detailEmpty}>Nenhum quarto vinculado</span>
+              : (cat.quartosObj ?? []).map((q) => {
+                  const full = quartos.find((x) => x.id === q.id);
+                  const num = full?.numero ?? q.id;
+                  const desc = q.descricao ? ` - ${q.descricao}` : '';
+                  return <span key={q.id} className={styles.pill}>Quarto {num}{desc}</span>;
+                })}
+          </div>
         </div>
-        <div className={styles.detailDivider} />
-        <span className={styles.detailGroupLabel}>Sazonalidades ativas</span>
-        <div className={styles.pillWrap}>
-          {seaNomes.length === 0
-            ? <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
-            : seaNomes.map((n, i) => <span key={i} className={[styles.pill, styles.badgeViolet].join(' ')} style={{ border: 'none' }}>{n}</span>)}
+        <div className={styles.infoBox}>
+          <div className={styles.infoBoxHeader}>
+            <Calendar size={13} color="var(--violet)" />
+            <span className={styles.infoBoxLabel}>Sazonalidades ativas</span>
+          </div>
+          <div className={styles.pillWrap} style={{ marginTop: 8 }}>
+            {seaNomes.length === 0
+              ? <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
+              : seaNomes.map((n, i) => <span key={i} className={[styles.pill, styles.pillViolet].join(' ')}>{n}</span>)}
+          </div>
         </div>
       </div>
     );
 
     if (tab === 3) return (
-      <div className={styles.detailBody}>
+      <div className={styles.detailSection}>
         <ChildPricingDisplay criancas={cat.criancas} />
       </div>
     );
@@ -935,67 +1115,125 @@ export default function PricingManagement() {
     const du = s.dayUse ?? {};
 
     if (tab === 0) return (
-      <div className={styles.detailBody}>
-        <DR label="Modo de operação">{MODO_LABEL[s.modoOperacao]}</DR>
-        <div className={styles.detailDivider} />
-        {s.modoOperacao === 'data-especifica' && <>
-          <DR label="Início">{s.dataInicio || '—'} {s.horaInicio}</DR>
-          <DR label="Fim">{s.dataFim || '—'} {s.horaFim}</DR>
-        </>}
+      <div className={styles.detailSection}>
+        <IB icon={<Calendar size={13} color="var(--violet)" />} label="Modo de operação" span2>
+          {MODO_LABEL[s.modoOperacao]}
+        </IB>
+        {s.modoOperacao === 'data-especifica' && (
+          <div className={styles.infoGrid}>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Início">
+              {s.dataInicio || '—'} {s.horaInicio}
+            </IB>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Fim">
+              {s.dataFim || '—'} {s.horaFim}
+            </IB>
+          </div>
+        )}
         {s.modoOperacao === 'semanal' && (
-          <DR label="Dias">{(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—'}</DR>
+          <IB icon={<Clock size={13} color="var(--violet)" />} label="Dias da semana" span2>
+            {(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—'}
+          </IB>
         )}
         {s.modoOperacao === 'mensal' && (
-          <DR label="Dias do mês">{(s.diasMes || []).join(', ') || '—'}</DR>
+          <IB icon={<Clock size={13} color="var(--violet)" />} label="Dias do mês" span2>
+            {(s.diasMes || []).join(', ') || '—'}
+          </IB>
         )}
         {s.modoOperacao === 'anual' && (
-          <DR label="Meses">{(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}</DR>
+          <IB icon={<Clock size={13} color="var(--violet)" />} label="Meses" span2>
+            {(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}
+          </IB>
         )}
         {s.modoOperacao === 'diario' && (
-          <DR label="Ciclo">{s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}</DR>
+          <IB icon={<Clock size={13} color="var(--violet)" />} label="Ciclo" span2>
+            {s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}
+          </IB>
         )}
-        {(s.horaCheckin || s.horaCheckout) && <>
-          <div className={styles.detailDivider} />
-          <DR label="Check-in">{s.horaCheckin || '—'}</DR>
-          <DR label="Check-out">{s.horaCheckout || '—'}</DR>
-        </>}
+        {(s.horaCheckin || s.horaCheckout) && (
+          <div className={styles.infoGrid}>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">
+              {s.horaCheckin || '—'}
+            </IB>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">
+              {s.horaCheckout || '—'}
+            </IB>
+          </div>
+        )}
       </div>
     );
 
     if (tab === 1) return (
-      <div className={styles.detailBody}>
-        <DR label="Modelo de cobrança">{s.modeloCobranca}</DR>
-        <DR label="Máx. de pessoas">{s.maxPessoas} pessoas</DR>
-        <div className={styles.detailDivider} />
-        {s.modeloCobranca === 'Por quarto (tarifa fixa)'
-          ? <DR label="Tarifa fixa"><span className={styles.detailPrice}>{fmtBRL(s.precoFixo)}</span></DR>
-          : <OccTable label="Preço/noite" occ={s.precosOcupacao} maxPessoas={s.maxPessoas} />
-        }
+      <div className={styles.detailSection}>
+        <div className={styles.infoGrid}>
+          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">
+            {s.modeloCobranca}
+          </IB>
+          <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
+            {s.maxPessoas} pessoa{s.maxPessoas !== 1 ? 's' : ''}
+          </IB>
+        </div>
+        {s.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
+          <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
+            <span className={styles.infoBoxValueLg}>{fmtBRL(s.precoFixo)}</span>
+          </IB>
+        ) : (
+          <div className={styles.infoBox}>
+            <div className={styles.infoBoxHeader}>
+              <DollarSign size={13} color="var(--violet)" />
+              <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+            </div>
+            <OccTable label="Preço/noite" occ={s.precosOcupacao} maxPessoas={s.maxPessoas} />
+          </div>
+        )}
       </div>
     );
 
-    if (tab === 2) return (
-      <div className={styles.detailBody}>
-        <DR label="Day Use">
-          <span className={[styles.badge, du.ativo ? styles.badgeAmber : ''].join(' ')}>
-            {du.ativo ? 'Ativo' : 'Inativo'}
-          </span>
-        </DR>
-        {du.ativo && <>
-          <div className={styles.detailDivider} />
-          <DR label="Modo">{du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</DR>
-          {du.modo === 'padrao' ? <>
-            <DR label="Preço base"><span className={styles.detailPrice}>{fmtBRL(du.precoFixo)}</span></DR>
-            {du.horasBase && <DR label="Horas incluídas">{du.horasBase}h</DR>}
-            <DR label="Hora adicional">{fmtBRL(du.precoAdicional)}</DR>
-          </> : <>
-            <DR label="Hora adicional/pessoa">{fmtBRL(du.horaAdicionalPorPessoa)}</DR>
-            <div className={styles.detailDivider} />
-            <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={s.maxPessoas} />
-          </>}
-        </>}
-      </div>
-    );
+    if (tab === 2) {
+      if (!du.ativo) return (
+        <div className={styles.detailSection}>
+          <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
+            <span className={styles.badge}>Inativo</span>
+          </IB>
+        </div>
+      );
+      return (
+        <div className={styles.detailSection}>
+          <div className={styles.infoGrid}>
+            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
+              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
+            </IB>
+            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
+              {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
+            </IB>
+          </div>
+          {du.modo === 'padrao' ? (
+            <div className={styles.infoGrid}>
+              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
+                <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
+              </IB>
+              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
+                {du.horasBase ? `${du.horasBase}h` : '—'}
+              </IB>
+              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
+                {fmtBRL(du.precoAdicional)}
+              </IB>
+            </div>
+          ) : (<>
+            <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional/pessoa" span2>
+              {fmtBRL(du.horaAdicionalPorPessoa)}
+            </IB>
+            <div className={styles.infoBox}>
+              <div className={styles.infoBoxHeader}>
+                <DollarSign size={13} color="var(--violet)" />
+                <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+              </div>
+              <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={s.maxPessoas} />
+            </div>
+          </>)}
+        </div>
+      );
+    }
+
     return null;
   };
 
@@ -1160,6 +1398,14 @@ export default function PricingManagement() {
               <FormField label="Descrição">
                 <Input value={catForm.descricao} onChange={(e) => setCatField('descricao', e.target.value.toUpperCase())} placeholder="DESCRIÇÃO DA CATEGORIA" />
               </FormField>
+              <div className={styles.formRow}>
+                <FormField label="Check-in">
+                  <TimePicker value={catForm.hora_checkin} onChange={(v) => setCatField('hora_checkin', v)} />
+                </FormField>
+                <FormField label="Check-out">
+                  <TimePicker value={catForm.hora_checkout} onChange={(v) => setCatField('hora_checkout', v)} />
+                </FormField>
+              </div>
               <PricingFields form={catForm} setField={setCatField} setOcc={setCatOcc} />
             </div>
           )}
@@ -1185,8 +1431,7 @@ export default function PricingManagement() {
                   return (
                     <label key={q.id} className={[styles.checkItem, active ? styles.checkItemActive : ''].join(' ')}>
                       <input type="checkbox" className={styles.checkItemCb} checked={active} onChange={() => toggleCatQuarto(q.id)} />
-                      <span className={styles.checkItemLabel}>Quarto {q.numero}</span>
-                      <span className={styles.checkItemSub}>{q.tipo}</span>
+                      <span className={styles.checkItemLabel}>Quarto {q.numero}{q.tipoOcupacao ? ` - ${q.tipoOcupacao.toUpperCase()}` : ''}</span>
                     </label>
                   );
                 })}
