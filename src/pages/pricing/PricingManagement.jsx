@@ -9,8 +9,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { TimePicker }               from '../../components/ui/TimePicker';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { Notification }             from '../../components/ui/Notification';
-import { pricingApi }               from './pricingMocks'; // sazonalidades ainda sem endpoint backend
-import { quartoCategoriApi, quartoApi } from '../../services/api';
+import { quartoCategoriApi, quartoApi, sazonalidadeApi } from '../../services/api';
 import styles from './PricingManagement.module.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -101,6 +100,112 @@ function catFromBackend(cat) {
     criancas,
     criado_por:     cat.funcionario  ?? null,
     data_criacao:   cat.data_hora_cadastro ?? null,
+  };
+}
+
+function seaFromBackend(s) {
+  // ── Detect scheduling mode ──────────────────────────────────────────────────
+  let modoOperacao = 'data-especifica';
+  let dataInicio = '', dataFim = '', horaInicio = '', horaFim = '';
+  let diaIntegral = true, horaInicioCiclo = '', horaFimCiclo = '';
+  let diasSemana = [], diasMes = [], meses = [];
+  const fmtDate = (d) => (d ? d.split('/').reverse().join('-') : '');
+
+  if (s.data_inicio != null) {
+    modoOperacao = 'data-especifica';
+    dataInicio   = fmtDate(s.data_inicio);
+    dataFim      = fmtDate(s.data_fim);
+    horaInicio   = s.hora_checkin  ?? '';
+    horaFim      = s.hora_checkout ?? '';
+  } else if (s.semanal != null) {
+    modoOperacao = 'semanal';
+    // backend 1-7 (Mon=1, Sun=7) → frontend 0-6 (Sun=0, Mon=1…Sat=6)
+    diasSemana = (s.semanal ?? []).map((d) => d % 7);
+  } else if (s.mensal != null) {
+    modoOperacao = 'mensal';
+    diasMes = s.mensal ?? [];
+  } else if (s.anual != null) {
+    modoOperacao = 'anual';
+    // backend 1-12 → frontend 0-11
+    meses = (s.anual ?? []).map((m) => m - 1);
+  } else if (s.diario_dia_integral != null || s.diario_hora_inicio_ciclo != null) {
+    modoOperacao    = 'diario';
+    diaIntegral     = s.diario_dia_integral ?? true;
+    horaInicioCiclo = s.diario_hora_inicio_ciclo ?? '';
+    horaFimCiclo    = s.diario_hora_fim_ciclo   ?? '';
+  }
+
+  const horaCheckin  = s.hora_checkin  ?? '14:00';
+  const horaCheckout = s.hora_checkout ?? '12:00';
+
+  // ── Pricing ─────────────────────────────────────────────────────────────────
+  const baseOcc  = (s.modelos_ocupacao ?? []);
+  const baseFixo = (s.modelos_fixo    ?? []);
+  const isFixo   = baseFixo.length > 0;
+
+  const precosOcupacao = {};
+  baseOcc.forEach((m) => { precosOcupacao[m.quantidade] = m.valor; });
+  const maxPessoas = baseOcc.length ? Math.max(...baseOcc.map((m) => m.quantidade)) : 5;
+
+  // ── Day Use ──────────────────────────────────────────────────────────────────
+  const baseDu = (s.day_use ?? [])[0] ?? null;
+  const du = baseDu ? {
+    ativo:    baseDu.ativo,
+    modo:     baseDu.padrao ? 'padrao' : 'ocupacao',
+    precoFixo:            baseDu.padrao?.preco_base ?? 0,
+    horasBase:            baseDu.padrao?.hora_preco_base ?? null,
+    precoAdicional:       baseDu.padrao?.valor_hora_adicional ?? 0,
+    precosOcupacao: baseDu.padrao ? {} : Object.fromEntries(
+      (baseDu.ocupacoes ?? []).map((o) => [o.quantidade_pessoa, o.quantidades?.[0]?.valor ?? 0])
+    ),
+    horaAdicionalPorPessoa: baseDu.padrao ? 0 : (baseDu.ocupacoes?.[0]?.quantidades?.[0]?.valor_hora_adicional_por_pessoa ?? 0),
+  } : { ativo: false, modo: 'padrao', precoFixo: 0, horasBase: null, precoAdicional: 0, precosOcupacao: {}, horaAdicionalPorPessoa: 0 };
+
+  // ── Menores ──────────────────────────────────────────────────────────────────
+  const baseMenor = (s.menores_idade ?? [])[0] ?? null;
+  let criancas = null;
+  if (baseMenor) {
+    const modo = MENOR_MODO_MAP[baseMenor.modelo] ?? 'taxa-fixa';
+    criancas = {
+      ativo: true,
+      gratuidadeAtiva: baseMenor.idade_gratuidade != null,
+      gratuidadeMax:   baseMenor.idade_gratuidade ?? '',
+      modo,
+      idadeMaxima: baseMenor.taxas_fixas?.[0]?.idade_maxima ?? '',
+      valorFixo:   baseMenor.taxas_fixas?.[0]?.valor_por_crianca ?? '',
+      entradas: modo === 'taxa-quantidade'
+        ? (baseMenor.taxas_por_quantidade ?? []).map((e) => ({ quantidade: e.quantidade_crianca, valor: e.valor }))
+        : modo === 'porcentagem-quantidade'
+        ? (baseMenor.porcentagens_por_quantidade ?? []).map((e) => ({ quantidade: e.quantidade, valor: e.porcentagem }))
+        : [],
+      faixas: (baseMenor.faixas_etarias ?? []).map((f) => ({
+        idadeMin: f.faixa_etaria?.[0] ?? 0,
+        idadeMax: f.faixa_etaria?.[1] ?? 0,
+        valor: f.valor,
+      })),
+      porcentagem: '',
+      maxCriancas: '',
+    };
+  }
+
+  return {
+    id:              s.id,
+    nome:            s.descricao,
+    modoOperacao,
+    dataInicio,      dataFim,
+    horaInicio,      horaFim,
+    diaIntegral,     horaInicioCiclo, horaFimCiclo,
+    horaCheckin,     horaCheckout,
+    diasSemana,      diasMes,         meses,
+    modeloCobranca:  isFixo ? 'Por quarto (tarifa fixa)' : 'Por ocupação',
+    precoFixo:       isFixo ? baseFixo[0].valor : null,
+    precosOcupacao,
+    maxPessoas,
+    dayUse:          du,
+    criancas,
+    categoriasIds:   (s.categorias ?? []).map((c) => c.categoria?.id ?? c.id),
+    criado_por:      s.funcionario       ?? null,
+    data_criacao:    s.data_hora_cadastro ?? null,
   };
 }
 
@@ -721,14 +826,14 @@ export default function PricingManagement() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [catPage, quartoPage, mockData] = await Promise.all([
+      const [catPage, quartoPage, seaPage] = await Promise.all([
         quartoCategoriApi.listar({ size: 900 }),
         quartoApi.listar(),
-        pricingApi.listar(), // sazonalidades: ainda sem endpoint próprio no backend
+        sazonalidadeApi.listar({ size: 900 }),
       ]);
       setData({
-        categorias:    (Array.isArray(catPage) ? catPage : (catPage.content ?? [])).map(catFromBackend),
-        sazonalidades: mockData.sazonalidades,
+        categorias:    (Array.isArray(catPage)  ? catPage  : (catPage.content  ?? [])).map(catFromBackend),
+        sazonalidades: (Array.isArray(seaPage)  ? seaPage  : (seaPage.content  ?? [])).map(seaFromBackend),
       });
       setQuartos(Array.isArray(quartoPage) ? quartoPage : (quartoPage.content ?? []));
     } catch (e) {
@@ -990,33 +1095,105 @@ export default function PricingManagement() {
   const handleSaveSea = async () => {
     setSeaSaving(true);
     try {
-      const payload = {
-        nome:            seaForm.nome.trim(), descricao: seaForm.descricao.trim(),
-        modoOperacao:    seaForm.modoOperacao,
-        dataInicio:      seaForm.dataInicio, dataFim: seaForm.dataFim,
-        horaInicio:      seaForm.horaInicio, horaFim: seaForm.horaFim,
-        diaIntegral:     seaForm.diaIntegral,
-        horaInicioCiclo: seaForm.horaInicioCiclo, horaFimCiclo: seaForm.horaFimCiclo,
-        horaCheckin:     seaForm.horaCheckin, horaCheckout: seaForm.horaCheckout,
-        diasSemana:      seaForm.diasSemana, diasMes: seaForm.diasMes, meses: seaForm.meses,
-        modeloCobranca:  seaForm.modeloCobranca, maxPessoas: seaForm.maxPessoas,
-        precoFixo:       seaForm.modeloCobranca === 'Por quarto (tarifa fixa)' ? parseBRL(seaForm.precoFixo) : null,
-        precosOcupacao:  seaForm.modeloCobranca === 'Por ocupação'
-          ? Object.fromEntries(Object.entries(seaForm.precosOcupacao).map(([k, v]) => [k, parseBRL(v)]))
-          : null,
-        dayUse: {
-          ativo:                seaForm.dayUse.ativo, modo: seaForm.dayUse.modo,
-          precoFixo:            parseBRL(seaForm.dayUse.precoFixo),
-          horasBase:            Number(seaForm.dayUse.horasBase) || null,
-          precoAdicional:       parseBRL(seaForm.dayUse.precoAdicional),
-          horaAdicionalPorPessoa: parseBRL(seaForm.dayUse.horaAdicionalPorPessoa),
-          precosOcupacao:       seaForm.dayUse.modo === 'ocupacao'
-            ? Object.fromEntries(Object.entries(seaForm.dayUse.precosOcupacao).map(([k, v]) => [k, parseBRL(v)]))
-            : {},
-        },
+      const f      = seaForm;
+      const isFixo = f.modeloCobranca === 'Por quarto (tarifa fixa)';
+      const maxPax = Number(f.maxPessoas) || 5;
+      const fmtDateOut = (d) => (d ? d.split('-').reverse().join('/') : null);
+
+      // ── Scheduling ──────────────────────────────────────────────────────────
+      const scheduleFields = {};
+      if (f.modoOperacao === 'data-especifica') {
+        scheduleFields.data_inicio  = fmtDateOut(f.dataInicio);
+        scheduleFields.data_fim     = fmtDateOut(f.dataFim);
+        scheduleFields.hora_checkin  = f.horaInicio || null;
+        scheduleFields.hora_checkout = f.horaFim    || null;
+      } else {
+        scheduleFields.hora_checkin  = f.horaCheckin  || null;
+        scheduleFields.hora_checkout = f.horaCheckout || null;
+        if (f.modoOperacao === 'diario') {
+          scheduleFields.diario_dia_integral      = f.diaIntegral;
+          scheduleFields.diario_hora_inicio_ciclo = f.diaIntegral ? null : (f.horaInicioCiclo || null);
+          scheduleFields.diario_hora_fim_ciclo    = f.diaIntegral ? null : (f.horaFimCiclo    || null);
+        } else if (f.modoOperacao === 'semanal') {
+          // frontend 0-6 (Sun=0) → backend 1-7 (Sun=7)
+          scheduleFields.semanal = f.diasSemana.map((d) => d === 0 ? 7 : d);
+        } else if (f.modoOperacao === 'mensal') {
+          scheduleFields.mensal = f.diasMes;
+        } else if (f.modoOperacao === 'anual') {
+          // frontend 0-11 → backend 1-12
+          scheduleFields.anual = f.meses.map((m) => m + 1);
+        }
+      }
+
+      // ── Pricing ─────────────────────────────────────────────────────────────
+      const modelos_ocupacao = isFixo ? [] :
+        Array.from({ length: maxPax }, (_, i) => ({
+          quantidade: i + 1,
+          valor: parseBRL(f.precosOcupacao[i + 1] ?? ''),
+        }));
+      const modelos_fixo = isFixo ? [{ valor: parseBRL(f.precoFixo) }] : [];
+
+      // ── Day Use ─────────────────────────────────────────────────────────────
+      const du = f.dayUse;
+      const day_use = du.ativo ? [{
+        ativo: true,
+        padrao: du.modo !== 'ocupacao' ? {
+          preco_base:           parseBRL(du.precoFixo ?? ''),
+          hora_preco_base:      Number(du.horasBase) || 0,
+          valor_hora_adicional: parseBRL(du.precoAdicional ?? '') || null,
+        } : null,
+        ocupacoes: du.modo === 'ocupacao'
+          ? Object.entries(du.precosOcupacao)
+              .filter(([, v]) => parseBRL(v) > 0)
+              .map(([k, v]) => ({
+                quantidade_pessoa: Number(k),
+                quantidades: [{ quantidade: 1, valor: parseBRL(v), valor_hora_adicional_por_pessoa: parseBRL(du.horaAdicionalPorPessoa) || null }],
+              }))
+          : [],
+      }] : null;
+
+      // ── Menores ─────────────────────────────────────────────────────────────
+      const MODO_ENUM = {
+        'taxa-fixa':              'TAXA_ADICIONAL_FIXA',
+        'taxa-quantidade':        'TAXA_POR_QUANTIDADE',
+        'taxa-faixa':             'TAXA_POR_FAIXA_ETARIA',
+        'porcentagem-quantidade': 'PORCENTAGEM_POR_QUANTIDADE',
       };
-      if (seaModal === 'create') { await pricingApi.criarSazonalidade(payload);            notify('Sazonalidade criada com sucesso!'); }
-      else                       { await pricingApi.atualizarSazonalidade(editingSea.id, payload); notify('Sazonalidade atualizada com sucesso!'); }
+      const c = f.criancas;
+      const menores_idade = c.ativo ? [{
+        idade_gratuidade: c.gratuidadeAtiva ? Number(c.gratuidadeMax) || null : null,
+        modelo: MODO_ENUM[c.modo],
+        taxas_fixas: c.modo === 'taxa-fixa'
+          ? [{ idade_maxima: Number(c.idadeMaxima) || 0, valor_por_crianca: parseBRL(c.valorFixo) }]
+          : [],
+        taxas_por_quantidade: c.modo === 'taxa-quantidade'
+          ? c.entradas.map((e) => ({ quantidade_crianca: e.quantidade, valor: parseBRL(e.valor) }))
+          : [],
+        faixas_etarias: c.modo === 'taxa-faixa'
+          ? c.faixas.map((fi) => ({ faixa_etaria: [Number(fi.idadeMin), Number(fi.idadeMax)], valor: parseBRL(fi.valor) }))
+          : [],
+        porcentagens_por_quantidade: c.modo === 'porcentagem-quantidade'
+          ? c.entradas.map((e) => ({ quantidade: e.quantidade, porcentagem: Number(e.valor) || 0 }))
+          : [],
+      }] : [];
+
+      const payload = {
+        descricao: f.nome.trim(),
+        ...scheduleFields,
+        modelos_ocupacao,
+        modelos_fixo,
+        day_use,
+        menores_idade,
+        fk_categorias: f.categoriasIds,
+      };
+
+      if (seaModal === 'create') {
+        await sazonalidadeApi.criar(payload);
+        notify('Sazonalidade criada com sucesso!');
+      } else {
+        await sazonalidadeApi.atualizar({ id: editingSea.id, ...payload });
+        notify('Sazonalidade atualizada com sucesso!');
+      }
       setSeaModal(null);
       load();
     } catch (e) {
@@ -1031,12 +1208,11 @@ export default function PricingManagement() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      if (deleteTarget.type === 'cat') {
-        notify('Exclusão de categoria não disponível no momento.', 'error');
+      if (deleteTarget.type === 'cat' || deleteTarget.type === 'sea') {
+        notify('Exclusão não disponível no momento.', 'error');
         setDeleteTarget(null);
         return;
       }
-      await pricingApi.excluirSazonalidade(deleteTarget.id);
       notify('Sazonalidade removida.');
       setDeleteTarget(null);
       load();
@@ -1048,8 +1224,8 @@ export default function PricingManagement() {
   };
 
   // ── Detail modal content helpers ──────────────────────────────────────────
-  const IB = ({ icon, label, children, span2 }) => (
-    <div className={[styles.infoBox, span2 ? styles.infoBoxSpan2 : ''].join(' ')}>
+  const IB = ({ icon, label, children, span2, className }) => (
+    <div className={[styles.infoBox, span2 ? styles.infoBoxSpan2 : '', className ?? ''].join(' ')}>
       <div className={styles.infoBoxHeader}>
         {icon}<span className={styles.infoBoxLabel}>{label}</span>
       </div>
@@ -1059,40 +1235,232 @@ export default function PricingManagement() {
 
   const renderCatDetail = (cat, tab) => {
     const du = cat.dayUse ?? {};
-    const seaNomes = (cat.sazonaisAtivas ?? [])
-      .map((sid) => sazonalidades.find((s) => s.id === sid)?.nome).filter(Boolean);
+    const appliedSeas = (cat.sazonaisAtivas ?? [])
+      .map((sid) => sazonalidades.find((s) => s.id === sid))
+      .filter(Boolean);
+    const hasSeas  = appliedSeas.length > 0;
+    const single   = appliedSeas.length === 1;
+    const sea0     = appliedSeas[0];
 
-    if (tab === 0) return (
-      <div className={styles.detailSection}>
-        <div className={styles.infoGrid}>
-          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">
-            {cat.modeloCobranca}
-          </IB>
-          <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
-            {cat.maxPessoas} pessoa{cat.maxPessoas !== 1 ? 's' : ''}
-          </IB>
+    // For a single seasonality: side-by-side only when the layout structure is the same
+    // (same model / same mode). If structure differs → stack (major change).
+    const priceGridCols = (single && sea0.modeloCobranca === cat.modeloCobranca)
+      ? '1fr 1fr' : '1fr';
+    const duGridCols = (single
+      && (sea0.dayUse?.ativo ?? false) === (cat.dayUse?.ativo ?? false)
+      && (sea0.dayUse?.modo ?? 'padrao') === (cat.dayUse?.modo ?? 'padrao'))
+      ? '1fr 1fr' : '1fr';
+    const childGridCols = (single
+      && (sea0?.criancas?.ativo ?? false) === (cat.criancas?.ativo ?? false)
+      && (sea0?.criancas?.modo ?? 'taxa-fixa') === (cat.criancas?.modo ?? 'taxa-fixa'))
+      ? '1fr 1fr' : '1fr';
+    const seaSchedCols = single ? '1fr 1fr' : '1fr';
+
+    // ── Reusable panel wrapper ──────────────────────────────────────────────
+    const Panel = ({ label, isSea, children }) => (
+      <div className={[styles.comparePanel, isSea ? styles.comparePanelSea : ''].join(' ')}>
+        <div className={[styles.comparePanelTitle, isSea ? styles.comparePanelTitleSea : ''].join(' ')}>
+          {label}
         </div>
-        {(cat.hora_checkin || cat.hora_checkout) && (
+        {children}
+      </div>
+    );
+
+    // ── Pricing content (hospedagem) ────────────────────────────────────────
+    const PriceContent = ({ item }) => {
+      const fixo = item.modeloCobranca === 'Por quarto (tarifa fixa)';
+      return (
+        <>
           <div className={styles.infoGrid}>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">
-              {cat.hora_checkin || '—'}
+            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo">{item.modeloCobranca}</IB>
+            {!fixo && (
+              <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
+                {item.maxPessoas} pessoa{item.maxPessoas !== 1 ? 's' : ''}
+              </IB>
+            )}
+          </div>
+          {fixo ? (
+            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
+              <span className={styles.infoBoxValueLg}>{fmtBRL(item.precoFixo)}</span>
             </IB>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">
-              {cat.hora_checkout || '—'}
+          ) : (
+            <div className={styles.infoBox}>
+              <div className={styles.infoBoxHeader}>
+                <DollarSign size={13} color="var(--violet)" />
+                <span className={styles.infoBoxLabel}>Por ocupação</span>
+              </div>
+              <OccTable label="Preço/noite" occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />
+            </div>
+          )}
+        </>
+      );
+    };
+
+    // ── Day Use content ─────────────────────────────────────────────────────
+    const DuContent = ({ item }) => {
+      const d = item.dayUse ?? {};
+      if (!d.ativo) return <span className={styles.badge}>Day Use inativo</span>;
+      return (
+        <>
+          <div className={styles.infoGrid}>
+            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
+              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
+            </IB>
+            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
+              {d.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
             </IB>
           </div>
-        )}
-        {cat.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-          <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
-            <span className={styles.infoBoxValueLg}>{fmtBRL(cat.precoFixo)}</span>
-          </IB>
-        ) : (
-          <div className={styles.infoBox}>
-            <div className={styles.infoBoxHeader}>
-              <DollarSign size={13} color="var(--violet)" />
-              <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+          {d.modo === 'padrao' ? (
+            <div className={styles.infoGrid}>
+              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
+                <span className={styles.infoBoxValueLg}>{fmtBRL(d.precoFixo)}</span>
+              </IB>
+              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas">
+                {d.horasBase ? `${d.horasBase}h` : '—'}
+              </IB>
+              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
+                {fmtBRL(d.precoAdicional)}
+              </IB>
             </div>
-            <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
+          ) : (
+            <>
+              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional/pessoa" span2>
+                {fmtBRL(d.horaAdicionalPorPessoa)}
+              </IB>
+              <div className={styles.infoBox}>
+                <div className={styles.infoBoxHeader}>
+                  <DollarSign size={13} color="var(--violet)" />
+                  <span className={styles.infoBoxLabel}>Por ocupação</span>
+                </div>
+                <OccTable label="Preço" occ={d.precosOcupacao} maxPessoas={item.maxPessoas} />
+              </div>
+            </>
+          )}
+        </>
+      );
+    };
+
+    // ── Aligned single-sea comparison helpers ──────────────────────────────
+    // Renders base IB + sea IB as direct children of a 2-col grid → rows auto-align
+    const SeaIB = ({ icon, label, children, span2 }) => (
+      <IB icon={icon} label={label} span2={span2} className={styles.comparePanelSea}>{children}</IB>
+    );
+
+    const renderPriceAligned = (baseCat, seaItem) => {
+      const fixo = baseCat.modeloCobranca === 'Por quarto (tarifa fixa)';
+      return (
+        <div className={styles.compareAligned}>
+          <div className={styles.comparePanelTitle}>Base</div>
+          <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{seaItem.nome}</div>
+
+          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo">{baseCat.modeloCobranca}</IB>
+          <SeaIB icon={<Tag size={13} color="#d97706" />} label="Modelo">{seaItem.modeloCobranca}</SeaIB>
+
+          {!fixo && <>
+            <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">{baseCat.maxPessoas} pessoa{baseCat.maxPessoas !== 1 ? 's' : ''}</IB>
+            <SeaIB icon={<Users size={13} color="#d97706" />} label="Capacidade">{seaItem.maxPessoas} pessoa{seaItem.maxPessoas !== 1 ? 's' : ''}</SeaIB>
+          </>}
+
+          {fixo ? <>
+            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa">
+              <span className={styles.infoBoxValueLg}>{fmtBRL(baseCat.precoFixo)}</span>
+            </IB>
+            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Tarifa fixa">
+              <span className={styles.infoBoxValueLg}>{fmtBRL(seaItem.precoFixo)}</span>
+            </SeaIB>
+          </> : <>
+            <div className={styles.infoBox}>
+              <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
+              <OccTable label="Preço/noite" occ={baseCat.precosOcupacao} maxPessoas={baseCat.maxPessoas} />
+            </div>
+            <div className={[styles.infoBox, styles.comparePanelSea].join(' ')}>
+              <div className={styles.infoBoxHeader}><DollarSign size={13} color="#d97706" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
+              <OccTable label="Preço/noite" occ={seaItem.precosOcupacao} maxPessoas={seaItem.maxPessoas} />
+            </div>
+          </>}
+        </div>
+      );
+    };
+
+    const renderDuAligned = (baseCat, seaItem) => {
+      const bd = baseCat.dayUse ?? {};
+      const sd = seaItem.dayUse ?? {};
+      return (
+        <div className={styles.compareAligned}>
+          <div className={styles.comparePanelTitle}>Base</div>
+          <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{seaItem.nome}</div>
+
+          <IB icon={<Calendar size={13} color={bd.ativo ? '#f59e0b' : 'var(--text-2)'} />} label="Day Use">
+            <span className={[styles.badge, bd.ativo ? styles.badgeAmber : ''].join(' ')}>{bd.ativo ? 'Ativo' : 'Inativo'}</span>
+          </IB>
+          <SeaIB icon={<Calendar size={13} color="#d97706" />} label="Day Use">
+            <span className={[styles.badge, sd.ativo ? styles.badgeAmber : ''].join(' ')}>{sd.ativo ? 'Ativo' : 'Inativo'}</span>
+          </SeaIB>
+
+          {(bd.ativo || sd.ativo) && <>
+            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">{bd.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</IB>
+            <SeaIB icon={<Tag size={13} color="#d97706" />} label="Modo">{sd.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</SeaIB>
+          </>}
+
+          {bd.ativo && bd.modo === 'padrao' && <>
+            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
+              <span className={styles.infoBoxValueLg}>{fmtBRL(bd.precoFixo)}</span>
+            </IB>
+            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Preço base">
+              <span className={styles.infoBoxValueLg}>{fmtBRL(sd.precoFixo)}</span>
+            </SeaIB>
+            <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas">{bd.horasBase ? `${bd.horasBase}h` : '—'}</IB>
+            <SeaIB icon={<Clock size={13} color="#d97706" />} label="Horas">{sd.horasBase ? `${sd.horasBase}h` : '—'}</SeaIB>
+            <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">{fmtBRL(bd.precoAdicional)}</IB>
+            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Hora adicional">{fmtBRL(sd.precoAdicional)}</SeaIB>
+          </>}
+
+          {bd.ativo && bd.modo === 'ocupacao' && <>
+            <div className={styles.infoBox}>
+              <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
+              <OccTable label="Preço" occ={bd.precosOcupacao} maxPessoas={baseCat.maxPessoas} />
+            </div>
+            <div className={[styles.infoBox, styles.comparePanelSea].join(' ')}>
+              <div className={styles.infoBoxHeader}><DollarSign size={13} color="#d97706" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
+              <OccTable label="Preço" occ={sd.precosOcupacao} maxPessoas={seaItem.maxPessoas} />
+            </div>
+          </>}
+        </div>
+      );
+    };
+
+    // ── Tab 0 — Hospedagem ──────────────────────────────────────────────────
+    if (tab === 0) return (
+      <div className={styles.detailSection}>
+        {(cat.hora_checkin || cat.hora_checkout) && (
+          <div className={styles.infoGrid}>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">{cat.hora_checkin || '—'}</IB>
+            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">{cat.hora_checkout || '—'}</IB>
+          </div>
+        )}
+        {!hasSeas && (
+          <>
+            <div className={styles.infoGrid}>
+              <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">{cat.modeloCobranca}</IB>
+              <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">{cat.maxPessoas} pessoa{cat.maxPessoas !== 1 ? 's' : ''}</IB>
+            </div>
+            {cat.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
+              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
+                <span className={styles.infoBoxValueLg}>{fmtBRL(cat.precoFixo)}</span>
+              </IB>
+            ) : (
+              <div className={styles.infoBox}>
+                <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Preço por ocupação</span></div>
+                <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
+              </div>
+            )}
+          </>
+        )}
+        {hasSeas && single && priceGridCols === '1fr 1fr' && renderPriceAligned(cat, appliedSeas[0])}
+        {hasSeas && (single ? priceGridCols !== '1fr 1fr' : true) && (
+          <div className={styles.compareGrid} style={{ gridTemplateColumns: priceGridCols }}>
+            <Panel label="Base" isSea={false}><PriceContent item={cat} /></Panel>
+            {appliedSeas.map((sea) => <Panel key={sea.id} label={sea.nome} isSea><PriceContent item={sea} /></Panel>)}
           </div>
         )}
         {(cat.criado_por || cat.data_criacao) && (
@@ -1104,49 +1472,56 @@ export default function PricingManagement() {
       </div>
     );
 
-    if (tab === 1) {
-      if (!du.ativo) return (
-        <div className={styles.detailSection}>
-          <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
-            <span className={styles.badge}>Inativo</span>
-          </IB>
-        </div>
-      );
-      return (
-        <div className={styles.detailSection}>
-          <div className={styles.infoGrid}>
-            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
-              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
+    // ── Tab 1 — Day Use ─────────────────────────────────────────────────────
+    if (tab === 1) return (
+      <div className={styles.detailSection}>
+        {!hasSeas && (
+          !du.ativo ? (
+            <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
+              <span className={styles.badge}>Inativo</span>
             </IB>
-            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
-              {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
-            </IB>
-          </div>
-          {du.modo === 'padrao' ? (
-            <div className={styles.infoGrid}>
-              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
-                <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
-              </IB>
-              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
-                {du.horasBase ? `${du.horasBase}h` : '—'}
-              </IB>
-              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
-                {fmtBRL(du.precoAdicional)}
-              </IB>
-            </div>
           ) : (
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxHeader}>
-                <DollarSign size={13} color="var(--violet)" />
-                <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+            <>
+              <div className={styles.infoGrid}>
+                <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
+                  <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
+                </IB>
+                <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
+                  {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
+                </IB>
               </div>
-              <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
-            </div>
-          )}
-        </div>
-      );
-    }
+              {du.modo === 'padrao' ? (
+                <div className={styles.infoGrid}>
+                  <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
+                    <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
+                  </IB>
+                  <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
+                    {du.horasBase ? `${du.horasBase}h` : '—'}
+                  </IB>
+                  <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
+                    {fmtBRL(du.precoAdicional)}
+                  </IB>
+                </div>
+              ) : (
+                <div className={styles.infoBox}>
+                  <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Preço por ocupação</span></div>
+                  <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
+                </div>
+              )}
+            </>
+          )
+        )}
+        {hasSeas && single && duGridCols === '1fr 1fr' && renderDuAligned(cat, appliedSeas[0])}
+        {hasSeas && (single ? duGridCols !== '1fr 1fr' : true) && (
+          <div className={styles.compareGrid} style={{ gridTemplateColumns: duGridCols }}>
+            <Panel label="Base" isSea={false}><DuContent item={cat} /></Panel>
+            {appliedSeas.map((sea) => <Panel key={sea.id} label={sea.nome} isSea><DuContent item={sea} /></Panel>)}
+          </div>
+        )}
+      </div>
+    );
 
+    // ── Tab 2 — Quartos & Sazonais ──────────────────────────────────────────
     if (tab === 2) return (
       <div className={styles.detailSection}>
         <div className={styles.infoBox}>
@@ -1159,29 +1534,49 @@ export default function PricingManagement() {
               ? <span className={styles.detailEmpty}>Nenhum quarto vinculado</span>
               : (cat.quartosObj ?? []).map((q) => {
                   const full = quartos.find((x) => x.id === q.id);
-                  const num = full?.numero ?? q.id;
+                  const num  = full?.numero ?? q.id;
                   const desc = q.descricao ? ` - ${q.descricao}` : '';
                   return <span key={q.id} className={styles.pill}>Quarto {num}{desc}</span>;
                 })}
           </div>
         </div>
-        <div className={styles.infoBox}>
-          <div className={styles.infoBoxHeader}>
-            <Calendar size={13} color="var(--violet)" />
-            <span className={styles.infoBoxLabel}>Sazonalidades ativas</span>
+        {hasSeas ? (
+          <div className={styles.compareGrid} style={{ gridTemplateColumns: seaSchedCols }}>
+            {appliedSeas.map((sea) => (
+              <div key={sea.id} className={[styles.comparePanel, styles.comparePanelSea].join(' ')}>
+                <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{sea.nome}</div>
+                <div className={styles.duRow}><span className={styles.duLabel}>Modo</span><span className={styles.duVal}>{MODO_LABEL[sea.modoOperacao]}</span></div>
+                <div className={styles.duRow}><span className={styles.duLabel}>Agendamento</span><span className={styles.duVal}>{describeSchedule(sea)}</span></div>
+              </div>
+            ))}
           </div>
-          <div className={styles.pillWrap} style={{ marginTop: 8 }}>
-            {seaNomes.length === 0
-              ? <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
-              : seaNomes.map((n, i) => <span key={i} className={[styles.pill, styles.pillViolet].join(' ')}>{n}</span>)}
+        ) : (
+          <div className={styles.infoBox}>
+            <div className={styles.infoBoxHeader}>
+              <Calendar size={13} color="var(--violet)" />
+              <span className={styles.infoBoxLabel}>Sazonalidades ativas</span>
+            </div>
+            <div className={styles.pillWrap} style={{ marginTop: 8 }}>
+              <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     );
 
+    // ── Tab 3 — Menores de Idade ────────────────────────────────────────────
     if (tab === 3) return (
       <div className={styles.detailSection}>
-        <ChildPricingDisplay criancas={cat.criancas} />
+        {hasSeas ? (
+          <div className={styles.compareGrid} style={{ gridTemplateColumns: childGridCols }}>
+            <Panel label="Base" isSea={false}><ChildPricingDisplay criancas={cat.criancas} /></Panel>
+            {appliedSeas.map((sea) => (
+              <Panel key={sea.id} label={sea.nome} isSea><ChildPricingDisplay criancas={sea.criancas} /></Panel>
+            ))}
+          </div>
+        ) : (
+          <ChildPricingDisplay criancas={cat.criancas} />
+        )}
       </div>
     );
 
@@ -1453,7 +1848,7 @@ export default function PricingManagement() {
         <Modal
           open={!!detailItem}
           onClose={closeDetail}
-          size="md"
+          size="lg"
           title={detailItem.nome}
           footer={
             <div className={styles.modalFooterBetween}>

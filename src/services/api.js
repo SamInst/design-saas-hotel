@@ -414,6 +414,24 @@ export const cadastroApi = {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  SAZONALIDADE
+//  GET    /sazonalidade?size=900
+//  POST   /sazonalidade          body: { descricao, data_inicio?, data_fim?, ... }
+//  PUT    /sazonalidade          body: { id, descricao, ..., fk_categorias }
+//  POST   /sazonalidade/vincular body: { fk_sazonalidade, fk_categoria }
+//  PUT    /sazonalidade/vincular body: { id, ativo }
+//  DELETE /sazonalidade/vincular/{id}
+// ─────────────────────────────────────────────────────────────
+export const sazonalidadeApi = {
+  listar(params)         { return request('/sazonalidade', { params }); },
+  criar(body)            { return request('/sazonalidade', { method: 'POST', body }); },
+  atualizar(body)        { return request('/sazonalidade', { method: 'PUT',  body }); },
+  vincular(body)         { return request('/sazonalidade/vincular', { method: 'POST', body }); },
+  toggleVinculo(body)    { return request('/sazonalidade/vincular', { method: 'PUT',  body }); },
+  removerVinculo(id)     { return request(`/sazonalidade/vincular/${id}`, { method: 'DELETE' }); },
+};
+
+// ─────────────────────────────────────────────────────────────
 //  QUARTO-CATEGORIA  (tela de preços)
 //  GET    /quarto-categoria?size=900
 //  POST   /quarto-categoria   body: Categoria.Request
