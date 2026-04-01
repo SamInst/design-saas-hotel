@@ -24,7 +24,7 @@ export const userStorage = {
   remove: ()       => localStorage.removeItem(USER_KEY),
 };
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────  
 //  PERMISSÕES HELPERS
 //  O backend retorna cargo.telas[] com permissoes[] por tela.
 // ─────────────────────────────────────────────────────────────

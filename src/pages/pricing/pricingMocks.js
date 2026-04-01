@@ -35,6 +35,7 @@ let _sazonalidades = [
     modeloCobranca: 'Por ocupação', maxPessoas: 5, precoFixo: null,
     precosOcupacao: { 1: 150, 2: 200, 3: 240, 4: 270, 5: 300 },
     dayUse: { ativo: true,  modo: 'padrao', precoFixo: 110, precoAdicional: 20, precosOcupacao: {}, horaAdicionalPorPessoa: 0 },
+    criado_por: { id: 1, nome: 'ADMINISTRADOR' }, data_criacao: '01/01/2026 10:00',
   },
   {
     id: 2,
@@ -49,6 +50,7 @@ let _sazonalidades = [
     modeloCobranca: 'Por ocupação', maxPessoas: 5, precoFixo: null,
     precosOcupacao: { 1: 300, 2: 380, 3: 440, 4: 500, 5: 560 },
     dayUse: { ativo: false, modo: 'padrao', precoFixo: 0, precoAdicional: 0, precosOcupacao: {}, horaAdicionalPorPessoa: 0 },
+    criado_por: { id: 1, nome: 'ADMINISTRADOR' }, data_criacao: '01/01/2026 10:00',
   },
   {
     id: 3,
@@ -62,6 +64,7 @@ let _sazonalidades = [
     modeloCobranca: 'Por ocupação', maxPessoas: 5, precoFixo: null,
     precosOcupacao: { 1: 180, 2: 240, 3: 280, 4: 310, 5: 340 },
     dayUse: { ativo: false, modo: 'padrao', precoFixo: 0, precoAdicional: 0, precosOcupacao: {}, horaAdicionalPorPessoa: 0 },
+    criado_por: { id: 1, nome: 'ADMINISTRADOR' }, data_criacao: '01/01/2026 10:00',
   },
 ];
 

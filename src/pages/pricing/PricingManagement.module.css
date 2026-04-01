@@ -193,9 +193,18 @@
 @media (max-width: 480px) { .formRow { grid-template-columns: 1fr; } }
 
 .sectionTitle {
+  display: flex; align-items: center; gap: 8px;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2);
-  border-bottom: 1px solid var(--border); padding-bottom: 6px;
+  letter-spacing: .06em; color: var(--violet);
+  margin: 2px 0;
+}
+.sectionTitle::before {
+  content: ''; width: 3px; height: 14px;
+  background: var(--violet); border-radius: 2px; flex-shrink: 0;
+}
+.sectionTitle::after {
+  content: ''; flex: 1; height: 1px;
+  background: rgba(124, 58, 237, 0.2);
 }
 
 /* ── Mode cards (radio selection) ── */
@@ -225,12 +234,11 @@
 /* Dias do mês (grid 7 colunas) */
 .dayGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 
-/* ── Occupancy price inputs ── */
-.occGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-@media (max-width: 480px) { .occGrid { grid-template-columns: repeat(3, 1fr); } }
-
-.occCell { display: flex; flex-direction: column; gap: 2px; }
-.occLabel { font-size: 10px; font-weight: 600; color: var(--text-2); text-align: center; }
+/* ── Field grid (3 per row — hospedagem + crianças) ── */
+.fieldGrid     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fieldCard     { display: flex; flex-direction: column; gap: 6px; }
+.fieldCardLabel { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.fieldCardRow  { display: flex; align-items: center; gap: 4px; }
 
 /* ── Checkbox list (quartos / sazonais) ── */
 .checkList { display: flex; flex-direction: column; gap: 6px; }
@@ -245,12 +253,32 @@
 .checkItemLabel     { font-size: 13px; font-weight: 500; color: var(--text); }
 .checkItemSub       { font-size: 11px; color: var(--text-2); margin-left: auto; }
 
+/* ── Seasonality category selector ── */
+.seaCatItem  { align-items: flex-start; padding: 10px 12px; }
+.seaCatInfo  { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.seaCatTags  { display: flex; flex-wrap: wrap; gap: 4px; }
+.seaCatTag   {
+  font-size: 10px; font-weight: 500; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 4px; padding: 2px 7px; white-space: nowrap;
+}
+.seaRefBtn {
+  flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--violet);
+  background: rgba(124,58,237,.08); border: 1px solid rgba(124,58,237,.25);
+  border-radius: 6px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
+  transition: background .12s;
+}
+.seaRefBtn:hover { background: rgba(124,58,237,.16); }
+
 /* ── Checkbox row (toggle Day Use) ── */
 .checkboxRow {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 12px 14px; border-radius: 10px;
   background: var(--surface-2); border: 1px solid var(--border);
-  cursor: pointer;
+  cursor: pointer; transition: border-color .12s;
+}
+.checkboxRowActive {
+  border-color: var(--violet); background: rgba(124,58,237,.06);
 }
 .checkbox      { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
 .checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
@@ -282,9 +310,11 @@
 
 /* ── Child pricing rows ── */
 .childRow {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 8px; min-width: 0;
 }
+.childInputAge  { width: 58px !important; min-width: 0; flex-shrink: 0; }
+.childInputVal  { flex: 1; min-width: 0; }
 .childQtdLabel {
   font-size: 12px; font-weight: 600; color: var(--text-2);
   white-space: nowrap; min-width: 90px;
@@ -314,22 +344,37 @@
 
 .listRowTags { display: flex; flex-wrap: wrap; gap: 4px; }
 .listTag {
-  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px;
+  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
   white-space: nowrap;
 }
-.listTagAmber  { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.08);  color: #d97706; }
-.listTagViolet { border-color: rgba(124,58,237,.3);  background: rgba(124,58,237,.08);  color: var(--violet); }
+.listTagAmber   { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.08);  color: #d97706; }
+.listTagViolet  { border-color: rgba(124,58,237,.3);  background: rgba(124,58,237,.08);  color: var(--violet); }
+.listTagEmerald { border-color: rgba(16,185,129,.3);  background: rgba(16,185,129,.08);  color: #059669; }
+.listTagBlue    { border-color: rgba(59,130,246,.3);  background: rgba(59,130,246,.08);  color: #2563eb; }
+.listTagSlate   { border-color: rgba(100,116,139,.3); background: rgba(100,116,139,.08); color: #475569; }
 
 .listPrice    { font-size: 15px; font-weight: 800; color: var(--violet); white-space: nowrap; }
 .listPriceSub { font-size: 11px; color: var(--text-2); white-space: nowrap; max-width: 220px; text-align: right; }
 
 /* ── Fixed-height tab bodies — prevents modal resize on tab switch ── */
-.formTabBody   { padding: 16px 0 0; height: 420px; overflow-y: auto; }
+.formTabBody   { padding: 16px 0 0; height: 420px; overflow-y: auto; overflow-x: hidden; }
 .detailTabBody { min-height: 300px; }
 
 /* ── Detail section padding ── */
 .detailSection { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; }
+
+/* ── Audit row (criado por / data) ── */
+.auditRow  {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  margin-top: 4px;
+}
+.auditItem {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-2); font-weight: 500;
+}
 
 /* ── Detail modal footer (excluir left, editar right) ── */
 .modalFooterBetween { display: flex; gap: 8px; align-items: center; justify-content: space-between; width: 100%; }
