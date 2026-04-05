@@ -198,7 +198,7 @@ const buildPessoaBody = (p, overrides = {}) => {
     data_nascimento: rawNasc,
     cpf:             unmask(p.cpf),
     rg:              up(p.rg),
-    email:           (p.email ?? '').trim(),
+    email:           (p.email ?? '').trim() || null,
     profissao:       up(p.profissao),
     telefone:        unmask(p.telefone),
     pais:            up(p.pais) || 'BRASIL',
@@ -685,6 +685,23 @@ export default function RegistersPage() {
   const [vinculLoading, setVinculLoading] = useState(false);
   const vinculDebounce = useRef(null);
 
+  // dependentes search (detalhe pessoa)
+  const [depSearch,        setDepSearch]        = useState('');
+  const [depSearchResults, setDepSearchResults] = useState([]);
+  const [depSearchLoading, setDepSearchLoading] = useState(false);
+  const depSearchDebounce = useRef(null);
+
+  // empresa search (detalhe pessoa — aba empresa)
+  const [empSearch,        setEmpSearch]        = useState('');
+  const [empSearchResults, setEmpSearchResults] = useState([]);
+  const [empSearchLoading, setEmpSearchLoading] = useState(false);
+  const empSearchDebounce = useRef(null);
+
+  // novo dependente (criar + vincular)
+  const [showNewDep,   setShowNewDep]   = useState(false);
+  const [newDepData,   setNewDepData]   = useState(blankPessoa());
+  const [savingNewDep, setSavingNewDep] = useState(false);
+
   const showNotif = (msg, type = 'success') => {
     setNotification({ message: msg, type });
     setTimeout(() => setNotification(null), 3200);
@@ -806,6 +823,101 @@ export default function RegistersPage() {
     return () => clearTimeout(vinculDebounce.current);
   }, [vinculSearch]);
 
+  // Auto-search dependentes
+  useEffect(() => {
+    clearTimeout(depSearchDebounce.current);
+    if (depSearch.length >= 2) {
+      depSearchDebounce.current = setTimeout(async () => {
+        setDepSearchLoading(true);
+        try {
+          const res = await cadastroApi.listarPessoas({ termo: depSearch, size: 20 });
+          setDepSearchResults(res?.content ?? []);
+        } catch {} finally { setDepSearchLoading(false); }
+      }, 300);
+    } else { setDepSearchResults([]); }
+    return () => clearTimeout(depSearchDebounce.current);
+  }, [depSearch]);
+
+  // Auto-search empresas (aba empresa do detalhe de pessoa)
+  useEffect(() => {
+    clearTimeout(empSearchDebounce.current);
+    if (empSearch.length >= 2) {
+      empSearchDebounce.current = setTimeout(async () => {
+        setEmpSearchLoading(true);
+        try {
+          const res = await cadastroApi.listarEmpresas({ termo: empSearch, size: 20 });
+          setEmpSearchResults(res?.content ?? []);
+        } catch {} finally { setEmpSearchLoading(false); }
+      }, 300);
+    } else { setEmpSearchResults([]); }
+    return () => clearTimeout(empSearchDebounce.current);
+  }, [empSearch]);
+
+  const refreshDetailPessoa = async () => {
+    const res = await cadastroApi.listarPessoas({ id: detailItem.id, size: 1 });
+    const updated = res?.content?.[0] ?? res;
+    if (updated) setDetailItem({ ...updated, _type: 'pessoa' });
+    fetchData(searchTerm, filterMode, page);
+  };
+
+  const handleSaveNewDep = async () => {
+    if (!newDepData.nome || !newDepData.cpf) {
+      showNotif('Preencha ao menos nome e CPF do dependente.', 'error'); return;
+    }
+    setSavingNewDep(true);
+    try {
+      const res = await cadastroApi.criarPessoa({
+        pessoas: [buildPessoaBody(newDepData, { titular: null })],
+        empresas: [],
+      });
+      const novaId = res?.pessoas?.[0]?.id ?? res?.[0]?.id;
+      if (novaId) {
+        await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: novaId }, vinculo: true });
+      }
+      showNotif('Dependente cadastrado e vinculado!');
+      setShowNewDep(false);
+      setNewDepData(blankPessoa());
+      await refreshDetailPessoa();
+    } catch (e) { showNotif(e.message || 'Erro ao cadastrar dependente.', 'error'); }
+    finally { setSavingNewDep(false); }
+  };
+
+  const handleVincularDependente = async pessoaId => {
+    try {
+      await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: pessoaId }, vinculo: true });
+      showNotif('Dependente vinculado!');
+      setDepSearch(''); setDepSearchResults([]);
+      await refreshDetailPessoa();
+    } catch (e) { showNotif(e.message || 'Erro ao vincular.', 'error'); }
+  };
+
+  const handleDesvincularDependente = async pessoaId => {
+    if (!window.confirm('Tem certeza que deseja desvincular este dependente?')) return;
+    try {
+      await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: pessoaId }, vinculo: false });
+      showNotif('Dependente desvinculado!');
+      await refreshDetailPessoa();
+    } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
+  };
+
+  const handleVincularEmpresa = async empresaId => {
+    try {
+      await cadastroApi.vincularPessoa({ empresa: { id: empresaId }, pessoa: { id: detailItem.id }, ativo: true });
+      showNotif('Empresa vinculada!');
+      setEmpSearch(''); setEmpSearchResults([]);
+      await refreshDetailPessoa();
+    } catch (e) { showNotif(e.message || 'Erro ao vincular empresa.', 'error'); }
+  };
+
+  const handleDesvincularEmpresa = async empresaId => {
+    if (!window.confirm('Tem certeza que deseja desvincular esta empresa?')) return;
+    try {
+      await cadastroApi.vincularPessoa({ empresa: { id: empresaId }, pessoa: { id: detailItem.id }, ativo: false });
+      showNotif('Empresa desvinculada!');
+      await refreshDetailPessoa();
+    } catch (e) { showNotif(e.message || 'Erro ao desvincular empresa.', 'error'); }
+  };
+
   const changeFilter = mode => { setFilterMode(mode); setPage(0); fetchData(searchTerm, mode, 0); };
   const goToPage     = pg   => { setPage(pg); fetchData(searchTerm, filterMode, pg); };
 
@@ -819,8 +931,10 @@ export default function RegistersPage() {
     setShowErrors(false);
     const n = parseInt(numDependentes) || 0;
     if (n > 0) {
-      setDependentes([]);
-      setCurrentDep(blankPessoa());
+      // Initialize all slots upfront so navigation preserves filled data
+      const allDeps = Array.from({ length: n }, () => blankPessoa());
+      setDependentes(allDeps);
+      setCurrentDep(allDeps[0]);
       setDepFillIdx(0);
     } else {
       setConfirmStep(true);
@@ -833,16 +947,25 @@ export default function RegistersPage() {
       return;
     }
     const n = parseInt(numDependentes) || 0;
-    const updatedDeps = [...dependentes, currentDep];
+    const updatedDeps = [...dependentes];
+    updatedDeps[depFillIdx] = currentDep;
     setDependentes(updatedDeps);
     if (depFillIdx + 1 < n) {
-      setCurrentDep(blankPessoa());
+      setCurrentDep(updatedDeps[depFillIdx + 1]);
       setDepFillIdx(depFillIdx + 1);
     } else {
       setDepFillIdx(-1);
       setCurrentDep(null);
       setConfirmStep(true);
     }
+  };
+
+  const handleDepBack = () => {
+    const updatedDeps = [...dependentes];
+    updatedDeps[depFillIdx] = currentDep;   // save current state before going back
+    setDependentes(updatedDeps);
+    setCurrentDep(updatedDeps[depFillIdx - 1]);
+    setDepFillIdx(depFillIdx - 1);
   };
 
   const doSavePessoa = async () => {
@@ -878,7 +1001,7 @@ export default function RegistersPage() {
         nome_fantasia: up(empresa.nomeFantasia),
         tipo_empresa:  empresa.tipoEmpresa || 'CLIENTE',
         telefone:      unmask(empresa.telefone),
-        email:         (empresa.email ?? '').trim(),
+        email:         (empresa.email ?? '').trim() || null,
         cep:           unmask(empresa.cep),
         endereco:      up(empresa.endereco),
         bairro:        up(empresa.bairro),
@@ -1051,6 +1174,13 @@ export default function RegistersPage() {
 
   const empresaNome = e =>
     e?.razaoSocial || e?.razao_social || e?.nomeFantasia || e?.nome_fantasia || e?.nome || '—';
+
+  const empresaLabel = e => {
+    const razao    = e?.razaoSocial ?? e?.razao_social;
+    const fantasia = e?.nomeFantasia ?? e?.nome_fantasia;
+    if (razao && fantasia && razao !== fantasia) return `${razao} (${fantasia})`;
+    return razao || fantasia || '—';
+  };
 
   const isBloqueado = detailItem?.status === 'BLOQUEADO';
 
@@ -1368,29 +1498,64 @@ export default function RegistersPage() {
             )}
 
             {detailTab === 'empresa' && (
-              (detailItem.empresas_vinculadas ?? []).length === 0 ? (
-                <div className={styles.emBreve}><Building2 size={36} opacity={0.2} /><span>Sem empresas vinculadas.</span></div>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {detailItem.empresas_vinculadas.map(e => (
-                    <div key={e.id} className={styles.empresaCard}>
-                      <div className={styles.empresaCardHead}>
-                        <Building2 size={14} className={styles.iconViolet} />
-                        <span className={styles.empresaCardTitle}>{empresaNome(e)}</span>
-                        <span className={styles.detailId}>#{e.id}</span>
-                      </div>
-                      <div className={styles.kvList} style={{ marginTop:8 }}>
-                        <KV label="CNPJ"         value={maskCNPJ(e.cnpj ?? '')} />
-                        <KV label="Razão Social"  value={e.razaoSocial ?? e.razao_social} />
-                        <KV label="Nome Fantasia" value={e.nomeFantasia ?? e.nome_fantasia} />
-                        <KV label="Telefone"      value={e.telefone} />
-                        <KV label="Email"         value={e.email} />
-                        <KV label="Status"        value={e.status} />
-                      </div>
+              <div>
+                <div className={styles.linkEmpresaSearch}>
+                  <div className={styles.searchWrap}>
+                    <Search size={13} className={styles.searchIcon} />
+                    <Input value={empSearch} onChange={e => setEmpSearch(e.target.value)}
+                      placeholder="Buscar empresa para vincular..."
+                      className={styles.searchInput} />
+                    {empSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
+                  </div>
+                  {empSearchResults.length > 0 && (
+                    <div className={styles.linkDropdown}>
+                      {empSearchResults.map(emp => {
+                        const jaVinculado = (detailItem.empresas_vinculadas ?? []).some(ev => ev.id === emp.id);
+                        return (
+                          <button key={emp.id}
+                            className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
+                            onClick={() => { if (!jaVinculado) handleVincularEmpresa(emp.id); }}
+                            disabled={jaVinculado}
+                          >
+                            <Building2 size={14} className={styles.iconViolet} />
+                            <span className={styles.nome}>{empresaLabel(emp)}</span>
+                            <span className={styles.mono}>{maskCNPJ(emp.cnpj ?? '')}</span>
+                            {jaVinculado
+                              ? <span className={styles.jaVinculadoBadge}>Já vinculada</span>
+                              : <span className={styles.vincularHint}><Plus size={11} /> Vincular</span>
+                            }
+                          </button>
+                        );
+                      })}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )
+                <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:14 }}>
+                  {(detailItem.empresas_vinculadas ?? []).length === 0
+                    ? <div className={styles.emBreve}><Building2 size={36} opacity={0.2} /><span>Sem empresas vinculadas.</span></div>
+                    : (detailItem.empresas_vinculadas ?? []).map(e => (
+                      <div key={e.id} className={styles.empresaCard}>
+                        <div className={styles.empresaCardHead}>
+                          <Building2 size={14} className={styles.iconViolet} />
+                          <span className={styles.empresaCardTitle}>{empresaLabel(e)}</span>
+                          <span className={styles.detailId}>#{e.id}</span>
+                          <button className={styles.btnRemove} onClick={() => handleDesvincularEmpresa(e.id)} title="Desvincular" style={{ marginLeft:'auto' }}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <div className={styles.kvList} style={{ marginTop:8 }}>
+                          <KV label="CNPJ"         value={maskCNPJ(e.cnpj ?? '')} />
+                          <KV label="Razão Social"  value={e.razaoSocial ?? e.razao_social} />
+                          <KV label="Nome Fantasia" value={e.nomeFantasia ?? e.nome_fantasia} />
+                          <KV label="Telefone"      value={e.telefone} />
+                          <KV label="Email"         value={e.email} />
+                          <KV label="Status"        value={e.status} />
+                        </div>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
             )}
 
             {detailTab === 'historico' && (
@@ -1402,26 +1567,62 @@ export default function RegistersPage() {
 
             {detailTab === 'dependentes' && (
               detailItem.titularId != null
-                ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Esta pessoa é dependente de {detailItem.titularNome}. <a style={{ color: 'var(--violet)', cursor: 'pointer' }} onClick={() => { setLinkedPessoaBackRef(null); setDetailItem(prev => ({ ...prev })); }}>Voltar</a></span></div>
-                : (detailItem.acompanhantes ?? []).length === 0
-                ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Sem dependentes cadastrados.</span></div>
+                ? <div className={styles.emBreve}><Users size={32} opacity={0.2} /><span>Esta pessoa é dependente de {detailItem.titularNome}.</span></div>
                 : (
-                  <div className={styles.depList}>
-                    {(detailItem.acompanhantes ?? []).map(dep => (
-                      <div key={dep.id} className={styles.depCard}
-                        onClick={() => {
-                          setLinkedPessoaBackRef(detailItem);
-                          setDetailItem({ ...dep, _type: 'pessoa' });
-                          setDetailTab('cadastro');
-                        }}>
-                        <AvatarCircle name={dep.nome} size={34} />
-                        <div>
-                          <div className={styles.nome}>{dep.nome}</div>
-                          <div className={styles.sub}>{maskCPF(dep.cpf ?? '')} · {dep.status}</div>
+                  <div>
+                    <div className={styles.linkEmpresaSearch}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div className={styles.searchWrap} style={{ flex: 1 }}>
+                          <Search size={13} className={styles.searchIcon} />
+                          <Input value={depSearch} onChange={e => setDepSearch(e.target.value)}
+                            placeholder="Buscar pessoa para vincular como dependente..."
+                            className={styles.searchInput} />
+                          {depSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                         </div>
-                        <ChevronRight size={14} className={styles.iconMuted} />
+                        <Button variant="primary" onClick={() => { setNewDepData(blankPessoa()); setShowNewDep(true); }}>
+                          <Plus size={13} /> Novo
+                        </Button>
                       </div>
-                    ))}
+                      {depSearchResults.length > 0 && (
+                        <div className={styles.linkDropdown}>
+                          {depSearchResults.map(p => {
+                            const jaVinculado = (detailItem.acompanhantes ?? []).some(a => a.id === p.id) || p.id === detailItem.id;
+                            return (
+                              <button key={p.id}
+                                className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
+                                onClick={() => { if (!jaVinculado) handleVincularDependente(p.id); }}
+                                disabled={jaVinculado}
+                              >
+                                <AvatarCircle name={p.nome} size={22} />
+                                <span className={styles.nome}>{p.nome}</span>
+                                <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
+                                {jaVinculado
+                                  ? <span className={styles.jaVinculadoBadge}>Já vinculado</span>
+                                  : <span className={styles.vincularHint}><Plus size={11} /> Vincular</span>
+                                }
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.depList} style={{ marginTop: 14 }}>
+                      {(detailItem.acompanhantes ?? []).length === 0
+                        ? <div className={styles.emBreve}><Users size={28} opacity={0.2} /><span>Sem dependentes vinculados.</span></div>
+                        : (detailItem.acompanhantes ?? []).map(dep => (
+                          <div key={dep.id} className={styles.depCard}>
+                            <AvatarCircle name={dep.nome} size={34} />
+                            <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => { setLinkedPessoaBackRef(detailItem); setDetailItem({ ...dep, _type: 'pessoa' }); setDetailTab('cadastro'); }}>
+                              <div className={styles.nome}>{dep.nome}</div>
+                              <div className={styles.sub}>{maskCPF(dep.cpf ?? '')} · {dep.status}</div>
+                            </div>
+                            <button className={styles.btnRemove} onClick={() => handleDesvincularDependente(dep.id)} title="Desvincular">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))
+                      }
+                    </div>
                   </div>
                 )
             )}
@@ -1619,7 +1820,7 @@ export default function RegistersPage() {
               {linkEmpresa ? (
                 <div className={styles.selectedEmpresa}>
                   <Building2 size={13} className={styles.iconViolet} />
-                  <span className={styles.nome}>{empresaNome(linkEmpresa)}</span>
+                  <span className={styles.nome}>{empresaLabel(linkEmpresa)}</span>
                   <span className={styles.mono}>{maskCNPJ(linkEmpresa.cnpj ?? '')}</span>
                   <button className={styles.btnRemove} onClick={() => setLinkEmpresa(null)}><X size={12} /></button>
                 </div>
@@ -1638,7 +1839,7 @@ export default function RegistersPage() {
                         <button key={e.id} className={styles.linkDropdownItem}
                           onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); }}>
                           <Building2 size={12} className={styles.iconViolet} />
-                          <span className={styles.nome}>{empresaNome(e)}</span>
+                          <span className={styles.nome}>{empresaLabel(e)}</span>
                           <span className={styles.mono}>{maskCNPJ(e.cnpj ?? '')}</span>
                         </button>
                       ))}
@@ -1700,6 +1901,9 @@ export default function RegistersPage() {
           footer={
             <div className={styles.modalFooter}>
               <Button onClick={() => setCurrentDep(blankPessoa())}>Limpar</Button>
+              {depFillIdx > 0 && (
+                <Button onClick={handleDepBack}>← Anterior</Button>
+              )}
               <Button variant="primary" onClick={handleDepSave}>
                 {depFillIdx + 1 < parseInt(numDependentes) ? 'Próximo →' : 'Concluir →'}
               </Button>
@@ -1714,6 +1918,29 @@ export default function RegistersPage() {
           />
         </Modal>
       )}
+
+      {/* ══ MODAL: NOVO DEPENDENTE (criar + vincular) ══════════ */}
+      <Modal
+        open={showNewDep}
+        onClose={() => setShowNewDep(false)}
+        size="xl"
+        title="Novo Dependente"
+        footer={
+          <div className={styles.modalFooter}>
+            <Button onClick={() => setNewDepData(blankPessoa())}>Limpar</Button>
+            <Button variant="primary" onClick={handleSaveNewDep} disabled={savingNewDep}>
+              {savingNewDep ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Cadastrar e Vincular'}
+            </Button>
+          </div>
+        }
+      >
+        <PessoaForm
+          data={newDepData}
+          onChange={setNewDepData}
+          onFetchCEP={fetchCEP}
+          onCheckCPF={checkCPF}
+        />
+      </Modal>
 
       {/* ══ MODAL: ADICIONAR / EDITAR EMPRESA ════════════════ */}
       <Modal
