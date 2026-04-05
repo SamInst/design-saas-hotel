@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search, Plus, User, Building2, Car,
   Loader2, AlertCircle, Calendar, Shield, UserCheck, UserX,
@@ -59,6 +60,7 @@ const ANOS_VEICULO = Array.from({ length: currentYear - 1999 }, (_, i) => String
 function SearchableCombobox({ value, onChange, options, placeholder }) {
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState('');
+  const [rect,  setRect]  = useState(null);
   const ref               = useRef(null);
 
   useEffect(() => {
@@ -74,6 +76,7 @@ function SearchableCombobox({ value, onChange, options, placeholder }) {
   const handleInput = (e) => {
     setQuery(e.target.value);
     onChange(e.target.value);
+    setRect(ref.current?.getBoundingClientRect());
     setOpen(true);
   };
 
@@ -83,25 +86,38 @@ function SearchableCombobox({ value, onChange, options, placeholder }) {
     setOpen(false);
   };
 
+  const handleFocus = () => {
+    setQuery('');
+    setRect(ref.current?.getBoundingClientRect());
+    setOpen(true);
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <input
         className={styles.comboInput}
         value={open ? query : value}
         onChange={handleInput}
-        onFocus={() => { setQuery(''); setOpen(true); }}
+        onFocus={handleFocus}
         placeholder={placeholder}
         autoComplete="off"
       />
-      {open && filtered.length > 0 && (
-        <div className={styles.comboDropdown}>
+      {open && filtered.length > 0 && rect && createPortal(
+        <div className={styles.comboDropdown} style={{
+          position: 'fixed',
+          top:  rect.bottom + 4,
+          left: rect.left,
+          width: rect.width,
+          zIndex: 9999,
+        }}>
           {filtered.map(opt => (
             <button key={opt} type="button" className={styles.comboItem}
               onMouseDown={() => handleSelect(opt)}>
               {opt}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -213,7 +229,7 @@ const buildPessoaBody = (p, overrides = {}) => {
     status:          p.status ?? 'ATIVO',
     titular:         titularId ? { id: titularId } : null,
     empresas:        (p.empresasVinculadas ?? p.empresas_vinculadas ?? []).map(e => ({ id: e.id })),
-    veiculos: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+    veiculos_vinculados: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
       ...(v.id ? { id: v.id } : {}),
       modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
       ano: Number(v.ano) || 0,
@@ -332,7 +348,11 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
     }
   };
 
-  const addVeiculo    = () => onChange(p => ({ ...p, veiculos: [...p.veiculos, blankVeiculo()] }));
+  const veiculosEndRef = useRef(null);
+  const addVeiculo    = () => {
+    onChange(p => ({ ...p, veiculos: [...p.veiculos, blankVeiculo()] }));
+    setTimeout(() => veiculosEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  };
   const removeVeiculo = i  => onChange(p => ({ ...p, veiculos: p.veiculos.filter((_,j) => j !== i) }));
   const setVeiculo    = (i, field, val) =>
     onChange(p => ({ ...p, veiculos: p.veiculos.map((v,j) => j === i ? { ...v, [field]: val } : v) }));
@@ -519,6 +539,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
           </div>
         </div>
       ))}
+      <div ref={veiculosEndRef} />
     </div>
   );
 }
@@ -928,6 +949,10 @@ export default function RegistersPage() {
       showNotif('Preencha todos os campos obrigatórios (*).', 'error');
       return;
     }
+    if ((titular.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
+      showNotif('Preencha a placa de todos os veículos.', 'error');
+      return;
+    }
     setShowErrors(false);
     const n = parseInt(numDependentes) || 0;
     if (n > 0) {
@@ -944,6 +969,10 @@ export default function RegistersPage() {
   const handleDepSave = () => {
     if (!currentDep.nome || !currentDep.cpf) {
       showNotif('Preencha ao menos nome e CPF do dependente.', 'error');
+      return;
+    }
+    if ((currentDep.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
+      showNotif('Preencha a placa de todos os veículos do dependente.', 'error');
       return;
     }
     const n = parseInt(numDependentes) || 0;
@@ -1073,6 +1102,10 @@ export default function RegistersPage() {
   };
 
   const handleSaveEditPessoa = async () => {
+    if ((editPessoa.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
+      showNotif('Preencha a placa de todos os veículos.', 'error');
+      return;
+    }
     setIsSubmitting(true);
     try {
       await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(editPessoa) });

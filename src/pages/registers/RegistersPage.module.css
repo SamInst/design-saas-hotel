@@ -321,7 +321,6 @@
 .comboInput::placeholder { color: var(--text-2); opacity: .6; }
 .comboInput:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
 .comboDropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
   background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto;
 }
