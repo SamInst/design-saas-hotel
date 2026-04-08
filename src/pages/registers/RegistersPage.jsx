@@ -1821,6 +1821,8 @@ export default function RegistersPage() {
       <Modal
         open={showAddPessoa}
         onClose={() => {
+          const temDados = titular.nome || titular.cpf || dependentes.length > 0;
+          if (temDados && !window.confirm('Deseja descartar o cadastro em andamento?')) return;
           setShowAddPessoa(false); setShowErrors(false); setActiveRegIdx(-1);
           setConfirmStep(false);
           setTitular(blankPessoa()); setDependentes([]);
