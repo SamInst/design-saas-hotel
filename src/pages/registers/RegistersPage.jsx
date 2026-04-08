@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   Search, Plus, User, Building2, Car,
   Loader2, AlertCircle, Calendar, Shield, UserCheck, UserX,
-  Users, ChevronRight, Trash2, CheckCircle2, XCircle,
+  Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
   Edit2, X, Phone, Mail,
 } from 'lucide-react';
@@ -57,7 +57,7 @@ const currentYear = new Date().getFullYear();
 const ANOS_VEICULO = Array.from({ length: currentYear - 1999 }, (_, i) => String(currentYear - i));
 
 // ── SearchableCombobox ────────────────────────────────────────
-function SearchableCombobox({ value, onChange, options, placeholder }) {
+function SearchableCombobox({ value, onChange, options, placeholder, hasError = false }) {
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState('');
   const [rect,  setRect]  = useState(null);
@@ -95,7 +95,7 @@ function SearchableCombobox({ value, onChange, options, placeholder }) {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <input
-        className={styles.comboInput}
+        className={[styles.comboInput, hasError ? styles.inputErr : ''].join(' ')}
         value={open ? query : value}
         onChange={handleInput}
         onFocus={handleFocus}
@@ -420,7 +420,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
               </FormField>
             </div>
 
-            <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
+            <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')} style={{ width: 150 }}>
               <FormField label="Data de Nascimento *">
                 <DatePicker
                   mode="single"
@@ -519,19 +519,35 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
             <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={12} /></button>
           </div>
           <div className={styles.grid3}>
-            <FormField label="Modelo">
-              <Input value={v.modelo} onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
+            <FormField label="Modelo *">
+              <Input
+                value={v.modelo}
+                onChange={e => setVeiculo(i,'modelo',e.target.value)}
+                placeholder="Ex: Civic"
+                className={showErrors && !v.modelo ? styles.inputErr : ''}
+              />
             </FormField>
-            <FormField label="Marca">
-              <SearchableCombobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)} options={MARCAS_VEICULO} placeholder="Ex: Honda" />
+            <FormField label="Marca *">
+              <SearchableCombobox
+                value={v.marca}
+                onChange={val => setVeiculo(i,'marca',val)}
+                options={MARCAS_VEICULO}
+                placeholder="Ex: Honda"
+                hasError={showErrors && !v.marca}
+              />
             </FormField>
             <FormField label="Ano">
               <SearchableCombobox value={v.ano} onChange={val => setVeiculo(i,'ano',val)} options={ANOS_VEICULO} placeholder="Ex: 2024" />
             </FormField>
           </div>
           <div className={styles.grid2}>
-            <FormField label="Placa">
-              <Input value={v.placa} onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))} placeholder="AAA0A00" />
+            <FormField label="Placa *">
+              <Input
+                value={v.placa}
+                onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
+                placeholder="AAA0A00"
+                className={showErrors && !cleanPlaca(v.placa) ? styles.inputErr : ''}
+              />
             </FormField>
             <FormField label="Cor">
               <SearchableCombobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)} options={CORES_VEICULO} placeholder="Ex: Preto" />
@@ -645,7 +661,7 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
 
 // ─────────────────────────────────────────────────────────────
 export default function RegistersPage() {
-  const { can, loggedUser } = usePermissions();
+  const { can } = usePermissions();
   const canCadastrar  = can('CADASTRO', 'CADASTRO');
   const canAtualizar  = can('CADASTRO', 'ATUALIZAR');
   const canBloquear   = can('CADASTRO', 'BLOQUEIO');
@@ -668,8 +684,6 @@ export default function RegistersPage() {
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
   const [showDetail,     setShowDetail]     = useState(false);
   const [showEdit,       setShowEdit]       = useState(false);
-  const [showDependentDetail, setShowDependentDetail] = useState(false);
-  const [showLinkedPessoaDetail, setShowLinkedPessoaDetail] = useState(false);
   const [detailItem,     setDetailItem]     = useState(null);
   const [detailType,     setDetailType]     = useState('pessoa');
   const [detailTab,      setDetailTab]      = useState('cadastro');
@@ -682,7 +696,7 @@ export default function RegistersPage() {
   const [editPessoa,  setEditPessoa]  = useState(blankPessoa());
   const [empresa,     setEmpresa]     = useState(blankEmpresa());
 
-  // validação + confirmação no cadastro de hóspede
+  // validação + prévia no cadastro de hóspede
   const [showErrors,  setShowErrors]  = useState(false);
   const [confirmStep, setConfirmStep] = useState(false);
 
@@ -693,12 +707,8 @@ export default function RegistersPage() {
   const [linkEmpresa, setLinkEmpresa] = useState(null);
   const linkDebounce = useRef(null);
 
-  // novo hóspede — empresa / dependentes
-  const [temEmpresa,      setTemEmpresa]      = useState('');   // '' | 'sim' | 'nao'
-  const [temDependentes,  setTemDependentes]  = useState('');   // '' | 'sim' | 'nao'
-  const [numDependentes,  setNumDependentes]  = useState('');
-  const [depFillIdx,      setDepFillIdx]      = useState(-1);
-  const [currentDep,      setCurrentDep]      = useState(null);
+  // novo hóspede — índice ativo no sidebar (-1 = titular, 0..n = dependentes)
+  const [activeRegIdx, setActiveRegIdx] = useState(-1);
 
   // vinculados (detalhe empresa)
   const [vinculSearch,  setVinculSearch]  = useState('');
@@ -719,7 +729,8 @@ export default function RegistersPage() {
   const empSearchDebounce = useRef(null);
 
   // novo dependente (criar + vincular)
-  const [showNewDep,   setShowNewDep]   = useState(false);
+  const [showNewDep,      setShowNewDep]      = useState(false);
+  const [showLinkEmpresa, setShowLinkEmpresa] = useState(false);
   const [newDepData,   setNewDepData]   = useState(blankPessoa());
   const [savingNewDep, setSavingNewDep] = useState(false);
 
@@ -942,59 +953,61 @@ export default function RegistersPage() {
   const changeFilter = mode => { setFilterMode(mode); setPage(0); fetchData(searchTerm, mode, 0); };
   const goToPage     = pg   => { setPage(pg); fetchData(searchTerm, filterMode, pg); };
 
-  const handleAddPessoa = () => {
-    if (!titular.nome || !titular.cpf || !titular.dataNascimento ||
-        !titular.telefone || !titular.cep) {
+  const handleAddDependente = () => {
+    setDependentes(prev => {
+      const next = [...prev, blankPessoa()];
+      setActiveRegIdx(next.length - 1);
+      return next;
+    });
+  };
+
+  const handleRemoveDependente = i => {
+    setDependentes(prev => prev.filter((_, j) => j !== i));
+    setActiveRegIdx(prev => (prev >= i ? Math.max(-1, prev - 1) : prev));
+  };
+
+  const setDepData = (i, val) =>
+    setDependentes(prev => prev.map((d, j) => j === i ? (typeof val === 'function' ? val(d) : val) : d));
+
+  const handlePreviewPessoa = () => {
+    if (!titular.nome || !titular.cpf || !titular.dataNascimento || !titular.telefone || !titular.cep) {
+      setActiveRegIdx(-1);
       setShowErrors(true);
-      showNotif('Preencha todos os campos obrigatórios (*).', 'error');
+      showNotif('Preencha os campos obrigatórios do titular (*).', 'error');
       return;
     }
     if ((titular.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
-      showNotif('Preencha a placa de todos os veículos.', 'error');
+      setActiveRegIdx(-1);
+      showNotif('Preencha a placa de todos os veículos do titular.', 'error');
+      return;
+    }
+    for (let i = 0; i < dependentes.length; i++) {
+      const dep = dependentes[i];
+      if (!dep.nome || !dep.cpf) {
+        setActiveRegIdx(i);
+        setShowErrors(true);
+        showNotif(`Preencha os campos obrigatórios do dependente ${i + 1} (*).`, 'error');
+        return;
+      }
+      if ((dep.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
+        setActiveRegIdx(i);
+        showNotif(`Preencha a placa dos veículos do dependente ${i + 1}.`, 'error');
+        return;
+      }
+    }
+    // CPF duplicado entre titular e dependentes
+    const todos = [titular, ...dependentes];
+    const cpfs = todos.map(p => unmask(p.cpf)).filter(Boolean);
+    const duplicado = cpfs.find((c, idx) => cpfs.indexOf(c) !== idx);
+    if (duplicado) {
+      const idxs = todos.reduce((acc, p, i) => (unmask(p.cpf) === duplicado ? [...acc, i] : acc), []);
+      const nomes = idxs.map(i => i === 0 ? 'Titular' : `Dependente ${i}`).join(' e ');
+      showNotif(`CPF duplicado entre ${nomes}.`, 'error');
+      setActiveRegIdx(idxs[1] === 0 ? -1 : idxs[1] - 1);
       return;
     }
     setShowErrors(false);
-    const n = parseInt(numDependentes) || 0;
-    if (n > 0) {
-      // Initialize all slots upfront so navigation preserves filled data
-      const allDeps = Array.from({ length: n }, () => blankPessoa());
-      setDependentes(allDeps);
-      setCurrentDep(allDeps[0]);
-      setDepFillIdx(0);
-    } else {
-      setConfirmStep(true);
-    }
-  };
-
-  const handleDepSave = () => {
-    if (!currentDep.nome || !currentDep.cpf) {
-      showNotif('Preencha ao menos nome e CPF do dependente.', 'error');
-      return;
-    }
-    if ((currentDep.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
-      showNotif('Preencha a placa de todos os veículos do dependente.', 'error');
-      return;
-    }
-    const n = parseInt(numDependentes) || 0;
-    const updatedDeps = [...dependentes];
-    updatedDeps[depFillIdx] = currentDep;
-    setDependentes(updatedDeps);
-    if (depFillIdx + 1 < n) {
-      setCurrentDep(updatedDeps[depFillIdx + 1]);
-      setDepFillIdx(depFillIdx + 1);
-    } else {
-      setDepFillIdx(-1);
-      setCurrentDep(null);
-      setConfirmStep(true);
-    }
-  };
-
-  const handleDepBack = () => {
-    const updatedDeps = [...dependentes];
-    updatedDeps[depFillIdx] = currentDep;   // save current state before going back
-    setDependentes(updatedDeps);
-    setCurrentDep(updatedDeps[depFillIdx - 1]);
-    setDepFillIdx(depFillIdx - 1);
+    setConfirmStep(true);
   };
 
   const doSavePessoa = async () => {
@@ -1010,7 +1023,7 @@ export default function RegistersPage() {
       showNotif('Hóspede(s) cadastrado(s) com sucesso!');
       setShowAddPessoa(false);
       setConfirmStep(false); setShowErrors(false);
-      setTitular(blankPessoa()); setDependentes([]);
+      setTitular(blankPessoa()); setDependentes([]); setActiveRegIdx(-1);
       setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
       fetchData(searchTerm, filterMode, page);
     } catch (e) { showNotif(e.message || 'Erro ao cadastrar.', 'error'); }
@@ -1197,7 +1210,6 @@ export default function RegistersPage() {
     { id: 'empresas',   label: 'Empresas',   Icon: Building2 },
   ];
 
-  const totalPessoas   = 1 + dependentes.length;
   const vinculadosList = detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? [];
 
   const nomeListing = item =>
@@ -1335,7 +1347,7 @@ export default function RegistersPage() {
                 <Button variant="primary" onClick={() => {
                   setTitular(blankPessoa()); setDependentes([]);
                   setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
-                  setShowErrors(false); setConfirmStep(false);
+                  setShowErrors(false); setActiveRegIdx(-1);
                   setShowAddPessoa(true);
                 }}>
                   <Plus size={14} /> Cadastrar Hóspede
@@ -1805,12 +1817,12 @@ export default function RegistersPage() {
       </Modal>
 
       {/* ══ MODAL: ADICIONAR HÓSPEDE ══════════════════════════ */}
+      {/* ══ MODAL: ADICIONAR HÓSPEDE ══════════════════════════ */}
       <Modal
         open={showAddPessoa}
         onClose={() => {
-          setShowAddPessoa(false); setConfirmStep(false); setShowErrors(false);
-          setTemEmpresa(''); setTemDependentes(''); setNumDependentes('');
-          setDepFillIdx(-1); setCurrentDep(null);
+          setShowAddPessoa(false); setShowErrors(false); setActiveRegIdx(-1);
+          setConfirmStep(false);
           setTitular(blankPessoa()); setDependentes([]);
           setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
         }}
@@ -1822,11 +1834,14 @@ export default function RegistersPage() {
               <>
                 <div className={styles.personCount}>
                   <Users size={13} />
-                  <span>{totalPessoas}</span>
-                  pessoa{totalPessoas !== 1 ? 's' : ''}
+                  <span>{1 + dependentes.length}</span>
+                  pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
                 </div>
-                <Button onClick={() => { setTitular(blankPessoa()); setDependentes([]); }}>Limpar</Button>
-                <Button variant="primary" onClick={handleAddPessoa}>Próximo →</Button>
+                <Button onClick={() => {
+                  if (activeRegIdx === -1) setTitular(blankPessoa());
+                  else setDepData(activeRegIdx, blankPessoa());
+                }}>Limpar</Button>
+                <Button variant="primary" onClick={handlePreviewPessoa}>Próximo →</Button>
               </>
             ) : (
               <>
@@ -1839,63 +1854,7 @@ export default function RegistersPage() {
           </div>
         }>
 
-        {!confirmStep ? (
-          <div>
-            <div>
-              <PessoaForm
-                data={titular} onChange={setTitular}
-                onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
-                showErrors={showErrors}
-              />
-
-              {/* EMPRESA section */}
-              <div className={styles.sectionDivider}><Building2 size={12} /> Empresa</div>
-              {linkEmpresa ? (
-                <div className={styles.selectedEmpresa}>
-                  <Building2 size={13} className={styles.iconViolet} />
-                  <span className={styles.nome}>{empresaLabel(linkEmpresa)}</span>
-                  <span className={styles.mono}>{maskCNPJ(linkEmpresa.cnpj ?? '')}</span>
-                  <button className={styles.btnRemove} onClick={() => setLinkEmpresa(null)}><X size={12} /></button>
-                </div>
-              ) : (
-                <div className={styles.linkEmpresaSearch}>
-                  <div className={styles.searchWrap}>
-                    <Search size={13} className={styles.searchIcon} />
-                    <Input value={linkSearch} onChange={e => setLinkSearch(e.target.value)}
-                      placeholder="Buscar empresa por nome ou CNPJ (mín. 3 caracteres)..."
-                      className={styles.searchInput} />
-                    {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
-                  </div>
-                  {linkResults.length > 0 && (
-                    <div className={styles.linkDropdown}>
-                      {linkResults.map(e => (
-                        <button key={e.id} className={styles.linkDropdownItem}
-                          onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); }}>
-                          <Building2 size={12} className={styles.iconViolet} />
-                          <span className={styles.nome}>{empresaLabel(e)}</span>
-                          <span className={styles.mono}>{maskCNPJ(e.cnpj ?? '')}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* DEPENDENTES section */}
-              <div className={styles.sectionDivider}><Users size={12} /> Dependentes</div>
-              <div style={{ maxWidth: 200 }}>
-                <FormField label="Quantidade">
-                  <Input
-                    type="number" min="1" max="10"
-                    value={numDependentes}
-                    onChange={e => setNumDependentes(e.target.value)}
-                    placeholder="0"
-                  />
-                </FormField>
-              </div>
-            </div>
-          </div>
-        ) : (
+        {confirmStep ? (
           <div className={styles.confirmWrap}>
             <p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>
             <div className={styles.confirmList}>
@@ -1917,40 +1876,127 @@ export default function RegistersPage() {
             {linkEmpresa && (
               <div className={styles.confirmEmpresa}>
                 <Building2 size={13} className={styles.iconViolet} />
-                <span>Vinculado à empresa: <strong>{empresaNome(linkEmpresa)}</strong></span>
+                <span>Vinculado à empresa: <strong>{empresaLabel(linkEmpresa)}</strong></span>
               </div>
             )}
           </div>
+        ) : (
+        <div className={styles.regLayout}>
+          {/* ── Sidebar ── */}
+          <div className={styles.regSidebar}>
+            <div className={styles.regSidebarLabel}>Cadastrando</div>
+            <div className={styles.regPersonList}>
+              {/* Titular */}
+              <button
+                className={[styles.regPersonCard, activeRegIdx === -1 ? styles.regPersonCardActive : ''].join(' ')}
+                onClick={() => setActiveRegIdx(-1)}
+              >
+                <AvatarCircle name={titular.nome || 'T'} size={36} />
+                <div className={styles.regPersonInfo}>
+                  <div className={styles.regPersonName}>{titular.nome || 'Titular'}</div>
+                  <div className={styles.regPersonRole}>Titular</div>
+                </div>
+              </button>
+              {/* Dependentes */}
+              {dependentes.map((dep, i) => (
+                <button
+                  key={i}
+                  className={[styles.regPersonCard, activeRegIdx === i ? styles.regPersonCardActive : ''].join(' ')}
+                  onClick={() => setActiveRegIdx(i)}
+                >
+                  <AvatarCircle name={dep.nome || `D${i + 1}`} size={36} />
+                  <div className={styles.regPersonInfo}>
+                    <div className={styles.regPersonName}>{dep.nome || `Dependente ${i + 1}`}</div>
+                    <div className={styles.regPersonRole}>Dependente {i + 1}</div>
+                  </div>
+                  <span
+                    className={styles.regPersonRemove}
+                    onClick={e => { e.stopPropagation(); handleRemoveDependente(i); }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <X size={10} />
+                  </span>
+                </button>
+              ))}
+              <button className={styles.regAddDep} onClick={handleAddDependente}>
+                <Plus size={13} /> Dependente
+              </button>
+              <button className={styles.regAddDep} style={{ color: '#0ea5e9', borderColor: 'rgba(14,165,233,.3)' }} onClick={() => setShowLinkEmpresa(true)}>
+                <Building2 size={13} /> Empresa
+              </button>
+            </div>
+
+            {/* ── Empresa selecionada na sidebar ── */}
+            {linkEmpresa && (
+              <div className={styles.regSidebarEmpresa}>
+                <div className={styles.regSidebarEmpresaLabel}><Building2 size={11} /> Empresa vinculada</div>
+                <div className={styles.regSidebarEmpresaSelected}>
+                  <Building2 size={12} className={styles.iconViolet} />
+                  <span className={styles.regSidebarEmpresaName}>{empresaLabel(linkEmpresa)}</span>
+                  <button className={styles.btnRemove} style={{ marginLeft: 'auto' }} onClick={() => setLinkEmpresa(null)}><X size={11} /></button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Form area ── */}
+          <div className={styles.regFormCol}>
+            <div className={styles.regFormArea}>
+              {activeRegIdx === -1 ? (
+                <PessoaForm
+                  data={titular} onChange={setTitular}
+                  onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
+                  showErrors={showErrors}
+                />
+              ) : (
+                <PessoaForm
+                  data={dependentes[activeRegIdx]}
+                  onChange={val => setDepData(activeRegIdx, val)}
+                  onFetchCEP={fetchCEP}
+                  onCheckCPF={checkCPF}
+                  showErrors={showErrors}
+                />
+              )}
+            </div>
+          </div>
+        </div>
         )}
       </Modal>
 
-      {/* ══ MODAL: PREENCHER DEPENDENTE ════════════════════════════ */}
-      {currentDep !== null && (
-        <Modal
-          open={depFillIdx >= 0}
-          onClose={() => { setDepFillIdx(-1); setCurrentDep(null); }}
-          size="xl"
-          title={`Dependente ${depFillIdx + 1} de ${numDependentes}`}
-          footer={
-            <div className={styles.modalFooter}>
-              <Button onClick={() => setCurrentDep(blankPessoa())}>Limpar</Button>
-              {depFillIdx > 0 && (
-                <Button onClick={handleDepBack}>← Anterior</Button>
-              )}
-              <Button variant="primary" onClick={handleDepSave}>
-                {depFillIdx + 1 < parseInt(numDependentes) ? 'Próximo →' : 'Concluir →'}
-              </Button>
+      {/* ══ MODAL: VINCULAR EMPRESA (cadastro hóspede) ════════ */}
+      <Modal
+        open={showLinkEmpresa}
+        onClose={() => { setShowLinkEmpresa(false); setLinkSearch(''); setLinkResults([]); }}
+        size="md"
+        title="Vincular Empresa"
+      >
+        <div className={styles.linkEmpresaSearch}>
+          <div className={styles.searchWrap}>
+            <Search size={13} className={styles.searchIcon} />
+            <Input
+              value={linkSearch}
+              onChange={e => setLinkSearch(e.target.value)}
+              placeholder="Buscar por nome ou CNPJ (mín. 3 caracteres)..."
+              className={styles.searchInput}
+              autoFocus
+            />
+            {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
+          </div>
+          {linkResults.length > 0 && (
+            <div className={styles.linkDropdown} style={{ position: 'static', marginTop: 8, boxShadow: 'none', border: '1px solid var(--border)' }}>
+              {linkResults.map(e => (
+                <button key={e.id} className={styles.linkDropdownItem}
+                  onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); setShowLinkEmpresa(false); }}>
+                  <Building2 size={12} className={styles.iconViolet} />
+                  <span className={styles.nome}>{empresaLabel(e)}</span>
+                  <span className={styles.mono}>{maskCNPJ(e.cnpj ?? '')}</span>
+                </button>
+              ))}
             </div>
-          }
-        >
-          <PessoaForm
-            data={currentDep}
-            onChange={setCurrentDep}
-            onFetchCEP={fetchCEP}
-            onCheckCPF={checkCPF}
-          />
-        </Modal>
-      )}
+          )}
+        </div>
+      </Modal>
 
       {/* ══ MODAL: NOVO DEPENDENTE (criar + vincular) ══════════ */}
       <Modal

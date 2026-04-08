@@ -43,7 +43,7 @@
 .sm { max-width: 420px; }
 .md { max-width: 520px; }
 .lg { max-width: 720px; }
-.xl { max-width: 920px; }
+.xl { max-width: 1080px; }
 
 .header {
   display: flex;

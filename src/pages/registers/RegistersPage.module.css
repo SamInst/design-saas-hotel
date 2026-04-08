@@ -146,7 +146,7 @@
 
 /* ── Detail KV grid ── */
 .detailGrid  { display:flex; flex-direction:column; gap:14px; }
-.section     { }
+
 .sectionLabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:7px; }
 .kvList  { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; }
 .kvRow   { display:flex; flex-direction:column; gap:1px; }
@@ -222,6 +222,15 @@
   padding:5px 12px; border-radius:5px; margin-right:auto; white-space:nowrap;
 }
 
+/* ── Uppercase inputs ── */
+.formBody input[type="text"],
+.formBody input[type="email"],
+.formBody input[type="tel"],
+.formBody input:not([type]),
+.comboInput { text-transform: uppercase; }
+.formBody input::placeholder,
+.comboInput::placeholder { text-transform: none; }
+
 /* ── Form layout ── */
 .formBody    { display:flex; flex-direction:column; gap:10px; }
 .formDivider { height:1px; background:var(--border); margin:4px 0; }
@@ -241,7 +250,7 @@
   flex:1; display:flex; flex-direction:column; gap:10px; min-width:0;
 }
 .photoFields {
-  display:grid; grid-template-columns:1fr 2fr 1.2fr;
+  display:grid; grid-template-columns:1fr 1.8fr 0.7fr;
   gap:10px; align-items:start;
 }
 .photoBig {
@@ -265,7 +274,7 @@
 }
 
 /* ── Required field highlight ── */
-.reqField    { }
+
 .reqFieldErr label { color:#ef4444 !important; }
 .reqFieldErr input,
 .reqFieldErr select { border-color:#ef4444 !important; }
@@ -277,7 +286,7 @@
 .cpfWrap  { position:relative; display:flex; align-items:center; }
 .cpfIcon  { position:absolute; right:10px; display:flex; align-items:center; pointer-events:none; }
 .cpfMsg   { font-size:11px; font-weight:500; }
-.cpfInput { }
+
 .inputOk   { border-color:#10b981 !important; }
 .inputWarn { border-color:#f59e0b !important; }
 .inputErr  { border-color:#ef4444 !important; }
@@ -473,6 +482,103 @@
   border: 1px dashed var(--border); border-radius: 10px;
 }
 
+/* ── Registro com sidebar ── */
+.regLayout {
+  display: flex; gap: 0;
+  margin: 0 -16px;
+  min-height: 0;
+}
+.regSidebar {
+  width: 260px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 14px 10px 10px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.regSidebarLabel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2);
+  padding: 0 4px; margin-bottom: 2px;
+}
+.regPersonList {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 1;
+}
+.regPersonCard {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  cursor: pointer; text-align: left; width: 100%;
+  transition: border-color .12s, background .12s;
+  position: relative;
+}
+.regPersonCard:hover { border-color: var(--violet); }
+.regPersonCardActive {
+  border-color: var(--violet);
+  background: rgba(124,58,237,.07);
+}
+.regPersonInfo {
+  flex: 1; min-width: 0;
+}
+.regPersonName {
+  font-size: 12px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-transform: uppercase;
+}
+.regPersonRole {
+  font-size: 10px; color: var(--text-2); margin-top: 1px;
+}
+.regPersonRemove {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px;
+  color: var(--text-2); cursor: pointer; transition: all .12s;
+  margin-left: auto;
+}
+.regPersonRemove:hover { background: rgba(239,68,68,.12); color: #ef4444; }
+.regAddDep {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px; border-radius: 8px;
+  border: 1px dashed var(--border); background: transparent;
+  color: var(--violet); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .12s; width: 100%;
+}
+.regAddDep:hover { border-color: var(--violet); background: rgba(124,58,237,.06); }
+.regSidebarEmpresa {
+  border-top: 1px solid var(--border);
+  padding: 10px 4px 4px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.regSidebarEmpresaLabel {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2); margin-bottom: 6px;
+}
+.regSidebarEmpresaSelected {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px; border-radius: 8px;
+  border: 1px solid rgba(124,58,237,.3);
+  background: rgba(124,58,237,.06);
+}
+.regSidebarEmpresaName {
+  font-size: 11px; font-weight: 600; color: var(--text);
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.regSidebarEmpresaNone {
+  font-size: 11px; color: var(--text-2); font-style: italic;
+}
+.regFormCol {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column;
+}
+.regFormArea {
+  flex: 1; min-width: 0;
+  padding: 0 16px;
+  overflow-y: auto;
+  max-height: 55vh;
+}
+
 /* ── Responsive ── */
 @media (max-width:700px) {
   .grid2, .grid3 { grid-template-columns:1fr; }
@@ -484,4 +590,15 @@
   .photoFields { grid-template-columns:1fr; }
   .modalTwoCol { flex-direction:column; }
   .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--border); }
+
+  .regLayout { flex-direction: column; }
+  .regSidebar {
+    width: 100%; border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 10px;
+  }
+  .regPersonList { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  .regPersonCard { width: auto; flex: 1 1 140px; }
+  .regFormArea { max-height: none; padding: 12px 16px; }
+  .regEmpresaBar { padding: 12px 16px; }
 }
