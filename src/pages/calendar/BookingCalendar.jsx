@@ -4,13 +4,14 @@ import {
   BedDouble, ChevronLeft, ChevronRight, Plus,
   ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell,
 } from 'lucide-react';
-import { Button }       from '../../components/ui/Button';
-import { Modal }        from '../../components/ui/Modal';
-import { FormField }    from '../../components/ui/Input';
-import { DatePicker }   from '../../components/ui/DatePicker';
-import { Notification } from '../../components/ui/Notification';
-import { addDaysStr }   from './calendarMocks';
-import { reservaApi, quartoCategoriApi, cadastroApi } from '../../services/api';
+import { Button }        from '../../components/ui/Button';
+import { Modal }         from '../../components/ui/Modal';
+import { FormField }     from '../../components/ui/Input';
+import { DatePicker }    from '../../components/ui/DatePicker';
+import { Notification }  from '../../components/ui/Notification';
+import { PaymentModal }  from '../../components/ui/PaymentModal';
+import { addDaysStr }    from './calendarMocks';
+import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -81,7 +82,6 @@ const HDR_H        = 56;
 const LEFT_W       = 80;
 const VISIBLE_DAYS = 31;
 const HALF         = DAY_CELL_W / 2;
-const FORMAS_PAG   = ['PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', 'Transferência'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmtBRL = (v) =>
@@ -452,10 +452,10 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
   );
 }
 
-// ─── Room Multi-Select Combobox ───────────────────────────────────────────────
-function RoomCombobox({ value, onChange, availableRooms, categorias }) {
-  const [open,     setOpen]     = useState(false);
-  const [filter,   setFilter]   = useState('');
+// ─── Room Combobox (single or multi-select) ───────────────────────────────────
+function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelect = false }) {
+  const [open,      setOpen]      = useState(false);
+  const [filter,    setFilter]    = useState('');
   const [dropStyle, setDropStyle] = useState({});
   const triggerRef = useRef(null);
   const dropRef    = useRef(null);
@@ -497,15 +497,21 @@ function RoomCombobox({ value, onChange, availableRooms, categorias }) {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const toggle = (r) => {
-    const rs = String(r);
-    onChange(value.includes(rs) ? value.filter((x) => x !== rs) : [...value, rs]);
+  const handleSelect = (r) => {
+    if (!availableRooms.includes(r)) return;
+    if (singleSelect) {
+      onChange([String(r)]);
+      setOpen(false);
+    } else {
+      const rs = String(r);
+      onChange(value.includes(rs) ? value.filter((x) => x !== rs) : [...value, rs]);
+    }
   };
 
   const fl = filter.toLowerCase();
-  const label = value.length === 0 ? 'Selecione quarto(s)...'
-    : value.length === 1 ? `Quarto ${fmtRoom(parseInt(value[0]))}`
-    : `${value.length} quartos selecionados`;
+  const label = value.length === 0
+    ? (singleSelect ? 'Selecione um quarto...' : 'Selecione quarto(s)...')
+    : `Quarto ${fmtRoom(parseInt(value[0]))}${!singleSelect && value.length > 1 ? ` +${value.length - 1}` : ''}`;
 
   const dropdown = open && createPortal(
     <div ref={dropRef} className={styles.comboDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
@@ -533,9 +539,11 @@ function RoomCombobox({ value, onChange, availableRooms, categorias }) {
               return (
                 <div key={r}
                   className={[styles.comboItem, sel ? styles.comboItemSel : '', !avail ? styles.comboItemUnavail : ''].join(' ')}
-                  onClick={() => avail && toggle(r)}
+                  onClick={() => handleSelect(r)}
                 >
-                  <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
+                  {!singleSelect && (
+                    <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
+                  )}
                   <span className={styles.comboItemNum}>Quarto {fmtRoom(r)}</span>
                   <span className={styles.comboItemTipo}>{cat.nome}</span>
                   {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
@@ -558,12 +566,12 @@ function RoomCombobox({ value, onChange, availableRooms, categorias }) {
         <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
       </button>
       {dropdown}
-      {value.length > 0 && (
+      {!singleSelect && value.length > 0 && (
         <div className={styles.comboChips}>
           {value.map((q) => (
             <div key={q} className={styles.hospedeChip}>
               <span>Quarto {fmtRoom(parseInt(q))}</span>
-              <button type="button" className={styles.chipRemove} onClick={() => toggle(parseInt(q))}><X size={10} /></button>
+              <button type="button" className={styles.chipRemove} onClick={() => handleSelect(parseInt(q))}><X size={10} /></button>
             </div>
           ))}
         </div>
@@ -598,12 +606,14 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   const [mpCheckout,  setMpCheckout]  = useState(null);
 
   // Step 3: Pagamentos
-  const [pagamentos,   setPagamentos]   = useState([]);
-  const [pagDesc,      setPagDesc]      = useState('Entrada');
-  const [pagForma,     setPagForma]     = useState('PIX');
-  const [pagValor,     setPagValor]     = useState('');
-  const [showPagModal, setShowPagModal] = useState(false);
-  const [saving,       setSaving]       = useState(false);
+  const [pagamentos,     setPagamentos]     = useState([]);
+  const [showPagModal,   setShowPagModal]   = useState(false);
+  const [tiposPagamento, setTiposPagamento] = useState([]);
+  const [saving,         setSaving]         = useState(false);
+
+  useEffect(() => {
+    enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
+  }, []);
 
   // Derived
   const checkinStr  = checkin  ? formatDate(checkin)  : '';
@@ -659,11 +669,9 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   const addManual   = ()   => { if (!manualNome.trim()) return; setHospSelecionados((p) => [...p, { id: `tmp-${Date.now()}`, nome: manualNome.trim(), cpf: '' }]); setManualNome(''); };
   const remHospede  = (id) => setHospSelecionados((p) => p.filter((x) => x.id !== id));
 
-  const addPagamento = () => {
-    const v = parseFloat(pagValor.replace(',', '.')) || 0;
-    if (!v || !pagForma) return;
-    setPagamentos((p) => [...p, { id: Date.now(), descricao: pagDesc, formaPagamento: pagForma, valor: v }]);
-    setPagValor(''); setPagDesc('Entrada');
+  const addPagamento = (payment) => {
+    setPagamentos((p) => [...p, { _localId: Date.now(), ...payment }]);
+    setShowPagModal(false);
   };
 
   const addPeriodo = () => {
@@ -702,11 +710,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
         data_saida:   toBrDate(dataSaida),
         ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
         ...(pagamentos.length ? {
-          pagamentos: pagamentos.map((pg) => ({
-            descricao:       pg.descricao,
-            valor:           pg.valor,
-            forma_pagamento: pg.formaPagamento,
-          })),
+          pagamentos: pagamentos.map(({ _localId, ...pg }) => pg),
         } : {}),
       });
 
@@ -855,8 +859,10 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
               </FormField>
               <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
                 <RoomCombobox value={quartos}
-                  onChange={(v) => tipo !== 'grupo' ? setQuartos(v.slice(-1)) : setQuartos(v)}
-                  availableRooms={availableRooms} categorias={categorias} />
+                  onChange={setQuartos}
+                  availableRooms={availableRooms}
+                  categorias={categorias}
+                  singleSelect={tipo !== 'grupo'} />
               </FormField>
             </div>
           )}
@@ -926,14 +932,17 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
               {pagamentos.length === 0 ? (
                 <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
               ) : (
-                pagamentos.map((p) => (
-                  <div key={p.id} className={styles.pagItem}>
-                    <span className={styles.pagDesc}>{p.descricao}</span>
-                    <span className={styles.pagForma}>{p.formaPagamento}</span>
-                    <span className={styles.finPago}>{fmtBRL(p.valor)}</span>
-                    <button type="button" className={styles.chipRemove} onClick={() => setPagamentos((prev) => prev.filter((x) => x.id !== p.id))}><X size={10} /></button>
-                  </div>
-                ))
+                pagamentos.map((p) => {
+                  const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
+                  return (
+                    <div key={p._localId} className={styles.pagItem}>
+                      <span className={styles.pagDesc}>{p.nome_pagador || p.descricao || '—'}</span>
+                      <span className={styles.pagForma}>{tipDesc}</span>
+                      <span className={styles.finPago}>{fmtBRL(p.valor)}</span>
+                      <button type="button" className={styles.chipRemove} onClick={() => setPagamentos((prev) => prev.filter((x) => x._localId !== p._localId))}><X size={10} /></button>
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -976,31 +985,15 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
       )}
       </div>
 
-      {/* Payment sub-modal */}
-      {showPagModal && (
-        <Modal open onClose={() => setShowPagModal(false)} size="sm" title="Adicionar Pagamento"
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowPagModal(false)}>Cancelar</Button>
-              <Button variant="primary" disabled={!pagValor} onClick={() => { addPagamento(); setShowPagModal(false); }}>Confirmar</Button>
-            </div>
-          }
-        >
-          <div className={styles.formStack}>
-            <FormField label="Descrição">
-              <input className={styles.formInput} value={pagDesc} onChange={(e) => setPagDesc(e.target.value)} placeholder="Entrada, parcela..." />
-            </FormField>
-            <FormField label="Forma de Pagamento">
-              <select className={styles.formSelect} value={pagForma} onChange={(e) => setPagForma(e.target.value)}>
-                {FORMAS_PAG.map((f) => <option key={f}>{f}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Valor (R$)">
-              <input className={styles.formInput} value={pagValor} onChange={(e) => setPagValor(e.target.value)} placeholder="0,00" />
-            </FormField>
-          </div>
-        </Modal>
-      )}
+      {/* Payment modal */}
+      <PaymentModal
+        open={showPagModal}
+        onClose={() => setShowPagModal(false)}
+        onConfirm={addPagamento}
+        tiposPagamento={tiposPagamento}
+        titularNome={hospSelecionados[0]?.nome || manualNome.trim() || null}
+        canAplicarDesconto={false}
+      />
     </Modal>
   );
 }
@@ -1039,15 +1032,30 @@ export default function BookingCalendar() {
     setTimeout(() => setNotif(null), 3500);
   }, []);
 
-  // ── Load categories once ──────────────────────────────────────────────────
+  // ── Load categories + rooms, then cross-reference ────────────────────────
   useEffect(() => {
-    quartoCategoriApi.listar({ size: 900 }).then((res) => {
-      const list = Array.isArray(res) ? res : (res.content ?? []);
-      setCategorias(list.map((c) => ({
-        id:      c.id,
-        nome:    c.nome,
-        quartos: (c.quartos ?? []).map((q) => q.id ?? q),
-      })));
+    Promise.all([
+      quartoCategoriApi.listar({ size: 900 }),
+      quartoApi.listar({ size: 900 }),
+    ]).then(([catRes, roomRes]) => {
+      const catList  = Array.isArray(catRes)  ? catRes  : (catRes?.content  ?? []);
+      const roomList = Array.isArray(roomRes) ? roomRes : (roomRes?.content ?? []);
+
+      setCategorias(
+        catList
+          .map((c) => {
+            // First try quartos embedded in category response
+            let quartos = (c.quartos ?? []).map((q) => q.id ?? q);
+            // Fall back: filter rooms list by categoriaId
+            if (!quartos.length) {
+              quartos = roomList
+                .filter((r) => (r.categoriaId ?? r.categoria?.id) === c.id)
+                .map((r) => r.id);
+            }
+            return { id: c.id, nome: c.nome, quartos };
+          })
+          .filter((c) => c.quartos.length > 0),
+      );
     }).catch(() => {});
   }, []);
 
@@ -1213,11 +1221,16 @@ export default function BookingCalendar() {
   }, []);
 
   const handleSaveNew = async (reservasBody) => {
-    const result = await reservaApi.criar({ reservas: reservasBody });
-    const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
-    setReservas((rs) => [...rs, ...novas]);
-    notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
-    setShowCreateModal(false);
+    try {
+      const result = await reservaApi.criar({ reservas: reservasBody });
+      const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
+      setReservas((rs) => [...rs, ...novas]);
+      notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
+      setShowCreateModal(false);
+    } catch (e) {
+      notify(e.message || 'Erro ao criar reserva.', 'error');
+      throw e; // re-throw so CreateModal's finally runs setSaving(false)
+    }
   };
   const handleCancelReserva = async (id) => {
     await reservaApi.cancelar(id);

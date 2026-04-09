@@ -124,6 +124,7 @@ export function PaymentModal({
   isSubmitting   = false,
   tipoRegistro       = '',
   loggedUser         = null,
+  titularNome        = null,
   canAplicarDesconto = true,
 }) {
   const [tipoPagId,   setTipoPagId]   = useState('');
@@ -217,6 +218,14 @@ export function PaymentModal({
         <FormField label="Nome do Pagador *">
           <Input placeholder="Nome completo"
             value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
+          {titularNome && (
+            <label className={styles.checkRow}>
+              <input type="checkbox"
+                checked={nomePagador === titularNome.toUpperCase()}
+                onChange={e => setNomePagador(e.target.checked ? titularNome.toUpperCase() : '')} />
+              <span>Nome do titular</span>
+            </label>
+          )}
           {loggedUser?.pessoa?.nome && (
             <label className={styles.checkRow}>
               <input type="checkbox"
