@@ -341,13 +341,66 @@ export const dayUseApi = {
 
 // ─────────────────────────────────────────────────────────────
 //  RESERVAS
+//  GET  /reserva?mes&ano&id?&nome?        → List<Reserva.PorDia>
+//  GET  /reserva/data?data&id?&nome?      → List<Reserva>
+//  GET  /reserva/quarto/{id}/mes?mes&ano  → List<Reserva>
+//  GET  /reserva/{id}                     → Reserva
+//  POST /reserva  { reservas:[{fk_quarto,data_entrada,data_saida,pessoas?,pagamentos?}] }
+//  PUT  /reserva  { id, fk_quarto?, data_entrada?, data_saida? }
+//  PUT  /reserva/{id}/cancelar            → 204
+//  POST /reserva/calcular-preco  [{fk_quarto,data_entrada,data_saida,quantidade_adultos,idades_criancas?}]
+//       → List<ResultadoPreco>
 // ─────────────────────────────────────────────────────────────
 export const reservaApi = {
-  listar(params)     { return request('/reservas', { params }); },
-  buscarPorId(id)    { return request(`/reservas/${id}`); },
-  criar(body)        { return request('/reservas', { method: 'POST', body }); },
-  atualizar(id, body){ return request(`/reservas/${id}`, { method: 'PUT', body }); },
-  cancelar(id)       { return request(`/reservas/${id}/cancelar`, { method: 'POST' }); },
+  /** Lista reservas por mês/ano (Gantt). Parâmetros opcionais: id, nome. */
+  listarPorMesAno({ mes, ano, id, nome } = {}) {
+    return request('/reserva', { params: { mes, ano, id, nome } });
+  },
+
+  /** Lista reservas de uma data específica (dd/MM/yyyy). Parâmetros opcionais: id, nome. */
+  listarPorData({ data, id, nome } = {}) {
+    return request('/reserva/data', { params: { data, id, nome } });
+  },
+
+  /** Lista reservas de um quarto em determinado mês/ano. */
+  listarPorQuartoMes({ quartoId, mes, ano }) {
+    return request(`/reserva/quarto/${quartoId}/mes`, { params: { mes, ano } });
+  },
+
+  /** Busca reserva completa por ID. */
+  buscarPorId(id) {
+    return request(`/reserva/${id}`);
+  },
+
+  /**
+   * Cria uma ou mais reservas.
+   * @param {{ reservas: Array<{ fk_quarto, data_entrada, data_saida, pessoas?, pagamentos? }> }} body
+   */
+  criar(body) {
+    return request('/reserva', { method: 'POST', body });
+  },
+
+  /**
+   * Atualiza dados de uma reserva existente.
+   * @param {{ id, fk_quarto?, data_entrada?, data_saida? }} body
+   */
+  atualizar(body) {
+    return request('/reserva', { method: 'PUT', body });
+  },
+
+  /** Cancela uma reserva pelo ID. Retorna 204. */
+  cancelar(id) {
+    return request(`/reserva/${id}/cancelar`, { method: 'PUT' });
+  },
+
+  /**
+   * Calcula preços antes de confirmar reserva.
+   * @param {Array<{ fk_quarto, data_entrada, data_saida, quantidade_adultos, idades_criancas? }>} body
+   * @returns {Promise<Array<ResultadoPreco>>}
+   */
+  calcularPrecos(body) {
+    return request('/reserva/calcular-preco', { method: 'POST', body });
+  },
 };
 
 // ─────────────────────────────────────────────────────────────

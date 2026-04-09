@@ -9,11 +9,69 @@ import { Modal }        from '../../components/ui/Modal';
 import { FormField }    from '../../components/ui/Input';
 import { DatePicker }   from '../../components/ui/DatePicker';
 import { Notification } from '../../components/ui/Notification';
-import {
-  CATEGORIAS, calendarApi, addDaysStr,
-  QUARTOS_INFO, HOSPEDES_CADASTRADOS,
-} from './calendarMocks';
+import { addDaysStr }   from './calendarMocks';
+import { reservaApi, quartoCategoriApi, cadastroApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
+
+// ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
+const parseBrDate = (s) => {
+  if (!s) return '';
+  const [dt] = s.split(' ');
+  const [d, m, y] = dt.split('/');
+  return `${y}-${m}-${d}`;
+};
+const toBrDate = (iso) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
+// ─── Status mapping (backend enums → frontend keys) ───────────────────────────
+const mapStatus = (r) => {
+  if (r.status) {
+    const s = (r.status + '').toLowerCase();
+    if (s === 'cancelado')  return 'cancelado';
+    if (s === 'hospedado')  return 'hospedado';
+    if (s === 'finalizado') return 'finalizado';
+    if (s === 'solicitada') return 'solicitada';
+    if (s === 'ativo')      return 'confirmada';
+    return s;
+  }
+  if (r.cancelado)          return 'cancelado';
+  if (r.hospedado)          return 'hospedado';
+  if (r.ativa === false)    return 'finalizado';
+  return 'confirmada';
+};
+
+// ─── Normalize backend Reserva → frontend shape ───────────────────────────────
+const normalizeReserva = (r) => {
+  const pessoas   = r.pessoas ?? [];
+  const titular   = pessoas[0];
+  const pags      = r.pagamentos ?? [];
+  const totalPago = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
+  return {
+    id:                     r.id,
+    quarto:                 r.quarto?.id ?? r.fk_quarto ?? r.quarto,
+    categoria:              r.categoria?.nome ?? '',
+    titularNome:            titular?.nome ?? r.titular_nome ?? 'Hóspede',
+    empresaNome:            r.empresa?.razao_social ?? r.empresa_nome ?? null,
+    quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
+    dataInicio:             parseBrDate(r.data_hora_entrada),
+    dataFim:                parseBrDate(r.data_hora_saida),
+    chegadaPrevista:        r.data_hora_entrada ?? '',
+    saidaPrevista:          r.data_hora_saida   ?? '',
+    status:                 mapStatus(r),
+    hospedes:               pessoas.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })),
+    pagamentos:             pags.map((p) => ({
+      id:             p.id,
+      descricao:      p.descricao ?? '',
+      formaPagamento: p.tipo_pagamento?.descricao ?? p.forma_pagamento ?? '',
+      valor:          p.valor ?? 0,
+    })),
+    valorTotal: r.valor_total ?? 0,
+    totalPago,
+  };
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_CELL_W   = 168;
@@ -72,10 +130,10 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel }) {
+function ReservaModal({ reserva, onClose, onCancel, categorias }) {
   const pendente = reserva.valorTotal - reserva.totalPago;
   const dias     = diffDays(reserva.dataInicio, reserva.dataFim);
-  const cat      = CATEGORIAS.find((c) => c.quartos.includes(reserva.quarto));
+  const cat      = categorias.find((c) => c.quartos.includes(reserva.quarto));
   return (
     <Modal open onClose={onClose} size="md"
       title={<><BedDouble size={15} /> Quarto {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
@@ -152,11 +210,11 @@ function ReservaModal({ reserva, onClose, onCancel }) {
 }
 
 // ─── Day Modal ────────────────────────────────────────────────────────────────
-function DayModal({ dateStr, reservas, onClose, onNewReserva }) {
+function DayModal({ dateStr, reservas, onClose, onNewReserva, categorias }) {
   const dayReservas    = reservas.filter((r) => r.dataInicio <= dateStr && r.dataFim > dateStr);
   const occupiedRooms  = new Set(dayReservas.map((r) => r.quarto));
-  const totalRooms     = CATEGORIAS.flatMap((c) => c.quartos).length;
-  const availableRooms = CATEGORIAS.flatMap((c) => c.quartos).filter((r) => !occupiedRooms.has(r));
+  const totalRooms     = categorias.flatMap((c) => c.quartos).length;
+  const availableRooms = categorias.flatMap((c) => c.quartos).filter((r) => !occupiedRooms.has(r));
   const totalPeople    = dayReservas.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
   const dayObj  = new Date(dateStr + 'T00:00:00');
   const weekday = dayObj.toLocaleDateString('pt-BR', { weekday: 'long' });
@@ -227,8 +285,8 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva }) {
 }
 
 // ─── Room Modal ───────────────────────────────────────────────────────────────
-function RoomModal({ room, reservas, onClose }) {
-  const cat          = CATEGORIAS.find((c) => c.quartos.includes(room));
+function RoomModal({ room, reservas, onClose, categorias }) {
+  const cat          = categorias.find((c) => c.quartos.includes(room));
   const roomReservas = [...reservas].filter((r) => r.quarto === room).sort((a, b) => a.dataInicio.localeCompare(b.dataInicio));
   return (
     <Modal open onClose={onClose} size="md"
@@ -395,7 +453,7 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
 }
 
 // ─── Room Multi-Select Combobox ───────────────────────────────────────────────
-function RoomCombobox({ value, onChange, availableRooms }) {
+function RoomCombobox({ value, onChange, availableRooms, categorias }) {
   const [open,     setOpen]     = useState(false);
   const [filter,   setFilter]   = useState('');
   const [dropStyle, setDropStyle] = useState({});
@@ -461,10 +519,9 @@ function RoomCombobox({ value, onChange, availableRooms }) {
           autoFocus
         />
       </div>
-      {CATEGORIAS.map((cat) => {
+      {categorias.map((cat) => {
         const rows = cat.quartos.filter((r) =>
-          !fl || fmtRoom(r).includes(fl) || cat.nome.toLowerCase().includes(fl) ||
-          (QUARTOS_INFO[r]?.tipo || '').toLowerCase().includes(fl)
+          !fl || fmtRoom(r).includes(fl) || cat.nome.toLowerCase().includes(fl)
         );
         if (!rows.length) return null;
         return (
@@ -473,7 +530,6 @@ function RoomCombobox({ value, onChange, availableRooms }) {
             {rows.map((r) => {
               const avail = availableRooms.includes(r);
               const sel   = value.includes(String(r));
-              const info  = QUARTOS_INFO[r];
               return (
                 <div key={r}
                   className={[styles.comboItem, sel ? styles.comboItemSel : '', !avail ? styles.comboItemUnavail : ''].join(' ')}
@@ -481,8 +537,7 @@ function RoomCombobox({ value, onChange, availableRooms }) {
                 >
                   <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
                   <span className={styles.comboItemNum}>Quarto {fmtRoom(r)}</span>
-                  {info && <span className={styles.comboItemTipo}>{info.tipo}</span>}
-                  <span className={styles.comboItemPreco}>{fmtBRL(info?.preco ?? 0)}/noite</span>
+                  <span className={styles.comboItemTipo}>{cat.nome}</span>
                   {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
                 </div>
               );
@@ -518,7 +573,7 @@ function RoomCombobox({ value, onChange, availableRooms }) {
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, onClose, onSave, onNotify }) {
+function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
   const STEPS = ['Tipo & Hóspedes', 'Quarto & Período', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(1);
@@ -555,15 +610,17 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   const checkoutStr = checkout ? formatDate(checkout) : '';
   const dias        = checkinStr && checkoutStr ? diffDays(checkinStr, checkoutStr) : 0;
 
+  const allRoomIds = useMemo(() => categorias.flatMap((c) => c.quartos), [categorias]);
+
   const availableRooms = useMemo(() => {
-    if (!checkinStr || !checkoutStr) return initialAvailable || CATEGORIAS.flatMap((c) => c.quartos);
-    return CATEGORIAS.flatMap((c) => c.quartos).filter(
+    if (!checkinStr || !checkoutStr) return initialAvailable || allRoomIds;
+    return allRoomIds.filter(
       (r) => !reservas.some((res) => res.quarto === r && res.dataInicio < checkoutStr && res.dataFim > checkinStr)
     );
-  }, [checkinStr, checkoutStr, reservas, initialAvailable]);
+  }, [checkinStr, checkoutStr, reservas, initialAvailable, allRoomIds]);
 
   const mpAvailableRooms = useMemo(() => {
-    if (!mpCheckin || !mpCheckout) return CATEGORIAS.flatMap((c) => c.quartos);
+    if (!mpCheckin || !mpCheckout) return allRoomIds;
     const ci = formatDate(mpCheckin);
     const co = formatDate(mpCheckout);
     const alreadyPicked = periodos.flatMap((p) => {
@@ -571,29 +628,35 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
       if (pi < co && po > ci) return p.rooms.map((r) => parseInt(r));
       return [];
     });
-    return CATEGORIAS.flatMap((c) => c.quartos).filter(
+    return allRoomIds.filter(
       (r) => !alreadyPicked.includes(r) && !reservas.some((res) => res.quarto === r && res.dataInicio < co && res.dataFim > ci)
     );
-  }, [mpCheckin, mpCheckout, periodos, reservas]);
+  }, [mpCheckin, mpCheckout, periodos, reservas, allRoomIds]);
 
-  // Financial
-  const valorTotalUnico = quartos.reduce((sum, q) => {
-    const qi = QUARTOS_INFO[parseInt(q)]; return sum + dias * (qi?.preco || 0);
-  }, 0);
-  const valorTotalMulti = periodos.reduce((sum, p) => {
-    const d  = diffDays(formatDate(p.checkin), formatDate(p.checkout));
-    return sum + p.rooms.reduce((s, q) => { const qi = QUARTOS_INFO[parseInt(q)]; return s + d * (qi?.preco || 0); }, 0);
-  }, 0);
-  const valorTotal = periodoMode === 'multiplos' ? valorTotalMulti : valorTotalUnico;
+  // Financial (prices come from calcularPrecos; show 0 here as placeholder)
+  const valorTotal = 0;
   const totalPago  = pagamentos.reduce((s, p) => s + p.valor, 0);
   const pendente   = Math.max(0, valorTotal - totalPago);
 
-  const filteredHospedes = hospSearch.trim().length >= 2
-    ? HOSPEDES_CADASTRADOS.filter((h) => h.nome.toLowerCase().includes(hospSearch.toLowerCase()))
-    : [];
+  // Guest search (real API)
+  const [filteredHospedes,  setFilteredHospedes]  = useState([]);
+  const [searchingHospedes, setSearchingHospedes] = useState(false);
+  useEffect(() => {
+    if (hospSearch.trim().length < 2) { setFilteredHospedes([]); return; }
+    const t = setTimeout(async () => {
+      setSearchingHospedes(true);
+      try {
+        const res  = await cadastroApi.listarPessoas({ termo: hospSearch.trim(), size: 6 });
+        const list = Array.isArray(res) ? res : (res.content ?? []);
+        setFilteredHospedes(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })));
+      } catch { setFilteredHospedes([]); }
+      finally  { setSearchingHospedes(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [hospSearch]);
 
   const addHospede  = (h)  => { if (hospSelecionados.find((x) => x.id === h.id)) return; setHospSelecionados((p) => [...p, h]); setHospSearch(''); };
-  const addManual   = ()   => { if (!manualNome.trim()) return; setHospSelecionados((p) => [...p, { id: Date.now(), nome: manualNome.trim(), cpf: '' }]); setManualNome(''); };
+  const addManual   = ()   => { if (!manualNome.trim()) return; setHospSelecionados((p) => [...p, { id: `tmp-${Date.now()}`, nome: manualNome.trim(), cpf: '' }]); setManualNome(''); };
   const remHospede  = (id) => setHospSelecionados((p) => p.filter((x) => x.id !== id));
 
   const addPagamento = () => {
@@ -609,12 +672,14 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
   };
 
-  // Room type summary
+  // Room type summary (group by category name)
   const allSelectedRooms = periodoMode === 'multiplos'
     ? [...new Set(periodos.flatMap((p) => p.rooms))]
     : quartos;
   const roomTypeSummary = allSelectedRooms.reduce((acc, q) => {
-    const t = QUARTOS_INFO[parseInt(q)]?.tipo || 'OUTRO'; acc[t] = (acc[t] || 0) + 1; return acc;
+    const cat = categorias.find((c) => c.quartos.includes(parseInt(q)));
+    const t   = cat?.nome || 'Quarto';
+    acc[t] = (acc[t] || 0) + 1; return acc;
   }, {});
   const roomSummaryStr = Object.entries(roomTypeSummary).map(([t, c]) => `${c}x ${t}`).join(', ');
 
@@ -626,35 +691,34 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
     if (isOrcamento) { onNotify('Orçamento gerado! (Em desenvolvimento)'); onClose(); return; }
     setSaving(true);
     try {
-      const titular  = hospSelecionados[0]?.nome || manualNome.trim() || 'Hóspede';
-      const hospList = hospSelecionados.length > 0
-        ? hospSelecionados.map((h) => ({ id: h.id, nome: h.nome, cpf: h.cpf || '' }))
-        : [{ id: Date.now(), nome: titular, cpf: '' }];
+      // Only include pessoas that have a real backend ID (not temp manual entries)
+      const pessoasIds = hospSelecionados
+        .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
+        .map((h) => ({ id: h.id }));
 
-      let dataArr;
+      const buildItem = (quartoId, dataEntrada, dataSaida) => ({
+        fk_quarto:    parseInt(quartoId),
+        data_entrada: toBrDate(dataEntrada),
+        data_saida:   toBrDate(dataSaida),
+        ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
+        ...(pagamentos.length ? {
+          pagamentos: pagamentos.map((pg) => ({
+            descricao:       pg.descricao,
+            valor:           pg.valor,
+            forma_pagamento: pg.formaPagamento,
+          })),
+        } : {}),
+      });
+
+      let reservasBody;
       if (periodoMode === 'multiplos') {
-        dataArr = periodos.flatMap((p) => {
-          const ci = formatDate(p.checkin); const co = formatDate(p.checkout); const d = diffDays(ci, co);
-          return p.rooms.map((q) => {
-            const cat = CATEGORIAS.find((c) => c.quartos.includes(parseInt(q)));
-            const qi  = QUARTOS_INFO[parseInt(q)];
-            return { quarto: parseInt(q), categoria: cat?.nome || '', titularNome: titular, empresaNome: null,
-              quantidadeAcompanhantes: Math.max(0, hospList.length - 1), dataInicio: ci, dataFim: co,
-              chegadaPrevista: ci + ' 14:00', saidaPrevista: co + ' 12:00', status: 'confirmada',
-              hospedes: hospList, pagamentos, valorTotal: d * (qi?.preco || 0), totalPago };
-          });
-        });
+        reservasBody = periodos.flatMap((p) =>
+          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout)))
+        );
       } else {
-        dataArr = quartos.map((q) => {
-          const cat = CATEGORIAS.find((c) => c.quartos.includes(parseInt(q)));
-          const qi  = QUARTOS_INFO[parseInt(q)];
-          return { quarto: parseInt(q), categoria: cat?.nome || '', titularNome: titular, empresaNome: null,
-            quantidadeAcompanhantes: Math.max(0, hospList.length - 1), dataInicio: checkinStr, dataFim: checkoutStr,
-            chegadaPrevista: checkinStr + ' 14:00', saidaPrevista: checkoutStr + ' 12:00', status: 'confirmada',
-            hospedes: hospList, pagamentos, valorTotal: dias * (qi?.preco || 0), totalPago };
-        });
+        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr));
       }
-      await onSave(dataArr);
+      await onSave(reservasBody);
     } finally { setSaving(false); }
   };
 
@@ -728,7 +792,9 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
 
           <FormField label="Hóspedes">
             <div className={styles.hospSearchWrap}>
-              <Search size={13} className={styles.hospSearchIcon} />
+              {searchingHospedes
+                ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
+                : <Search size={13} className={styles.hospSearchIcon} />}
               <input className={styles.formInput} style={{ paddingLeft: 30 }} value={hospSearch}
                 onChange={(e) => setHospSearch(e.target.value)} placeholder="Buscar hóspede cadastrado..." />
             </div>
@@ -790,7 +856,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
               <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
                 <RoomCombobox value={quartos}
                   onChange={(v) => tipo !== 'grupo' ? setQuartos(v.slice(-1)) : setQuartos(v)}
-                  availableRooms={availableRooms} />
+                  availableRooms={availableRooms} categorias={categorias} />
               </FormField>
             </div>
           )}
@@ -815,7 +881,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
               )}
               <div className={styles.mpForm}>
                 <FormField label="Quartos para este período">
-                  <RoomCombobox value={mpRooms} onChange={setMpRooms} availableRooms={mpAvailableRooms} />
+                  <RoomCombobox value={mpRooms} onChange={setMpRooms} availableRooms={mpAvailableRooms} categorias={categorias} />
                 </FormField>
                 <FormField label="Período">
                   <div className={styles.dateCompact}>
@@ -945,6 +1011,7 @@ export default function BookingCalendar() {
   const todayStr = formatDate(today);
 
   const [reservas,    setReservas]    = useState([]);
+  const [categorias,  setCategorias]  = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [viewDate,    setViewDate]    = useState(() => { const d = new Date(today); d.setDate(d.getDate() - 1); return d; });
   const [collapsedCats,   setCollapsedCats]   = useState({});
@@ -972,9 +1039,32 @@ export default function BookingCalendar() {
     setTimeout(() => setNotif(null), 3500);
   }, []);
 
+  // ── Load categories once ──────────────────────────────────────────────────
   useEffect(() => {
-    calendarApi.listarReservas().then((d) => { setReservas(d); setLoading(false); });
+    quartoCategoriApi.listar({ size: 900 }).then((res) => {
+      const list = Array.isArray(res) ? res : (res.content ?? []);
+      setCategorias(list.map((c) => ({
+        id:      c.id,
+        nome:    c.nome,
+        quartos: (c.quartos ?? []).map((q) => q.id ?? q),
+      })));
+    }).catch(() => {});
   }, []);
+
+  // ── Reload reservations when month/year changes ───────────────────────────
+  useEffect(() => {
+    setLoading(true);
+    const mes = viewDate.getMonth() + 1;
+    const ano = viewDate.getFullYear();
+    reservaApi.listarPorMesAno({ mes, ano })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setReservas(list.map(normalizeReserva).filter((r) => r.dataInicio));
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewDate.getMonth(), viewDate.getFullYear()]);
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -1010,15 +1100,15 @@ export default function BookingCalendar() {
   const navigateToReserva = (r) => { setViewDate(new Date(r.dataInicio + 'T00:00:00')); setSearchTerm(''); setShowSearchDropdown(false); };
 
   const solicitadasCount = reservas.filter((r) => r.status === 'solicitada').length;
-  const allRooms         = CATEGORIAS.flatMap((c) => c.quartos);
+  const allRooms         = categorias.flatMap((c) => c.quartos);
 
-  const handleApproveSolicitacao = async (id, quarto, obs) => {
-    const upd = await calendarApi.atualizarReserva(id, { status: 'confirmada', quarto, ...(obs ? { observacao: obs } : {}) });
-    setReservas((rs) => rs.map((r) => r.id === id ? upd : r));
+  const handleApproveSolicitacao = async (id, quarto) => {
+    const upd = await reservaApi.atualizar({ id, fk_quarto: quarto });
+    setReservas((rs) => rs.map((r) => r.id === id ? normalizeReserva(upd) : r));
     notify('Solicitação aprovada!'); setShowSolicitacoes(false);
   };
   const handleRejectSolicitacao = async (id) => {
-    await calendarApi.cancelarReserva(id);
+    await reservaApi.cancelar(id);
     setReservas((rs) => rs.filter((r) => r.id !== id));
     notify('Solicitação rejeitada.'); setShowSolicitacoes(false);
   };
@@ -1102,8 +1192,13 @@ export default function BookingCalendar() {
       setConfirmData({
         title: ds.type === 'move' ? 'Mover Reserva' : 'Ajustar Período', message,
         onConfirm: async () => {
-          const upd = await calendarApi.atualizarReserva(resId, snapshot);
-          setReservas((rs) => rs.map((x) => x.id === resId ? upd : x));
+          const upd = await reservaApi.atualizar({
+            id:          resId,
+            fk_quarto:   snapshot.quarto,
+            data_entrada: toBrDate(snapshot.dataInicio),
+            data_saida:   toBrDate(snapshot.dataFim),
+          });
+          setReservas((rs) => rs.map((x) => x.id === resId ? normalizeReserva(upd) : x));
           notify(ds.type === 'move' ? 'Reserva movida.' : 'Período ajustado.'); setConfirmData(null);
         },
       });
@@ -1117,15 +1212,15 @@ export default function BookingCalendar() {
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
 
-  const handleSaveNew = async (dataArr) => {
-    const arr   = Array.isArray(dataArr) ? dataArr : [dataArr];
-    const novas = await Promise.all(arr.map((d) => calendarApi.criarReserva(d)));
+  const handleSaveNew = async (reservasBody) => {
+    const result = await reservaApi.criar({ reservas: reservasBody });
+    const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
     setReservas((rs) => [...rs, ...novas]);
     notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
     setShowCreateModal(false);
   };
   const handleCancelReserva = async (id) => {
-    await calendarApi.cancelarReserva(id);
+    await reservaApi.cancelar(id);
     setReservas((rs) => rs.filter((r) => r.id !== id));
     notify('Reserva cancelada.');
   };
@@ -1318,7 +1413,7 @@ export default function BookingCalendar() {
                 })}
               </div>
 
-              {CATEGORIAS.map((cat) => {
+              {categorias.map((cat) => {
                 const isCollapsed = !!collapsedCats[cat.id];
                 return (
                   <div key={cat.id}>
@@ -1381,16 +1476,16 @@ export default function BookingCalendar() {
       </div>
 
       {/* Modals */}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} categorias={categorias} />}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialAvailable={createInit.available}
-          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} />
+          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} />
       )}
       {dayModal && (
-        <DayModal dateStr={dayModal.dateStr} reservas={filteredReservas} onClose={() => setDayModal(null)}
+        <DayModal dateStr={dayModal.dateStr} reservas={filteredReservas} onClose={() => setDayModal(null)} categorias={categorias}
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }} />
       )}
-      {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} />}
+      {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} />}
       {showSolicitacoes && (
         <SolicitacoesModal reservas={reservas} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
           onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
