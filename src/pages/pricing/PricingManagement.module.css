@@ -250,8 +250,18 @@
 .checkItem:hover    { border-color: rgba(124,58,237,.3); }
 .checkItemActive    { border-color: var(--violet); background: rgba(124,58,237,.06); }
 .checkItemCb        { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
-.checkItemLabel     { font-size: 13px; font-weight: 500; color: var(--text); }
+.checkItemLabel     { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .checkItemSub       { font-size: 11px; color: var(--text-2); margin-left: auto; }
+.checkItemUnavailable {
+  opacity: .55; cursor: not-allowed;
+  background: var(--surface-2); border-color: var(--border);
+}
+.checkItemUnavailable:hover { border-color: var(--border); }
+.checkItemUnavailable .checkItemCb { cursor: not-allowed; }
+.checkItemTag {
+  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 5px;
+  background: rgba(239,68,68,.1); color: #ef4444; white-space: nowrap;
+}
 
 /* ── Seasonality category selector ── */
 .seaCatItem  { align-items: flex-start; padding: 10px 12px; }

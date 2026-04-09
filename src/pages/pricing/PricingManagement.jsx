@@ -128,11 +128,6 @@ function seaFromBackend(s) {
     modoOperacao = 'anual';
     // backend 1-12 → frontend 0-11
     meses = (s.anual ?? []).map((m) => m - 1);
-  } else if (s.diario_dia_integral != null || s.diario_hora_inicio_ciclo != null) {
-    modoOperacao    = 'diario';
-    diaIntegral     = s.diario_dia_integral ?? true;
-    horaInicioCiclo = s.diario_hora_inicio_ciclo ?? '';
-    horaFimCiclo    = s.diario_hora_fim_ciclo   ?? '';
   }
 
   const horaCheckin  = s.hora_checkin  ?? '14:00';
@@ -215,7 +210,6 @@ const DIAS_MES    = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const MODO_LABEL = {
   'data-especifica': 'Data Específica',
-  diario:            'Diário',
   semanal:           'Semanal',
   mensal:            'Mensal',
   anual:             'Anual',
@@ -225,10 +219,6 @@ function describeSchedule(s) {
   switch (s.modoOperacao) {
     case 'data-especifica':
       return `${s.dataInicio || '—'} → ${s.dataFim || '—'}  ${s.horaInicio || ''} / ${s.horaFim || ''}`.trim();
-    case 'diario':
-      return s.diaIntegral
-        ? `Diário · Integral · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`
-        : `Diário · ${s.horaInicioCiclo}–${s.horaFimCiclo} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
     case 'semanal': {
       const dias = (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ');
       return `Semanal · ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
@@ -318,10 +308,6 @@ function isSeaValid(f) {
     case 'data-especifica':
       if (!f.dataInicio || !f.dataFim || !f.horaInicio || !f.horaFim) return false;
       break;
-    case 'diario':
-      if (!f.horaCheckin || !f.horaCheckout) return false;
-      if (!f.diaIntegral && (!f.horaInicioCiclo || !f.horaFimCiclo)) return false;
-      break;
     case 'semanal':
       if (!f.diasSemana.length || !f.horaCheckin || !f.horaCheckout) return false;
       break;
@@ -396,24 +382,6 @@ function ScheduleFields({ form, onChange }) {
     </>
   );
 
-  if (mode === 'diario') return (
-    <>
-      <label className={styles.checkboxRow}>
-        <input type="checkbox" className={styles.checkbox} checked={form.diaIntegral} onChange={(e) => onChange('diaIntegral', e.target.checked)} />
-        <div><span className={styles.checkboxLabel}>Dia Integral</span><span className={styles.checkboxSub}>Sem definição de horário de ciclo</span></div>
-      </label>
-      {!form.diaIntegral && (
-        <div className={styles.formRow}>
-          <FormField label="Início do ciclo *"><TimePicker value={form.horaInicioCiclo} onChange={(v) => onChange('horaInicioCiclo', v)} /></FormField>
-          <FormField label="Fim do ciclo *"><TimePicker value={form.horaFimCiclo} onChange={(v) => onChange('horaFimCiclo', v)} /></FormField>
-        </div>
-      )}
-      <div className={styles.formRow}>
-        <FormField label="Check-in *"><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
-        <FormField label="Check-out *"><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
-      </div>
-    </>
-  );
 
   if (mode === 'semanal') return (
     <>
@@ -1110,11 +1078,7 @@ export default function PricingManagement() {
       } else {
         scheduleFields.hora_checkin  = f.horaCheckin  || null;
         scheduleFields.hora_checkout = f.horaCheckout || null;
-        if (f.modoOperacao === 'diario') {
-          scheduleFields.diario_dia_integral      = f.diaIntegral;
-          scheduleFields.diario_hora_inicio_ciclo = f.diaIntegral ? null : (f.horaInicioCiclo || null);
-          scheduleFields.diario_hora_fim_ciclo    = f.diaIntegral ? null : (f.horaFimCiclo    || null);
-        } else if (f.modoOperacao === 'semanal') {
+        if (f.modoOperacao === 'semanal') {
           // frontend 0-6 (Sun=0) → backend 1-7 (Sun=7)
           scheduleFields.semanal = f.diasSemana.map((d) => d === 0 ? 7 : d);
         } else if (f.modoOperacao === 'mensal') {
@@ -1616,11 +1580,6 @@ export default function PricingManagement() {
             {(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}
           </IB>
         )}
-        {s.modoOperacao === 'diario' && (
-          <IB icon={<Clock size={13} color="var(--violet)" />} label="Ciclo" span2>
-            {s.diaIntegral ? 'Integral' : `${s.horaInicioCiclo}–${s.horaFimCiclo}`}
-          </IB>
-        )}
         {(s.horaCheckin || s.horaCheckout) && (
           <div className={styles.infoGrid}>
             <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">
@@ -1958,10 +1917,21 @@ export default function PricingManagement() {
               <div className={styles.checkList}>
                 {quartos.map((q) => {
                   const active = catForm.quartos.includes(q.id);
+                  const outraCat = data.categorias.find(
+                    (c) => c.id !== editingCat?.id && (c.quartos ?? []).includes(q.id)
+                  );
+                  const unavailable = !!outraCat && !active;
                   return (
-                    <label key={q.id} className={[styles.checkItem, active ? styles.checkItemActive : ''].join(' ')}>
-                      <input type="checkbox" className={styles.checkItemCb} checked={active} onChange={() => toggleCatQuarto(q.id)} />
-                      <span className={styles.checkItemLabel}>Quarto {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}</span>
+                    <label key={q.id} className={[
+                      styles.checkItem,
+                      active ? styles.checkItemActive : '',
+                      unavailable ? styles.checkItemUnavailable : '',
+                    ].join(' ')}>
+                      <input type="checkbox" className={styles.checkItemCb} checked={active} disabled={unavailable} onChange={() => !unavailable && toggleCatQuarto(q.id)} />
+                      <span className={styles.checkItemLabel}>
+                        Quarto {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}
+                        {unavailable && <span className={styles.checkItemTag}>{outraCat.nome}</span>}
+                      </span>
                     </label>
                   );
                 })}
@@ -2033,7 +2003,6 @@ export default function PricingManagement() {
               <div className={styles.modeCards}>
                 {[
                   { value: 'data-especifica', label: 'Data Específica', desc: 'Período fixo' },
-                  { value: 'diario',          label: 'Diário',          desc: 'Todo dia' },
                   { value: 'semanal',         label: 'Semanal',         desc: 'Dias da semana' },
                   { value: 'mensal',          label: 'Mensal',          desc: 'Dias do mês' },
                   { value: 'anual',           label: 'Anual',           desc: 'Meses do ano' },
