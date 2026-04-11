@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  BedDouble, ChevronLeft, ChevronRight, Plus,
+  BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
@@ -45,30 +45,55 @@ const mapStatus = (r) => {
 };
 
 // ─── Normalize backend Reserva → frontend shape ───────────────────────────────
+// API response: pessoas[i] = { id, pessoa: {id, nome, cpf, ...}, representante }
+//               pagamentos[i] = { id, pagamento: {uuid, tipo_pagamento, nome_pagador, valor, ...} }
 const normalizeReserva = (r) => {
-  const pessoas   = r.pessoas ?? [];
-  const titular   = pessoas[0];
-  const pags      = r.pagamentos ?? [];
+  // Unwrap nested pessoa objects
+  const pessoasRaw = r.pessoas ?? [];
+  const pessoas    = pessoasRaw.map((p) => p.pessoa ?? p);
+  const titular    = pessoas[0];
+
+  // Unwrap nested pagamento objects
+  const pagsRaw   = r.pagamentos ?? [];
+  const pags      = pagsRaw.map((p) => p.pagamento ?? p);
   const totalPago = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
+
   return {
-    id:                     r.id,
-    quarto:                 r.quarto?.id ?? r.fk_quarto ?? r.quarto,
-    categoria:              r.categoria?.nome ?? '',
-    titularNome:            titular?.nome ?? r.titular_nome ?? 'Hóspede',
-    empresaNome:            r.empresa?.razao_social ?? r.empresa_nome ?? null,
+    id:                      r.id,
+    quarto:                  r.quarto?.id ?? r.fk_quarto ?? r.quarto,
+    categoria:               r.categoria?.nome ?? '',
+    titularNome:             titular?.nome ?? r.titular_nome ?? 'Hóspede',
+    empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
+    funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
-    dataInicio:             parseBrDate(r.data_hora_entrada),
-    dataFim:                parseBrDate(r.data_hora_saida),
-    chegadaPrevista:        r.data_hora_entrada ?? '',
-    saidaPrevista:          r.data_hora_saida   ?? '',
-    status:                 mapStatus(r),
-    hospedes:               pessoas.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })),
-    pagamentos:             pags.map((p) => ({
-      id:             p.id,
-      descricao:      p.descricao ?? '',
-      formaPagamento: p.tipo_pagamento?.descricao ?? p.forma_pagamento ?? '',
-      valor:          p.valor ?? 0,
+    dataInicio:              parseBrDate(r.data_hora_entrada),
+    dataFim:                 parseBrDate(r.data_hora_saida),
+    chegadaPrevista:         r.data_hora_entrada ?? '',
+    saidaPrevista:           r.data_hora_saida   ?? '',
+    status:                  mapStatus(r),
+    hospedes: pessoas.map((p) => ({
+      id:       p.id,
+      nome:     p.nome,
+      cpf:      p.cpf ?? '',
+      telefone: p.celular ?? p.telefone ?? '',
+      email:    p.email ?? '',
     })),
+    pagamentos: pagsRaw.map((entry) => {
+      const p = entry.pagamento ?? entry;
+      return {
+        id:                  p.uuid ?? p.id,
+        descricao:           p.descricao ?? '',
+        formaPagamento:      p.tipo_pagamento?.descricao ?? p.forma_pagamento ?? '',
+        nomePagador:         p.nome_pagador ?? '',
+        valor:               p.valor ?? 0,
+        cancelado:           p.cancelado ?? false,
+        dataRegistro:        p.data_hora_registro ?? entry.data_hora_registro ?? '',
+        funcionario:         p.funcionario?.nome ?? entry.funcionario?.nome ?? '',
+        motivoCancelamento:  p.motivo_cancelamento?.motivo_cancelamento ?? null,
+        dataMotivo:          p.motivo_cancelamento?.data_hora_registro ?? null,
+        funcMotivo:          p.motivo_cancelamento?.funcionario?.nome ?? null,
+      };
+    }),
     valorTotal: r.valor_total ?? 0,
     totalPago,
   };
@@ -130,82 +155,521 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, categorias }) {
-  const pendente = reserva.valorTotal - reserva.totalPago;
-  const dias     = diffDays(reserva.dataInicio, reserva.dataFim);
-  const cat      = categorias.find((c) => c.quartos.includes(reserva.quarto));
+function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categorias }) {
+  // ── Edit mode ──────────────────────────────────────────────────────────────
+  const [editing,      setEditing]      = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [editQuarto,   setEditQuarto]   = useState([String(reserva.quarto)]);
+  const [editCheckin,  setEditCheckin]  = useState(new Date(reserva.dataInicio + 'T00:00:00'));
+  const [editCheckout, setEditCheckout] = useState(new Date(reserva.dataFim   + 'T00:00:00'));
+
+  // ── Tabs ───────────────────────────────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState('dados');
+
+  // ── Pessoas ────────────────────────────────────────────────────────────────
+  const [pessoas,         setPessoas]         = useState(reserva.hospedes ?? []);
+  const [pessoaFilter,    setPessoaFilter]    = useState('');
+  const [pessoaQuery,     setPessoaQuery]     = useState('');
+  const [pessoaResults,   setPessoaResults]   = useState([]);
+  const [pessoaSearching, setPessoaSearching] = useState(false);
+  const [showAddPessoa,   setShowAddPessoa]   = useState(false);
+  const pessoaTimerRef = useRef(null);
+
+  // ── Pagamentos ─────────────────────────────────────────────────────────────
+  const [pagamentos,        setPagamentos]        = useState(reserva.pagamentos ?? []);
+  const [tiposPagamento,    setTiposPagamento]    = useState([]);
+  const [showPayModal,      setShowPayModal]      = useState(false);
+  const [paySubmitting,     setPaySubmitting]     = useState(false);
+  const [cancelPagId,       setCancelPagId]       = useState(null);
+  const [cancelMotivo,      setCancelMotivo]      = useState('');
+  const [cancelSubmitting,  setCancelSubmitting]  = useState(false);
+  const [viewPagamento,     setViewPagamento]     = useState(null);
+
+  useEffect(() => {
+    enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
+  }, []);
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+  const totalPago  = pagamentos.filter((p) => !p.cancelado).reduce((s, p) => s + (p.valor ?? 0), 0);
+  const pendente   = reserva.valorTotal - totalPago;
+  const dias       = diffDays(reserva.dataInicio, reserva.dataFim);
+  const cat        = categorias.find((c) => c.quartos.includes(reserva.quarto));
+  const allRoomIds = categorias.flatMap((c) => c.quartos);
+
+  // ── Phone display mask ─────────────────────────────────────────────────────
+  const fmtPhone = (v) => {
+    const d = (v || '').replace(/\D/g, '').slice(0, 11);
+    if (!d) return '';
+    if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    return d.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+  };
+
+  // ── Pessoa search ──────────────────────────────────────────────────────────
+  const handlePessoaQuery = (val) => {
+    setPessoaQuery(val);
+    clearTimeout(pessoaTimerRef.current);
+    if (val.trim().length < 2) { setPessoaResults([]); return; }
+    pessoaTimerRef.current = setTimeout(() => {
+      setPessoaSearching(true);
+      cadastroApi.listarPessoas({ termo: val.trim(), size: 8 })
+        .then((res) => {
+          const list = Array.isArray(res) ? res : (res?.content ?? []);
+          setPessoaResults(list.map((p) => p.pessoa ?? p));
+        })
+        .catch(() => {})
+        .finally(() => setPessoaSearching(false));
+    }, 300);
+  };
+
+  const handleAddPessoa = async (p) => {
+    if (pessoas.find((h) => h.id === p.id)) return;
+    try { await reservaApi.adicionarPessoa(reserva.id, p.id); } catch (_) {}
+    setPessoas((prev) => [...prev, {
+      id: p.id, nome: p.nome, cpf: p.cpf ?? '',
+      telefone: p.celular ?? p.telefone ?? '', email: p.email ?? '',
+    }]);
+    setShowAddPessoa(false);
+    setPessoaQuery('');
+    setPessoaResults([]);
+  };
+
+  const handleRemovePessoa = async (pessoaId) => {
+    try { await reservaApi.removerPessoa(reserva.id, pessoaId); } catch (_) {}
+    setPessoas((prev) => prev.filter((h) => h.id !== pessoaId));
+  };
+
+  const filteredPessoas = pessoaFilter.trim()
+    ? pessoas.filter((h) =>
+        h.nome.toLowerCase().includes(pessoaFilter.toLowerCase()) ||
+        (h.cpf || '').includes(pessoaFilter))
+    : pessoas;
+
+  // ── Pagamentos ─────────────────────────────────────────────────────────────
+  const handleAddPagamento = async (payment) => {
+    setPaySubmitting(true);
+    try {
+      const result = await reservaApi.adicionarPagamento(reserva.id, payment);
+      const tp = tiposPagamento.find((t) => t.id === payment.tipo_pagamento?.id);
+      setPagamentos((prev) => [...prev, {
+        id:             result?.uuid ?? result?.id ?? `local-${Date.now()}`,
+        formaPagamento: tp?.descricao ?? '',
+        nomePagador:    payment.nome_pagador ?? '',
+        descricao:      payment.descricao ?? '',
+        valor:          payment.valor ?? 0,
+        cancelado:      false,
+      }]);
+      setShowPayModal(false);
+      onNotify?.('Pagamento adicionado!');
+    } catch (_) {
+    } finally {
+      setPaySubmitting(false);
+    }
+  };
+
+  const handleConfirmCancelPagamento = async () => {
+    if (!cancelMotivo.trim()) return;
+    setCancelSubmitting(true);
+    try {
+      await reservaApi.cancelarPagamento(cancelPagId, cancelMotivo.trim());
+      setPagamentos((prev) => prev.filter((p) => p.id !== cancelPagId));
+      onNotify?.('Pagamento cancelado.');
+    } catch (_) {
+    } finally {
+      setCancelSubmitting(false);
+      setCancelPagId(null);
+      setCancelMotivo('');
+    }
+  };
+
+  // ── Edit save ──────────────────────────────────────────────────────────────
+  const handleSaveEdit = async () => {
+    setSaving(true);
+    try {
+      await onUpdate({
+        id:           reserva.id,
+        fk_quarto:    parseInt(editQuarto[0]),
+        data_entrada: toBrDate(formatDate(editCheckin)),
+        data_saida:   toBrDate(formatDate(editCheckout)),
+      });
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave = editQuarto.length > 0 && editCheckin && editCheckout && editCheckout > editCheckin;
+
+  const TABS = [
+    { key: 'dados',      label: 'Dados da Reserva' },
+    { key: 'pessoas',    label: `Pessoas (${pessoas.length})` },
+    { key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` },
+  ];
+
+  // ── Edit mode render ───────────────────────────────────────────────────────
+  if (editing) {
+    return (
+      <Modal open onClose={onClose} size="md"
+        title={<><Pencil size={15} /> Editar Reserva — {reserva.titularNome}</>}
+        footer={
+          <div className={styles.footerSpread}>
+            <Button variant="secondary" onClick={() => setEditing(false)}>← Voltar</Button>
+            <Button variant="primary" disabled={!canSave || saving} onClick={handleSaveEdit}>
+              {saving && <Loader2 size={13} className={styles.spin} />} Salvar
+            </Button>
+          </div>
+        }
+      >
+        <div className={styles.formStack}>
+          <FormField label="Quarto">
+            <RoomCombobox
+              value={editQuarto} onChange={setEditQuarto}
+              availableRooms={allRoomIds} categorias={categorias} singleSelect
+            />
+          </FormField>
+          <FormField label="Período de estadia">
+            <DatePicker
+              mode="range" startDate={editCheckin} endDate={editCheckout}
+              onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
+              placeholder="Check-in → Check-out"
+            />
+          </FormField>
+        </div>
+      </Modal>
+    );
+  }
+
+  // ── View mode render ───────────────────────────────────────────────────────
   return (
-    <Modal open onClose={onClose} size="md"
-      title={<><BedDouble size={15} /> Quarto {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
-      footer={
-        <div className={styles.footerSpread}>
-          <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
-            Cancelar Reserva
-          </Button>
-          <Button variant="secondary" onClick={onClose}>Fechar</Button>
+    <>
+      <Modal open onClose={onClose} size="md"
+        bodyStyle={{ padding: 0, gap: 0 }}
+        title={<><BedDouble size={15} /> Quarto {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
+        footer={
+          <div className={styles.footerSpread}>
+            <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+              Cancelar Reserva
+            </Button>
+            <Button variant="primary" onClick={() => setEditing(true)}>
+              <Pencil size={13} /> Editar
+            </Button>
+          </div>
+        }
+      >
+        {/* Tab nav */}
+        <div className={styles.detailTabs}>
+          {TABS.map((t) => (
+            <button key={t.key}
+              className={[styles.detailTab, activeTab === t.key ? styles.detailTabActive : ''].join(' ')}
+              onClick={() => setActiveTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
         </div>
-      }
-    >
-      <div className={styles.detailBody}>
-        <div className={styles.detailRoomHeader}>
-          <div className={styles.detailRoomBadge}>
-            <span className={styles.detailRoomNum}>{fmtRoom(reserva.quarto)}</span>
-          </div>
-          <div>
-            <div className={styles.detailRoomCat}>{cat?.nome || reserva.categoria}</div>
-            <span className={[styles.statusBadge, styles[`status_${reserva.status}`]].join(' ')}>
-              {STATUS_LABEL[reserva.status] ?? reserva.status}
-            </span>
-          </div>
-        </div>
-        <div className={styles.detailGrid2}>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Check-in</span>
-            <span className={styles.detailValue}>{fmtDateBR(reserva.dataInicio)}</span>
-            <span className={styles.detailSub}>{reserva.chegadaPrevista?.split(' ')[1] ?? '14:00'}</span>
-          </div>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Check-out</span>
-            <span className={styles.detailValue}>{fmtDateBR(reserva.dataFim)}</span>
-            <span className={styles.detailSub}>{reserva.saidaPrevista?.split(' ')[1] ?? '12:00'}</span>
-          </div>
-        </div>
-        <div className={styles.detailBox}>
-          <span className={styles.detailLabel}>Período</span>
-          <span className={styles.detailValue}>{diariasTxt(dias)}</span>
-        </div>
-        {reserva.empresaNome && (
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Empresa</span>
-            <span className={styles.detailValue} style={{ fontSize: 14 }}>{reserva.empresaNome}</span>
-          </div>
-        )}
-        <div className={styles.detailBox}>
-          <span className={styles.detailLabel}>Hóspedes ({reserva.hospedes?.length ?? 0})</span>
-          <div className={styles.hospedeList}>
-            {(reserva.hospedes || []).map((h) => (
-              <div key={h.id} className={styles.hospedeRow}>
-                <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+
+        {/* Fixed-height scrollable content area */}
+        <div className={styles.detailTabContent}>
+
+          {/* ── Dados da Reserva ── */}
+          {activeTab === 'dados' && (
+            <div className={styles.detailBody}>
+              <div className={styles.detailRoomHeader}>
+                <div className={styles.detailRoomBadge}>
+                  <span className={styles.detailRoomNum}>{fmtRoom(reserva.quarto)}</span>
+                </div>
                 <div>
-                  <div className={styles.hospedeName}>{h.nome}</div>
-                  {h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}
+                  <div className={styles.detailRoomCat}>{cat?.nome || reserva.categoria}</div>
+                  <span className={[styles.statusBadge, styles[`status_${reserva.status}`]].join(' ')}>
+                    {STATUS_LABEL[reserva.status] ?? reserva.status}
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-        <div className={styles.detailBox}>
-          <span className={styles.detailLabel}>Financeiro</span>
-          <div className={styles.finGrid}>
-            <div className={styles.finBox}><span className={styles.finBoxLabel}>Total</span><span className={styles.finTotal}>{fmtBRL(reserva.valorTotal)}</span></div>
-            <div className={styles.finBox}><span className={styles.finBoxLabel}>Pago</span><span className={styles.finPago}>{fmtBRL(reserva.totalPago)}</span></div>
-            <div className={styles.finBox}><span className={styles.finBoxLabel}>Pendente</span>
-              <span className={pendente > 0 ? styles.finPendente : styles.finPago}>{fmtBRL(Math.max(0, pendente))}</span>
+              <div className={styles.detailGrid2}>
+                <div className={styles.detailBox}>
+                  <span className={styles.detailLabel}>Check-in</span>
+                  <span className={styles.detailValue}>{fmtDateBR(reserva.dataInicio)}</span>
+                  <span className={styles.detailSub}>{reserva.chegadaPrevista?.split(' ')[1] ?? '14:00'}</span>
+                </div>
+                <div className={styles.detailBox}>
+                  <span className={styles.detailLabel}>Check-out</span>
+                  <span className={styles.detailValue}>{fmtDateBR(reserva.dataFim)}</span>
+                  <span className={styles.detailSub}>{reserva.saidaPrevista?.split(' ')[1] ?? '12:00'}</span>
+                </div>
+              </div>
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Período</span>
+                <span className={styles.detailValue}>{diariasTxt(dias)}</span>
+              </div>
+              {reserva.empresaNome && (
+                <div className={styles.detailBox}>
+                  <span className={styles.detailLabel}>Empresa</span>
+                  <span className={styles.detailValue} style={{ fontSize: 14 }}>{reserva.empresaNome}</span>
+                </div>
+              )}
+              {reserva.funcionario && (
+                <div className={styles.detailBox}>
+                  <span className={styles.detailLabel}>Registrado por</span>
+                  <span className={styles.detailValue} style={{ fontSize: 14 }}>{reserva.funcionario}</span>
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* ── Pessoas ── */}
+          {activeTab === 'pessoas' && (
+            <div className={styles.detailBody}>
+              {/* Filter bar */}
+              <div className={styles.tabSearchRow}>
+                <Search size={13} className={styles.tabSearchIcon} />
+                <input className={styles.tabSearchInput}
+                  placeholder="Filtrar por nome ou CPF..."
+                  value={pessoaFilter}
+                  onChange={(e) => setPessoaFilter(e.target.value)} />
+              </div>
+
+              {filteredPessoas.length === 0 && !showAddPessoa && (
+                <div className={styles.emptyState}>Nenhuma pessoa encontrada.</div>
+              )}
+
+              {filteredPessoas.map((h, i) => (
+                <div key={h.id} className={styles.pessoaCard}>
+                  <div className={styles.pessoaCardHeader}>
+                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+                    <div className={styles.pessoaCardInfo}>
+                      <div className={styles.hospedeName}>{h.nome}</div>
+                      {h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}
+                    </div>
+                    <div className={styles.pessoaCardActions}>
+                      <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>
+                        {i === 0 ? 'Titular' : 'Acompanhante'}
+                      </span>
+                      {i > 0 && (
+                        <button className={styles.removeIconBtn} title="Remover"
+                          onClick={() => handleRemovePessoa(h.id)}>
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {(h.telefone || h.email) && (
+                    <div className={styles.pessoaCardDetails}>
+                      {h.telefone && (
+                        <div className={styles.pessoaDetailRow}>
+                          <span className={styles.detailLabel}>Telefone</span>
+                          <span className={styles.pessoaDetailVal}>{fmtPhone(h.telefone)}</span>
+                        </div>
+                      )}
+                      {h.email && (
+                        <div className={styles.pessoaDetailRow}>
+                          <span className={styles.detailLabel}>E-mail</span>
+                          <span className={styles.pessoaDetailVal}>{h.email}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Add pessoa inline search */}
+              {showAddPessoa ? (
+                <div className={styles.addInlineBox}>
+                  <div className={styles.addInlineRow}>
+                    <Search size={13} />
+                    <input className={styles.addInlineInput}
+                      placeholder="Buscar por nome ou CPF..."
+                      value={pessoaQuery}
+                      onChange={(e) => handlePessoaQuery(e.target.value)}
+                      autoFocus />
+                    {pessoaSearching
+                      ? <Loader2 size={13} className={styles.spin} />
+                      : <button className={styles.removeIconBtn}
+                          onClick={() => { setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]); }}>
+                          <X size={12} />
+                        </button>
+                    }
+                  </div>
+                  {pessoaResults.length > 0 && (
+                    <div className={styles.inlineDropdown}>
+                      {pessoaResults.map((p) => (
+                        <button key={p.id} className={styles.inlineDropdownItem} onClick={() => handleAddPessoa(p)}>
+                          <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>
+                            {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{p.cpf}</div>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button className={styles.addLinkBtn} onClick={() => setShowAddPessoa(true)}>
+                  <Plus size={13} /> Adicionar pessoa
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Pagamentos ── */}
+          {activeTab === 'pagamentos' && (
+            <div className={styles.detailBody}>
+              {/* Summary */}
+              <div className={styles.finSummary}>
+                <div className={styles.finSummaryBox}>
+                  <span className={styles.finBoxLabel}>Total</span>
+                  <span className={styles.finTotal}>{fmtBRL(reserva.valorTotal)}</span>
+                </div>
+                <div className={styles.finSummaryBox}>
+                  <span className={styles.finBoxLabel}>Pago</span>
+                  <span className={styles.finPago}>{fmtBRL(totalPago)}</span>
+                </div>
+                <div className={styles.finSummaryBox}>
+                  <span className={styles.finBoxLabel}>Pendente</span>
+                  <span className={pendente > 0 ? styles.finPendente : styles.finPago}>
+                    {fmtBRL(Math.max(0, pendente))}
+                  </span>
+                </div>
+              </div>
+
+              {pagamentos.length === 0 && (
+                <div className={styles.emptyState}>Nenhum pagamento registrado.</div>
+              )}
+
+              {pagamentos.map((p) => (
+                <div key={p.id}
+                  className={[styles.pagCard, p.cancelado ? styles.pagCardCancelado : '', styles.pagCardClickable].join(' ')}
+                  onClick={() => setViewPagamento(p)}>
+                  <div className={styles.pagCardTop}>
+                    <div className={styles.pagCardMethod}>{p.formaPagamento || 'Pagamento'}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div className={p.cancelado ? styles.pagCardValorCancelado : styles.pagCardValor}>{fmtBRL(p.valor)}</div>
+                      {!p.cancelado && (
+                        <button className={styles.removeIconBtn} title="Cancelar pagamento"
+                          onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
+                          <Trash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {p.nomePagador && (
+                    <div className={styles.pagCardRow}>
+                      <span className={styles.detailLabel}>Pagador</span>
+                      <span className={styles.pagCardVal}>{p.nomePagador}</span>
+                    </div>
+                  )}
+                  {p.descricao && (
+                    <div className={styles.pagCardRow}>
+                      <span className={styles.detailLabel}>Descrição</span>
+                      <span className={styles.pagCardVal}>{p.descricao}</span>
+                    </div>
+                  )}
+                  {p.cancelado && (
+                    <div className={styles.pagCardCanceladoBadge}>Cancelado</div>
+                  )}
+                </div>
+              ))}
+
+              <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}>
+                <Plus size={13} /> Adicionar pagamento
+              </button>
+            </div>
+          )}
+
         </div>
-      </div>
-    </Modal>
+      </Modal>
+
+      <PaymentModal
+        open={showPayModal}
+        onClose={() => setShowPayModal(false)}
+        onConfirm={handleAddPagamento}
+        tiposPagamento={tiposPagamento}
+        isSubmitting={paySubmitting}
+        titularNome={reserva.titularNome}
+        canAplicarDesconto={false}
+      />
+
+      <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
+        title="Detalhes do Pagamento"
+        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>Fechar</Button></div>}
+      >
+        {viewPagamento && (
+          <div className={styles.detailBody}>
+            {viewPagamento.cancelado && (
+              <div className={styles.pagViewCanceladoBanner}>Pagamento Cancelado</div>
+            )}
+            <div className={styles.detailGrid2}>
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Forma de Pagamento</span>
+                <span className={styles.detailValue} style={{ fontSize: 14 }}>{viewPagamento.formaPagamento || '—'}</span>
+              </div>
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Valor</span>
+                <span className={[styles.detailValue, viewPagamento.cancelado ? styles.pagCardValorCancelado : styles.finPago].join(' ')}>
+                  {fmtBRL(viewPagamento.valor)}
+                </span>
+              </div>
+            </div>
+            {viewPagamento.nomePagador && (
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Pagador</span>
+                <span className={styles.detailValue} style={{ fontSize: 14 }}>{viewPagamento.nomePagador}</span>
+              </div>
+            )}
+            {viewPagamento.descricao && (
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Descrição</span>
+                <span className={styles.detailValue} style={{ fontSize: 14 }}>{viewPagamento.descricao}</span>
+              </div>
+            )}
+            {viewPagamento.funcionario && (
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Registrado por</span>
+                <span className={styles.detailValue} style={{ fontSize: 14 }}>{viewPagamento.funcionario}</span>
+              </div>
+            )}
+            {viewPagamento.dataRegistro && (
+              <div className={styles.detailBox}>
+                <span className={styles.detailLabel}>Data de Registro</span>
+                <span className={styles.detailValue} style={{ fontSize: 14 }}>{viewPagamento.dataRegistro}</span>
+              </div>
+            )}
+            {viewPagamento.cancelado && viewPagamento.motivoCancelamento && (
+              <div className={[styles.detailBox, styles.pagViewCancelBox].join(' ')}>
+                <span className={styles.detailLabel}>Motivo do Cancelamento</span>
+                <span className={styles.detailValue} style={{ fontSize: 13, fontWeight: 500 }}>{viewPagamento.motivoCancelamento}</span>
+                {viewPagamento.funcMotivo && (
+                  <span className={styles.detailSub}>por {viewPagamento.funcMotivo}{viewPagamento.dataMotivo ? ` — ${viewPagamento.dataMotivo}` : ''}</span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
+        title="Cancelar Pagamento"
+        footer={
+          <div className={styles.footerRight}>
+            <Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button>
+            <Button variant="danger"
+              disabled={!cancelMotivo.trim() || cancelSubmitting}
+              onClick={handleConfirmCancelPagamento}>
+              {cancelSubmitting ? <><Loader2 size={13} className={styles.spin} /> Cancelando...</> : 'Confirmar'}
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>
+          Informe o motivo do cancelamento deste pagamento.
+        </p>
+        <textarea
+          className={styles.motivoTextarea}
+          placeholder="Motivo do cancelamento..."
+          rows={3}
+          value={cancelMotivo}
+          onChange={(e) => setCancelMotivo(e.target.value)}
+        />
+      </Modal>
+    </>
   );
 }
 
@@ -581,7 +1045,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelec
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
+function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
   const STEPS = ['Tipo & Hóspedes', 'Quarto & Período', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(1);
@@ -596,7 +1060,7 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
   // Step 2: período único
   const [quartos,  setQuartos]  = useState(initialRoom ? [String(initialRoom)] : []);
   const [checkin,  setCheckin]  = useState(initialStart ? new Date(initialStart + 'T00:00:00') : null);
-  const [checkout, setCheckout] = useState(null);
+  const [checkout, setCheckout] = useState(initialEnd   ? new Date(initialEnd   + 'T00:00:00') : null);
 
   // Step 2: múltiplos períodos
   const [periodoMode, setPeriodoMode] = useState('unico'); // 'unico' | 'multiplos'
@@ -838,15 +1302,17 @@ function CreateModal({ initialRoom, initialStart, initialAvailable, reservas, on
       {/* ── Step 2: Quarto & Período ───────────────────────────────────────── */}
       {step === 2 && (
         <div className={styles.formStack}>
-          {/* Período mode tabs */}
-          <div className={styles.periodoTabs}>
-            {[['unico', 'Período Único'], ['multiplos', 'Múltiplos Períodos']].map(([v, l]) => (
-              <button key={v} type="button"
-                className={[styles.periodoTab, periodoMode === v ? styles.periodoTabActive : ''].join(' ')}
-                onClick={() => setPeriodoMode(v)}
-              >{l}</button>
-            ))}
-          </div>
+          {/* Período mode tabs — ocultos quando um quarto específico já foi pré-selecionado */}
+          {!initialRoom && (
+            <div className={styles.periodoTabs}>
+              {[['unico', 'Período Único'], ['multiplos', 'Múltiplos Períodos']].map(([v, l]) => (
+                <button key={v} type="button"
+                  className={[styles.periodoTab, periodoMode === v ? styles.periodoTabActive : ''].join(' ')}
+                  onClick={() => setPeriodoMode(v)}
+                >{l}</button>
+              ))}
+            </div>
+          )}
 
           {periodoMode === 'unico' && (
             <div className={styles.step2Grid}>
@@ -1066,8 +1532,20 @@ export default function BookingCalendar() {
     const ano = viewDate.getFullYear();
     reservaApi.listarPorMesAno({ mes, ano })
       .then((data) => {
-        const list = Array.isArray(data) ? data : [];
-        setReservas(list.map(normalizeReserva).filter((r) => r.dataInicio));
+        // Response shape: [{ data: "dd/MM/yyyy", reservas: [...] }]
+        // Flatten groups and deduplicate by id (a multi-day reserva appears in multiple groups)
+        const groups = Array.isArray(data) ? data : [];
+        const seenIds = new Set();
+        const flat = [];
+        for (const group of groups) {
+          for (const r of (group.reservas ?? [])) {
+            if (!seenIds.has(r.id)) {
+              seenIds.add(r.id);
+              flat.push(r);
+            }
+          }
+        }
+        setReservas(flat.map(normalizeReserva).filter((r) => r.dataInicio));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -1236,6 +1714,17 @@ export default function BookingCalendar() {
     await reservaApi.cancelar(id);
     setReservas((rs) => rs.filter((r) => r.id !== id));
     notify('Reserva cancelada.');
+  };
+
+  const handleUpdateReserva = async (body) => {
+    try {
+      const upd = await reservaApi.atualizar(body);
+      setReservas((rs) => rs.map((r) => r.id === body.id ? normalizeReserva(upd) : r));
+      notify('Reserva atualizada!');
+    } catch (e) {
+      notify(e?.message ?? 'Erro ao atualizar reserva.', 'error');
+      throw e;
+    }
   };
 
   // ── Render bars ────────────────────────────────────────────────────────────
@@ -1489,9 +1978,9 @@ export default function BookingCalendar() {
       </div>
 
       {/* Modals */}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} categorias={categorias} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} onUpdate={handleUpdateReserva} onNotify={notify} categorias={categorias} />}
       {showCreateModal && (
-        <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialAvailable={createInit.available}
+        <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
           reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} />
       )}
       {dayModal && (

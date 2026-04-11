@@ -393,6 +393,26 @@ export const reservaApi = {
     return request(`/reserva/${id}/cancelar`, { method: 'PUT' });
   },
 
+  /** Vincula uma pessoa a uma reserva. */
+  adicionarPessoa(reservaId, pessoaId) {
+    return request(`/reserva/${reservaId}/pessoa`, { method: 'POST', body: { id: pessoaId, representante: false } });
+  },
+
+  /** Remove uma pessoa de uma reserva. */
+  removerPessoa(reservaId, pessoaId) {
+    return request(`/reserva/${reservaId}/pessoa/${pessoaId}`, { method: 'DELETE' });
+  },
+
+  /** Registra um pagamento em uma reserva. */
+  adicionarPagamento(reservaId, body) {
+    return request(`/reserva/${reservaId}/pagamento`, { method: 'POST', body });
+  },
+
+  /** Cancela um pagamento informando o motivo. */
+  cancelarPagamento(pagId, motivoCancelamento) {
+    return request(`/pagamento/${pagId}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
+  },
+
   /**
    * Calcula preços antes de confirmar reserva.
    * @param {Array<{ fk_quarto, data_entrada, data_saida, quantidade_adultos, idades_criancas? }>} body
