@@ -48,7 +48,10 @@
 .monthLabel {
   font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize;
   min-width: 148px; text-align: center; padding: 7px 12px; user-select: none;
+  background: none; border: none; cursor: pointer; font-family: inherit;
+  transition: color 0.12s;
 }
+.monthLabel:hover { color: var(--violet); }
 .todayBtn {
   padding: 7px 14px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--surface); color: var(--violet);
@@ -695,7 +698,14 @@
 }
 .comboGroup { margin-bottom: 8px; }
 .comboGroup:last-child { margin-bottom: 0; }
-.comboGroupLabel { font-size: 10px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.comboGroupLabel {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  background: #1e293b;
+  padding: 5px 10px;
+  margin: 0 0 2px 0;
+  position: sticky; top: 0; z-index: 1;
+}
 .comboChips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 
 /* ── Room buttons ──────────────────────────────────────────────────────────── */
@@ -712,6 +722,36 @@
 .finSummaryBox { display: flex; flex-direction: column; gap: 4px; padding: 11px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); text-align: center; }
 .finSummaryLabel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
 .finSummaryValue { font-size: 16px; font-weight: 800; color: var(--text); }
+
+/* ── Step 3 minimalist layout ───────────────────────────────────────────────── */
+.step3Root { display: flex; flex-direction: column; gap: 0; }
+.step3Section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.step3Section:last-child { border-bottom: none; }
+.step3SectionTitle {
+  display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2); margin-bottom: 10px;
+}
+.step3SectionHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.step3SectionHeader .step3SectionTitle { margin-bottom: 0; }
+
+/* ── Month picker ───────────────────────────────────────────────────────────── */
+.monthPickerCard {
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  z-index: 100; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+  padding: 12px; min-width: 220px;
+}
+.monthPickerYearRow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.monthPickerYear { font-size: 14px; font-weight: 700; color: var(--text); }
+.monthPickerArrow { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); color: var(--text-2); cursor: pointer; transition: background 0.12s; }
+.monthPickerArrow:hover { background: var(--bg); }
+.monthPickerGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.monthPickerCell { padding: 7px 4px; font-size: 12px; font-weight: 500; color: var(--text-2); border: 1px solid transparent; border-radius: 6px; background: none; cursor: pointer; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.monthPickerCell:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
+.monthPickerCellActive { background: var(--violet) !important; color: #fff !important; border-color: var(--violet) !important; font-weight: 700; }
 
 /* ── Payment section ───────────────────────────────────────────────────────── */
 .pagSectionHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }

@@ -390,9 +390,14 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
         title={<><BedDouble size={15} /> Quarto {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
         footer={
           <div className={styles.footerSpread}>
-            <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
-              Cancelar Reserva
-            </Button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                Cancelar Reserva
+              </Button>
+              <Button variant="secondary" onClick={() => onNotify({ type: 'info', message: 'Funcionalidade em breve.' })}>
+                Mover para Pernoites
+              </Button>
+            </div>
             {hasChanges ? (
               <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
                 {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
@@ -810,36 +815,38 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva, categorias, onSele
 }
 
 // ─── Room Modal ───────────────────────────────────────────────────────────────
-function RoomModal({ room, reservas, onClose, categorias }) {
+function RoomModal({ room, reservas, onClose, categorias, onSelectReserva }) {
   const cat          = categorias.find((c) => c.quartos.includes(room));
   const roomReservas = [...reservas].filter((r) => r.quarto === room).sort((a, b) => a.dataInicio.localeCompare(b.dataInicio));
+  const totalPessoas = roomReservas.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
   return (
     <Modal open onClose={onClose} size="md"
       title={<><BedDouble size={15} /> Quarto {fmtRoom(room)} — {cat?.nome || ''}</>}
       footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
     >
+      {/* Stats strip */}
+      <div className={styles.dayStatsStrip}>
+        <span className={styles.dayStatChip}><b>{roomReservas.length}</b> reserva{roomReservas.length !== 1 ? 's' : ''}</span>
+        <span className={styles.dayStatDivider} />
+        <span className={styles.dayStatChip}><b>{totalPessoas}</b> pessoa{totalPessoas !== 1 ? 's' : ''} no total</span>
+        <span className={styles.dayStatDivider} />
+        <span className={styles.dayStatChip}>{cat?.nome || '—'}</span>
+      </div>
       {roomReservas.length === 0 ? (
         <div className={styles.emptyState}>Nenhuma reserva registrada.</div>
       ) : (
-        <div className={styles.roomHistoryList}>
+        <div className={styles.dayRoomList}>
           {roomReservas.map((r) => {
-            const dias = diffDays(r.dataInicio, r.dataFim);
+            const dias     = diffDays(r.dataInicio, r.dataFim);
+            const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
             return (
-              <div key={r.id} className={styles.roomHistoryRow}>
-                <div className={styles.roomHistoryLeft}>
-                  <div className={styles.roomHistoryDates}>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataInicio)}</span>
-                    <span className={styles.roomHistoryArrow}>→</span>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataFim)}</span>
-                    <span className={styles.roomHistoryNights}>{diariasTxt(dias)}</span>
-                  </div>
-                  <div className={styles.roomHistoryTitle}>{r.titularNome}</div>
-                </div>
-                <div className={styles.roomHistoryHospedes}>
-                  {(r.hospedes || []).slice(0, 4).map((h) => (
-                    <div key={h.id} className={styles.initialsCircleSm} title={h.nome}>{initials(h.nome)}</div>
-                  ))}
-                  {(r.hospedes || []).length > 4 && <div className={styles.initialsCircleSm}>+{r.hospedes.length - 4}</div>}
+              <div key={r.id} className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`]].join(' ')}
+                onClick={() => onSelectReserva(r)}>
+                <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
+                <div className={styles.searchDropInfo}>
+                  <div className={styles.searchDropName}>{r.titularNome}</div>
+                  <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
                 </div>
                 <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
               </div>
@@ -978,7 +985,7 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
 }
 
 // ─── Room Combobox (single or multi-select) ───────────────────────────────────
-function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelect = false }) {
+function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelect = false, disabled = false }) {
   const [open,      setOpen]      = useState(false);
   const [filter,    setFilter]    = useState('');
   const [dropStyle, setDropStyle] = useState({});
@@ -1085,7 +1092,8 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelec
   return (
     <div className={styles.comboWrap}>
       <button ref={triggerRef} type="button" className={styles.comboTrigger}
-        onClick={() => { setOpen((o) => !o); setFilter(''); }}
+        onClick={() => { if (!disabled) { setOpen((o) => !o); setFilter(''); } }}
+        disabled={disabled} style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
       >
         <span className={value.length === 0 ? styles.comboPlaceholder : ''}>{label}</span>
         <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
@@ -1105,30 +1113,90 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelec
   );
 }
 
+// ─── Room Hospedes Picker ─────────────────────────────────────────────────────
+function RoomHospedesPicker({ value = [], onChange }) {
+  const [search,    setSearch]    = useState('');
+  const [results,   setResults]   = useState([]);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    if (search.trim().length < 2) { setResults([]); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
+        const list = Array.isArray(res) ? res : (res.content ?? []);
+        setResults(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })));
+      } catch { setResults([]); }
+      finally  { setSearching(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const add = (h) => {
+    if (value.find((x) => x.id === h.id)) return;
+    onChange([...value, h]);
+    setSearch(''); setResults([]);
+  };
+  const rem = (id) => onChange(value.filter((x) => x.id !== id));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className={styles.hospSearchWrap}>
+        {searching
+          ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
+          : <Search size={13} className={styles.hospSearchIcon} />}
+        <input className={styles.formInput} style={{ paddingLeft: 30 }} value={search}
+          onChange={(e) => setSearch(e.target.value)} placeholder="Buscar hóspede..." />
+      </div>
+      {results.length > 0 && (
+        <div className={styles.searchResultsList}>
+          {results.map((h) => (
+            <div key={h.id} className={styles.searchResultItem} onClick={() => add(h)}>
+              <div className={styles.initialsCircle}>{initials(h.nome)}</div>
+              <div><div className={styles.searchResultName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
+              <Plus size={13} className={styles.addIcon} />
+            </div>
+          ))}
+        </div>
+      )}
+      {value.length > 0 && (
+        <div className={styles.selectedChips}>
+          {value.map((h) => (
+            <div key={h.id} className={styles.hospedeChip}>
+              <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
+              <span>{h.nome}</span>
+              <button type="button" className={styles.chipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
 function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
-  const STEPS = ['Tipo & Hóspedes', 'Quarto & Período', 'Resumo & Pagamento'];
+  const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(1);
   const [tipo,        setTipo]        = useState('simples');  // 'simples' | 'grupo'
   const [isOrcamento, setIsOrcamento] = useState(false);
 
-  // Step 1: Hóspedes
-  const [hospSearch,       setHospSearch]       = useState('');
-  const [hospSelecionados, setHospSelecionados] = useState([]);
-  const [manualNome,       setManualNome]       = useState('');
 
   // Step 2: período único
-  const [quartos,  setQuartos]  = useState(initialRoom ? [String(initialRoom)] : []);
-  const [checkin,  setCheckin]  = useState(initialStart ? new Date(initialStart + 'T00:00:00') : null);
-  const [checkout, setCheckout] = useState(initialEnd   ? new Date(initialEnd   + 'T00:00:00') : null);
+  const [quartos,        setQuartos]        = useState(initialRoom ? [String(initialRoom)] : []);
+  const [checkin,        setCheckin]        = useState(initialStart ? new Date(initialStart + 'T00:00:00') : null);
+  const [checkout,       setCheckout]       = useState(initialEnd   ? new Date(initialEnd   + 'T00:00:00') : null);
+  const [quartoHospedes, setQuartoHospedes] = useState({}); // { [quartoId]: [hospede] }
 
   // Step 2: múltiplos períodos
-  const [periodoMode, setPeriodoMode] = useState('unico'); // 'unico' | 'multiplos'
-  const [periodos,    setPeriodos]    = useState([]);      // [{ rooms, checkin, checkout }]
-  const [mpRooms,     setMpRooms]     = useState([]);
-  const [mpCheckin,   setMpCheckin]   = useState(null);
-  const [mpCheckout,  setMpCheckout]  = useState(null);
+  const [periodoMode,    setPeriodoMode]    = useState('unico'); // 'unico' | 'multiplos'
+  const [periodos,       setPeriodos]       = useState([]);      // [{ rooms, checkin, checkout, roomHospedes }]
+  const [mpRooms,        setMpRooms]        = useState([]);
+  const [mpCheckin,      setMpCheckin]      = useState(null);
+  const [mpCheckout,     setMpCheckout]     = useState(null);
+  const [mpRoomHospedes, setMpRoomHospedes] = useState({}); // { [quartoId]: [hospede] } for current mp form
 
   // Step 3: Pagamentos
   const [pagamentos,     setPagamentos]     = useState([]);
@@ -1168,31 +1236,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     );
   }, [mpCheckin, mpCheckout, periodos, reservas, allRoomIds]);
 
-  // Financial (prices come from calcularPrecos; show 0 here as placeholder)
+  // Financial
   const valorTotal = 0;
   const totalPago  = pagamentos.reduce((s, p) => s + p.valor, 0);
   const pendente   = Math.max(0, valorTotal - totalPago);
-
-  // Guest search (real API)
-  const [filteredHospedes,  setFilteredHospedes]  = useState([]);
-  const [searchingHospedes, setSearchingHospedes] = useState(false);
-  useEffect(() => {
-    if (hospSearch.trim().length < 2) { setFilteredHospedes([]); return; }
-    const t = setTimeout(async () => {
-      setSearchingHospedes(true);
-      try {
-        const res  = await cadastroApi.listarPessoas({ termo: hospSearch.trim(), size: 6 });
-        const list = Array.isArray(res) ? res : (res.content ?? []);
-        setFilteredHospedes(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })));
-      } catch { setFilteredHospedes([]); }
-      finally  { setSearchingHospedes(false); }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [hospSearch]);
-
-  const addHospede  = (h)  => { if (hospSelecionados.find((x) => x.id === h.id)) return; setHospSelecionados((p) => [...p, h]); setHospSearch(''); };
-  const addManual   = ()   => { if (!manualNome.trim()) return; setHospSelecionados((p) => [...p, { id: `tmp-${Date.now()}`, nome: manualNome.trim(), cpf: '' }]); setManualNome(''); };
-  const remHospede  = (id) => setHospSelecionados((p) => p.filter((x) => x.id !== id));
 
   const addPagamento = (payment) => {
     setPagamentos((p) => [...p, { _localId: Date.now(), ...payment }]);
@@ -1201,8 +1248,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   const addPeriodo = () => {
     if (!mpRooms.length || !mpCheckin || !mpCheckout) return;
-    setPeriodos((p) => [...p, { rooms: [...mpRooms], checkin: mpCheckin, checkout: mpCheckout }]);
-    setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
+    setPeriodos((p) => [...p, { rooms: [...mpRooms], checkin: mpCheckin, checkout: mpCheckout, roomHospedes: { ...mpRoomHospedes } }]);
+    setMpRooms([]); setMpCheckin(null); setMpCheckout(null); setMpRoomHospedes({});
   };
 
   // Room type summary (group by category name)
@@ -1220,32 +1267,38 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     ? quartos.length > 0 && checkinStr && checkoutStr && dias > 0
     : periodos.length > 0;
 
+  // Derived: all unique hospedes across all rooms/periods
+  const allHospedes = useMemo(() => {
+    const seen = new Set();
+    const list = periodoMode === 'unico'
+      ? Object.values(quartoHospedes).flat()
+      : periodos.flatMap((p) => Object.values(p.roomHospedes || {}).flat());
+    return list.filter((h) => { if (seen.has(h.id)) return false; seen.add(h.id); return true; });
+  }, [periodoMode, quartoHospedes, periodos]);
+
   const handleSave = async () => {
     if (isOrcamento) { onNotify('Orçamento gerado! (Em desenvolvimento)'); onClose(); return; }
     setSaving(true);
     try {
-      // Only include pessoas that have a real backend ID (not temp manual entries)
-      const pessoasIds = hospSelecionados
+      const toIds = (hospedes) => (hospedes || [])
         .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
         .map((h) => ({ id: h.id }));
 
-      const buildItem = (quartoId, dataEntrada, dataSaida) => ({
+      const buildItem = (quartoId, dataEntrada, dataSaida, hospedes) => ({
         fk_quarto:    parseInt(quartoId),
         data_entrada: toBrDate(dataEntrada),
         data_saida:   toBrDate(dataSaida),
-        ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
-        ...(pagamentos.length ? {
-          pagamentos: pagamentos.map(({ _localId, ...pg }) => pg),
-        } : {}),
+        ...(hospedes?.length ? { pessoas: hospedes } : {}),
+        ...(pagamentos.length ? { pagamentos: pagamentos.map(({ _localId, ...pg }) => pg) } : {}),
       });
 
       let reservasBody;
       if (periodoMode === 'multiplos') {
         reservasBody = periodos.flatMap((p) =>
-          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout)))
+          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout), toIds(p.roomHospedes?.[q] || [])))
         );
       } else {
-        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr));
+        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || [])));
       }
       await onSave(reservasBody);
     } finally { setSaving(false); }
@@ -1299,7 +1352,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         </div>
       )}
 
-      {/* ── Step 1: Tipo & Hóspedes ────────────────────────────────────────── */}
+      {/* ── Step 1: Tipo ──────────────────────────────────────────────────── */}
       {step === 1 && (
         <div className={styles.formStack}>
           <FormField label="Tipo de Reserva">
@@ -1317,45 +1370,6 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 <span>Simular Orçamento</span>
               </label>
             </div>
-          </FormField>
-
-          <FormField label="Hóspedes">
-            <div className={styles.hospSearchWrap}>
-              {searchingHospedes
-                ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
-                : <Search size={13} className={styles.hospSearchIcon} />}
-              <input className={styles.formInput} style={{ paddingLeft: 30 }} value={hospSearch}
-                onChange={(e) => setHospSearch(e.target.value)} placeholder="Buscar hóspede cadastrado..." />
-            </div>
-            {filteredHospedes.length > 0 && (
-              <div className={styles.searchResultsList}>
-                {filteredHospedes.slice(0, 6).map((h) => (
-                  <div key={h.id} className={styles.searchResultItem} onClick={() => addHospede(h)}>
-                    <div className={styles.initialsCircle}>{initials(h.nome)}</div>
-                    <div><div className={styles.searchResultName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
-                    <Plus size={13} className={styles.addIcon} />
-                  </div>
-                ))}
-              </div>
-            )}
-            {hospSelecionados.length > 0 && (
-              <div className={styles.selectedChips}>
-                {hospSelecionados.map((h) => (
-                  <div key={h.id} className={styles.hospedeChip}>
-                    <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
-                    <span>{h.nome}</span>
-                    <button type="button" className={styles.chipRemove} onClick={() => remHospede(h.id)}><X size={10} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-            {isOrcamento && (
-              <div className={styles.manualRow}>
-                <input className={styles.formInput} value={manualNome} onChange={(e) => setManualNome(e.target.value)}
-                  placeholder="Nome do titular (para orçamento)..." onKeyDown={(e) => e.key === 'Enter' && addManual()} />
-                <Button variant="secondary" onClick={addManual} disabled={!manualNome.trim()}><Plus size={13} /></Button>
-              </div>
-            )}
           </FormField>
         </div>
       )}
@@ -1376,22 +1390,33 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           )}
 
           {periodoMode === 'unico' && (
-            <div className={styles.step2Grid}>
-              <FormField label="Período de estadia">
-                <div className={styles.dateCompact}>
-                  <DatePicker mode="range" startDate={checkin} endDate={checkout}
-                    onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); }}
-                    placeholder="Check-in → Check-out" minDate={new Date()} />
-                </div>
-              </FormField>
-              <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
-                <RoomCombobox value={quartos}
-                  onChange={setQuartos}
-                  availableRooms={availableRooms}
-                  categorias={categorias}
-                  singleSelect={tipo !== 'grupo'} />
-              </FormField>
-            </div>
+            <>
+              <div className={styles.step2Grid}>
+                <FormField label="Período de estadia">
+                  <div className={styles.dateCompact}>
+                    <DatePicker mode="range" startDate={checkin} endDate={checkout}
+                      onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); }}
+                      placeholder="Check-in → Check-out" minDate={new Date()} />
+                  </div>
+                </FormField>
+                <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
+                  <RoomCombobox value={quartos}
+                    onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
+                    availableRooms={availableRooms}
+                    categorias={categorias}
+                    singleSelect={tipo !== 'grupo'}
+                    disabled={!checkinStr || !checkoutStr} />
+                </FormField>
+              </div>
+              {/* Per-room hospedes */}
+              {quartos.map((q) => (
+                <FormField key={q} label={`Hóspedes — Quarto ${fmtRoom(parseInt(q))}`}>
+                  <RoomHospedesPicker
+                    value={quartoHospedes[q] || []}
+                    onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))} />
+                </FormField>
+              ))}
+            </>
           )}
 
           {periodoMode === 'multiplos' && (
@@ -1405,6 +1430,23 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         <div className={styles.periodoItemInfo}>
                           <span className={styles.periodoItemRooms}>{p.rooms.map((q) => `#${fmtRoom(parseInt(q))}`).join(', ')}</span>
                           <span className={styles.periodoItemDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(diffDays(ci, co))}</span>
+                          {p.rooms.some((q) => p.roomHospedes?.[q]?.length > 0) && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+                              {p.rooms.filter((q) => p.roomHospedes?.[q]?.length > 0).map((q) => (
+                                <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 10, color: 'var(--text-2)', fontWeight: 600 }}>#{fmtRoom(parseInt(q))}</span>
+                                  <div className={styles.selectedChips} style={{ margin: 0 }}>
+                                    {p.roomHospedes[q].map((h) => (
+                                      <div key={h.id} className={styles.hospedeChip}>
+                                        <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
+                                        <span>{h.nome}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <button type="button" className={styles.chipRemove} onClick={() => setPeriodos((ps) => ps.filter((_, j) => j !== i))}><X size={12} /></button>
                       </div>
@@ -1413,48 +1455,94 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 </div>
               )}
               <div className={styles.mpForm}>
-                <FormField label="Quartos para este período">
-                  <RoomCombobox value={mpRooms} onChange={setMpRooms} availableRooms={mpAvailableRooms} categorias={categorias} />
-                </FormField>
-                <FormField label="Período">
-                  <div className={styles.dateCompact}>
-                    <DatePicker mode="range" startDate={mpCheckin} endDate={mpCheckout}
-                      onRangeChange={({ start, end }) => { setMpCheckin(start); setMpCheckout(end); }}
-                      placeholder="Check-in → Check-out" minDate={new Date()} />
-                  </div>
-                </FormField>
+                <div className={styles.step2Grid}>
+                  <FormField label="Período">
+                    <div className={styles.dateCompact}>
+                      <DatePicker mode="range" startDate={mpCheckin} endDate={mpCheckout}
+                        onRangeChange={({ start, end }) => { setMpCheckin(start); setMpCheckout(end); }}
+                        placeholder="Check-in → Check-out" minDate={new Date()} />
+                    </div>
+                  </FormField>
+                  <FormField label="Quartos para este período">
+                    <RoomCombobox value={mpRooms}
+                      onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
+                      availableRooms={mpAvailableRooms} categorias={categorias}
+                      disabled={!mpCheckin || !mpCheckout} />
+                  </FormField>
+                </div>
+                {/* Per-room hospedes for this period */}
+                {mpRooms.map((q) => (
+                  <FormField key={q} label={`Hóspedes — Quarto ${fmtRoom(parseInt(q))}`}>
+                    <RoomHospedesPicker
+                      value={mpRoomHospedes[q] || []}
+                      onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))} />
+                  </FormField>
+                ))}
                 <Button variant="secondary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout} onClick={addPeriodo}>
                   <Plus size={13} /> Adicionar Período
                 </Button>
               </div>
             </>
           )}
+
         </div>
       )}
 
       {/* ── Step 3: Resumo & Pagamentos ───────────────────────────────────── */}
       {step === 3 && (
-        <div className={styles.formStack}>
-          <div className={styles.finSummaryGrid}>
-            <div className={styles.finSummaryBox}>
-              <span className={styles.finSummaryLabel}>Total</span>
-              <span className={styles.finSummaryValue}>{fmtBRL(valorTotal)}</span>
-            </div>
-            <div className={styles.finSummaryBox}>
-              <span className={styles.finSummaryLabel}>Pago</span>
-              <span className={[styles.finSummaryValue, styles.finPago].join(' ')}>{fmtBRL(totalPago)}</span>
-            </div>
-            <div className={styles.finSummaryBox}>
-              <span className={styles.finSummaryLabel}>Pendente</span>
-              <span className={[styles.finSummaryValue, pendente > 0 ? styles.finPendente : styles.finPago].join(' ')}>{fmtBRL(pendente)}</span>
+        <div className={styles.step3Root}>
+          {/* Financial strip */}
+          <div className={styles.finStrip}>
+            <span className={styles.finStripItem}>Total <b>{fmtBRL(valorTotal)}</b></span>
+            <span className={styles.finStripDivider} />
+            <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b></span>
+            <span className={styles.finStripDivider} />
+            <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b></span>
+          </div>
+
+          {/* Resumo section */}
+          <div className={styles.step3Section}>
+            <span className={styles.step3SectionTitle}>Resumo da Reserva</span>
+            <div className={styles.kvList}>
+              {allSelectedRooms.length > 0 && <>
+                <div className={styles.kvRow}><span className={styles.kvLabel}>Quarto{allSelectedRooms.length > 1 ? 's' : ''}</span><span className={styles.kvVal}>{allSelectedRooms.map((q) => `#${fmtRoom(parseInt(q))}`).join(', ')}</span></div>
+                {roomSummaryStr && <div className={styles.kvRow}><span className={styles.kvLabel}>Disposição</span><span className={styles.kvVal}>{roomSummaryStr}</span></div>}
+              </>}
+              {periodoMode === 'unico' && checkinStr && checkoutStr && (
+                <div className={styles.kvRow}><span className={styles.kvLabel}>Período</span><span className={styles.kvVal}>{fmtDateBR(checkinStr)} → {fmtDateBR(checkoutStr)} ({diariasTxt(dias)})</span></div>
+              )}
+              {periodoMode === 'multiplos' && periodos.map((p, i) => {
+                const ci = formatDate(p.checkin); const co = formatDate(p.checkout);
+                return <div key={i} className={styles.kvRow}><span className={styles.kvLabel}>Período {i + 1}</span><span className={styles.kvVal}>{p.rooms.map((q) => `#${fmtRoom(parseInt(q))}`).join(', ')} · {fmtDateBR(ci)} → {fmtDateBR(co)}</span></div>;
+              })}
+              {allHospedes.length > 0 && (
+                <div className={styles.kvRow}><span className={styles.kvLabel}>Titular</span><span className={styles.kvVal}>{allHospedes[0]?.nome}</span></div>
+              )}
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal} style={{ textTransform: 'capitalize' }}>{tipo}{isOrcamento ? ' (orçamento)' : ''}</span></div>
             </div>
           </div>
 
+          {/* Hóspedes section */}
+          {allHospedes.length > 0 && (
+            <div className={styles.step3Section}>
+              <span className={styles.step3SectionTitle}>Hóspedes</span>
+              <div className={styles.hospedeList}>
+                {allHospedes.map((h) => (
+                  <div key={h.id} className={styles.hospedeRow}>
+                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+                    <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pagamentos section */}
           {!isOrcamento && (
-            <div className={styles.detailBox}>
-              <div className={styles.pagSectionHeader}>
-                <span className={styles.detailLabel}>Pagamentos</span>
-                <Button variant="secondary" onClick={() => setShowPagModal(true)}><Plus size={13} /> Adicionar</Button>
+            <div className={styles.step3Section}>
+              <div className={styles.step3SectionHeader}>
+                <span className={styles.step3SectionTitle}>Pagamentos</span>
+                <button className={styles.addLinkBtn} onClick={() => setShowPagModal(true)}><Plus size={12} /> Adicionar</button>
               </div>
               {pagamentos.length === 0 ? (
                 <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
@@ -1473,41 +1561,6 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               )}
             </div>
           )}
-
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Resumo da Reserva</span>
-            {allSelectedRooms.length > 0 && (
-              <>
-                <div className={styles.finRow}><span>Quarto{allSelectedRooms.length > 1 ? 's' : ''}:</span><span>{allSelectedRooms.map((q) => `#${fmtRoom(parseInt(q))}`).join(', ')}</span></div>
-                {roomSummaryStr && <div className={styles.finRow}><span>Disposição:</span><span>{roomSummaryStr}</span></div>}
-              </>
-            )}
-            {periodoMode === 'unico' && checkinStr && checkoutStr && (
-              <div className={styles.finRow}><span>Período:</span><span>{fmtDateBR(checkinStr)} → {fmtDateBR(checkoutStr)} ({diariasTxt(dias)})</span></div>
-            )}
-            {periodoMode === 'multiplos' && periodos.map((p, i) => {
-              const ci = formatDate(p.checkin); const co = formatDate(p.checkout);
-              return <div key={i} className={styles.finRow}><span>Período {i + 1}:</span><span>{p.rooms.map((q) => `#${fmtRoom(parseInt(q))}`).join(', ')} · {fmtDateBR(ci)} → {fmtDateBR(co)}</span></div>;
-            })}
-            {(hospSelecionados.length > 0 || manualNome.trim()) && (
-              <div className={styles.finRow}><span>Titular:</span><span>{hospSelecionados[0]?.nome || manualNome.trim()}</span></div>
-            )}
-            <div className={styles.finRow}><span>Tipo:</span><span style={{ textTransform: 'capitalize' }}>{tipo}{isOrcamento ? ' (orçamento)' : ''}</span></div>
-          </div>
-
-          {hospSelecionados.length > 0 && (
-            <div className={styles.detailBox}>
-              <span className={styles.detailLabel}>Hóspedes</span>
-              <div className={styles.hospedeList}>
-                {hospSelecionados.map((h) => (
-                  <div key={h.id} className={styles.hospedeRow}>
-                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                    <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
       </div>
@@ -1518,7 +1571,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         onClose={() => setShowPagModal(false)}
         onConfirm={addPagamento}
         tiposPagamento={tiposPagamento}
-        titularNome={hospSelecionados[0]?.nome || manualNome.trim() || null}
+        titularNome={allHospedes[0]?.nome || null}
         canAplicarDesconto={false}
       />
     </Modal>
@@ -1541,7 +1594,9 @@ export default function BookingCalendar() {
   const [searchTerm,      setSearchTerm]      = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
-  const [dayModal,  setDayModal]  = useState(null);
+  const [dayModal,        setDayModal]        = useState(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
   const [roomModal, setRoomModal] = useState(null);
   const [selRoom,   setSelRoom]   = useState(null);
   const [selStart,  setSelStart]  = useState(null);
@@ -1551,8 +1606,9 @@ export default function BookingCalendar() {
   const [confirmData, setConfirmData] = useState(null);
   const [notif,       setNotif]       = useState(null);
 
-  const lastHoverRef = useRef(null);
-  const searchRef    = useRef(null);
+  const lastHoverRef   = useRef(null);
+  const searchRef      = useRef(null);
+  const monthPickerRef = useRef(null);
 
   const notify = useCallback((msg, type = 'success') => {
     setNotif({ message: msg, type });
@@ -1620,6 +1676,14 @@ export default function BookingCalendar() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  // Close month picker on outside click
+  useEffect(() => {
+    if (!showMonthPicker) return;
+    const h = (e) => { if (monthPickerRef.current && !monthPickerRef.current.contains(e.target)) setShowMonthPicker(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [showMonthPicker]);
+
   const days        = Array.from({ length: VISIBLE_DAYS }, (_, i) => { const d = new Date(viewDate); d.setDate(d.getDate() + i); return d; });
   const daysStr     = days.map((d) => formatDate(d));
   const firstDayStr = daysStr[0];
@@ -1646,7 +1710,7 @@ export default function BookingCalendar() {
     ? reservas.filter((r) => r.titularNome.toLowerCase().includes(searchTerm.toLowerCase()) || (r.empresaNome && r.empresaNome.toLowerCase().includes(searchTerm.toLowerCase()))).slice(0, 8)
     : [];
 
-  const navigateToReserva = (r) => { setViewDate(new Date(r.dataInicio + 'T00:00:00')); setSearchTerm(''); setShowSearchDropdown(false); };
+  const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setSelectedReserva(r); };
 
   const solicitadasCount = reservas.filter((r) => r.status === 'solicitada').length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
@@ -1891,10 +1955,37 @@ export default function BookingCalendar() {
             <p className={styles.subtitle}>Visualize e gerencie reservas por quarto e período</p>
           </div>
           <div className={styles.tableTools}>
-            <div className={styles.navGroup}>
+            <div className={styles.navGroup} style={{ position: 'relative' }} ref={monthPickerRef}>
               <button className={styles.navBtn} onClick={() => shiftMonth(-1)}><ChevronLeft size={14} /></button>
-              <span className={styles.monthLabel}>{monthLabel}</span>
+              <button className={styles.monthLabel} onClick={() => { setPickerYear(viewDate.getFullYear()); setShowMonthPicker((v) => !v); }}>
+                {monthLabel}
+              </button>
               <button className={styles.navBtn} onClick={() => shiftMonth(1)}><ChevronRight size={14} /></button>
+              {showMonthPicker && (
+                <div className={styles.monthPickerCard}>
+                  <div className={styles.monthPickerYearRow}>
+                    <button className={styles.monthPickerArrow} onClick={() => setPickerYear((y) => y - 1)}><ChevronLeft size={13} /></button>
+                    <span className={styles.monthPickerYear}>{pickerYear}</span>
+                    <button className={styles.monthPickerArrow} onClick={() => setPickerYear((y) => y + 1)}><ChevronRight size={13} /></button>
+                  </div>
+                  <div className={styles.monthPickerGrid}>
+                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => {
+                      const isActive = pickerYear === viewDate.getFullYear() && i === viewDate.getMonth();
+                      return (
+                        <button key={i}
+                          className={[styles.monthPickerCell, isActive ? styles.monthPickerCellActive : ''].join(' ')}
+                          onClick={() => {
+                            const d = new Date(pickerYear, i, 1);
+                            setViewDate(d);
+                            setShowMonthPicker(false);
+                          }}>
+                          {m}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <button className={styles.todayBtn} onClick={goToToday}>Hoje</button>
 
@@ -2053,8 +2144,8 @@ export default function BookingCalendar() {
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
+      {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
       {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} onUpdate={handleUpdateReserva} onNotify={notify} categorias={categorias} />}
-      {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} />}
       {showSolicitacoes && (
         <SolicitacoesModal reservas={reservas} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
           onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
