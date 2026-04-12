@@ -651,15 +651,15 @@
 /* ── Múltiplos períodos form ───────────────────────────────────────────────── */
 .periodosList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
 .periodoItem {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  background: color-mix(in srgb, var(--violet) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--violet) 20%, transparent);
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 .periodoItemInfo  { flex: 1; display: flex; flex-direction: column; gap: 4px; }
 .periodoItemRooms { font-size: 13px; font-weight: 600; color: var(--violet); }
 .periodoItemDates { font-size: 13px; font-weight: 600; color: var(--text); }
-.periodoItemRoomNum { font-size: 13px; font-weight: 700; color: var(--violet); min-width: 32px; }
+.periodoItemRoomNum { font-size: 12px; font-weight: 700; color: var(--text-2); min-width: 32px; }
 .mpForm { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
 
 /* ── Hóspede search ────────────────────────────────────────────────────────── */
@@ -750,13 +750,66 @@
 .step3SectionHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .step3SectionHeader .step3SectionTitle { margin-bottom: 0; }
 
+/* Period block in step 3 */
+.step3PeriodoBlock {
+  margin-bottom: 24px;
+}
+.step3PeriodoBlock:last-child { margin-bottom: 0; }
+
+.step3PeriodoBand {
+  display: flex; align-items: center; gap: 12px;
+  padding: 7px 12px;
+  background: #1e293b;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: 12px;
+}
+.step3PeriodoBandLabel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: rgba(255,255,255,0.55); flex-shrink: 0;
+}
+.step3PeriodoBandDates {
+  font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.9);
+}
+
+.step3PeriodoContent {
+  display: flex; flex-direction: column; gap: 0;
+}
+
+/* Room block in step 3 */
+.step3RoomBlock {
+  display: flex; flex-direction: column;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.step3RoomBlock:last-child { border-bottom: none; margin-bottom: 0; }
+
+/* Generic section inside room block */
+.step3RoomSection {
+  padding: 10px 0 4px;
+}
+
+/* Payment sub-section — darker tinted background */
+.step3PaySection {
+  display: flex; flex-direction: column;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--text) 5%, var(--surface-2));
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 4px 0;
+}
+.step3PayLabel {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2); margin-bottom: 6px;
+}
+
 /* Room label inside step 3 */
 .step3RoomLabel {
   font-size: 11px; font-weight: 700; color: var(--violet);
   text-transform: uppercase; letter-spacing: .05em;
-  padding: 4px 0 2px;
+  padding: 10px 0 0;
   border-bottom: 1px solid color-mix(in srgb, var(--violet) 20%, var(--border));
-  margin-bottom: 2px;
+  padding-bottom: 4px;
 }
 
 /* ── Month picker ───────────────────────────────────────────────────────────── */

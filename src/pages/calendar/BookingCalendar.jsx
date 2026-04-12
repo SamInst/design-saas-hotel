@@ -1225,7 +1225,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [quartosPag,     setQuartosPag]     = useState({});         // { [quartoId]: [payment] } individual
   const [showPagModal,   setShowPagModal]   = useState(false);
   const [showPagModalRoom, setShowPagModalRoom] = useState(null);   // quartoId for individual mode
-  const [observacao,     setObservacao]     = useState('');
+  const [quartosObs,     setQuartosObs]     = useState({}); // { [quartoId]: string }
   const [tiposPagamento, setTiposPagamento] = useState([]);
   const [saving,         setSaving]         = useState(false);
 
@@ -1311,7 +1311,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           data_saida:   toBrDate(dataSaida),
           ...(hospedes?.length ? { pessoas: hospedes } : {}),
           ...(roomPags.length  ? { pagamentos: roomPags } : {}),
-          ...(observacao.trim() ? { observacao: observacao.trim() } : {}),
+          ...(quartosObs[quartoId]?.trim() ? { observacao: quartosObs[quartoId].trim() } : {}),
         };
       };
 
@@ -1463,7 +1463,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                   <span className={styles.periodoItemRoomNum}>#{fmtRoom(parseInt(q))}</span>
                                   {hosp.length > 0
                                     ? hosp.map((h, hi) => (
-                                        <span key={h.id} style={{ fontSize: 12, color: 'var(--violet)', fontWeight: 500 }}>
+                                        <span key={h.id} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 400 }}>
                                           {h.nome}{hi < hosp.length - 1 ? ',' : ''}
                                         </span>
                                       ))
@@ -1564,55 +1564,65 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               const co = p.checkout ? formatDate(p.checkout) : checkoutStr;
               const dias2 = ci && co ? diffDays(ci, co) : 0;
               return (
-                <div key={pi}>
-                  <div className={styles.kvList} style={{ padding: '0 0 10px' }}>
-                    <div className={styles.kvRow}><span className={styles.kvLabel}>Check-in</span><span className={styles.kvVal}>{fmtDateBR(ci)}</span></div>
-                    <div className={styles.kvRow}><span className={styles.kvLabel}>Check-out</span><span className={styles.kvVal}>{fmtDateBR(co)} ({diariasTxt(dias2)})</span></div>
+                <div key={pi} className={styles.step3PeriodoBlock}>
+                  <div className={styles.step3PeriodoBand}>
+                    <span className={styles.step3PeriodoBandLabel}>{periodoMode === 'multiplos' ? `Período ${pi + 1}` : 'Período'}</span>
+                    <span className={styles.step3PeriodoBandDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(dias2)}</span>
                   </div>
+                  <div className={styles.step3PeriodoContent}>
                   {p.rooms.map((q) => {
                     const qHosp = (p.roomHospedes || {})[q] || [];
                     return (
-                      <div key={q} style={{ marginBottom: 16 }}>
+                      <div key={q} className={styles.step3RoomBlock}>
                         <div className={styles.step3RoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
-                        {qHosp.length > 0 ? (
-                          <div className={styles.hospedeList} style={{ marginTop: 10 }}>
-                            {qHosp.map((h) => (
-                              <div key={h.id} className={styles.hospedeRow}>
-                                <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                                <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className={styles.pagEmpty} style={{ padding: '4px 0' }}>Sem hóspedes vinculados</div>
-                        )}
-                        {/* Payment per room */}
+
+                        {/* Hóspedes */}
+                        <div className={styles.step3RoomSection}>
+                          {qHosp.length > 0 ? (
+                            <div className={styles.hospedeList}>
+                              {qHosp.map((h) => (
+                                <div key={h.id} className={styles.hospedeRow}>
+                                  <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+                                  <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                          )}
+                        </div>
+
+                        {/* Pagamento */}
                         {!isOrcamento && (
-                          <div style={{ marginTop: 8 }}>
+                          <div className={styles.step3PaySection}>
+                            <span className={styles.step3PayLabel}>Pagamento</span>
                             {renderPagList(
                               quartosPag[q] || [],
                               (lid) => setQuartosPag((prev) => ({ ...prev, [q]: (prev[q] || []).filter((x) => x._localId !== lid) }))
                             )}
-                            <button className={styles.addLinkBtn} style={{ marginTop: 4 }}
+                            <button className={styles.addLinkBtn} style={{ marginTop: 6 }}
                               onClick={() => { setShowPagModalRoom(q); setShowPagModal(true); }}>
                               <Plus size={12} /> Adicionar pagamento
                             </button>
                           </div>
                         )}
+
+                        {/* Observação */}
+                        <div className={styles.step3RoomSection}>
+                          <textarea className={styles.obsTextarea} rows={2}
+                            placeholder="Observação para este quarto (opcional)..."
+                            value={quartosObs[q] || ''}
+                            onChange={(e) => setQuartosObs((prev) => ({ ...prev, [q]: e.target.value }))} />
+                        </div>
                       </div>
                     );
                   })}
+                  </div>{/* end step3PeriodoContent */}
                 </div>
               );
             })}
 
 
-            {/* ── Observação ── */}
-            <div style={{ paddingTop: 4, paddingBottom: 14 }}>
-              <textarea className={styles.obsTextarea} rows={3}
-                placeholder="Observações sobre a reserva (opcional)..."
-                value={observacao} onChange={(e) => setObservacao(e.target.value)} />
-            </div>
 
           </div>
         );
