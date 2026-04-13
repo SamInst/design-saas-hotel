@@ -433,9 +433,10 @@
 .addInlineInput { flex: 1; background: none; border: none; outline: none; font-size: 13px; color: var(--text); }
 .addInlineInput::placeholder { color: var(--text-2); }
 .inlineDropdown { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
-.inlineDropdownItem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: none; border: none; border-bottom: 1px solid var(--border); cursor: pointer; text-align: left; transition: background 0.1s; }
+.inlineDropdownItem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: none; border: none; border-bottom: 1px solid var(--border); cursor: pointer; text-align: left; transition: background 0.1s; width: 100%; }
 .inlineDropdownItem:last-child { border-bottom: none; }
-.inlineDropdownItem:hover { background: var(--surface-2); }
+.inlineDropdownItem:hover:not(:disabled) { background: var(--surface-2); }
+.inlineDropdownItemBlocked { opacity: 0.55; cursor: not-allowed; }
 
 /* ── Add link button ───────────────────────────────────────────────────────── */
 .addLinkBtn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px dashed var(--border); border-radius: var(--radius); cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-2); padding: 8px 12px; width: 100%; justify-content: center; transition: border-color 0.15s, color 0.15s; }
@@ -702,9 +703,39 @@
   border-bottom: 1px solid var(--border); transition: background 0.1s;
 }
 .searchResultItem:last-child { border-bottom: none; }
-.searchResultItem:hover { background: var(--surface-2); }
+.searchResultItem:not(.searchResultBlocked):hover { background: var(--surface-2); }
+.searchResultBlocked { opacity: 0.55; cursor: not-allowed; }
 .searchResultName { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; }
 .addIcon { margin-left: auto; color: var(--violet); flex-shrink: 0; }
+/* Companion selection panel */
+.companionHeader { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.companionBack { display: flex; align-items: center; gap: 4px; background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text-2); padding: 2px 0; font-family: inherit; }
+.companionBack:hover { color: var(--text); }
+.companionRow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.companionRow:last-of-type { border-bottom: none; }
+.companionRowClickable { cursor: pointer; }
+.companionRowClickable:hover { background: var(--surface-2); }
+.companionCheck {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+.companionChecked { background: var(--violet); border-color: var(--violet); color: #fff; }
+.companionInfo { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.companionName { font-size: 13px; font-weight: 500; color: var(--text); }
+.companionMeta { font-size: 11px; color: var(--text-2); }
+.companionActions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.companionBtnSecondary { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; font-family: inherit; }
+.companionBtnSecondary:hover { background: var(--surface-2); }
+.companionBtnPrimary { padding: 5px 12px; border: none; border-radius: 6px; background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.companionBtnPrimary:hover { opacity: 0.88; }
+.titularChip { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--violet); padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--violet) 10%, transparent); flex-shrink: 0; }
+.companionCountChip { font-size: 10px; font-weight: 600; color: var(--text-2); padding: 1px 5px; border-radius: 4px; background: var(--surface-2); flex-shrink: 0; }
+
+.blockedChip {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: #ef4444; padding: 1px 6px; border-radius: 4px;
+  background: color-mix(in srgb, #ef4444 12%, transparent); white-space: nowrap; flex-shrink: 0;
+}
 .selectedChips { display: flex; flex-wrap: wrap; gap: 6px; }
 .hospedeChip {
   display: flex; align-items: center; gap: 5px; padding: 3px 8px 3px 4px;
@@ -767,7 +798,7 @@
 .finSummaryValue { font-size: 16px; font-weight: 800; color: var(--text); }
 
 /* ── Step 3 minimalist layout ───────────────────────────────────────────────── */
-.step3Root { display: flex; flex-direction: column; padding: 4px 16px 16px; }
+.step3Root { display: flex; flex-direction: column; padding: 14px 16px 16px; }
 .step3Section {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
@@ -792,6 +823,11 @@
   background: #1e293b;
   border-radius: 4px 4px 0 0;
   margin-bottom: 12px;
+}
+.step3PeriodoBandTop {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: #1e293b;
 }
 .step3PeriodoBandLabel {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -820,18 +856,22 @@
 }
 
 /* Payment sub-section — darker tinted background */
-.step3PaySection {
-  display: flex; flex-direction: column;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--text) 5%, var(--surface-2));
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  margin: 4px 0;
+.step3PayArea { display: flex; flex-direction: column; gap: 0; padding: 6px 0 0; }
+.step3PayHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.step3AddPagBtn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 6px;
+  border: 1px solid var(--violet); background: color-mix(in srgb, var(--violet) 10%, transparent);
+  color: var(--violet); font-size: 11px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background 0.12s;
 }
-.step3PayLabel {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2); margin-bottom: 6px;
-}
+.step3AddPagBtn:hover { background: color-mix(in srgb, var(--violet) 18%, transparent); }
+.step3PagRow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.step3PagRow:last-child { border-bottom: none; }
+.step3PagRowTop { display: flex; align-items: center; gap: 8px; }
+.step3PagDesc { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.step3PagVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
+.step3PagMeta { font-size: 11px; color: var(--text-2); }
 
 /* Room label inside step 3 */
 .step3RoomLabel {
@@ -840,6 +880,7 @@
   padding: 10px 0 0;
   border-bottom: 1px solid color-mix(in srgb, var(--violet) 20%, var(--border));
   padding-bottom: 4px;
+  margin-bottom: 10px;
 }
 
 /* Step 3 price breakdown */
@@ -866,6 +907,27 @@
 /* Summary bar extras */
 .summaryTotal { font-weight: 700; color: var(--emerald); margin-left: auto; }
 .summaryCalcLoader { margin-left: auto; display: flex; align-items: center; }
+
+/* ── Collapsible price card (Step 3) ───────────────────────────────────────── */
+.priceCard {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: var(--surface-2);
+}
+.priceCardHeader {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: none; border: none; cursor: pointer;
+  color: inherit; text-align: left;
+}
+.priceCardHeader:hover { background: color-mix(in srgb, var(--border) 30%, transparent); }
+.priceCardSummary { flex: 1; display: flex; align-items: center; gap: 0; }
+.priceCardChevron { color: var(--text-2); flex-shrink: 0; transition: transform .15s; }
+.priceCardChevronOpen { color: var(--text-2); flex-shrink: 0; transform: rotate(180deg); transition: transform .15s; }
+.priceCardBody { border-top: 1px solid var(--border); padding: 8px 12px; display: flex; flex-direction: column; gap: 12px; }
+.priceCardRoom { display: flex; flex-direction: column; gap: 3px; }
+.priceCardRoomLabel { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.priceCardRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.priceCardRowRight { display: flex; align-items: center; gap: 8px; }
+.priceCardBase { font-size: 11px; color: var(--text-2); text-decoration: line-through; }
 
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {

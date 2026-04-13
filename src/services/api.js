@@ -415,12 +415,10 @@ export const reservaApi = {
 
   /** Calcula preço de um quarto para um período com as datas de nascimento dos hóspedes. */
   calcularPreco({ fk_quarto, data_entrada, data_saida, datas_nascimento = [] }) {
-    const qs = new URLSearchParams();
-    qs.append('fk_quarto', fk_quarto);
-    qs.append('data_entrada', data_entrada);
-    qs.append('data_saida', data_saida);
-    datas_nascimento.forEach((d) => qs.append('datas_nascimento', d));
-    return request(`/reserva/calcular-preco?${qs.toString()}`);
+    // Dates use dd/MM/yyyy — build manually to avoid URLSearchParams encoding "/" as "%2F"
+    const parts = [`fk_quarto=${fk_quarto}`, `data_entrada=${data_entrada}`, `data_saida=${data_saida}`];
+    datas_nascimento.forEach((d) => parts.push(`datas_nascimento=${d}`));
+    return request(`/reserva/calcular-preco?${parts.join('&')}`);
   },
 };
 

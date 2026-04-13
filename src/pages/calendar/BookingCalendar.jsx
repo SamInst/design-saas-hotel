@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell,
+  ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell, Check,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -66,6 +66,7 @@ const normalizeReserva = (r) => {
     empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
+    observacao:              r.observacao ?? null,
     quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
     dataInicio:              parseBrDate(r.data_hora_entrada),
     dataFim:                 parseBrDate(r.data_hora_saida),
@@ -160,7 +161,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categorias }) {
+function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categorias, tiposPagamento }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
   const [editing,      setEditing]      = useState(false);
   const [editQuarto,   setEditQuarto]   = useState([String(reserva.quarto)]);
@@ -198,19 +199,15 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
   const [pessoaResults,   setPessoaResults]   = useState([]);
   const [pessoaSearching, setPessoaSearching] = useState(false);
   const [showAddPessoa,   setShowAddPessoa]   = useState(false);
+  const [pendingPessoa,   setPendingPessoa]   = useState(null); // { titular, selected: Set<id> }
   const pessoaTimerRef = useRef(null);
 
   // ── Pagamentos ─────────────────────────────────────────────────────────────
   const [pagamentos,     setPagamentos]     = useState(reserva.pagamentos ?? []);
-  const [tiposPagamento, setTiposPagamento] = useState([]);
   const [showPayModal,   setShowPayModal]   = useState(false);
   const [cancelPagId,    setCancelPagId]    = useState(null);
   const [cancelMotivo,   setCancelMotivo]   = useState('');
   const [viewPagamento,  setViewPagamento]  = useState(null);
-
-  useEffect(() => {
-    enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
-  }, []);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPago  = pagamentos.filter((p) => !p.cancelado).reduce((s, p) => s + (p.valor ?? 0), 0);
@@ -237,7 +234,18 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
       cadastroApi.listarPessoas({ termo: val.trim(), size: 8 })
         .then((res) => {
           const list = Array.isArray(res) ? res : (res?.content ?? []);
-          setPessoaResults(list.map((p) => p.pessoa ?? p));
+          setPessoaResults(list.map((p) => {
+            const r = p.pessoa ?? p;
+            return {
+              ...r,
+              bloqueado: r.status === 'BLOQUEADO',
+              acompanhantes: (r.acompanhantes ?? []).map((a) => ({
+                id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+                bloqueado: a.status === 'BLOQUEADO',
+                idade: a.idade ?? null,
+              })),
+            };
+          }));
         })
         .catch(() => {})
         .finally(() => setPessoaSearching(false));
@@ -252,9 +260,33 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
       telefone: p.celular ?? p.telefone ?? '', email: p.email ?? '',
     }]);
     addOp({ type: 'addPessoa', pessoaId: p.id });
-    setShowAddPessoa(false);
-    setPessoaQuery('');
-    setPessoaResults([]);
+  };
+
+  const handlePessoaResultClick = (p) => {
+    if (p.bloqueado) return;
+    if (p.acompanhantes?.length > 0) {
+      setPendingPessoa({ titular: p, selected: new Set() });
+    } else {
+      handleAddPessoa(p);
+      setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]);
+    }
+  };
+
+  const togglePendingAcomp = (id) => setPendingPessoa((prev) => {
+    const next = new Set(prev.selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return { ...prev, selected: next };
+  });
+
+  const confirmAddPessoas = (withCompanions) => {
+    const toAdd = [pendingPessoa.titular];
+    if (withCompanions) {
+      pendingPessoa.titular.acompanhantes
+        .filter((a) => !a.bloqueado && pendingPessoa.selected.has(a.id))
+        .forEach((a) => toAdd.push(a));
+    }
+    toAdd.forEach((p) => handleAddPessoa(p));
+    setPendingPessoa(null); setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]);
   };
 
   const handleRemovePessoa = (pessoaId) => {
@@ -472,6 +504,13 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                 )}
               </div>
 
+              {reserva.observacao && (
+                <div className={styles.dadosRegistrado}>
+                  <span className={styles.kvLabel}>Observação</span>
+                  <span className={styles.kvVal} style={{ whiteSpace: 'pre-wrap' }}>{reserva.observacao}</span>
+                </div>
+              )}
+
               {reserva.funcionario && (
                 <div className={styles.dadosRegistrado}>
                   <span className={styles.kvLabel}>Registrado por</span>
@@ -512,17 +551,59 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                         </button>
                     }
                   </div>
-                  {pessoaResults.length > 0 && (
+                  {(pessoaResults.length > 0 || pendingPessoa) && (
                     <div className={styles.inlineDropdown}>
-                      {pessoaResults.map((p) => (
-                        <button key={p.id} className={styles.inlineDropdownItem} onClick={() => handleAddPessoa(p)}>
-                          <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>
-                            {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmtCpf(p.cpf)}</div>}
+                      {pendingPessoa ? (
+                        <>
+                          <div className={styles.companionHeader}>
+                            <button className={styles.companionBack} onClick={() => setPendingPessoa(null)}><ChevronLeft size={12} /> Voltar</button>
                           </div>
-                        </button>
-                      ))}
+                          {/* Titular */}
+                          <div className={styles.companionRow}>
+                            <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
+                            <div className={styles.companionInfo}>
+                              <span className={styles.companionName}>{pendingPessoa.titular.nome}</span>
+                              {pendingPessoa.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pendingPessoa.titular.cpf)}</span>}
+                            </div>
+                            <span className={styles.titularChip}>Titular</span>
+                          </div>
+                          {/* Companions */}
+                          {pendingPessoa.titular.acompanhantes.map((a) => (
+                            <div key={a.id}
+                              className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
+                              onClick={() => !a.bloqueado && togglePendingAcomp(a.id)}>
+                              <div className={[styles.companionCheck, pendingPessoa.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
+                                {pendingPessoa.selected.has(a.id) && <Check size={11} />}
+                              </div>
+                              <div className={styles.companionInfo}>
+                                <span className={styles.companionName}>{a.nome}</span>
+                                {a.cpf && <span className={styles.companionMeta}>{fmtCpf(a.cpf)}{a.idade ? ` · ${a.idade} anos` : ''}</span>}
+                              </div>
+                              {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                            </div>
+                          ))}
+                          <div className={styles.companionActions}>
+                            <button className={styles.companionBtnSecondary} onClick={() => confirmAddPessoas(false)}>Só o titular</button>
+                            <button className={styles.companionBtnPrimary} onClick={() => confirmAddPessoas(true)}>Adicionar →</button>
+                          </div>
+                        </>
+                      ) : (
+                        pessoaResults.map((p) => (
+                          <button key={p.id}
+                            className={[styles.inlineDropdownItem, p.bloqueado ? styles.inlineDropdownItemBlocked : ''].join(' ')}
+                            disabled={p.bloqueado}
+                            onClick={() => handlePessoaResultClick(p)}>
+                            <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>
+                              {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmtCpf(p.cpf)}</div>}
+                            </div>
+                            {p.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                            {p.acompanhantes?.length > 0 && !p.bloqueado && <span className={styles.companionCountChip}>{p.acompanhantes.length} acomp.</span>}
+                            {!p.bloqueado && <ChevronRight size={13} style={{ color: 'var(--text-2)', flexShrink: 0 }} />}
+                          </button>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>
@@ -1108,53 +1189,133 @@ function RoomHospedesPicker({ value = [], onChange }) {
   const [results,   setResults]   = useState([]);
   const [searching, setSearching] = useState(false);
   const [dropStyle, setDropStyle] = useState({});
+  const [pending,   setPending]   = useState(null); // { titular, selected: Set<id> }
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (search.trim().length < 2) { setResults([]); return; }
+    if (search.trim().length < 2) { setResults([]); setPending(null); return; }
     setSearching(true);
     const t = setTimeout(async () => {
       try {
         const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
         const list = Array.isArray(res) ? res : (res.content ?? []);
-        setResults(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '', dataNascimento: p.data_nascimento ?? '' })));
+        const mapPessoa = (p) => ({
+          id: p.id, nome: p.nome, cpf: p.cpf ?? '',
+          dataNascimento: p.data_nascimento ?? '',
+          bloqueado: p.status === 'BLOQUEADO',
+          acompanhantes: (p.acompanhantes ?? []).map((a) => ({
+            id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+            dataNascimento: a.data_nascimento ?? '',
+            bloqueado: a.status === 'BLOQUEADO',
+            idade: a.idade ?? null,
+          })),
+        });
+        setResults(list.map(mapPessoa));
       } catch { setResults([]); }
       finally  { setSearching(false); }
     }, 300);
     return () => clearTimeout(t);
   }, [search]);
 
-  // Position dropdown via fixed portal whenever results appear
-  useEffect(() => {
-    if (!results.length || !inputRef.current) return;
+  const calcDropPos = (maxH = 260) => {
+    if (!inputRef.current) return;
     const rect = inputRef.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom - 8;
-    setDropStyle({
-      position: 'fixed',
-      zIndex: 99999,
-      left: rect.left,
-      top: rect.bottom + 4,
-      width: rect.width,
-      maxHeight: Math.min(220, spaceBelow),
-    });
-  }, [results]);
-
-  const add = (h) => {
-    if (value.find((x) => x.id === h.id)) return;
-    onChange([...value, h]);
-    setSearch(''); setResults([]);
+    setDropStyle({ position: 'fixed', zIndex: 99999, left: rect.left, top: rect.bottom + 4, width: rect.width, maxHeight: Math.min(maxH, spaceBelow) });
   };
+
+  useEffect(() => { if (results.length) calcDropPos(); }, [results]);
+
+  const addMany = (list) => {
+    const existing = new Set(value.map((x) => x.id));
+    const toAdd = list.filter((h) => !existing.has(h.id));
+    if (toAdd.length) onChange([...value, ...toAdd]);
+  };
+
+  const handleResultClick = (h) => {
+    if (h.bloqueado) return;
+    if (h.acompanhantes?.length > 0) {
+      setPending({ titular: h, selected: new Set() });
+      calcDropPos(320);
+    } else {
+      addMany([h]);
+      setSearch(''); setResults([]);
+    }
+  };
+
+  const toggleCompanion = (id) => setPending((prev) => {
+    const next = new Set(prev.selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return { ...prev, selected: next };
+  });
+
+  const confirmAdd = (withCompanions) => {
+    const toAdd = [pending.titular];
+    if (withCompanions) {
+      pending.titular.acompanhantes
+        .filter((a) => !a.bloqueado && pending.selected.has(a.id))
+        .forEach((a) => toAdd.push(a));
+    }
+    addMany(toAdd);
+    setPending(null); setSearch(''); setResults([]);
+  };
+
   const rem = (id) => onChange(value.filter((x) => x.id !== id));
 
-  const dropdown = results.length > 0 && createPortal(
+  const showDrop = pending !== null || results.length > 0;
+  const dropdown = showDrop && createPortal(
     <div className={styles.searchResultsList} style={{ ...dropStyle, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
-      {results.map((h) => (
-        <div key={h.id} className={styles.searchResultItem} onClick={() => add(h)}>
-          <div className={styles.searchResultName}>{h.nome}</div>
-          {h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}
-          <Plus size={13} className={styles.addIcon} />
-        </div>
-      ))}
+      {pending ? (
+        <>
+          <div className={styles.companionHeader}>
+            <button className={styles.companionBack} onClick={() => setPending(null)}><ChevronLeft size={12} /> Voltar</button>
+          </div>
+          {/* Titular — always included */}
+          <div className={styles.companionRow}>
+            <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
+            <div className={styles.companionInfo}>
+              <span className={styles.companionName}>{pending.titular.nome}</span>
+              {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
+            </div>
+            <span className={styles.titularChip}>Titular</span>
+          </div>
+          {/* Companions */}
+          {pending.titular.acompanhantes.map((a) => (
+            <div key={a.id}
+              className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
+              onClick={() => !a.bloqueado && toggleCompanion(a.id)}>
+              <div className={[styles.companionCheck, pending.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
+                {pending.selected.has(a.id) && <Check size={11} />}
+              </div>
+              <div className={styles.companionInfo}>
+                <span className={styles.companionName}>{a.nome}</span>
+                <span className={styles.companionMeta}>
+                  {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
+                </span>
+              </div>
+              {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+            </div>
+          ))}
+          <div className={styles.companionActions}>
+            <button className={styles.companionBtnSecondary} onClick={() => confirmAdd(false)}>Só o titular</button>
+            <button className={styles.companionBtnPrimary} onClick={() => confirmAdd(true)}>Adicionar →</button>
+          </div>
+        </>
+      ) : (
+        results.map((h) => (
+          <div key={h.id}
+            className={[styles.searchResultItem, h.bloqueado ? styles.searchResultBlocked : ''].join(' ')}
+            onClick={() => handleResultClick(h)}>
+            <div className={styles.searchResultName}>{h.nome}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
+              {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
+              {h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+            </div>
+            {!h.bloqueado && <ChevronRight size={13} className={styles.addIcon} />}
+          </div>
+        ))
+      )}
     </div>,
     document.body
   );
@@ -1184,7 +1345,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
+function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento }) {
   const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(initialRoom ? 2 : 1);
@@ -1212,14 +1373,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [showPagModal,   setShowPagModal]   = useState(false);
   const [showPagModalRoom, setShowPagModalRoom] = useState(null);   // quartoId for individual mode
   const [quartosObs,     setQuartosObs]     = useState({}); // { [quartoId]: string }
-  const [tiposPagamento, setTiposPagamento] = useState([]);
-  const [saving,         setSaving]         = useState(false);
-  const [precosCalc,     setPrecosCalc]     = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
-  const [calcLoading,    setCalcLoading]    = useState(false);
-
-  useEffect(() => {
-    enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
-  }, []);
+  const [saving,      setSaving]      = useState(false);
+  const [precosCalc,       setPrecosCalc]       = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
+  const [calcLoading,      setCalcLoading]      = useState(false);
+  const [showPriceDetails, setShowPriceDetails] = useState(false);
+  const [roomPriceOpen,    setRoomPriceOpen]    = useState({}); // { [`${q}_${pi}`]: bool }
 
   // Derived
   const checkinStr  = checkin  ? formatDate(checkin)  : '';
@@ -1284,10 +1442,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   const isoToBr = (iso) => iso.split('-').reverse().join('/'); // "yyyy-MM-dd" → "dd/MM/yyyy"
 
-  const handleGoToStep3 = async () => {
-    setStep(3);
+  const runCalcPrecos = async () => {
     setCalcLoading(true);
     setPrecosCalc({});
+    setShowPriceDetails(false);
+    setRoomPriceOpen({});
     try {
       const displayPeriodos = periodoMode === 'unico'
         ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes }]
@@ -1300,12 +1459,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             const hospedes = p.roomHospedes?.[quartoId] || [];
             const datas_nascimento = hospedes
               .filter((h) => h.dataNascimento)
-              .map((h) => isoToBr(h.dataNascimento));
+              .map((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.dataNascimento) ? isoToBr(h.dataNascimento) : h.dataNascimento);
             try {
               const res = await reservaApi.calcularPreco({
-                fk_quarto: parseInt(quartoId),
-                data_entrada: toBrDate(new Date(p.checkin + 'T00:00:00')),
-                data_saida:   toBrDate(new Date(p.checkout + 'T00:00:00')),
+                fk_quarto:    parseInt(quartoId),
+                data_entrada: toBrDate(p.checkin),
+                data_saida:   toBrDate(p.checkout),
                 datas_nascimento,
               });
               results[`${quartoId}_${pi}`] = res;
@@ -1318,6 +1477,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       setCalcLoading(false);
     }
   };
+
+  const handleGoToStep3 = async () => { setStep(3); await runCalcPrecos(); };
 
   const handleSave = async () => {
     if (isOrcamento) { onNotify('Orçamento gerado! (Em desenvolvimento)'); onClose(); return; }
@@ -1357,7 +1518,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       title={<><Plus size={15} /> Nova Reserva</>}
       footer={
         <div className={styles.footerSpread}>
-          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) setPrecosCalc({}); }}>Voltar</Button>}</div>
+          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); } }}>Voltar</Button>}</div>
           <div className={styles.footerRight}>
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
             {step < 3 ? (
@@ -1383,8 +1544,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         ))}
       </div>
 
-      {/* Live summary bar */}
-      {(allSelectedRooms.length > 0 || checkinStr) && (
+      {/* Live summary bar — hidden on step 3 (replaced by period bands below) */}
+      {step !== 3 && (allSelectedRooms.length > 0 || checkinStr) && (
         <div className={styles.summaryBar}>
           {allSelectedRooms.length > 0 && (
             <span>{allSelectedRooms.length === 1 ? `Quarto ${fmtRoom(parseInt(allSelectedRooms[0]))}` : `${allSelectedRooms.length} quartos`}</span>
@@ -1396,11 +1557,13 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             <span>{periodos.length} período{periodos.length !== 1 ? 's' : ''}</span>
           )}
           {isOrcamento && <span className={styles.orcamentoBadge}>Orçamento</span>}
-          {step === 3 && calcLoading && <span className={styles.summaryCalcLoader}><Loader2 size={11} className={styles.spin} /></span>}
-          {step === 3 && !calcLoading && Object.keys(precosCalc).length > 0 && (() => {
-            const grand = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
-            return grand > 0 ? <span className={styles.summaryTotal}>{fmtBRL(grand)}</span> : null;
-          })()}
+        </div>
+      )}
+
+      {/* Period bands — shown on step 3 in place of summaryBar */}
+      {step === 3 && periodoMode === 'unico' && checkinStr && checkoutStr && (
+        <div className={styles.step3PeriodoBandTop}>
+          <span className={styles.step3PeriodoBandDates}>{fmtDateBR(checkinStr)} → {fmtDateBR(checkoutStr)} · {diariasTxt(dias)}</span>
         </div>
       )}
 
@@ -1552,35 +1715,76 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           ? [{ rooms: quartos, checkin, checkout, roomHospedes: quartoHospedes }]
           : periodos;
 
-        const renderPagList = (pags, onRemove) => (
-          pags.length === 0
-            ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
-            : pags.map((p) => {
-                const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
-                return (
-                  <div key={p._localId} className={styles.pagCard2}>
-                    <div className={styles.pagCard2Top}>
-                      <span className={styles.pagCard2Desc}>{p.descricao || tipDesc}</span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-                        <span className={styles.pagCard2Valor}>{fmtBRL(p.valor)}</span>
-                        <button type="button" className={styles.removeIconBtn} onClick={() => onRemove(p._localId)}><Trash2 size={11} /></button>
-                      </div>
-                    </div>
-                    <div className={styles.pagCard2Meta}>
-                      <span>{p._criadoEm}</span>
-                      <span className={styles.pagCard2Sep}>·</span>
-                      <span>{tipDesc}</span>
-                    </div>
-                    {p.nome_pagador && (
-                      <div className={styles.pagCard2Pagador}>{p.nome_pagador}</div>
-                    )}
-                  </div>
-                );
-              })
-        );
+
+        // Financial totals
+        const grandTotal   = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
+        const totalPago    = Object.values(quartosPag).flat().reduce((s, p) => s + (p.valor ?? 0), 0);
+        const pendente     = Math.max(0, grandTotal - totalPago);
 
         return (
           <div className={styles.step3Root}>
+
+            {/* ── Collapsible price card ── */}
+            <div className={styles.priceCard} style={{ marginBottom: 14 }}>
+              <button
+                className={styles.priceCardHeader}
+                onClick={() => !calcLoading && setShowPriceDetails((v) => !v)}
+              >
+                <span className={styles.priceCardSummary}>
+                  <span className={styles.finStripItem}>
+                    Valor Total{' '}
+                    {calcLoading
+                      ? <b><Loader2 size={11} className={styles.spin} /></b>
+                      : <b>{fmtBRL(grandTotal)}</b>
+                    }
+                  </span>
+                  <span className={styles.finStripDivider} />
+                  <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b></span>
+                  <span className={styles.finStripDivider} />
+                  <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b></span>
+                </span>
+                {!calcLoading && (
+                  <ChevronDown size={14} className={showPriceDetails ? styles.priceCardChevronOpen : styles.priceCardChevron} />
+                )}
+              </button>
+
+              {showPriceDetails && !calcLoading && (
+                <div className={styles.priceCardBody}>
+                  {displayPeriodos.map((p, pi) => (
+                    p.rooms.map((q) => {
+                      const calc = precosCalc[`${q}_${pi}`];
+                      if (!calc) return null;
+                      return (
+                        <div key={`${q}_${pi}`} className={styles.priceCardRoom}>
+                          {calc.detalhes?.map((d, di) => (
+                            <div key={di} className={styles.priceCardRow}>
+                              <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                              <div className={styles.priceCardRowRight}>
+                                {d.valor_base !== d.valor_final && (
+                                  <span className={styles.priceCardBase}>{fmtBRL(d.valor_base)}</span>
+                                )}
+                                <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {calc.sazonalidades_aplicadas?.length > 0 && (
+                            <div className={styles.step3SazRow}>
+                              {calc.sazonalidades_aplicadas.map((s) => (
+                                <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
+                              ))}
+                            </div>
+                          )}
+                          <div className={styles.step3PriceTotal}>
+                            <span>Total do quarto {fmtRoom(parseInt(q))}</span>
+                            <span>{fmtBRL(calc.valor_total)}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* ── Tipo de reserva ── */}
             <div className={styles.kvList} style={{ padding: '0 0 14px' }}>
@@ -1592,51 +1796,73 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             {displayPeriodos.map((p, pi) => {
               const ci = p.checkin ? formatDate(p.checkin) : checkinStr;
               const co = p.checkout ? formatDate(p.checkout) : checkoutStr;
-              const dias2 = ci && co ? diffDays(ci, co) : 0;
+              const d2 = ci && co ? diffDays(ci, co) : 0;
               return (
                 <div key={pi} className={styles.step3PeriodoBlock}>
-                  <div className={styles.step3PeriodoBand}>
-                    <span className={styles.step3PeriodoBandLabel}>{periodoMode === 'multiplos' ? `Período ${pi + 1}` : 'Período'}</span>
-                    <span className={styles.step3PeriodoBandDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(dias2)}</span>
-                  </div>
+                  {periodoMode === 'multiplos' && (
+                    <div className={styles.step3PeriodoBand}>
+                      <span className={styles.step3PeriodoBandLabel}>Período {pi + 1}</span>
+                      <span className={styles.step3PeriodoBandDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(d2)}</span>
+                    </div>
+                  )}
                   <div className={styles.step3PeriodoContent}>
                   {p.rooms.map((q) => {
-                    const qHosp = (p.roomHospedes || {})[q] || [];
+                    const qHosp  = (p.roomHospedes || {})[q] || [];
+                    const rKey   = `${q}_${pi}`;
+                    const rCalc  = precosCalc[rKey];
+                    const multiRoom = periodoMode === 'multiplos' || quartos.length > 1;
                     return (
                       <div key={q} className={styles.step3RoomBlock}>
                         <div className={styles.step3RoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
 
-                        {/* Preço calculado */}
-                        {(() => {
-                          const calc = precosCalc[`${q}_${pi}`];
-                          if (calc) return (
-                            <div className={styles.step3PriceBlock}>
-                              {calc.detalhes?.map((d, di) => (
-                                <div key={di} className={styles.step3PriceRow}>
-                                  <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                                </div>
-                              ))}
-                              {calc.sazonalidades_aplicadas?.length > 0 && (
-                                <div className={styles.step3SazRow}>
-                                  {calc.sazonalidades_aplicadas.map((s) => (
-                                    <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
-                                  ))}
-                                </div>
+                        {/* Per-room price card (multi-room only) */}
+                        {multiRoom && (rCalc || calcLoading) && (
+                          <div className={styles.priceCard} style={{ marginBottom: 10 }}>
+                            <button
+                              className={styles.priceCardHeader}
+                              onClick={() => !calcLoading && setRoomPriceOpen((prev) => ({ ...prev, [rKey]: !prev[rKey] }))}
+                            >
+                              <span className={styles.priceCardSummary}>
+                                <span className={styles.finStripItem}>
+                                  Valor Total{' '}
+                                  {calcLoading && !rCalc
+                                    ? <b><Loader2 size={11} className={styles.spin} /></b>
+                                    : <b>{fmtBRL(rCalc?.valor_total ?? 0)}</b>
+                                  }
+                                </span>
+                              </span>
+                              {!calcLoading && rCalc && (
+                                <ChevronDown size={14} className={roomPriceOpen[rKey] ? styles.priceCardChevronOpen : styles.priceCardChevron} />
                               )}
-                              <div className={styles.step3PriceTotal}>
-                                <span>Total do quarto</span>
-                                <span>{fmtBRL(calc.valor_total)}</span>
+                            </button>
+                            {roomPriceOpen[rKey] && !calcLoading && rCalc && (
+                              <div className={styles.priceCardBody}>
+                                {rCalc.detalhes?.map((d, di) => (
+                                  <div key={di} className={styles.priceCardRow}>
+                                    <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                                    <div className={styles.priceCardRowRight}>
+                                      {d.valor_base !== d.valor_final && (
+                                        <span className={styles.priceCardBase}>{fmtBRL(d.valor_base)}</span>
+                                      )}
+                                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {rCalc.sazonalidades_aplicadas?.length > 0 && (
+                                  <div className={styles.step3SazRow}>
+                                    {rCalc.sazonalidades_aplicadas.map((s) => (
+                                      <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className={styles.step3PriceTotal}>
+                                  <span>Total do quarto {fmtRoom(parseInt(q))}</span>
+                                  <span>{fmtBRL(rCalc.valor_total)}</span>
+                                </div>
                               </div>
-                            </div>
-                          );
-                          if (calcLoading) return (
-                            <div className={styles.step3PriceLoading}>
-                              <Loader2 size={11} className={styles.spin} /> calculando...
-                            </div>
-                          );
-                          return null;
-                        })()}
+                            )}
+                          </div>
+                        )}
 
                         {/* Hóspedes */}
                         <div className={styles.step3RoomSection}>
@@ -1645,7 +1871,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                               {qHosp.map((h) => (
                                 <div key={h.id} className={styles.hospedeRow}>
                                   <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                                  <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
+                                  <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}</div>
                                 </div>
                               ))}
                             </div>
@@ -1656,16 +1882,36 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
                         {/* Pagamento */}
                         {!isOrcamento && (
-                          <div className={styles.step3PaySection}>
-                            <span className={styles.step3PayLabel}>Pagamento</span>
-                            {renderPagList(
-                              quartosPag[q] || [],
-                              (lid) => setQuartosPag((prev) => ({ ...prev, [q]: (prev[q] || []).filter((x) => x._localId !== lid) }))
-                            )}
-                            <button className={styles.addLinkBtn} style={{ marginTop: 6 }}
-                              onClick={() => { setShowPagModalRoom(q); setShowPagModal(true); }}>
-                              <Plus size={12} /> Adicionar pagamento
-                            </button>
+                          <div className={styles.step3PayArea}>
+                            <div className={styles.step3PayHeader}>
+                              <span className={styles.step3RoomLabel} style={{ borderBottom: 'none', paddingBottom: 0 }}>Pagamento</span>
+                              <button className={styles.step3AddPagBtn}
+                                onClick={() => { setShowPagModalRoom(q); setShowPagModal(true); }}>
+                                <Plus size={11} /> Adicionar
+                              </button>
+                            </div>
+                            {(quartosPag[q] || []).length === 0
+                              ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
+                              : (quartosPag[q] || []).map((p) => {
+                                  const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
+                                  return (
+                                    <div key={p._localId} className={styles.step3PagRow}>
+                                      <div className={styles.step3PagRowTop}>
+                                        <span className={styles.step3PagDesc}>{p.descricao || tipDesc}</span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                                          <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
+                                          <button type="button" className={styles.removeIconBtn}
+                                            onClick={() => setQuartosPag((prev) => ({ ...prev, [q]: (prev[q] || []).filter((x) => x._localId !== p._localId) }))}>
+                                            <Trash2 size={11} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                      <div className={styles.step3PagMeta}>{p._criadoEm} · {tipDesc}</div>
+                                      {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
+                                    </div>
+                                  );
+                                })
+                            }
                           </div>
                         )}
 
@@ -1715,9 +1961,10 @@ export default function BookingCalendar() {
   const today    = new Date(); today.setHours(0, 0, 0, 0);
   const todayStr = formatDate(today);
 
-  const [reservas,    setReservas]    = useState([]);
-  const [categorias,  setCategorias]  = useState([]);
-  const [loading,     setLoading]     = useState(true);
+  const [reservas,       setReservas]       = useState([]);
+  const [categorias,     setCategorias]     = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [tiposPagamento, setTiposPagamento] = useState([]);
   const [viewDate,    setViewDate]    = useState(() => { const d = new Date(today); d.setDate(d.getDate() - 1); return d; });
   const [collapsedCats,   setCollapsedCats]   = useState({});
   const [selectedReserva, setSelectedReserva] = useState(null);
@@ -1746,6 +1993,8 @@ export default function BookingCalendar() {
     setNotif({ message: msg, type });
     setTimeout(() => setNotif(null), 3500);
   }, []);
+
+  useEffect(() => { enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {}); }, []);
 
   // ── Load categories + rooms, then cross-reference ────────────────────────
   useEffect(() => {
@@ -2271,7 +2520,7 @@ export default function BookingCalendar() {
       {/* Modals */}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
-          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} />
+          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} />
       )}
       {dayModal && (
         <DayModal dateStr={dayModal.dateStr} reservas={filteredReservas} onClose={() => setDayModal(null)} categorias={categorias}
@@ -2279,7 +2528,7 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} onUpdate={handleUpdateReserva} onNotify={notify} categorias={categorias} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} onUpdate={handleUpdateReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} />}
       {showSolicitacoes && (
         <SolicitacoesModal reservas={reservas} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
           onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
