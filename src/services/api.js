@@ -413,13 +413,14 @@ export const reservaApi = {
     return request(`/pagamento/${pagId}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
   },
 
-  /**
-   * Calcula preços antes de confirmar reserva.
-   * @param {Array<{ fk_quarto, data_entrada, data_saida, quantidade_adultos, idades_criancas? }>} body
-   * @returns {Promise<Array<ResultadoPreco>>}
-   */
-  calcularPrecos(body) {
-    return request('/reserva/calcular-preco', { method: 'POST', body });
+  /** Calcula preço de um quarto para um período com as datas de nascimento dos hóspedes. */
+  calcularPreco({ fk_quarto, data_entrada, data_saida, datas_nascimento = [] }) {
+    const qs = new URLSearchParams();
+    qs.append('fk_quarto', fk_quarto);
+    qs.append('data_entrada', data_entrada);
+    qs.append('data_saida', data_saida);
+    datas_nascimento.forEach((d) => qs.append('datas_nascimento', d));
+    return request(`/reserva/calcular-preco?${qs.toString()}`);
   },
 };
 

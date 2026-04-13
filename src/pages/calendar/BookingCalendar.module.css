@@ -458,8 +458,9 @@
 .finSummary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 10px 12px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border); }
 .finSummaryBox { display: flex; flex-direction: column; gap: 3px; }
 .pagCard { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border); }
-.pagCardClickable { cursor: pointer; transition: background 0.12s, border-color 0.12s; }
-.pagCardClickable:not(.pagCardCancelado):hover { background: color-mix(in srgb, var(--violet) 5%, var(--surface-2)); border-color: color-mix(in srgb, var(--violet) 30%, var(--border)); }
+.pagCardClickable { cursor: pointer; transition: background 0.12s, border-color 0.12s, opacity 0.12s; }
+.pagCard.pagCardClickable:not(.pagCardCancelado):hover { background: color-mix(in srgb, var(--violet) 5%, var(--surface-2)); border-color: color-mix(in srgb, var(--violet) 30%, var(--border)); }
+.pagRow.pagCardClickable:not(.pagRowCancelado):hover .pagRowDesc { color: var(--violet); }
 .pagCardCancelado { opacity: 0.45; filter: grayscale(1); }
 .pagCardCancelado.pagCardClickable { pointer-events: auto; cursor: pointer; }
 .pagCardTop { display: flex; align-items: center; justify-content: space-between; }
@@ -469,17 +470,36 @@
 .pagCardRow { display: flex; align-items: baseline; gap: 6px; }
 .pagCardVal { font-size: 12px; color: var(--text); }
 .pagCardCanceladoBadge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-2); padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text-2) 12%, transparent); width: fit-content; }
+/* Flat pessoa row */
+.pessoaRow { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pessoaRow:last-child { border-bottom: none; }
+
+/* Flat payment row (no background) */
+.pagRow { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.pagRow:last-child { border-bottom: none; }
+.pagRowCancelado { opacity: 0.45; filter: grayscale(1); }
+.pagCardClickable.pagRow { cursor: pointer; }
+.pagRowTop { display: flex; align-items: center; gap: 8px; }
+.pagRowDesc { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.pagRowVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
+.pagRowMeta { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+.pagRowPagador { font-size: 12px; color: var(--text-2); }
 /* ── Payment detail view ───────────────────────────────────────────────────── */
 .kvDetailRoot { display: flex; flex-direction: column; gap: 0; }
 
 /* Dados da Reserva – minimal room header */
-.dadosHeader { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.dadosHeader { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .dadosRoomPill {
-  font-size: 13px; font-weight: 700; color: var(--text);
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 3px 10px; white-space: nowrap;
+  font-size: 11px; font-weight: 700; color: var(--violet);
+  text-transform: uppercase; letter-spacing: .05em;
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+  border-radius: 5px; padding: 3px 10px; white-space: nowrap;
 }
 .dadosRoomCat { font-size: 13px; color: var(--text-2); flex: 1; }
+.dadosRegistrado {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+}
 .kvMeta { color: var(--text-2); font-size: 12px; }
 
 .kvSectionDivider {
@@ -821,6 +841,31 @@
   border-bottom: 1px solid color-mix(in srgb, var(--violet) 20%, var(--border));
   padding-bottom: 4px;
 }
+
+/* Step 3 price breakdown */
+.step3PriceBlock { padding: 6px 0 8px; display: flex; flex-direction: column; gap: 3px; }
+.step3PriceRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.step3PriceDesc { font-size: 12px; color: var(--text-2); }
+.step3PriceVal { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.step3PriceTotal {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+.step3SazRow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.step3SazChip {
+  font-size: 10px; font-weight: 600; color: var(--violet); padding: 1px 6px;
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+  border-radius: 4px; text-transform: uppercase; letter-spacing: .04em;
+}
+.step3PriceLoading {
+  font-size: 11px; color: var(--text-2); display: flex; align-items: center;
+  gap: 5px; padding: 4px 0;
+}
+
+/* Summary bar extras */
+.summaryTotal { font-weight: 700; color: var(--emerald); margin-left: auto; }
+.summaryCalcLoader { margin-left: auto; display: flex; align-items: center; }
 
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {

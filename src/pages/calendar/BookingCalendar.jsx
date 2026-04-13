@@ -65,6 +65,7 @@ const normalizeReserva = (r) => {
     titularNome:             titular?.nome ?? r.titular_nome ?? 'Hóspede',
     empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
+    dataHoraRegistro:        r.data_hora_registro ?? null,
     quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
     dataInicio:              parseBrDate(r.data_hora_entrada),
     dataFim:                 parseBrDate(r.data_hora_saida),
@@ -127,6 +128,7 @@ const diffDays  = (a, b) =>
   Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
 const fmtRoom   = (n) => String(n).padStart(2, '0');
 const fmtDateBR = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
+const fmtCpf = (v) => { const d = (v || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (v || ''); };
 const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
 
 const initials = (nome) => {
@@ -439,7 +441,6 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                 </span>
               </div>
 
-              <div className={styles.kvSectionDivider}>Período</div>
               <div className={styles.kvList}>
                 <div className={styles.kvRow}>
                   <span className={styles.kvLabel}>Check-in</span>
@@ -463,26 +464,22 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                   <span className={styles.kvLabel}>Duração</span>
                   <span className={styles.kvVal}>{diariasTxt(dias)}</span>
                 </div>
+                {reserva.empresaNome && (
+                  <div className={styles.kvRow}>
+                    <span className={styles.kvLabel}>Empresa</span>
+                    <span className={styles.kvVal}>{reserva.empresaNome}</span>
+                  </div>
+                )}
               </div>
 
-              {(reserva.empresaNome || reserva.funcionario) && (
-                <>
-                  <div className={styles.kvSectionDivider}>Informações</div>
-                  <div className={styles.kvList}>
-                    {reserva.empresaNome && (
-                      <div className={styles.kvRow}>
-                        <span className={styles.kvLabel}>Empresa</span>
-                        <span className={styles.kvVal}>{reserva.empresaNome}</span>
-                      </div>
-                    )}
-                    {reserva.funcionario && (
-                      <div className={styles.kvRow}>
-                        <span className={styles.kvLabel}>Registrado por</span>
-                        <span className={styles.kvVal}>{reserva.funcionario}</span>
-                      </div>
-                    )}
-                  </div>
-                </>
+              {reserva.funcionario && (
+                <div className={styles.dadosRegistrado}>
+                  <span className={styles.kvLabel}>Registrado por</span>
+                  <span className={styles.kvVal}>{reserva.funcionario}</span>
+                  {reserva.dataHoraRegistro && (
+                    <span className={styles.kvMeta}>{reserva.dataHoraRegistro}</span>
+                  )}
+                </div>
               )}
             </div>
           )}
@@ -522,7 +519,7 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                           <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>
-                            {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{p.cpf}</div>}
+                            {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmtCpf(p.cpf)}</div>}
                           </div>
                         </button>
                       ))}
@@ -536,14 +533,10 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
               )}
 
               {pessoas.map((h, i) => (
-                <div key={h.id} className={styles.pessoaCard}>
-                  <div className={styles.pessoaCardHeader}>
-                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                    <div className={styles.pessoaCardInfo}>
-                      <div className={styles.hospedeName}>{h.nome}</div>
-                      {h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}
-                    </div>
-                    <div className={styles.pessoaCardActions}>
+                <div key={h.id} className={styles.pessoaRow}>
+                  <div className={styles.pagRowTop}>
+                    <span className={styles.pagRowDesc}>{h.nome}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                       <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>
                         {i === 0 ? 'Titular' : 'Acompanhante'}
                       </span>
@@ -555,22 +548,8 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                       )}
                     </div>
                   </div>
-                  {(h.telefone || h.email) && (
-                    <div className={styles.pessoaCardDetails}>
-                      {h.telefone && (
-                        <div className={styles.pessoaDetailRow}>
-                          <span className={styles.detailLabel}>Telefone</span>
-                          <span className={styles.pessoaDetailVal}>{fmtPhone(h.telefone)}</span>
-                        </div>
-                      )}
-                      {h.email && (
-                        <div className={styles.pessoaDetailRow}>
-                          <span className={styles.detailLabel}>E-mail</span>
-                          <span className={styles.pessoaDetailVal}>{h.email}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {h.telefone && <div className={styles.pagRowMeta}>{fmtPhone(h.telefone)}</div>}
+                  {h.email && <div className={styles.pagRowMeta}>{h.email}</div>}
                 </div>
               ))}
 
@@ -599,12 +578,12 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
 
               {pagamentos.map((p) => (
                 <div key={p.id}
-                  className={[styles.pagCard, p.cancelado ? styles.pagCardCancelado : '', styles.pagCardClickable].join(' ')}
+                  className={[styles.pagRow, p.cancelado ? styles.pagRowCancelado : '', styles.pagCardClickable].join(' ')}
                   onClick={() => setViewPagamento(p)}>
-                  <div className={styles.pagCardTop}>
-                    <div className={styles.pagCardMethod}>{p.formaPagamento || 'Pagamento'}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div className={p.cancelado ? styles.pagCardValorCancelado : styles.pagCardValor}>{fmtBRL(p.valor)}</div>
+                  <div className={styles.pagRowTop}>
+                    <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                      <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
                       {!p.cancelado && (
                         <button className={styles.removeIconBtn} title="Cancelar pagamento"
                           onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
@@ -613,21 +592,13 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
                       )}
                     </div>
                   </div>
-                  {p.nomePagador && (
-                    <div className={styles.pagCardRow}>
-                      <span className={styles.detailLabel}>Pagador</span>
-                      <span className={styles.pagCardVal}>{p.nomePagador}</span>
-                    </div>
-                  )}
-                  {p.descricao && (
-                    <div className={styles.pagCardRow}>
-                      <span className={styles.detailLabel}>Descrição</span>
-                      <span className={styles.pagCardVal}>{p.descricao}</span>
-                    </div>
-                  )}
-                  {p.cancelado && (
-                    <div className={styles.pagCardCanceladoBadge}>Cancelado</div>
-                  )}
+                  <div className={styles.pagRowMeta}>
+                    {p.dataRegistro && <span>{p.dataRegistro}</span>}
+                    {p.dataRegistro && <span className={styles.pagCard2Sep}>·</span>}
+                    <span>{p.formaPagamento || '—'}</span>
+                  </div>
+                  {p.nomePagador && <div className={styles.pagRowPagador}>{p.nomePagador}</div>}
+                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
                 </div>
               ))}
 
@@ -1146,7 +1117,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
       try {
         const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
         const list = Array.isArray(res) ? res : (res.content ?? []);
-        setResults(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '' })));
+        setResults(list.map((p) => ({ id: p.id, nome: p.nome, cpf: p.cpf ?? '', dataNascimento: p.data_nascimento ?? '' })));
       } catch { setResults([]); }
       finally  { setSearching(false); }
     }, 300);
@@ -1243,6 +1214,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [quartosObs,     setQuartosObs]     = useState({}); // { [quartoId]: string }
   const [tiposPagamento, setTiposPagamento] = useState([]);
   const [saving,         setSaving]         = useState(false);
+  const [precosCalc,     setPrecosCalc]     = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
+  const [calcLoading,    setCalcLoading]    = useState(false);
 
   useEffect(() => {
     enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {});
@@ -1309,6 +1282,43 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     return list.filter((h) => { if (seen.has(h.id)) return false; seen.add(h.id); return true; });
   }, [periodoMode, quartoHospedes, periodos]);
 
+  const isoToBr = (iso) => iso.split('-').reverse().join('/'); // "yyyy-MM-dd" → "dd/MM/yyyy"
+
+  const handleGoToStep3 = async () => {
+    setStep(3);
+    setCalcLoading(true);
+    setPrecosCalc({});
+    try {
+      const displayPeriodos = periodoMode === 'unico'
+        ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes }]
+        : periodos.map((p) => ({ ...p, checkin: formatDate(p.checkin), checkout: formatDate(p.checkout) }));
+
+      const results = {};
+      await Promise.all(
+        displayPeriodos.flatMap((p, pi) =>
+          p.rooms.map(async (quartoId) => {
+            const hospedes = p.roomHospedes?.[quartoId] || [];
+            const datas_nascimento = hospedes
+              .filter((h) => h.dataNascimento)
+              .map((h) => isoToBr(h.dataNascimento));
+            try {
+              const res = await reservaApi.calcularPreco({
+                fk_quarto: parseInt(quartoId),
+                data_entrada: toBrDate(new Date(p.checkin + 'T00:00:00')),
+                data_saida:   toBrDate(new Date(p.checkout + 'T00:00:00')),
+                datas_nascimento,
+              });
+              results[`${quartoId}_${pi}`] = res;
+            } catch { /* silent */ }
+          })
+        )
+      );
+      setPrecosCalc(results);
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     if (isOrcamento) { onNotify('Orçamento gerado! (Em desenvolvimento)'); onClose(); return; }
     setSaving(true);
@@ -1347,11 +1357,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       title={<><Plus size={15} /> Nova Reserva</>}
       footer={
         <div className={styles.footerSpread}>
-          <div>{step > 1 && <Button variant="secondary" onClick={() => setStep((s) => s - 1)}>Voltar</Button>}</div>
+          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) setPrecosCalc({}); }}>Voltar</Button>}</div>
           <div className={styles.footerRight}>
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
             {step < 3 ? (
-              <Button variant="primary" disabled={step === 2 && !canNext2} onClick={() => setStep((s) => s + 1)}>Próximo</Button>
+              <Button variant="primary" disabled={step === 2 && !canNext2} onClick={step === 2 ? handleGoToStep3 : () => setStep((s) => s + 1)}>Próximo</Button>
             ) : (
               <Button variant="primary" disabled={!canNext2 || saving} onClick={handleSave}>
                 {saving && <Loader2 size={13} className={styles.spin} />}
@@ -1386,6 +1396,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             <span>{periodos.length} período{periodos.length !== 1 ? 's' : ''}</span>
           )}
           {isOrcamento && <span className={styles.orcamentoBadge}>Orçamento</span>}
+          {step === 3 && calcLoading && <span className={styles.summaryCalcLoader}><Loader2 size={11} className={styles.spin} /></span>}
+          {step === 3 && !calcLoading && Object.keys(precosCalc).length > 0 && (() => {
+            const grand = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
+            return grand > 0 ? <span className={styles.summaryTotal}>{fmtBRL(grand)}</span> : null;
+          })()}
         </div>
       )}
 
@@ -1590,6 +1605,38 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                     return (
                       <div key={q} className={styles.step3RoomBlock}>
                         <div className={styles.step3RoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
+
+                        {/* Preço calculado */}
+                        {(() => {
+                          const calc = precosCalc[`${q}_${pi}`];
+                          if (calc) return (
+                            <div className={styles.step3PriceBlock}>
+                              {calc.detalhes?.map((d, di) => (
+                                <div key={di} className={styles.step3PriceRow}>
+                                  <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                                </div>
+                              ))}
+                              {calc.sazonalidades_aplicadas?.length > 0 && (
+                                <div className={styles.step3SazRow}>
+                                  {calc.sazonalidades_aplicadas.map((s) => (
+                                    <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
+                                  ))}
+                                </div>
+                              )}
+                              <div className={styles.step3PriceTotal}>
+                                <span>Total do quarto</span>
+                                <span>{fmtBRL(calc.valor_total)}</span>
+                              </div>
+                            </div>
+                          );
+                          if (calcLoading) return (
+                            <div className={styles.step3PriceLoading}>
+                              <Loader2 size={11} className={styles.spin} /> calculando...
+                            </div>
+                          );
+                          return null;
+                        })()}
 
                         {/* Hóspedes */}
                         <div className={styles.step3RoomSection}>
