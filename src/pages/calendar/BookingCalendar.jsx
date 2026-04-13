@@ -1187,7 +1187,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
 function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias }) {
   const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
 
-  const [step,        setStep]        = useState(1);
+  const [step,        setStep]        = useState(initialRoom ? 2 : 1);
   const [tipo,        setTipo]        = useState('simples');  // 'simples' | 'grupo'
   const [isOrcamento, setIsOrcamento] = useState(false);
 
