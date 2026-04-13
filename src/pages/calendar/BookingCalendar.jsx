@@ -429,45 +429,60 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
 
           {/* ── Dados da Reserva ── */}
           {activeTab === 'dados' && (
-            <div className={styles.detailBody}>
-              <div className={styles.detailRoomHeader}>
-                <div className={styles.detailRoomBadge}>
-                  <span className={styles.detailRoomNum}>{fmtRoom(reserva.quarto)}</span>
-                </div>
-                <div>
-                  <div className={styles.detailRoomCat}>{cat?.nome || reserva.categoria}</div>
-                  <span className={[styles.statusBadge, styles[`status_${reserva.status}`]].join(' ')}>
-                    {STATUS_LABEL[reserva.status] ?? reserva.status}
+            <div className={styles.kvDetailRoot}>
+              {/* minimal room + status header */}
+              <div className={styles.dadosHeader}>
+                <div className={styles.dadosRoomPill}>{fmtRoom(reserva.quarto)}</div>
+                <span className={styles.dadosRoomCat}>{cat?.nome || reserva.categoria}</span>
+                <span className={[styles.statusBadge, styles[`status_${reserva.status}`]].join(' ')}>
+                  {STATUS_LABEL[reserva.status] ?? reserva.status}
+                </span>
+              </div>
+
+              <div className={styles.kvSectionDivider}>Período</div>
+              <div className={styles.kvList}>
+                <div className={styles.kvRow}>
+                  <span className={styles.kvLabel}>Check-in</span>
+                  <span className={styles.kvVal}>
+                    {fmtDateBR(reserva.dataInicio)}
+                    {reserva.chegadaPrevista && (
+                      <span className={styles.kvMeta}> · {reserva.chegadaPrevista.split(' ')[1] ?? '14:00'}</span>
+                    )}
                   </span>
                 </div>
+                <div className={styles.kvRow}>
+                  <span className={styles.kvLabel}>Check-out</span>
+                  <span className={styles.kvVal}>
+                    {fmtDateBR(reserva.dataFim)}
+                    {reserva.saidaPrevista && (
+                      <span className={styles.kvMeta}> · {reserva.saidaPrevista.split(' ')[1] ?? '12:00'}</span>
+                    )}
+                  </span>
+                </div>
+                <div className={styles.kvRow}>
+                  <span className={styles.kvLabel}>Duração</span>
+                  <span className={styles.kvVal}>{diariasTxt(dias)}</span>
+                </div>
               </div>
-              <div className={styles.detailGrid2}>
-                <div className={styles.detailBox}>
-                  <span className={styles.detailLabel}>Check-in</span>
-                  <span className={styles.detailValue}>{fmtDateBR(reserva.dataInicio)}</span>
-                  <span className={styles.detailSub}>{reserva.chegadaPrevista?.split(' ')[1] ?? '14:00'}</span>
-                </div>
-                <div className={styles.detailBox}>
-                  <span className={styles.detailLabel}>Check-out</span>
-                  <span className={styles.detailValue}>{fmtDateBR(reserva.dataFim)}</span>
-                  <span className={styles.detailSub}>{reserva.saidaPrevista?.split(' ')[1] ?? '12:00'}</span>
-                </div>
-              </div>
-              <div className={styles.detailBox}>
-                <span className={styles.detailLabel}>Período</span>
-                <span className={styles.detailValue}>{diariasTxt(dias)}</span>
-              </div>
-              {reserva.empresaNome && (
-                <div className={styles.detailBox}>
-                  <span className={styles.detailLabel}>Empresa</span>
-                  <span className={styles.detailValue} style={{ fontSize: 14 }}>{reserva.empresaNome}</span>
-                </div>
-              )}
-              {reserva.funcionario && (
-                <div className={styles.detailBox}>
-                  <span className={styles.detailLabel}>Registrado por</span>
-                  <span className={styles.detailValue} style={{ fontSize: 14 }}>{reserva.funcionario}</span>
-                </div>
+
+              {(reserva.empresaNome || reserva.funcionario) && (
+                <>
+                  <div className={styles.kvSectionDivider}>Informações</div>
+                  <div className={styles.kvList}>
+                    {reserva.empresaNome && (
+                      <div className={styles.kvRow}>
+                        <span className={styles.kvLabel}>Empresa</span>
+                        <span className={styles.kvVal}>{reserva.empresaNome}</span>
+                      </div>
+                    )}
+                    {reserva.funcionario && (
+                      <div className={styles.kvRow}>
+                        <span className={styles.kvLabel}>Registrado por</span>
+                        <span className={styles.kvVal}>{reserva.funcionario}</span>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}

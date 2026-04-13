@@ -472,6 +472,16 @@
 /* ── Payment detail view ───────────────────────────────────────────────────── */
 .kvDetailRoot { display: flex; flex-direction: column; gap: 0; }
 
+/* Dados da Reserva – minimal room header */
+.dadosHeader { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.dadosRoomPill {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px; white-space: nowrap;
+}
+.dadosRoomCat { font-size: 13px; color: var(--text-2); flex: 1; }
+.kvMeta { color: var(--text-2); font-size: 12px; }
+
 .kvSectionDivider {
   display: flex; align-items: center; gap: 8px;
   color: #1d4ed8; font-size: 11px; font-weight: 700;
