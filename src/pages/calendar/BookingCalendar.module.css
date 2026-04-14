@@ -887,10 +887,10 @@
 .step3PriceBlock { padding: 6px 0 8px; display: flex; flex-direction: column; gap: 3px; }
 .step3PriceRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .step3PriceDesc { font-size: 12px; color: var(--text-2); }
-.step3PriceVal { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.step3PriceVal { font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
 .step3PriceTotal {
   display: flex; justify-content: space-between; align-items: center;
-  margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border);
+  margin-top: 2px;
   font-size: 12px; font-weight: 700; color: var(--text);
 }
 .step3SazRow { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
@@ -922,12 +922,17 @@
 .priceCardSummary { flex: 1; display: flex; align-items: center; gap: 0; }
 .priceCardChevron { color: var(--text-2); flex-shrink: 0; transition: transform .15s; }
 .priceCardChevronOpen { color: var(--text-2); flex-shrink: 0; transform: rotate(180deg); transition: transform .15s; }
-.priceCardBody { border-top: 1px solid var(--border); padding: 8px 12px; display: flex; flex-direction: column; gap: 12px; }
-.priceCardRoom { display: flex; flex-direction: column; gap: 3px; }
-.priceCardRoomLabel { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.priceCardBody { border-top: 1px solid var(--border); padding: 0 12px; display: flex; flex-direction: column; }
+.priceCardBodyInner { padding: 10px 12px; gap: 6px; }
+.priceCardRoom { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.priceCardRoom:last-child { border-bottom: none; }
+.priceCardRoomLabel { font-size: 12px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .priceCardRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .priceCardRowRight { display: flex; align-items: center; gap: 8px; }
 .priceCardBase { font-size: 11px; color: var(--text-2); text-decoration: line-through; }
+.priceDetailItem { display: flex; flex-direction: column; gap: 2px; }
+.priceDetailSub { display: flex; gap: 8px; flex-wrap: wrap; }
+.priceDetailSub span { font-size: 11px; color: var(--text-2); }
 
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {

@@ -1756,15 +1756,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                       if (!calc) return null;
                       return (
                         <div key={`${q}_${pi}`} className={styles.priceCardRoom}>
+                          <div className={styles.priceCardRoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
                           {calc.detalhes?.map((d, di) => (
-                            <div key={di} className={styles.priceCardRow}>
-                              <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                              <div className={styles.priceCardRowRight}>
-                                {d.valor_base !== d.valor_final && (
-                                  <span className={styles.priceCardBase}>{fmtBRL(d.valor_base)}</span>
-                                )}
+                            <div key={di} className={styles.priceDetailItem}>
+                              <div className={styles.priceCardRow}>
+                                <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                 <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                               </div>
+                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                                <div className={styles.priceDetailSub}>
+                                  <span>Base {fmtBRL(d.valor_base)}</span>
+                                  {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                                  {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                                </div>
+                              )}
                             </div>
                           ))}
                           {calc.sazonalidades_aplicadas?.length > 0 && (
@@ -1775,7 +1780,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                             </div>
                           )}
                           <div className={styles.step3PriceTotal}>
-                            <span>Total do quarto {fmtRoom(parseInt(q))}</span>
+                            <span>Total</span>
                             <span>{fmtBRL(calc.valor_total)}</span>
                           </div>
                         </div>
@@ -1836,16 +1841,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                               )}
                             </button>
                             {roomPriceOpen[rKey] && !calcLoading && rCalc && (
-                              <div className={styles.priceCardBody}>
+                              <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
                                 {rCalc.detalhes?.map((d, di) => (
-                                  <div key={di} className={styles.priceCardRow}>
-                                    <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                                    <div className={styles.priceCardRowRight}>
-                                      {d.valor_base !== d.valor_final && (
-                                        <span className={styles.priceCardBase}>{fmtBRL(d.valor_base)}</span>
-                                      )}
+                                  <div key={di} className={styles.priceDetailItem}>
+                                    <div className={styles.priceCardRow}>
+                                      <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                       <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                                     </div>
+                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                                      <div className={styles.priceDetailSub}>
+                                        <span>Base {fmtBRL(d.valor_base)}</span>
+                                        {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                                        {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                                 {rCalc.sazonalidades_aplicadas?.length > 0 && (
