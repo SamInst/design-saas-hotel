@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, Users, Building2, Search, CalendarDays, Bell, Check,
+  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -74,11 +74,12 @@ const normalizeReserva = (r) => {
     saidaPrevista:           r.data_hora_saida   ?? '',
     status:                  mapStatus(r),
     hospedes: pessoas.map((p) => ({
-      id:       p.id,
-      nome:     p.nome,
-      cpf:      p.cpf ?? '',
-      telefone: p.celular ?? p.telefone ?? '',
-      email:    p.email ?? '',
+      id:            p.id,
+      nome:          p.nome,
+      cpf:           p.cpf ?? '',
+      telefone:      p.celular ?? p.telefone ?? '',
+      email:         p.email ?? '',
+      dataNascimento: p.data_nascimento ?? '',
     })),
     pagamentos: pagsRaw.map((entry) => {
       const p = entry.pagamento ?? entry;
@@ -360,17 +361,44 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
     }
   };
 
+  // ── Edit calc ─────────────────────────────────────────────────────────────
+  const [editCalc,        setEditCalc]        = useState(null);
+  const [editCalcLoading, setEditCalcLoading] = useState(false);
+
+  useEffect(() => {
+    if (!editing || !editQuarto[0] || !editCheckin || !editCheckout) return;
+    let cancelled = false;
+    setEditCalcLoading(true);
+    setEditCalc(null);
+    const brDate = (d) => toBrDate(formatDate(d));
+    const datas_nascimento = pessoas
+      .map((p) => p.dataNascimento)
+      .filter(Boolean)
+      .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
+    reservaApi.calcularPreco({
+      fk_quarto:    parseInt(editQuarto[0]),
+      data_entrada: brDate(editCheckin),
+      data_saida:   brDate(editCheckout),
+      datas_nascimento,
+    }).then((res) => { if (!cancelled) setEditCalc(res); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setEditCalcLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing, editQuarto[0], editCheckin, editCheckout]);
+
   // ── Edit save (quarto/datas) ───────────────────────────────────────────────
   const [editSaving,  setEditSaving]  = useState(false);
 
   const handleSaveEdit = async () => {
     setEditSaving(true);
     try {
+      const valorTotal = editCalc?.valor_total ?? reserva.valorTotal;
       await onUpdate({
         id:           reserva.id,
         fk_quarto:    parseInt(editQuarto[0]),
         data_entrada: toBrDate(formatDate(editCheckin)),
         data_saida:   toBrDate(formatDate(editCheckout)),
+        ...(valorTotal != null ? { valor_total: valorTotal } : {}),
       });
       setEditing(false);
     } finally {
@@ -404,7 +432,7 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
           <FormField label="Quarto">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
-              availableRooms={allRoomIds} categorias={categorias} singleSelect
+              availableRooms={allRoomIds} categorias={categorias} roomDescMap={roomDescMap} singleSelect
             />
           </FormField>
           <FormField label="Período de estadia">
@@ -414,6 +442,67 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
               placeholder="Check-in → Check-out"
             />
           </FormField>
+
+          {/* Price card */}
+          {(editCalc || editCalcLoading) && (
+            <div className={styles.priceCard}>
+              <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
+                <span className={styles.priceCardSummary}>
+                  <span className={styles.finStripItem}>
+                    Valor Total{' '}
+                    {editCalcLoading
+                      ? <b><Loader2 size={11} className={styles.spin} /></b>
+                      : <b>{fmtBRL(editCalc?.valor_total ?? 0)}</b>
+                    }
+                  </span>
+                  {editCalc && (
+                    <>
+                      <span className={styles.finStripDivider} />
+                      <span className={styles.finStripItem}>
+                        Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>
+                      </span>
+                      <span className={styles.finStripDivider} />
+                      <span className={styles.finStripItem}>
+                        Pendente <b style={{ color: (editCalc.valor_total - totalPago) > 0 ? '#f97316' : 'var(--emerald)' }}>
+                          {fmtBRL(Math.max(0, editCalc.valor_total - totalPago))}
+                        </b>
+                      </span>
+                    </>
+                  )}
+                </span>
+              </div>
+              {editCalc?.detalhes?.length > 0 && (
+                <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
+                  {editCalc.detalhes.map((d, di) => (
+                    <div key={di} className={styles.priceDetailItem}>
+                      <div className={styles.priceCardRow}>
+                        <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                        <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                      </div>
+                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                        <div className={styles.priceDetailSub}>
+                          <span>Base {fmtBRL(d.valor_base)}</span>
+                          {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                          {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {editCalc.sazonalidades_aplicadas?.length > 0 && (
+                    <div className={styles.step3SazRow}>
+                      {editCalc.sazonalidades_aplicadas.map((s) => (
+                        <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
+                      ))}
+                    </div>
+                  )}
+                  <div className={styles.step3PriceTotal}>
+                    <span>Total</span>
+                    <span>{fmtBRL(editCalc.valor_total)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Modal>
     );
@@ -1055,7 +1144,7 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
 }
 
 // ─── Room Combobox (single or multi-select) ───────────────────────────────────
-function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelect = false, disabled = false }) {
+function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap = {}, singleSelect = false, disabled = false }) {
   const [open,      setOpen]      = useState(false);
   const [filter,    setFilter]    = useState('');
   const [dropStyle, setDropStyle] = useState({});
@@ -1147,7 +1236,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, singleSelec
                     <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
                   )}
                   <span className={styles.comboItemNum}>Quarto {fmtRoom(r)}</span>
-                  <span className={styles.comboItemTipo}>{cat.nome}</span>
+                  {roomDescMap[r] && <span className={styles.comboItemTipo}>{roomDescMap[r]}</span>}
                   {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
                 </div>
               );
@@ -1345,7 +1434,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento }) {
+function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {} }) {
   const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(initialRoom ? 2 : 1);
@@ -1489,12 +1578,14 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         .map((h) => ({ id: h.id }));
 
       const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
-      const buildItem = (quartoId, dataEntrada, dataSaida, hospedes) => {
-        const roomPags = cleanPags(quartosPag[quartoId] || []);
+      const buildItem = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx) => {
+        const roomPags   = cleanPags(quartosPag[quartoId] || []);
+        const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
         return {
           fk_quarto:    parseInt(quartoId),
           data_entrada: toBrDate(dataEntrada),
           data_saida:   toBrDate(dataSaida),
+          ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
           ...(hospedes?.length ? { pessoas: hospedes } : {}),
           ...(roomPags.length  ? { pagamentos: roomPags } : {}),
           ...(quartosObs[quartoId]?.trim() ? { observacao: quartosObs[quartoId].trim() } : {}),
@@ -1503,11 +1594,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
       let reservasBody;
       if (periodoMode === 'multiplos') {
-        reservasBody = periodos.flatMap((p) =>
-          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout), toIds(p.roomHospedes?.[q] || [])))
+        reservasBody = periodos.flatMap((p, pi) =>
+          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout), toIds(p.roomHospedes?.[q] || []), pi))
         );
       } else {
-        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || [])));
+        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || []), 0));
       }
       await onSave(reservasBody);
     } finally { setSaving(false); }
@@ -1621,7 +1712,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   <RoomCombobox value={quartos}
                     onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                     availableRooms={availableRooms}
-                    categorias={categorias}
+                    categorias={categorias} roomDescMap={roomDescMap}
                     singleSelect={tipo !== 'grupo'}
                     disabled={!checkinStr || !checkoutStr} />
                 </FormField>
@@ -1685,7 +1776,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   <FormField label="Quartos para este período">
                     <RoomCombobox value={mpRooms}
                       onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
-                      availableRooms={mpAvailableRooms} categorias={categorias}
+                      availableRooms={mpAvailableRooms} categorias={categorias} roomDescMap={roomDescMap}
                       disabled={!mpCheckin || !mpCheckout} />
                   </FormField>
                 </div>
@@ -1741,7 +1832,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   <span className={styles.finStripDivider} />
                   <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b></span>
                   <span className={styles.finStripDivider} />
-                  <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b></span>
+                  <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b></span>
                 </span>
                 {!calcLoading && (
                   <ChevronDown size={14} className={showPriceDetails ? styles.priceCardChevronOpen : styles.priceCardChevron} />
@@ -1892,11 +1983,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         {/* Pagamento */}
                         {!isOrcamento && (
                           <div className={styles.step3PayArea}>
+                            <div className={styles.step3PagLabel}>Pagamentos</div>
                             <div className={styles.step3PayHeader}>
-                              <span className={styles.step3RoomLabel} style={{ borderBottom: 'none', paddingBottom: 0 }}>Pagamento</span>
                               <button className={styles.step3AddPagBtn}
                                 onClick={() => { setShowPagModalRoom(q); setShowPagModal(true); }}>
-                                <Plus size={11} /> Adicionar
+                                <Plus size={11} /> Adicionar pagamento
                               </button>
                             </div>
                             {(quartosPag[q] || []).length === 0
@@ -1972,6 +2063,7 @@ export default function BookingCalendar() {
 
   const [reservas,       setReservas]       = useState([]);
   const [categorias,     setCategorias]     = useState([]);
+  const [roomDescMap,    setRoomDescMap]    = useState({}); // { [roomId]: descricao }
   const [loading,        setLoading]        = useState(true);
   const [tiposPagamento, setTiposPagamento] = useState([]);
   const [viewDate,    setViewDate]    = useState(() => { const d = new Date(today); d.setDate(d.getDate() - 1); return d; });
@@ -1981,6 +2073,8 @@ export default function BookingCalendar() {
   const [createInit,      setCreateInit]      = useState({ room: null, start: null, end: null, available: null });
   const [searchTerm,      setSearchTerm]      = useState('');
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [remoteSearchResults, setRemoteSearchResults] = useState([]);
+  const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
   const [dayModal,        setDayModal]        = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -2013,6 +2107,10 @@ export default function BookingCalendar() {
     ]).then(([catRes, roomRes]) => {
       const catList  = Array.isArray(catRes)  ? catRes  : (catRes?.content  ?? []);
       const roomList = Array.isArray(roomRes) ? roomRes : (roomRes?.content ?? []);
+
+      const descMap = {};
+      roomList.forEach((r) => { if (r.id) descMap[r.id] = r.descricao ?? ''; });
+      setRoomDescMap(descMap);
 
       setCategorias(
         catList
@@ -2074,6 +2172,54 @@ export default function BookingCalendar() {
     return () => document.removeEventListener('mousedown', h);
   }, [showMonthPicker]);
 
+  // Remote search for other months
+  useEffect(() => {
+    const term = searchTerm.trim();
+    if (term.length < 2) { setRemoteSearchResults([]); setRemoteSearchLoading(false); return; }
+    setRemoteSearchLoading(true);
+    const viewMes = viewDate.getMonth() + 1;
+    const viewAno = viewDate.getFullYear();
+    const months = [];
+    for (let delta = -6; delta <= 6; delta++) {
+      if (delta === 0) continue; // skip current view month (already in-memory)
+      const d = new Date(viewAno, viewMes - 1 + delta, 1);
+      months.push({ mes: d.getMonth() + 1, ano: d.getFullYear() });
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const allResults = await Promise.all(
+          months.map((m) =>
+            reservaApi.listarPorMesAno({ mes: m.mes, ano: m.ano, nome: term })
+              .then((data) => {
+                const groups = Array.isArray(data) ? data : [];
+                const seenIds = new Set();
+                const flat = [];
+                for (const group of groups) {
+                  for (const r of (group.reservas ?? [])) {
+                    if (!seenIds.has(r.id)) { seenIds.add(r.id); flat.push(r); }
+                  }
+                }
+                return flat.map(normalizeReserva).filter((r) => r.dataInicio);
+              })
+              .catch(() => [])
+          )
+        );
+        if (cancelled) return;
+        const localIds = new Set(reservas.map((r) => r.id));
+        const merged = allResults.flat().filter((r) => !localIds.has(r.id));
+        // Deduplicate across months
+        const seen = new Set();
+        const deduped = merged.filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+        setRemoteSearchResults(deduped);
+      } catch { /* ignore */ } finally {
+        if (!cancelled) setRemoteSearchLoading(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(timer); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, viewDate.getMonth(), viewDate.getFullYear()]);
+
   const days        = Array.from({ length: VISIBLE_DAYS }, (_, i) => { const d = new Date(viewDate); d.setDate(d.getDate() + i); return d; });
   const daysStr     = days.map((d) => formatDate(d));
   const firstDayStr = daysStr[0];
@@ -2094,15 +2240,28 @@ export default function BookingCalendar() {
 
   const searchNorm = normalizeStr(searchTerm.trim());
 
-  const filteredReservas = searchNorm.length >= 2
-    ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm)))
-    : reservas;
+  // Calendar always shows all reservations regardless of search
+  const filteredReservas = reservas;
 
   const searchResults = searchNorm.length >= 2
     ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm))).slice(0, 8)
     : [];
 
-  const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setSelectedReserva(r); };
+  // Remote results grouped by month for the dropdown separator
+  const remoteSearchByMonth = (() => {
+    if (!remoteSearchResults.length) return [];
+    const groups = {};
+    for (const r of remoteSearchResults) {
+      const d = new Date(r.dataInicio + 'T00:00:00');
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      if (!groups[key]) groups[key] = { key, label, items: [] };
+      groups[key].items.push(r);
+    }
+    return Object.values(groups).sort((a, b) => a.key.localeCompare(b.key));
+  })();
+
+  const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
 
   const solicitadasCount = reservas.filter((r) => r.status === 'solicitada').length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
@@ -2197,11 +2356,13 @@ export default function BookingCalendar() {
       setConfirmData({
         title: ds.type === 'move' ? 'Mover Reserva' : 'Ajustar Período', message,
         onConfirm: async () => {
+          const resAtual = reservas.find((r) => r.id === resId);
           const upd = await reservaApi.atualizar({
             id:          resId,
             fk_quarto:   snapshot.quarto,
             data_entrada: toBrDate(snapshot.dataInicio),
             data_saida:   toBrDate(snapshot.dataFim),
+            ...(resAtual?.valorTotal != null ? { valor_total: resAtual.valorTotal } : {}),
           });
           setReservas((rs) => rs.map((x) => x.id === resId ? normalizeReserva(upd) : x));
           notify(ds.type === 'move' ? 'Reserva movida.' : 'Período ajustado.'); setConfirmData(null);
@@ -2238,7 +2399,9 @@ export default function BookingCalendar() {
   const handleUpdateReserva = async (body) => {
     try {
       const upd = await reservaApi.atualizar(body);
-      setReservas((rs) => rs.map((r) => r.id === body.id ? normalizeReserva(upd) : r));
+      const normalized = normalizeReserva(upd);
+      setReservas((rs) => rs.map((r) => r.id === body.id ? normalized : r));
+      setSelectedReserva((prev) => prev?.id === body.id ? normalized : prev);
       notify('Reserva atualizada!');
     } catch (e) {
       notify(e?.message ?? 'Erro ao atualizar reserva.', 'error');
@@ -2308,6 +2471,17 @@ export default function BookingCalendar() {
         onClick={(e) => { e.stopPropagation(); if (!dragState) setSelectedReserva(orig); }}
         title={`${orig.titularNome} — ${diariasTxt(dias)}`}
       >
+        {/* Floating status label */}
+        {startInView && !isGhost && (
+          <div className={styles.barStatusTag}>
+            {orig.status === 'confirmada' && <><Check size={9} strokeWidth={3} /> Reserva confirmada</>}
+            {orig.status === 'solicitada' && <>Reserva solicitada</>}
+            {orig.status === 'hospedado'  && <><Check size={9} strokeWidth={3} /> Hospedado</>}
+            {orig.status === 'finalizado' && <>Finalizado</>}
+            {orig.status === 'cancelado'  && <>Cancelado</>}
+          </div>
+        )}
+
         {startInView && !isGhost && (
           <div className={styles.resizeHandle} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-l')} />
         )}
@@ -2317,12 +2491,11 @@ export default function BookingCalendar() {
             <div className={styles.barDateLabel}>{display.dataInicio} → {display.dataFim} · {diariasTxt(diffDays(display.dataInicio, display.dataFim))}</div>
           ) : (
             <div className={styles.barMeta}>
-              <span className={styles.barBadge}><Users size={9} /> {totalPeople}</span>
-              <span className={styles.barBadge}>
-                <CalendarDays size={9} />
+              <span className={styles.barMetaItem}><Users size={12} /> {totalPeople} pessoa{totalPeople !== 1 ? 's' : ''}</span>
+              <span className={styles.barMetaItem}>
+                <CalendarDays size={12} />
                 {currentDiaria !== null ? `${currentDiaria}/${dias}` : diariasTxt(dias)}
               </span>
-              {orig.empresaNome && <span className={styles.barBadge}><Building2 size={9} /></span>}
             </div>
           )}
         </div>
@@ -2389,9 +2562,9 @@ export default function BookingCalendar() {
                 onFocus={() => searchTerm.length >= 2 && setShowSearchDropdown(true)}
                 placeholder="Buscar hóspede..." />
               {searchTerm && (
-                <button className={styles.clearSearch} onClick={() => { setSearchTerm(''); setShowSearchDropdown(false); }}><X size={12} /></button>
+                <button className={styles.clearSearch} onClick={() => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); }}><X size={12} /></button>
               )}
-              {showSearchDropdown && searchResults.length > 0 && (
+              {showSearchDropdown && (searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) && (
                 <div className={styles.searchDropdown}>
                   {searchResults.map((r) => {
                     const dias     = diffDays(r.dataInicio, r.dataFim);
@@ -2408,6 +2581,29 @@ export default function BookingCalendar() {
                       </div>
                     );
                   })}
+                  {remoteSearchLoading && (
+                    <div className={styles.searchDropLoading}><Loader2 size={12} className={styles.spin} /> buscando outros meses...</div>
+                  )}
+                  {!remoteSearchLoading && remoteSearchByMonth.map((group) => (
+                    <div key={group.key}>
+                      <div className={styles.searchDropSeparator}>{group.label}</div>
+                      {group.items.map((r) => {
+                        const dias     = diffDays(r.dataInicio, r.dataFim);
+                        const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
+                        return (
+                          <div key={r.id} className={styles.searchDropItem} onClick={() => navigateToReserva(r)}>
+                            <div className={styles.searchDropRoomCircle}>{fmtRoom(r.quarto)}</div>
+                            <div className={styles.searchDropInfo}>
+                              <div className={styles.searchDropName}>{r.titularNome}</div>
+                              <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                              <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                            </div>
+                            <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -2529,7 +2725,7 @@ export default function BookingCalendar() {
       {/* Modals */}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
-          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} />
+          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
       )}
       {dayModal && (
         <DayModal dateStr={dayModal.dateStr} reservas={filteredReservas} onClose={() => setDayModal(null)} categorias={categorias}

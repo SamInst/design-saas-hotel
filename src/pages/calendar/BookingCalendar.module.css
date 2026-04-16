@@ -112,6 +112,15 @@
 .searchDropRoomCircle { width: 36px; height: 36px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-mono), monospace; }
 .searchDropDates { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 .searchDropMeta  { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.searchDropSeparator {
+  padding: 5px 12px 3px; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-2); border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.searchDropLoading {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px;
+  font-size: 11px; color: var(--text-2);
+}
 
 /* ── Solicitações badge ────────────────────────────────────────────────────── */
 .solBtnWrap { position: relative; display: inline-flex; }
@@ -256,7 +265,7 @@
 .bar {
   position: absolute; top: 4px; bottom: 4px;
   display: flex; align-items: stretch; cursor: grab; pointer-events: auto;
-  overflow: hidden; transition: filter 0.12s, opacity 0.15s;
+  overflow: visible; transition: filter 0.12s, opacity 0.15s;
   z-index: 5; min-width: 16px; user-select: none; border-radius: 5px;
 }
 .bar:hover  { filter: brightness(1.08); }
@@ -324,11 +333,24 @@
 
 /* Bar content */
 .barContent {
-  flex: 1; min-width: 0; padding: 0 4px;
+  flex: 1; min-width: 0; padding: 0 4px 0 12px;
   display: flex; flex-direction: column; justify-content: center; overflow: hidden; gap: 2px;
 }
+.barStatusTag {
+  position: absolute; top: -10px; left: 16px;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: #fff; border-radius: 4px;
+  padding: 1px 6px; white-space: nowrap; pointer-events: none;
+}
+.bar_confirmada .barStatusTag { background: color-mix(in srgb, #10b981 70%, #000); }
+.bar_solicitada .barStatusTag { background: color-mix(in srgb, #f59e0b 70%, #000); }
+.bar_hospedado  .barStatusTag { background: color-mix(in srgb, #64748b 70%, #000); }
+.bar_finalizado .barStatusTag { background: color-mix(in srgb, #6366f1 70%, #000); }
+.bar_cancelado  .barStatusTag { background: color-mix(in srgb, #ef4444 70%, #000); }
+
 .barName {
-  font-size: 10px; font-weight: 700; color: #fff; line-height: 1.2;
+  font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   text-shadow: 0 1px 2px rgba(0,0,0,0.2);
 }
@@ -337,6 +359,10 @@
   display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px 1px 3px;
   background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
   border-radius: 999px; font-size: 9px; color: #fff; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+}
+.barMetaItem {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 11px; color: rgba(255,255,255,0.9); font-weight: 600; white-space: nowrap; flex-shrink: 0;
 }
 
 /* ── Legend ────────────────────────────────────────────────────────────────── */
@@ -674,10 +700,11 @@
 
 /* ── Período mode tabs ─────────────────────────────────────────────────────── */
 .periodoTabs { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.periodoTab { flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: none; cursor: pointer; transition: all 0.13s; border-right: 1px solid var(--border); }
+.periodoTab { flex: 1; padding: 8px 12px; font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border: none; cursor: pointer; transition: all 0.13s; border-right: 1px solid var(--border); opacity: 0.45; }
 .periodoTab:last-child { border-right: none; }
-.periodoTab:hover { background: color-mix(in srgb, var(--violet) 8%, transparent); color: var(--violet); }
-.periodoTabActive { background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); }
+.periodoTab:hover { opacity: 0.7; }
+.periodoTabActive { background: var(--violet); color: #fff; opacity: 1; }
+.periodoTabActive:hover { opacity: 1; }
 
 /* ── Múltiplos períodos form ───────────────────────────────────────────────── */
 .periodosList { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
@@ -861,17 +888,27 @@
 .step3AddPagBtn {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 10px; border-radius: 6px;
-  border: 1px solid var(--violet); background: color-mix(in srgb, var(--violet) 10%, transparent);
-  color: var(--violet); font-size: 11px; font-weight: 600; cursor: pointer;
+  border: 1px solid #f97316; background: color-mix(in srgb, #f97316 10%, transparent);
+  color: #f97316; font-size: 11px; font-weight: 600; cursor: pointer;
   font-family: inherit; transition: background 0.12s;
 }
-.step3AddPagBtn:hover { background: color-mix(in srgb, var(--violet) 18%, transparent); }
+.step3AddPagBtn:hover { background: color-mix(in srgb, #f97316 18%, transparent); }
 .step3PagRow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .step3PagRow:last-child { border-bottom: none; }
 .step3PagRowTop { display: flex; align-items: center; gap: 8px; }
 .step3PagDesc { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
 .step3PagVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
 .step3PagMeta { font-size: 11px; color: var(--text-2); }
+
+/* Payment label inside step 3 */
+.step3PagLabel {
+  font-size: 11px; font-weight: 700; color: #f97316;
+  text-transform: uppercase; letter-spacing: .05em;
+  padding: 10px 0 0;
+  border-bottom: 1px solid color-mix(in srgb, #f97316 20%, var(--border));
+  padding-bottom: 4px;
+  margin-bottom: 10px;
+}
 
 /* Room label inside step 3 */
 .step3RoomLabel {
