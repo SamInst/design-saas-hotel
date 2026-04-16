@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check,
+  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check, FileDown, FileText,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -11,7 +11,7 @@ import { DatePicker }    from '../../components/ui/DatePicker';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }    from './calendarMocks';
-import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi } from '../../services/api';
+import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -36,6 +36,7 @@ const mapStatus = (r) => {
     if (s === 'finalizado') return 'finalizado';
     if (s === 'solicitada') return 'solicitada';
     if (s === 'ativo')      return 'confirmada';
+    if (s === 'orcamento')  return 'orcamento';
     return s;
   }
   if (r.cancelado)          return 'cancelado';
@@ -143,6 +144,179 @@ const initials = (nome) => {
 const STATUS_LABEL = {
   hospedado: 'Hospedado', confirmada: 'Confirmada',
   solicitada: 'Solicitada', finalizado: 'Finalizado', cancelado: 'Cancelado',
+  orcamento: 'Orçamento',
+};
+
+// ─── Orçamento PDF generator ─────────────────────────────────────────────────
+/**
+ * @param {{
+ *   tipo: string,
+ *   periodoMode: 'unico'|'multiplos',
+ *   displayPeriodos: Array<{ rooms: string[], checkin: string, checkout: string, roomHospedes: object }>,
+ *   precosCalc: object,
+ *   quartosObs: object,
+ *   roomDescMap: object,
+ * }} opts
+ */
+const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '' }) => {
+  const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const dt  = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
+  const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  const fn  = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
+  const rm  = (n) => String(n).padStart(2, '0');
+
+  const grandTotal = displayPeriodos.flatMap((p, pi) => p.rooms.map((q) => precosCalc[`${q}_${pi}`]?.valor_total ?? 0))
+    .reduce((a, b) => a + b, 0);
+
+  let periodsHtml = '';
+  let unicoRoomsHtml = '';
+  displayPeriodos.forEach((p, pi) => {
+    const d = dias(p.checkin, p.checkout);
+    const periodLabel = periodoMode === 'multiplos' ? `<div class="periodo-band">Período ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>` : '';
+    let roomsHtml = '';
+    p.rooms.forEach((quartoId) => {
+      const calc = precosCalc[`${quartoId}_${pi}`];
+      if (!calc) return;
+      const hospedes = p.roomHospedes?.[quartoId] || [];
+      const obs = quartosObs[quartoId] || '';
+      const desc = roomDescMap[quartoId] || '';
+
+      let detalhesHtml = '';
+      (calc.detalhes || []).forEach((det) => {
+        const hasSub = det.acrescimo_sazonalidade > 0 || det.valor_criancas > 0;
+        detalhesHtml += `
+          <div class="price-row">
+            <span class="price-desc">${det.descricao}</span>
+            <span class="price-val">${brl(det.valor_final)}</span>
+          </div>
+          ${hasSub ? `<div class="price-sub">Base ${brl(det.valor_base)}${det.acrescimo_sazonalidade > 0 ? ` + Saz. ${brl(det.acrescimo_sazonalidade)}` : ''}${det.valor_criancas > 0 ? ` + Crianças ${brl(det.valor_criancas)}` : ''}</div>` : ''}`;
+      });
+
+      const sazHtml = (calc.sazonalidades_aplicadas || []).length > 0
+        ? `<div class="saz-chips">${calc.sazonalidades_aplicadas.map((s) => `<span class="saz-chip">${s.descricao}</span>`).join('')}</div>` : '';
+
+      const hospedesHtml = hospedes.map((h) => {
+        const ini = initials(h.nome);
+        return `<div class="person-row">
+          <div class="person-avatar">${ini}</div>
+          <div>
+            <div class="person-name">${h.nome}</div>
+            ${h.cpf ? `<div class="person-cpf">${fmtCpf(h.cpf)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+
+      const obsHtml = obs.trim() ? `<label class="obs-label">Observação</label><div class="obs-box">${obs.trim()}</div>` : '';
+
+      roomsHtml += `
+        <div class="room-block">
+          <div class="room-card">
+            <div class="room-label">Quarto ${rm(quartoId)}${desc ? ` <span class="room-desc">${desc}</span>` : ''}</div>
+            ${detalhesHtml}
+            ${sazHtml}
+            <div class="total-row">
+              <span class="total-label">Total</span>
+              <span class="total-val">${brl(calc.valor_total)}</span>
+            </div>
+          </div>
+          ${hospedes.length > 0 ? `
+          <div class="quarto-section">
+            <div class="quarto-section-label">Quarto ${rm(quartoId)}</div>
+            ${hospedesHtml}
+          </div>` : ''}
+          ${obsHtml}
+        </div>`;
+    });
+
+    if (periodoMode === 'unico') {
+      unicoRoomsHtml += roomsHtml;
+    } else {
+      periodsHtml += `${periodLabel}<div class="period-rooms">${roomsHtml}</div>`;
+    }
+  });
+
+  const unico = periodoMode === 'unico' && displayPeriodos[0];
+  const unicoD = unico ? dias(unico.checkin, unico.checkout) : 0;
+  const unicoBand = unico ? `<div class="periodo-band">${dt(unico.checkin)} → ${dt(unico.checkout)} · ${fn(unicoD)}</div>` : '';
+
+  const tipoLabel = tipo === 'grupo' ? 'Múltiplas Reservas (Orçamento)' : 'Simples (Orçamento)';
+  const modoLabel = periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos';
+
+  const summaryHtml = `
+    <div class="price-strip">
+      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(grandTotal)}</b></div>
+      <div class="price-strip-divider"></div>
+      <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(0)}</b></div>
+      <div class="price-strip-divider"></div>
+      <div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(grandTotal)}</b></div>
+    </div>`;
+
+  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
+  <meta charset="utf-8">
+  <title>Isto é Pousada | Orçamento de Reserva</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#0f172a;font-size:14px}
+    .page{max-width:740px;margin:0 auto;padding:32px 28px}
+    .doc-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px}
+    .doc-sub{font-size:12px;color:#94a3b8;margin-bottom:24px}
+    .periodo-band{background:#1e293b;color:#fff;padding:11px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.01em;margin-top:20px}
+    .price-strip{display:flex;align-items:center;padding:11px 16px;border:1px solid #e2e8f0;border-top:none;border-bottom:1px solid #e2e8f0;background:#f8fafc}
+    .price-strip-item{display:flex;align-items:center;gap:4px;font-size:12px;color:#64748b;flex:1}
+    .price-strip-item b{color:#0f172a;font-weight:700}
+    .price-strip-divider{width:1px;height:18px;background:#e2e8f0;margin:0 12px}
+    .pago-val{color:#10b981 !important}
+    .pendente-val{color:#f97316 !important}
+    .room-block{border:1px solid #e2e8f0;border-top:none;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+    .room-block:last-child{border-radius:0 0 8px 8px}
+    .room-card{display:flex;flex-direction:column;gap:4px}
+    .room-label{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px}
+    .room-desc{font-weight:400;color:#64748b;font-size:12px;margin-left:6px}
+    .price-row{display:flex;justify-content:space-between;align-items:flex-start}
+    .price-desc{font-size:12px;color:#475569}
+    .price-val{font-size:12px;font-weight:500;color:#475569;white-space:nowrap}
+    .price-sub{font-size:11px;color:#94a3b8;margin-bottom:2px}
+    .saz-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+    .saz-chip{font-size:10px;font-weight:700;color:#7c3aed;background:rgba(124,58,237,.1);padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em}
+    .total-row{display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:6px;border-top:1px solid #e2e8f0}
+    .total-label{font-size:13px;font-weight:700;color:#0f172a}
+    .total-val{font-size:14px;font-weight:800;color:#0f172a}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+    .info-item label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:4px;display:block}
+    .info-item span{font-size:14px;color:#0f172a;font-weight:500}
+    .quarto-section{margin-top:2px}
+    .quarto-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f97316;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #fed7aa}
+    .person-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+    .person-avatar{width:38px;height:38px;border-radius:50%;background:#ede9fe;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+    .person-name{font-size:13px;font-weight:600;color:#0f172a}
+    .person-cpf{font-size:11px;color:#64748b;margin-top:1px}
+    .obs-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:5px;display:block}
+    .obs-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;font-size:13px;color:#64748b;min-height:50px}
+    .period-rooms{}
+    @media print{
+      body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .page{padding:20px}
+    }
+  </style>
+</head><body>
+<div class="page">
+  <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; Orçamento de Reserva</div>
+  <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
+  ${periodoMode === 'unico' ? unicoBand : ''}
+  ${summaryHtml}
+  ${periodoMode === 'unico' ? unicoRoomsHtml : periodsHtml}
+  <div class="info-grid">
+    <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>
+    <div class="info-item"><label>Modo</label><span>${modoLabel}</span></div>
+  </div>
+</div>
+<script>window.onload=()=>{window.print();}<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=700');
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
 };
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
@@ -162,12 +336,13 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categorias, tiposPagamento }) {
+function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync, onNotify, categorias, tiposPagamento, dragValues = null }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
-  const [editing,      setEditing]      = useState(false);
-  const [editQuarto,   setEditQuarto]   = useState([String(reserva.quarto)]);
-  const [editCheckin,  setEditCheckin]  = useState(new Date(reserva.dataInicio + 'T00:00:00'));
-  const [editCheckout, setEditCheckout] = useState(new Date(reserva.dataFim   + 'T00:00:00'));
+  // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
+  const [editing,      setEditing]      = useState(dragValues !== null);
+  const [editQuarto,   setEditQuarto]   = useState(dragValues ? [String(dragValues.quarto)] : [String(reserva.quarto)]);
+  const [editCheckin,  setEditCheckin]  = useState(dragValues ? new Date(dragValues.checkin + 'T00:00:00') : new Date(reserva.dataInicio + 'T00:00:00'));
+  const [editCheckout, setEditCheckout] = useState(dragValues ? new Date(dragValues.checkout + 'T00:00:00') : new Date(reserva.dataFim + 'T00:00:00'));
 
   // ── Tabs ───────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('dados');
@@ -340,6 +515,7 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
   // ── Save all pending ops ────────────────────────────────────────────────────
   const handleSaveChanges = async () => {
     setSaving(true);
+    const hasPessoaOps = pendingOps.some((o) => o.type === 'addPessoa' || o.type === 'removePessoa');
     try {
       for (const op of pendingOps) {
         if (op.type === 'addPessoa')
@@ -353,6 +529,13 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
       }
       setPendingOps([]);
       setHasChanges(false);
+      // Re-fetch so parent bar updates (titular name, guest count, etc.)
+      if (hasPessoaOps && onSync) {
+        try {
+          const fresh = await reservaApi.buscarPorId(reserva.id);
+          onSync(normalizeReserva(fresh));
+        } catch { /* ignore sync failure */ }
+      }
       onNotify?.('Alterações salvas!');
     } catch (e) {
       onNotify?.(e?.message ?? 'Erro ao salvar alterações.', 'error');
@@ -517,9 +700,17 @@ function ReservaModal({ reserva, onClose, onCancel, onUpdate, onNotify, categori
         footer={
           <div className={styles.footerSpread}>
             <div style={{ display: 'flex', gap: 6 }}>
-              <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
-                Cancelar Reserva
-              </Button>
+              {reserva.status === 'orcamento' ? (
+                <Button variant="primary" onClick={() => onActivate?.(reserva.id)}>
+                  Ativar Reserva
+                </Button>
+              ) : (
+                reserva.status !== 'cancelado' && reserva.status !== 'finalizado' && (
+                  <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                    Cancelar Reserva
+                  </Button>
+                )
+              )}
               <Button variant="secondary" onClick={() => onNotify({ type: 'info', message: 'Funcionalidade em breve.' })}>
                 Mover para Pernoites
               </Button>
@@ -1008,6 +1199,64 @@ function RoomModal({ room, reservas, onClose, categorias, onSelectReserva }) {
                   <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
                 </div>
                 <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Orçamentos Modal ────────────────────────────────────────────────────────
+function OrcamentosModal({ reservas, onClose, onActivate, roomDescMap }) {
+  const orcamentos = reservas.filter((r) => r.status === 'orcamento');
+
+  const handleDownload = (r) => {
+    // Build displayPeriodos from normalized reserva
+    const displayPeriodos = [{
+      rooms: [String(r.quarto)],
+      checkin: r.dataInicio,
+      checkout: r.dataFim,
+      roomHospedes: { [String(r.quarto)]: r.hospedes || [] },
+    }];
+    // Build precosCalc from valorTotal if available (no detalhes, just total)
+    const precosCalc = {};
+    if (r.valorTotal) {
+      precosCalc[`${r.quarto}_0`] = { valor_total: r.valorTotal, detalhes: [], sazonalidades_aplicadas: [] };
+    }
+    const quartosObs = r.observacao ? { [String(r.quarto)]: r.observacao } : {};
+    const _u = userStorage.get();
+    const _uName = _u?.pessoa?.nome ?? _u?.nome ?? '';
+    gerarOrcamentoPdf({ tipo: 'simples', periodoMode: 'unico', displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _uName });
+  };
+
+  return (
+    <Modal open onClose={onClose} size="md"
+      title={<><FileText size={15} /> Orçamentos ({orcamentos.length})</>}
+      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
+    >
+      {orcamentos.length === 0 ? (
+        <div className={styles.emptyState}>Nenhum orçamento pendente.</div>
+      ) : (
+        <div className={styles.roomHistoryList}>
+          {orcamentos.map((r) => {
+            const dias = diffDays(r.dataInicio, r.dataFim);
+            return (
+              <div key={r.id} className={styles.roomHistoryRow}>
+                <div className={styles.roomHistoryLeft} style={{ cursor: 'pointer' }} onClick={() => onActivate?.(r)}>
+                  <div className={styles.roomHistoryDates}>
+                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataInicio)}</span>
+                    <span className={styles.roomHistoryArrow}>→</span>
+                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataFim)}</span>
+                    <span className={styles.roomHistoryNights}>{diariasTxt(dias)}</span>
+                  </div>
+                  <div className={styles.roomHistoryTitle}>{r.titularNome}</div>
+                  <div className={styles.roomHistoryMeta}>Quarto {fmtRoom(r.quarto)}{r.valorTotal ? ` · ${fmtBRL(r.valorTotal)}` : ''}</div>
+                </div>
+                <button className={styles.orcDownloadBtn} title="Baixar orçamento" onClick={() => handleDownload(r)}>
+                  <FileDown size={15} />
+                </button>
               </div>
             );
           })}
@@ -1570,14 +1819,45 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const handleGoToStep3 = async () => { setStep(3); await runCalcPrecos(); };
 
   const handleSave = async () => {
-    if (isOrcamento) { onNotify('Orçamento gerado! (Em desenvolvimento)'); onClose(); return; }
     setSaving(true);
     try {
+      const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
+
+      if (isOrcamento) {
+        // Orçamento: send minimal body with orcamento: true, no pessoas/pagamentos
+        const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx) => {
+          const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
+          return {
+            fk_quarto:    parseInt(quartoId),
+            data_entrada: toBrDate(dataEntrada),
+            data_saida:   toBrDate(dataSaida),
+            orcamento:    true,
+            ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
+          };
+        };
+        const displayPeriodos = periodoMode === 'unico'
+          ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes }]
+          : periodos.map((p) => ({ ...p, checkin: formatDate(p.checkin), checkout: formatDate(p.checkout) }));
+        let reservasBody;
+        if (periodoMode === 'multiplos') {
+          reservasBody = periodos.flatMap((p, pi) =>
+            p.rooms.map((q) => buildOrcItem(q, formatDate(p.checkin), formatDate(p.checkout), pi))
+          );
+        } else {
+          reservasBody = quartos.map((q) => buildOrcItem(q, checkinStr, checkoutStr, 0));
+        }
+        await onSave(reservasBody);
+        // Generate PDF after successful save
+        const _user = userStorage.get();
+        const _userName = _user?.pessoa?.nome ?? _user?.nome ?? '';
+        gerarOrcamentoPdf({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _userName });
+        return;
+      }
+
       const toIds = (hospedes) => (hospedes || [])
         .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
         .map((h) => ({ id: h.id }));
 
-      const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
       const buildItem = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx) => {
         const roomPags   = cleanPags(quartosPag[quartoId] || []);
         const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
@@ -2076,6 +2356,7 @@ export default function BookingCalendar() {
   const [remoteSearchResults, setRemoteSearchResults] = useState([]);
   const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
+  const [showOrcamentos,     setShowOrcamentos]     = useState(false);
   const [dayModal,        setDayModal]        = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
@@ -2085,12 +2366,13 @@ export default function BookingCalendar() {
   const [selHover,  setSelHover]  = useState(null);
   const [dragState, setDragState] = useState(null);
   const [ghostDrag, setGhostDrag] = useState(null);
-  const [confirmData, setConfirmData] = useState(null);
   const [notif,       setNotif]       = useState(null);
 
-  const lastHoverRef   = useRef(null);
-  const searchRef      = useRef(null);
-  const monthPickerRef = useRef(null);
+  const lastHoverRef        = useRef(null);
+  const searchRef           = useRef(null);
+  const monthPickerRef      = useRef(null);
+  const dragJustHappenedRef = useRef(false);
+  const [dragEditValues,   setDragEditValues]   = useState(null); // { quarto, checkin, checkout }
 
   const notify = useCallback((msg, type = 'success') => {
     setNotif({ message: msg, type });
@@ -2264,6 +2546,7 @@ export default function BookingCalendar() {
   const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
 
   const solicitadasCount = reservas.filter((r) => r.status === 'solicitada').length;
+  const orcamentosCount  = reservas.filter((r) => r.status === 'orcamento').length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
 
   const handleApproveSolicitacao = async (id, quarto) => {
@@ -2347,30 +2630,14 @@ export default function BookingCalendar() {
     if (!r) { setDragState(null); setGhostDrag(null); return; }
     const changed = gd.quarto !== r.quarto || gd.dataInicio !== r.dataInicio || gd.dataFim !== r.dataFim;
     if (changed) {
-      const dias = diffDays(gd.dataInicio, gd.dataFim);
-      const message = ds.type === 'move'
-        ? gd.quarto !== r.quarto ? `Mover para Quarto ${fmtRoom(gd.quarto)}: ${gd.dataInicio} → ${gd.dataFim} (${diariasTxt(dias)})?`
-          : `Alterar datas para ${gd.dataInicio} → ${gd.dataFim} (${diariasTxt(dias)})?`
-        : `Ajustar período para ${gd.dataInicio} → ${gd.dataFim} (${diariasTxt(dias)})?`;
-      const snapshot = { ...gd }; const resId = ds.id;
-      setConfirmData({
-        title: ds.type === 'move' ? 'Mover Reserva' : 'Ajustar Período', message,
-        onConfirm: async () => {
-          const resAtual = reservas.find((r) => r.id === resId);
-          const upd = await reservaApi.atualizar({
-            id:          resId,
-            fk_quarto:   snapshot.quarto,
-            data_entrada: toBrDate(snapshot.dataInicio),
-            data_saida:   toBrDate(snapshot.dataFim),
-            ...(resAtual?.valorTotal != null ? { valor_total: resAtual.valorTotal } : {}),
-          });
-          setReservas((rs) => rs.map((x) => x.id === resId ? normalizeReserva(upd) : x));
-          notify(ds.type === 'move' ? 'Reserva movida.' : 'Período ajustado.'); setConfirmData(null);
-        },
-      });
+      dragJustHappenedRef.current = true;
+      setTimeout(() => { dragJustHappenedRef.current = false; }, 300);
+      // Open edit modal with the ghost values pre-filled
+      setDragEditValues({ quarto: gd.quarto, checkin: gd.dataInicio, checkout: gd.dataFim });
+      setSelectedReserva(r);
     }
     setDragState(null); setGhostDrag(null); lastHoverRef.current = null;
-  }, [notify]);
+  }, []);
 
   useEffect(() => { window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp); }, [handleGlobalMouseUp]);
   useEffect(() => {
@@ -2396,17 +2663,36 @@ export default function BookingCalendar() {
     notify('Reserva cancelada.');
   };
 
+  const handleActivateReserva = async (id) => {
+    try {
+      let upd = await reservaApi.ativar(id);
+      if (!upd) upd = await reservaApi.buscarPorId(id);
+      const normalized = normalizeReserva(upd);
+      setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
+      setSelectedReserva(normalized);
+      notify('Reserva ativada!');
+    } catch (e) {
+      notify(e?.message ?? 'Erro ao ativar reserva.', 'error');
+    }
+  };
+
   const handleUpdateReserva = async (body) => {
     try {
       const upd = await reservaApi.atualizar(body);
       const normalized = normalizeReserva(upd);
       setReservas((rs) => rs.map((r) => r.id === body.id ? normalized : r));
       setSelectedReserva((prev) => prev?.id === body.id ? normalized : prev);
+      setDragEditValues(null);
       notify('Reserva atualizada!');
     } catch (e) {
       notify(e?.message ?? 'Erro ao atualizar reserva.', 'error');
       throw e;
     }
+  };
+
+  const handleSyncReserva = (normalized) => {
+    setReservas((rs) => rs.map((r) => r.id === normalized.id ? normalized : r));
+    setSelectedReserva((prev) => prev?.id === normalized.id ? normalized : prev);
   };
 
   // ── Render bars ────────────────────────────────────────────────────────────
@@ -2468,17 +2754,18 @@ export default function BookingCalendar() {
         className={[styles.bar, styles[`bar_${orig.status}`], isGhost ? styles.barGhost : '', isDragging ? styles.barDragging : ''].join(' ')}
         style={{ left, width, borderRadius, opacity: isCancelado ? Math.min(opacity, 0.55) : opacity }}
         onMouseDown={isGhost ? undefined : (e) => handleBarMouseDown(e, orig)}
-        onClick={(e) => { e.stopPropagation(); if (!dragState) setSelectedReserva(orig); }}
+        onClick={(e) => { e.stopPropagation(); if (!dragState && !dragJustHappenedRef.current) setSelectedReserva(orig); }}
         title={`${orig.titularNome} — ${diariasTxt(dias)}`}
       >
         {/* Floating status label */}
-        {startInView && !isGhost && (
-          <div className={styles.barStatusTag}>
+        {!isGhost && (
+          <div className={startInView ? styles.barStatusTag : styles.barStatusTagInline}>
             {orig.status === 'confirmada' && <><Check size={9} strokeWidth={3} /> Reserva confirmada</>}
             {orig.status === 'solicitada' && <>Reserva solicitada</>}
             {orig.status === 'hospedado'  && <><Check size={9} strokeWidth={3} /> Hospedado</>}
             {orig.status === 'finalizado' && <>Finalizado</>}
             {orig.status === 'cancelado'  && <>Cancelado</>}
+            {orig.status === 'orcamento'  && <>Orçamento</>}
           </div>
         )}
 
@@ -2608,6 +2895,12 @@ export default function BookingCalendar() {
               )}
             </div>
 
+            {/* Orçamentos */}
+            <div className={styles.solBtnWrap}>
+              <Button variant="secondary" onClick={() => setShowOrcamentos(true)}><FileText size={14} /> Orçamentos</Button>
+              {orcamentosCount > 0 && <span className={styles.solBadge}>{orcamentosCount}</span>}
+            </div>
+
             {/* Solicitações */}
             <div className={styles.solBtnWrap}>
               <Button variant="secondary" onClick={() => setShowSolicitacoes(true)}><Bell size={14} /> Solicitações</Button>
@@ -2733,13 +3026,15 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => setSelectedReserva(null)} onCancel={handleCancelReserva} onUpdate={handleUpdateReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} />}
+      {showOrcamentos && (
+        <OrcamentosModal reservas={reservas} onClose={() => setShowOrcamentos(false)}
+          roomDescMap={roomDescMap}
+          onActivate={(r) => { setShowOrcamentos(false); setSelectedReserva(r); }} />
+      )}
       {showSolicitacoes && (
         <SolicitacoesModal reservas={reservas} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
           onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
-      )}
-      {confirmData && (
-        <ConfirmModal title={confirmData.title} message={confirmData.message} onConfirm={confirmData.onConfirm} onCancel={() => setConfirmData(null)} />
       )}
     </div>
   );

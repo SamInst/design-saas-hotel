@@ -388,9 +388,14 @@ export const reservaApi = {
     return request('/reserva', { method: 'PUT', body });
   },
 
-  /** Cancela uma reserva pelo ID. Retorna 204. */
+  /** Cancela uma reserva pelo ID. */
   cancelar(id) {
     return request(`/reserva/${id}/cancelar`, { method: 'PUT' });
+  },
+
+  /** Ativa um orçamento transformando-o em reserva confirmada. */
+  ativar(id) {
+    return request(`/reserva/${id}/ativar`, { method: 'PUT' });
   },
 
   /** Vincula uma pessoa a uma reserva. */

@@ -307,6 +307,13 @@
 .bar_cancelado .barName  { color: rgba(239,68,68,0.8); }
 .bar_cancelado .barBadge { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.3); color: rgba(239,68,68,0.75); }
 
+.bar_orcamento {
+  background: rgba(99,102,241,0.18);
+  border: 1.5px dashed rgba(99,102,241,0.55);
+}
+.bar_orcamento .barName  { color: rgba(165,180,252,0.9); }
+.bar_orcamento .barBadge { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); color: rgba(165,180,252,0.85); }
+
 /* Ghost bar */
 .barGhost {
   opacity: 0.8 !important; z-index: 20 !important; cursor: grabbing !important;
@@ -343,11 +350,22 @@
   color: #fff; border-radius: 4px;
   padding: 1px 6px; white-space: nowrap; pointer-events: none;
 }
-.bar_confirmada .barStatusTag { background: color-mix(in srgb, #10b981 70%, #000); }
-.bar_solicitada .barStatusTag { background: color-mix(in srgb, #f59e0b 70%, #000); }
-.bar_hospedado  .barStatusTag { background: color-mix(in srgb, #64748b 70%, #000); }
-.bar_finalizado .barStatusTag { background: color-mix(in srgb, #6366f1 70%, #000); }
-.bar_cancelado  .barStatusTag { background: color-mix(in srgb, #ef4444 70%, #000); }
+.bar_confirmada .barStatusTag, .bar_confirmada .barStatusTagInline { background: color-mix(in srgb, #10b981 70%, #000); }
+.bar_solicitada .barStatusTag, .bar_solicitada .barStatusTagInline { background: color-mix(in srgb, #f59e0b 70%, #000); }
+.bar_hospedado  .barStatusTag, .bar_hospedado  .barStatusTagInline { background: color-mix(in srgb, #64748b 70%, #000); }
+.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #6366f1 70%, #000); }
+.bar_cancelado  .barStatusTag, .bar_cancelado  .barStatusTagInline { background: color-mix(in srgb, #ef4444 70%, #000); }
+.bar_orcamento  .barStatusTag, .bar_orcamento  .barStatusTagInline { background: color-mix(in srgb, #6366f1 55%, #000); }
+
+/* Tag inside bar when bar start is scrolled off-screen */
+.barStatusTagInline {
+  position: absolute; top: 4px; left: 8px;
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: #fff; border-radius: 4px;
+  padding: 1px 6px; white-space: nowrap; pointer-events: none;
+  max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis;
+}
 
 .barName {
   font-size: 13px; font-weight: 700; color: #fff; line-height: 1.2;
@@ -424,6 +442,7 @@
 .status_hospedado  { background: #8b5cf6; }
 .status_finalizado { background: #0f766e; }
 .status_cancelado  { background: #ef4444; }
+.status_orcamento  { background: #6366f1; }
 
 /* ── Hóspede list ──────────────────────────────────────────────────────────── */
 .hospedeList { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
@@ -617,8 +636,16 @@
 .roomHistoryDate    { font-size: 13px; font-weight: 600; color: var(--text); }
 .roomHistoryArrow   { font-size: 11px; color: var(--text-2); }
 .roomHistoryNights  { font-size: 11px; color: var(--text-2); margin-left: 2px; }
-.roomHistoryTitle   { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+.roomHistoryTitle   { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.roomHistoryMeta    { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 .roomHistoryHospedes { display: flex; align-items: center; gap: 4px; }
+.orcDownloadBtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text-2); cursor: pointer; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.orcDownloadBtn:hover { background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); border-color: var(--violet); }
 
 /* ── Create Modal — step bar ───────────────────────────────────────────────── */
 .stepBar { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); flex-shrink: 0; }
