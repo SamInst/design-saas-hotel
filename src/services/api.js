@@ -418,12 +418,14 @@ export const reservaApi = {
     return request(`/pagamento/${pagId}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
   },
 
-  /** Calcula preço de um quarto para um período com as datas de nascimento dos hóspedes. */
-  calcularPreco({ fk_quarto, data_entrada, data_saida, datas_nascimento = [] }) {
-    // Dates use dd/MM/yyyy — build manually to avoid URLSearchParams encoding "/" as "%2F"
-    const parts = [`fk_quarto=${fk_quarto}`, `data_entrada=${data_entrada}`, `data_saida=${data_saida}`];
-    datas_nascimento.forEach((d) => parts.push(`datas_nascimento=${d}`));
-    return request(`/reserva/calcular-preco?${parts.join('&')}`);
+  /**
+   * Calcula preço para um ou mais quartos.
+   * Aceita array de { fk_quarto, data_entrada, data_saida, datas_nascimento[] } (datas em dd/MM/yyyy).
+   * Retorna array de resultados na mesma ordem.
+   */
+  calcularPreco(items) {
+    const body = Array.isArray(items) ? items : [items];
+    return request('/reserva/calcular-preco', { method: 'POST', body });
   },
 };
 

@@ -183,13 +183,13 @@ const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, qua
 
       let detalhesHtml = '';
       (calc.detalhes || []).forEach((det) => {
-        const hasSub = det.acrescimo_sazonalidade > 0 || det.valor_criancas > 0;
+        const hasSub = det.valor_base > 0 || det.acrescimo_sazonalidade > 0 || det.valor_criancas > 0;
         detalhesHtml += `
           <div class="price-row">
             <span class="price-desc">${det.descricao}</span>
             <span class="price-val">${brl(det.valor_final)}</span>
           </div>
-          ${hasSub ? `<div class="price-sub">Base ${brl(det.valor_base)}${det.acrescimo_sazonalidade > 0 ? ` + Saz. ${brl(det.acrescimo_sazonalidade)}` : ''}${det.valor_criancas > 0 ? ` + Crianças ${brl(det.valor_criancas)}` : ''}</div>` : ''}`;
+          ${hasSub ? `<div class="price-sub">${brl((det.valor_base ?? 0) + (det.acrescimo_sazonalidade ?? 0))}${det.sazonalidade?.descricao ? ` <span class="saz-chip">${det.sazonalidade.descricao}</span>` : ''}${det.valor_criancas > 0 ? ` <span>+ Crianças ${brl(det.valor_criancas)}</span>` : ''}</div>` : ''}`;
       });
 
       const sazHtml = (calc.sazonalidades_aplicadas || []).length > 0
@@ -558,12 +558,12 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
       .map((p) => p.dataNascimento)
       .filter(Boolean)
       .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
-    reservaApi.calcularPreco({
+    reservaApi.calcularPreco([{
       fk_quarto:    parseInt(editQuarto[0]),
       data_entrada: brDate(editCheckin),
       data_saida:   brDate(editCheckout),
       datas_nascimento,
-    }).then((res) => { if (!cancelled) setEditCalc(res); })
+    }]).then((res) => { if (!cancelled) setEditCalc(Array.isArray(res) ? res[0] : res); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setEditCalcLoading(false); });
     return () => { cancelled = true; };
@@ -662,22 +662,15 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
                         <span className={styles.step3PriceDesc}>{d.descricao}</span>
                         <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                       </div>
-                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
                         <div className={styles.priceDetailSub}>
-                          <span>Base {fmtBRL(d.valor_base)}</span>
-                          {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                          <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                          {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
                           {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
                         </div>
                       )}
                     </div>
                   ))}
-                  {editCalc.sazonalidades_aplicadas?.length > 0 && (
-                    <div className={styles.step3SazRow}>
-                      {editCalc.sazonalidades_aplicadas.map((s) => (
-                        <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
-                      ))}
-                    </div>
-                  )}
                   <div className={styles.step3PriceTotal}>
                     <span>Total</span>
                     <span>{fmtBRL(editCalc.valor_total)}</span>
@@ -701,28 +694,37 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
           <div className={styles.footerSpread}>
             <div style={{ display: 'flex', gap: 6 }}>
               {reserva.status === 'orcamento' ? (
-                <Button variant="primary" onClick={() => onActivate?.(reserva.id)}>
-                  Ativar Reserva
+                <>
+                  <Button variant="primary" onClick={() => onActivate?.(reserva.id)}>
+                    Ativar Reserva
+                  </Button>
+                  <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                    Cancelar Orçamento
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {reserva.status !== 'cancelado' && reserva.status !== 'finalizado' && (
+                    <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                      Cancelar Reserva
+                    </Button>
+                  )}
+                  <Button variant="secondary" onClick={() => onNotify({ type: 'info', message: 'Funcionalidade em breve.' })}>
+                    Mover para Pernoites
+                  </Button>
+                </>
+              )}
+            </div>
+            {reserva.status !== 'orcamento' && (
+              hasChanges ? (
+                <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
+                  {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
                 </Button>
               ) : (
-                reserva.status !== 'cancelado' && reserva.status !== 'finalizado' && (
-                  <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
-                    Cancelar Reserva
-                  </Button>
-                )
-              )}
-              <Button variant="secondary" onClick={() => onNotify({ type: 'info', message: 'Funcionalidade em breve.' })}>
-                Mover para Pernoites
-              </Button>
-            </div>
-            {hasChanges ? (
-              <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
-                {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
-              </Button>
-            ) : (
-              <Button variant="primary" onClick={() => setEditing(true)}>
-                <Pencil size={13} /> Editar
-              </Button>
+                <Button variant="primary" onClick={() => setEditing(true)}>
+                  <Pencil size={13} /> Editar
+                </Button>
+              )
             )}
           </div>
         }
@@ -1521,6 +1523,56 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
   );
 }
 
+// ─── Sem Cadastro Hospedes Picker (orçamento sem cadastro) ───────────────────
+function SemCadastroHospedesPicker({ value = [], onChange }) {
+  const [nome, setNome] = useState('');
+  const [dob,  setDob]  = useState(null);
+
+  const canAdd = nome.trim().length > 0 && dob !== null;
+
+  const add = () => {
+    if (!canAdd) return;
+    onChange([...value, { nome: nome.trim(), dataNascimento: formatDate(dob) }]);
+    setNome(''); setDob(null);
+  };
+
+  const rem = (i) => onChange(value.filter((_, j) => j !== i));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div className={styles.semCadastroAddRow}>
+        <div className={styles.hospSearchWrap} style={{ flex: 1, minWidth: 0 }}>
+          <input
+            className={styles.formInput}
+            type="text"
+            placeholder="Nome do hóspede"
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          />
+        </div>
+        <div style={{ width: 160, flexShrink: 0 }}>
+          <DatePicker value={dob} onChange={setDob} placeholder="Nascimento" maxDate={new Date()} />
+        </div>
+        <button type="button" className={styles.addOrcGuestBtn} onClick={add} disabled={!canAdd}>
+          <Plus size={13} />
+        </button>
+      </div>
+      {value.length > 0 && (
+        <div className={styles.selectedChips}>
+          {value.map((p, i) => (
+            <div key={i} className={styles.hospedeChipRect}>
+              <span>{p.nome}</span>
+              {p.dataNascimento && <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{fmtDateBR(p.dataNascimento)}</span>}
+              <button type="button" className={styles.chipRemove} onClick={() => rem(i)}><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Room Hospedes Picker ─────────────────────────────────────────────────────
 function RoomHospedesPicker({ value = [], onChange }) {
   const [search,    setSearch]    = useState('');
@@ -1687,23 +1739,26 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(initialRoom ? 2 : 1);
-  const [tipo,        setTipo]        = useState('simples');  // 'simples' | 'grupo'
+  const [tipo,        setTipo]        = useState('simples'); // 'simples' | 'grupo'
   const [isOrcamento, setIsOrcamento] = useState(false);
-
+  const [orcMode,     setOrcMode]     = useState('cadastro'); // 'cadastro' | 'sem_cadastro'
 
   // Step 2: período único
   const [quartos,        setQuartos]        = useState(initialRoom ? [String(initialRoom)] : []);
   const [checkin,        setCheckin]        = useState(initialStart ? new Date(initialStart + 'T00:00:00') : null);
   const [checkout,       setCheckout]       = useState(initialEnd   ? new Date(initialEnd   + 'T00:00:00') : null);
-  const [quartoHospedes, setQuartoHospedes] = useState({}); // { [quartoId]: [hospede] }
+  const [quartoHospedes,    setQuartoHospedes]    = useState({}); // { [quartoId]: [hospede] } — registered
+  const [quartoHospedesOrc, setQuartoHospedesOrc] = useState({}); // { [quartoId]: [{ nome, dataNascimento }] } — sem cadastro
 
   // Step 2: múltiplos períodos
   const [periodoMode,    setPeriodoMode]    = useState('unico'); // 'unico' | 'multiplos'
-  const [periodos,       setPeriodos]       = useState([]);      // [{ rooms, checkin, checkout, roomHospedes }]
+  const [periodos,       setPeriodos]       = useState([]);      // [{ rooms, checkin, checkout, roomHospedes, roomHospedesOrc }]
   const [mpRooms,        setMpRooms]        = useState([]);
   const [mpCheckin,      setMpCheckin]      = useState(null);
   const [mpCheckout,     setMpCheckout]     = useState(null);
-  const [mpRoomHospedes, setMpRoomHospedes] = useState({}); // { [quartoId]: [hospede] } for current mp form
+  const [mpRoomHospedes,    setMpRoomHospedes]    = useState({});
+  const [mpRoomHospedesOrc, setMpRoomHospedesOrc] = useState({});
+  const [editingPeriodoIdx, setEditingPeriodoIdx] = useState(null); // index of period being edited
 
   // Step 3: Pagamentos
 
@@ -1735,7 +1790,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     if (!mpCheckin || !mpCheckout) return allRoomIds;
     const ci = formatDate(mpCheckin);
     const co = formatDate(mpCheckout);
-    const alreadyPicked = periodos.flatMap((p) => {
+    const alreadyPicked = periodos.flatMap((p, idx) => {
+      if (idx === editingPeriodoIdx) return []; // exclude own rooms when editing
       const pi = formatDate(p.checkin); const po = formatDate(p.checkout);
       if (pi < co && po > ci) return p.rooms.map((r) => parseInt(r));
       return [];
@@ -1743,7 +1799,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     return allRoomIds.filter(
       (r) => !alreadyPicked.includes(r) && !reservas.some((res) => res.quarto === r && res.dataInicio < co && res.dataFim > ci)
     );
-  }, [mpCheckin, mpCheckout, periodos, reservas, allRoomIds]);
+  }, [mpCheckin, mpCheckout, periodos, editingPeriodoIdx, reservas, allRoomIds]);
 
 
   const addPagamento = (payment) => {
@@ -1755,10 +1811,38 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setShowPagModalRoom(null);
   };
 
+  // Derived orcamento flags
+  const isOrcSemCadastro = isOrcamento && orcMode === 'sem_cadastro';
+
+  const resetMpForm = () => {
+    setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
+    setMpRoomHospedes({}); setMpRoomHospedesOrc({});
+    setEditingPeriodoIdx(null);
+  };
+
   const addPeriodo = () => {
     if (!mpRooms.length || !mpCheckin || !mpCheckout) return;
-    setPeriodos((p) => [...p, { rooms: [...mpRooms], checkin: mpCheckin, checkout: mpCheckout, roomHospedes: { ...mpRoomHospedes } }]);
-    setMpRooms([]); setMpCheckin(null); setMpCheckout(null); setMpRoomHospedes({});
+    const entry = {
+      rooms: [...mpRooms], checkin: mpCheckin, checkout: mpCheckout,
+      roomHospedes:    { ...mpRoomHospedes },
+      roomHospedesOrc: { ...mpRoomHospedesOrc },
+    };
+    if (editingPeriodoIdx !== null) {
+      setPeriodos((ps) => ps.map((p, i) => i === editingPeriodoIdx ? entry : p));
+    } else {
+      setPeriodos((ps) => [...ps, entry]);
+    }
+    resetMpForm();
+  };
+
+  const startEditPeriodo = (i) => {
+    const p = periodos[i];
+    setMpRooms([...p.rooms]);
+    setMpCheckin(p.checkin instanceof Date ? p.checkin : new Date(p.checkin + 'T00:00:00'));
+    setMpCheckout(p.checkout instanceof Date ? p.checkout : new Date(p.checkout + 'T00:00:00'));
+    setMpRoomHospedes({ ...(p.roomHospedes || {}) });
+    setMpRoomHospedesOrc({ ...(p.roomHospedesOrc || {}) });
+    setEditingPeriodoIdx(i);
   };
 
   const allSelectedRooms = periodoMode === 'multiplos'
@@ -1787,29 +1871,38 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setRoomPriceOpen({});
     try {
       const displayPeriodos = periodoMode === 'unico'
-        ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes }]
+        ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes, roomHospedesOrc: quartoHospedesOrc }]
         : periodos.map((p) => ({ ...p, checkin: formatDate(p.checkin), checkout: formatDate(p.checkout) }));
 
-      const results = {};
-      await Promise.all(
-        displayPeriodos.flatMap((p, pi) =>
-          p.rooms.map(async (quartoId) => {
-            const hospedes = p.roomHospedes?.[quartoId] || [];
-            const datas_nascimento = hospedes
+      // Build ordered list of { key, item } so we can map response[i] → key
+      const indexed = [];
+      displayPeriodos.forEach((p, pi) => {
+        p.rooms.forEach((quartoId) => {
+          let datas_nascimento;
+          if (isOrcSemCadastro) {
+            const orcGuests = p.roomHospedesOrc?.[quartoId] || [];
+            datas_nascimento = orcGuests
               .filter((h) => h.dataNascimento)
               .map((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.dataNascimento) ? isoToBr(h.dataNascimento) : h.dataNascimento);
-            try {
-              const res = await reservaApi.calcularPreco({
-                fk_quarto:    parseInt(quartoId),
-                data_entrada: toBrDate(p.checkin),
-                data_saida:   toBrDate(p.checkout),
-                datas_nascimento,
-              });
-              results[`${quartoId}_${pi}`] = res;
-            } catch { /* silent */ }
-          })
-        )
-      );
+          } else {
+            const hospedes = p.roomHospedes?.[quartoId] || [];
+            datas_nascimento = hospedes
+              .filter((h) => h.dataNascimento)
+              .map((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.dataNascimento) ? isoToBr(h.dataNascimento) : h.dataNascimento);
+          }
+          indexed.push({
+            key:  `${quartoId}_${pi}`,
+            item: { fk_quarto: parseInt(quartoId), data_entrada: toBrDate(p.checkin), data_saida: toBrDate(p.checkout), datas_nascimento },
+          });
+        });
+      });
+
+      if (indexed.length === 0) return;
+      const resArray = await reservaApi.calcularPreco(indexed.map((x) => x.item));
+      const results = {};
+      (Array.isArray(resArray) ? resArray : []).forEach((r, i) => {
+        if (indexed[i]) results[indexed[i].key] = r;
+      });
       setPrecosCalc(results);
     } finally {
       setCalcLoading(false);
@@ -1824,27 +1917,47 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
 
       if (isOrcamento) {
-        // Orçamento: send minimal body with orcamento: true, no pessoas/pagamentos
-        const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx) => {
+        // Orçamento: send minimal body with orcamento: true + pessoas_orcamento
+        const isoToBrLocal = (s) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split('-').reverse().join('/') : s);
+        const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
+          let pessoasOrc;
+          if (isOrcSemCadastro) {
+            // Unregistered guests entered manually
+            if (orcGuests.length > 0) {
+              pessoasOrc = orcGuests.map((h) => ({
+                nome: h.nome,
+                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
+              }));
+            }
+          } else {
+            // Registered guests — map to { nome, data_nascimento }
+            if (registeredGuests.length > 0) {
+              pessoasOrc = registeredGuests.map((h) => ({
+                nome: h.nome,
+                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
+              }));
+            }
+          }
           return {
             fk_quarto:    parseInt(quartoId),
             data_entrada: toBrDate(dataEntrada),
             data_saida:   toBrDate(dataSaida),
             orcamento:    true,
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
+            ...(pessoasOrc?.length ? { pessoas_orcamento: pessoasOrc } : {}),
           };
         };
         const displayPeriodos = periodoMode === 'unico'
-          ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes }]
+          ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes, roomHospedesOrc: quartoHospedesOrc }]
           : periodos.map((p) => ({ ...p, checkin: formatDate(p.checkin), checkout: formatDate(p.checkout) }));
         let reservasBody;
         if (periodoMode === 'multiplos') {
           reservasBody = periodos.flatMap((p, pi) =>
-            p.rooms.map((q) => buildOrcItem(q, formatDate(p.checkin), formatDate(p.checkout), pi))
+            p.rooms.map((q) => buildOrcItem(q, formatDate(p.checkin), formatDate(p.checkout), pi, p.roomHospedes?.[q] || [], p.roomHospedesOrc?.[q] || []))
           );
         } else {
-          reservasBody = quartos.map((q) => buildOrcItem(q, checkinStr, checkoutStr, 0));
+          reservasBody = quartos.map((q) => buildOrcItem(q, checkinStr, checkoutStr, 0, quartoHospedes[q] || [], quartoHospedesOrc[q] || []));
         }
         await onSave(reservasBody);
         // Generate PDF after successful save
@@ -1945,19 +2058,31 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {step === 1 && (
         <div className={styles.formStack}>
           <FormField label="Tipo de Reserva">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div className={styles.tipoRow}>
-                {[['simples', 'Reserva Simples'], ['grupo', 'Múltiplas Reservas']].map(([v, l]) => (
-                  <button key={v} type="button"
-                    className={[styles.tipoBtn, tipo === v ? styles.tipoBtnActive : ''].join(' ')}
-                    onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
-                  >{l}</button>
-                ))}
-              </div>
+            <div className={styles.tipoRow}>
+              {[['simples', 'Reserva Simples'], ['grupo', 'Múltiplas Reservas']].map(([v, l]) => (
+                <button key={v} type="button"
+                  className={[styles.tipoBtn, tipo === v ? styles.tipoBtnActive : ''].join(' ')}
+                  onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
+                >{l}</button>
+              ))}
+            </div>
+          </FormField>
+          <FormField label="">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <label className={styles.orcamentoToggle}>
                 <input type="checkbox" checked={isOrcamento} onChange={(e) => setIsOrcamento(e.target.checked)} />
                 <span>Simular Orçamento</span>
               </label>
+              {isOrcamento && (
+                <div className={styles.tipoRow}>
+                  {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
+                    <button key={v} type="button"
+                      className={[styles.tipoBtn, orcMode === v ? styles.tipoBtnActive : ''].join(' ')}
+                      onClick={() => setOrcMode(v)}
+                    >{l}</button>
+                  ))}
+                </div>
+              )}
             </div>
           </FormField>
         </div>
@@ -2001,9 +2126,15 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                   <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Quarto {fmtRoom(parseInt(q))}</div>
-                  <RoomHospedesPicker
-                    value={quartoHospedes[q] || []}
-                    onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))} />
+                  {isOrcSemCadastro ? (
+                    <SemCadastroHospedesPicker
+                      value={quartoHospedesOrc[q] || []}
+                      onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))} />
+                  ) : (
+                    <RoomHospedesPicker
+                      value={quartoHospedes[q] || []}
+                      onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))} />
+                  )}
                 </div>
               ))}
             </>
@@ -2015,19 +2146,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 <div className={styles.periodosList}>
                   {periodos.map((p, i) => {
                     const ci = formatDate(p.checkin); const co = formatDate(p.checkout);
+                    const isEditing = editingPeriodoIdx === i;
                     return (
-                      <div key={i} className={styles.periodoItem}>
+                      <div key={i} className={[styles.periodoItem, isEditing ? styles.periodoItemEditing : ''].join(' ')}>
                         <div className={styles.periodoItemInfo}>
                           <span className={styles.periodoItemDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(diffDays(ci, co))}</span>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 6 }}>
                             {p.rooms.map((q) => {
-                              const hosp = p.roomHospedes?.[q] || [];
+                              const hosp = isOrcSemCadastro ? (p.roomHospedesOrc?.[q] || []) : (p.roomHospedes?.[q] || []);
                               return (
                                 <div key={q} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                   <span className={styles.periodoItemRoomNum}>#{fmtRoom(parseInt(q))}</span>
                                   {hosp.length > 0
                                     ? hosp.map((h, hi) => (
-                                        <span key={h.id} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 400 }}>
+                                        <span key={isOrcSemCadastro ? hi : h.id} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 400 }}>
                                           {h.nome}{hi < hosp.length - 1 ? ',' : ''}
                                         </span>
                                       ))
@@ -2038,7 +2170,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                             })}
                           </div>
                         </div>
-                        <button type="button" className={styles.chipRemove} onClick={() => setPeriodos((ps) => ps.filter((_, j) => j !== i))}><X size={12} /></button>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {!isEditing && (
+                            <button type="button" className={styles.periodoEditBtn} onClick={() => startEditPeriodo(i)}><Pencil size={11} /></button>
+                          )}
+                          <button type="button" className={styles.chipRemove} onClick={() => { if (isEditing) resetMpForm(); setPeriodos((ps) => ps.filter((_, j) => j !== i)); }}><X size={12} /></button>
+                        </div>
                       </div>
                     );
                   })}
@@ -2064,14 +2201,25 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                     <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Quarto {fmtRoom(parseInt(q))}</div>
-                    <RoomHospedesPicker
-                      value={mpRoomHospedes[q] || []}
-                      onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))} />
+                    {isOrcSemCadastro ? (
+                      <SemCadastroHospedesPicker
+                        value={mpRoomHospedesOrc[q] || []}
+                        onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))} />
+                    ) : (
+                      <RoomHospedesPicker
+                        value={mpRoomHospedes[q] || []}
+                        onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))} />
+                    )}
                   </div>
                 ))}
-                <Button variant="secondary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout} onClick={addPeriodo}>
-                  <Plus size={13} /> Adicionar Período
-                </Button>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Button variant={editingPeriodoIdx !== null ? 'primary' : 'secondary'} disabled={!mpRooms.length || !mpCheckin || !mpCheckout} onClick={addPeriodo}>
+                    {editingPeriodoIdx !== null ? <><Check size={13} /> Salvar Alterações</> : <><Plus size={13} /> Adicionar Período</>}
+                  </Button>
+                  {editingPeriodoIdx !== null && (
+                    <Button variant="secondary" onClick={resetMpForm}>Cancelar</Button>
+                  )}
+                </div>
               </div>
             </>
           )}
@@ -2083,7 +2231,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {step === 3 && (() => {
         // Build the periods list for display
         const displayPeriodos = periodoMode === 'unico'
-          ? [{ rooms: quartos, checkin, checkout, roomHospedes: quartoHospedes }]
+          ? [{ rooms: quartos, checkin, checkout, roomHospedes: quartoHospedes, roomHospedesOrc: quartoHospedesOrc }]
           : periodos;
 
 
@@ -2134,22 +2282,15 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                 <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                 <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                               </div>
-                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
                                 <div className={styles.priceDetailSub}>
-                                  <span>Base {fmtBRL(d.valor_base)}</span>
-                                  {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                                  <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                                  {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
                                   {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
                                 </div>
                               )}
                             </div>
                           ))}
-                          {calc.sazonalidades_aplicadas?.length > 0 && (
-                            <div className={styles.step3SazRow}>
-                              {calc.sazonalidades_aplicadas.map((s) => (
-                                <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
-                              ))}
-                            </div>
-                          )}
                           <div className={styles.step3PriceTotal}>
                             <span>Total</span>
                             <span>{fmtBRL(calc.valor_total)}</span>
@@ -2164,7 +2305,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
             {/* ── Tipo de reserva ── */}
             <div className={styles.kvList} style={{ padding: '0 0 14px' }}>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal} style={{ textTransform: 'capitalize' }}>{tipo}{isOrcamento ? ' (orçamento)' : ''}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Múltiplas Reservas' : 'Reserva Simples'}{isOrcamento ? ` · Orçamento ${orcMode === 'sem_cadastro' ? 'sem Cadastro' : 'com Cadastro'}` : ''}</span></div>
               <div className={styles.kvRow}><span className={styles.kvLabel}>Modo</span><span className={styles.kvVal}>{periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos'}</span></div>
             </div>
 
@@ -2183,7 +2324,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   )}
                   <div className={styles.step3PeriodoContent}>
                   {p.rooms.map((q) => {
-                    const qHosp  = (p.roomHospedes || {})[q] || [];
+                    const qHosp    = (p.roomHospedes || {})[q] || [];
+                    const qHospOrc = (p.roomHospedesOrc || {})[q] || [];
                     const rKey   = `${q}_${pi}`;
                     const rCalc  = precosCalc[rKey];
                     const multiRoom = periodoMode === 'multiplos' || quartos.length > 1;
@@ -2219,22 +2361,15 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                       <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                       <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                                     </div>
-                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
                                       <div className={styles.priceDetailSub}>
-                                        <span>Base {fmtBRL(d.valor_base)}</span>
-                                        {d.acrescimo_sazonalidade > 0 && <span>+ Saz. {fmtBRL(d.acrescimo_sazonalidade)}</span>}
+                                        <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                                        {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
                                         {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
                                       </div>
                                     )}
                                   </div>
                                 ))}
-                                {rCalc.sazonalidades_aplicadas?.length > 0 && (
-                                  <div className={styles.step3SazRow}>
-                                    {rCalc.sazonalidades_aplicadas.map((s) => (
-                                      <span key={s.id} className={styles.step3SazChip}>{s.descricao}</span>
-                                    ))}
-                                  </div>
-                                )}
                                 <div className={styles.step3PriceTotal}>
                                   <span>Total do quarto {fmtRoom(parseInt(q))}</span>
                                   <span>{fmtBRL(rCalc.valor_total)}</span>
@@ -2246,17 +2381,35 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
                         {/* Hóspedes */}
                         <div className={styles.step3RoomSection}>
-                          {qHosp.length > 0 ? (
-                            <div className={styles.hospedeList}>
-                              {qHosp.map((h) => (
-                                <div key={h.id} className={styles.hospedeRow}>
-                                  <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                                  <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}</div>
-                                </div>
-                              ))}
-                            </div>
+                          {isOrcSemCadastro ? (
+                            qHospOrc.length > 0 ? (
+                              <div className={styles.hospedeList}>
+                                {qHospOrc.map((h, hi) => (
+                                  <div key={hi} className={styles.hospedeRow}>
+                                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+                                    <div>
+                                      <div className={styles.hospedeName}>{h.nome}</div>
+                                      {h.dataNascimento && <div className={styles.hospedeCpf}>{fmtDateBR(h.dataNascimento)}</div>}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                            )
                           ) : (
-                            <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                            qHosp.length > 0 ? (
+                              <div className={styles.hospedeList}>
+                                {qHosp.map((h) => (
+                                  <div key={h.id} className={styles.hospedeRow}>
+                                    <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
+                                    <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                            )
                           )}
                         </div>
 
