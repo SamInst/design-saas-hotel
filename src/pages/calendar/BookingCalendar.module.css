@@ -68,8 +68,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  min-width: 190px;
-  max-width: 240px;
+  min-width: 380px;
+  max-width: 480px;
 }
 .searchIcon {
   position: absolute; left: 9px; color: var(--text-2); pointer-events: none; z-index: 1;
@@ -286,18 +286,18 @@
 .bar_solicitada .barBadge { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.35); color: #fff; }
 
 .bar_hospedado {
-  background: #7c3aed;
+  background: #374151;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 .bar_hospedado .barName  { color: #fff; }
 .bar_hospedado .barBadge { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.35); color: #fff; }
 
 .bar_finalizado {
-  background: #64748b;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  background: #9ca3af;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
-.bar_finalizado .barName  { color: rgba(255,255,255,0.9); }
-.bar_finalizado .barBadge { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.28); color: rgba(255,255,255,0.85); }
+.bar_finalizado .barName  { color: rgba(255,255,255,0.95); }
+.bar_finalizado .barBadge { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.9); }
 
 /* Cancelado — ghost red */
 .bar_cancelado {
@@ -341,7 +341,7 @@
 /* Bar content */
 .barContent {
   flex: 1; min-width: 0; padding: 0 4px 0 12px;
-  display: flex; flex-direction: column; justify-content: center; overflow: hidden; gap: 2px;
+  display: flex; flex-direction: column; justify-content: center; overflow: hidden; gap: 1px;
 }
 .barStatusTag {
   position: absolute; top: -10px; left: 16px;
@@ -352,14 +352,14 @@
 }
 .bar_confirmada .barStatusTag, .bar_confirmada .barStatusTagInline { background: color-mix(in srgb, #10b981 70%, #000); }
 .bar_solicitada .barStatusTag, .bar_solicitada .barStatusTagInline { background: color-mix(in srgb, #f59e0b 70%, #000); }
-.bar_hospedado  .barStatusTag, .bar_hospedado  .barStatusTagInline { background: color-mix(in srgb, #64748b 70%, #000); }
-.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #6366f1 70%, #000); }
+.bar_hospedado  .barStatusTag, .bar_hospedado  .barStatusTagInline { background: color-mix(in srgb, #374151 70%, #000); }
+.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #9ca3af 70%, #000); }
 .bar_cancelado  .barStatusTag, .bar_cancelado  .barStatusTagInline { background: color-mix(in srgb, #ef4444 70%, #000); }
 .bar_orcamento  .barStatusTag, .bar_orcamento  .barStatusTagInline { background: color-mix(in srgb, #6366f1 55%, #000); }
 
-/* Tag inside bar when bar start is scrolled off-screen */
+/* Tag above bar when bar start is scrolled off-screen — anchored to left visible edge */
 .barStatusTagInline {
-  position: absolute; top: 4px; left: 8px;
+  position: absolute; top: -10px; left: 8px;
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   color: #fff; border-radius: 4px;
@@ -439,8 +439,8 @@
 .statusBadgeSm { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; }
 .status_confirmada { background: #10b981; }
 .status_solicitada { background: #f59e0b; }
-.status_hospedado  { background: #8b5cf6; }
-.status_finalizado { background: #0f766e; }
+.status_hospedado  { background: #374151; }
+.status_finalizado { background: #9ca3af; }
 .status_cancelado  { background: #ef4444; }
 .status_orcamento  { background: #6366f1; }
 
@@ -583,6 +583,9 @@
 .kvListCancel { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px 12px; background: color-mix(in srgb, #ef4444 5%, var(--surface-2)); border: 1px solid color-mix(in srgb, #ef4444 20%, var(--border)); border-radius: var(--radius); }
 .kvRow { display: flex; flex-direction: column; gap: 2px; }
 .kvRowFull { grid-column: 1 / -1; }
+.kvRowDates { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 6px 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.kvDateCell { display: flex; flex-direction: column; gap: 2px; }
+.kvDateArrow { color: var(--text-2); font-size: 13px; flex-shrink: 0; }
 .kvLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .kvVal { font-size: 13px; color: var(--text); font-weight: 500; }
 .pagStatusAtivo { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--emerald) 15%, transparent); color: var(--emerald); width: fit-content; }
@@ -715,8 +718,9 @@
 /* ── Tipo pills ────────────────────────────────────────────────────────────── */
 .tipoRow { display: flex; gap: 8px; flex-wrap: wrap; }
 .tipoBtn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.13s; }
-.tipoBtn:hover  { border-color: var(--violet); color: var(--violet); }
+.tipoBtn:hover  { border-color: var(--violet); }
 .tipoBtnActive  { background: var(--violet); border-color: var(--violet); color: #fff; }
+.tipoBtnActive:hover { color: #fff; }
 
 /* Orçamento toggle */
 .orcamentoToggle {
@@ -728,9 +732,10 @@
 /* Sem Cadastro Hospedes Picker */
 .semCadastroAddRow { display: flex; align-items: center; gap: 8px; }
 .addOrcGuestBtn {
-  flex-shrink: 0; width: 32px; height: 32px; border-radius: var(--radius);
-  border: 1px solid var(--border); background: var(--surface); color: var(--violet);
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: var(--radius);
+  border: 1px solid var(--violet); background: var(--surface); color: var(--violet);
+  display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap;
+  font-size: 12px; font-weight: 600;
   transition: background 0.13s, border-color 0.13s;
 }
 .addOrcGuestBtn:hover:not(:disabled) { background: color-mix(in srgb, var(--violet) 8%, transparent); border-color: var(--violet); }
@@ -767,11 +772,14 @@
   transition: color 0.12s;
 }
 .periodoEditBtn:hover { color: var(--violet); }
-.mpForm { display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
+.mpForm { display: flex; flex-direction: column; gap: 10px; }
 
 /* ── Hóspede search ────────────────────────────────────────────────────────── */
-.hospSearchWrap { position: relative; display: flex; align-items: center; margin-bottom: 6px; }
-.hospSearchIcon { position: absolute; left: 9px; color: var(--text-2); pointer-events: none; }
+.hospSearchWrap { position: relative; display: flex; align-items: center; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 4px 8px 4px 30px; gap: 4px; flex-wrap: wrap; min-height: 36px; transition: border-color 0.15s; }
+.hospSearchWrap:focus-within { border-color: var(--violet); }
+.hospSearchIcon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; }
+.hospInputInner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.hospInlineInput { border: none; outline: none; background: transparent; font-size: 13px; color: var(--text); font-family: inherit; min-width: 80px; flex: 1; padding: 0; }
 .searchResultsList { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
 .searchResultItem {
   display: flex; align-items: center; gap: 8px;
@@ -834,9 +842,9 @@
 .comboWrap { position: relative; }
 .comboTrigger {
   width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 10px; min-height: 36px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit;
-  cursor: pointer; text-align: left; box-sizing: border-box; transition: border-color 0.15s;
+  cursor: pointer; text-align: left; box-sizing: border-box; transition: border-color 0.15s; flex-wrap: wrap;
 }
 .comboTrigger:focus, .comboTrigger:hover { border-color: var(--violet); outline: none; }
 .comboPlaceholder { color: var(--text-2); }
@@ -857,6 +865,7 @@
   position: sticky; top: 0; z-index: 1;
 }
 .comboChips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.comboChipsInline { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; align-items: center; }
 
 /* ── Room buttons ──────────────────────────────────────────────────────────── */
 .roomBtnRow { display: flex; flex-wrap: wrap; gap: 5px; }
@@ -1026,6 +1035,57 @@
 .priceDetailSub { display: flex; gap: 8px; flex-wrap: wrap; }
 .priceDetailSub span { font-size: 11px; color: var(--text-2); }
 
+/* ── Edit comparison layout ─────────────────────────────────────────────────── */
+.editCompareGrid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.editComparePanel {
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--surface-2); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.editComparePanelNew { border-color: rgba(16,185,129,.35); background: rgba(16,185,129,.04); }
+
+/* Dark band */
+.editCompareBand {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 12px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.editCompareBandNew {
+  background: rgba(16,185,129,.1); border-bottom-color: rgba(16,185,129,.25);
+}
+.editCompareBandLabel {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); flex-shrink: 0;
+}
+.editCompareBandNew .editCompareBandLabel { color: #10b981; }
+.editCompareBandInfo {
+  font-size: 11px; font-weight: 500; color: var(--text); text-align: right;
+}
+.editCompareBandNew .editCompareBandInfo { color: #059669; }
+
+/* Body */
+.editCompareBody { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
+.editCompareRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.editCompareDesc { flex: 1; font-size: 12px; color: var(--text-2); min-width: 0; }
+.editCompareVal { font-size: 12px; font-weight: 500; color: var(--text); white-space: nowrap; }
+.editComparePanelNew .editCompareVal { color: #10b981; }
+.editCompareTotalRow {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 2px; padding-top: 6px; border-top: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text);
+}
+.editComparePanelNew .editCompareTotalRow { color: #10b981; border-top-color: rgba(16,185,129,.25); }
+.editCompareFinRow {
+  display: flex; gap: 12px; padding-top: 6px; margin-top: 2px;
+  border-top: 1px solid rgba(16,185,129,.2);
+}
+.editCompareFinItem { font-size: 11px; color: var(--text-2); }
+.editCompareFinItem b { margin-left: 3px; }
+.editCompareDiff { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 2px 0; }
+.editCompareDiffUp { color: #f43f5e; }
+.editCompareDiffDown { color: #10b981; }
+.editCompareLoading { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 4px; padding: 4px 0; }
+
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {
   position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
@@ -1151,3 +1211,75 @@
   font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
   background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25);
 }
+
+
+/* ── Floating action panel ─────────────────────────────────────────────────── */
+.floatPanel {
+  position: fixed;
+  right: 18px;
+  bottom: 24px;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+  padding: 8px 6px;
+  min-width: 148px;
+}
+.floatBtnWrap { position: relative; }
+.floatBtn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 12px;
+  border: none; background: none;
+  border-radius: 10px;
+  color: var(--text-2); font-size: 12px; font-weight: 500;
+  cursor: pointer; text-align: left;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+.floatBtn:hover { background: var(--surface-2); color: var(--text); }
+.floatBtnActive { color: var(--violet) !important; background: color-mix(in srgb, var(--violet) 8%, transparent) !important; }
+.floatBtnPrimary { background: var(--violet); color: #fff !important; font-weight: 600; }
+.floatBtnPrimary:hover { background: color-mix(in srgb, var(--violet) 85%, #000) !important; color: #fff !important; }
+.floatBadge {
+  margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px; background: var(--violet); color: #fff;
+  font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.floatDivider { height: 1px; background: var(--border); margin: 2px 0; }
+.statusDot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Filter dropdown */
+.floatFilterDrop {
+  position: absolute;
+  right: calc(100% + 8px);
+  bottom: 0;
+  min-width: 170px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.13);
+  padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.floatFilterRow {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px;
+  font-size: 12px; color: var(--text);
+  cursor: pointer; user-select: none;
+}
+.floatFilterRow:hover { background: var(--surface-2); }
+.floatFilterRow input { accent-color: var(--violet); width: 14px; height: 14px; cursor: pointer; }
+.floatFilterClear {
+  margin-top: 4px; padding: 5px 8px;
+  border: none; background: none; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-2); cursor: pointer; text-align: left;
+  border-radius: 0 0 8px 8px;
+}
+.floatFilterClear:hover { color: var(--violet); }

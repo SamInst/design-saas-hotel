@@ -353,8 +353,15 @@ export const dayUseApi = {
 // ─────────────────────────────────────────────────────────────
 export const reservaApi = {
   /** Lista reservas por mês/ano (Gantt). Parâmetros opcionais: id, nome. */
-  listarPorMesAno({ mes, ano, id, nome } = {}) {
-    return request('/reserva', { params: { mes, ano, id, nome } });
+  listarPorMesAno({ mes, ano, id, nome, status } = {}) {
+    const qs = new URLSearchParams();
+    if (mes   != null) qs.append('mes',  mes);
+    if (ano   != null) qs.append('ano',  ano);
+    if (id    != null) qs.append('id',   id);
+    if (nome  != null) qs.append('nome', nome);
+    const statuses = Array.isArray(status) ? status : (status ? [status] : []);
+    statuses.forEach((s) => qs.append('status', s));
+    return request(`/reserva?${qs.toString()}`);
   },
 
   /** Lista reservas de uma data específica (dd/MM/yyyy). Parâmetros opcionais: id, nome. */
@@ -388,9 +395,14 @@ export const reservaApi = {
     return request('/reserva', { method: 'PUT', body });
   },
 
-  /** Cancela uma reserva pelo ID. */
-  cancelar(id) {
-    return request(`/reserva/${id}/cancelar`, { method: 'PUT' });
+  /** Cancela uma reserva informando o motivo. */
+  cancelar(id, motivoCancelamento) {
+    return request(`/reserva/${id}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
+  },
+
+  /** Atualiza o status de uma lista de reservas. */
+  atualizarStatus(ids, status) {
+    return request('/reserva/status', { method: 'PUT', body: { ids, status } });
   },
 
   /** Ativa um orçamento transformando-o em reserva confirmada. */
@@ -398,14 +410,9 @@ export const reservaApi = {
     return request(`/reserva/${id}/ativar`, { method: 'PUT' });
   },
 
-  /** Vincula uma pessoa a uma reserva. */
-  adicionarPessoa(reservaId, pessoaId) {
-    return request(`/reserva/${reservaId}/pessoa`, { method: 'POST', body: { id: pessoaId, representante: false } });
-  },
-
-  /** Remove uma pessoa de uma reserva. */
-  removerPessoa(reservaId, pessoaId) {
-    return request(`/reserva/${reservaId}/pessoa/${pessoaId}`, { method: 'DELETE' });
+  /** Adiciona ou remove uma pessoa de uma reserva. vincular=true adiciona, false remove. */
+  vincularPessoaReserva(reservaId, pessoaId, { vincular, representante = false } = {}) {
+    return request(`/reserva/${reservaId}/pessoa/${pessoaId}`, { method: 'POST', body: { vincular, representante } });
   },
 
   /** Registra um pagamento em uma reserva. */
@@ -426,6 +433,10 @@ export const reservaApi = {
   calcularPreco(items) {
     const body = Array.isArray(items) ? items : [items];
     return request('/reserva/calcular-preco', { method: 'POST', body });
+  },
+
+  verificarDisponibilidade({ fk_quartos, data_entrada, data_saida }) {
+    return request(`/reserva/disponibilidade?fk_quartos=${fk_quartos.join(',')}&data_entrada=${data_entrada}&data_saida=${data_saida}`);
   },
 };
 

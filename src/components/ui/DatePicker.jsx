@@ -146,6 +146,8 @@ export function DatePicker({
         onChange?.(parsed);
         setViewYear(parsed.getFullYear());
         setViewMonth(parsed.getMonth());
+        setOpen(false);
+        setViewMode('days');
       }
     } else if (formatted === '') {
       onChange?.(null);

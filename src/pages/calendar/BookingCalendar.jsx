@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check, FileDown, FileText,
+  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -63,7 +63,7 @@ const normalizeReserva = (r) => {
     id:                      r.id,
     quarto:                  r.quarto?.id ?? r.fk_quarto ?? r.quarto,
     categoria:               r.categoria?.nome ?? '',
-    titularNome:             titular?.nome ?? r.titular_nome ?? 'Hóspede',
+    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.titular_nome ?? 'Hóspede',
     empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
@@ -100,6 +100,12 @@ const normalizeReserva = (r) => {
     }),
     valorTotal: r.valor_total ?? 0,
     totalPago,
+    orcamentoInfo: r.orcamento_info ?? null,
+    pessoasOrcamento: (r.pessoas_orcamento ?? []).map((p) => ({
+      id:             p.id,
+      nome:           p.nome,
+      dataNascimento: p.data_nascimento ?? '',
+    })),
   };
 };
 
@@ -211,7 +217,7 @@ const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, qua
       roomsHtml += `
         <div class="room-block">
           <div class="room-card">
-            <div class="room-label">Quarto ${rm(quartoId)}${desc ? ` <span class="room-desc">${desc}</span>` : ''}</div>
+            <div class="room-label">Apartamento ${rm(quartoId)}${desc ? ` <span class="room-desc">${desc}</span>` : ''}</div>
             ${detalhesHtml}
             ${sazHtml}
             <div class="total-row">
@@ -221,7 +227,7 @@ const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, qua
           </div>
           ${hospedes.length > 0 ? `
           <div class="quarto-section">
-            <div class="quarto-section-label">Quarto ${rm(quartoId)}</div>
+            <div class="quarto-section-label">Hóspedes</div>
             ${hospedesHtml}
           </div>` : ''}
           ${obsHtml}
@@ -239,7 +245,7 @@ const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, qua
   const unicoD = unico ? dias(unico.checkin, unico.checkout) : 0;
   const unicoBand = unico ? `<div class="periodo-band">${dt(unico.checkin)} → ${dt(unico.checkout)} · ${fn(unicoD)}</div>` : '';
 
-  const tipoLabel = tipo === 'grupo' ? 'Múltiplas Reservas (Orçamento)' : 'Simples (Orçamento)';
+  const tipoLabel = tipo === 'grupo' ? 'Vários Apartamentos (Orçamento)' : 'Apartamento Único (Orçamento)';
   const modoLabel = periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos';
 
   const summaryHtml = `
@@ -313,10 +319,18 @@ const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, qua
 <script>window.onload=()=>{window.print();}<\/script>
 </body></html>`;
 
-  const win = window.open('', '_blank', 'width=800,height=700');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+  iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
+  setTimeout(() => {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 250);
 };
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
@@ -336,7 +350,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync, onNotify, categorias, tiposPagamento, dragValues = null }) {
+function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -383,7 +397,12 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
   const [showPayModal,   setShowPayModal]   = useState(false);
   const [cancelPagId,    setCancelPagId]    = useState(null);
   const [cancelMotivo,   setCancelMotivo]   = useState('');
-  const [viewPagamento,  setViewPagamento]  = useState(null);
+  const [viewPagamento,      setViewPagamento]      = useState(null);
+  const [confirmPernoite,    setConfirmPernoite]    = useState(false);
+  const [confirmCancel,      setConfirmCancel]      = useState(false);
+  const [confirmCancel2,     setConfirmCancel2]     = useState(false);
+  const [cancelMotivRes,     setCancelMotivRes]     = useState('');
+  const [confirmRemovePessoa, setConfirmRemovePessoa] = useState(null); // { id, nome }
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPago  = pagamentos.filter((p) => !p.cancelado).reduce((s, p) => s + (p.valor ?? 0), 0);
@@ -519,9 +538,9 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
     try {
       for (const op of pendingOps) {
         if (op.type === 'addPessoa')
-          await reservaApi.adicionarPessoa(reserva.id, op.pessoaId);
+          await reservaApi.vincularPessoaReserva(reserva.id, op.pessoaId, { vincular: true });
         else if (op.type === 'removePessoa')
-          await reservaApi.removerPessoa(reserva.id, op.pessoaId);
+          await reservaApi.vincularPessoaReserva(reserva.id, op.pessoaId, { vincular: false });
         else if (op.type === 'addPagamento')
           await reservaApi.adicionarPagamento(reserva.id, op.payment);
         else if (op.type === 'cancelPagamento')
@@ -533,7 +552,22 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
       if (hasPessoaOps && onSync) {
         try {
           const fresh = await reservaApi.buscarPorId(reserva.id);
-          onSync(normalizeReserva(fresh));
+          const normalized = normalizeReserva(fresh);
+          onSync(normalized);
+          // Recalculate price with updated guest list from backend
+          const freshPessoas = normalized.hospedes ?? [];
+          const datas_nascimento = freshPessoas
+            .map((p) => p.dataNascimento).filter(Boolean)
+            .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
+          setViewCalcLoading(true);
+          reservaApi.calcularPreco([{
+            fk_quarto:    parseInt(reserva.quarto),
+            data_entrada: toBrDate(reserva.dataInicio),
+            data_saida:   toBrDate(reserva.dataFim),
+            datas_nascimento,
+          }]).then((res) => setViewCalc(Array.isArray(res) ? res[0] : res))
+            .catch(() => {})
+            .finally(() => setViewCalcLoading(false));
         } catch { /* ignore sync failure */ }
       }
       onNotify?.('Alterações salvas!');
@@ -547,6 +581,31 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
   // ── Edit calc ─────────────────────────────────────────────────────────────
   const [editCalc,        setEditCalc]        = useState(null);
   const [editCalcLoading, setEditCalcLoading] = useState(false);
+  const [origCalc,        setOrigCalc]        = useState(null);
+  const [origCalcLoading, setOrigCalcLoading] = useState(false);
+  const [viewCalc,        setViewCalc]        = useState(null);
+  const [viewCalcLoading, setViewCalcLoading] = useState(false);
+
+  // Fetch original price once when editing starts
+  useEffect(() => {
+    if (!editing) return;
+    let cancelled = false;
+    setOrigCalcLoading(true);
+    setOrigCalc(null);
+    const datas_nascimento = pessoas
+      .map((p) => p.dataNascimento)
+      .filter(Boolean)
+      .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
+    reservaApi.calcularPreco([{
+      fk_quarto:    parseInt(reserva.quarto),
+      data_entrada: toBrDate(reserva.dataInicio),
+      data_saida:   toBrDate(reserva.dataFim),
+      datas_nascimento,
+    }]).then((res) => { if (!cancelled) setOrigCalc(Array.isArray(res) ? res[0] : res); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setOrigCalcLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing]);
 
   useEffect(() => {
     if (!editing || !editQuarto[0] || !editCheckin || !editCheckout) return;
@@ -568,6 +627,26 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
       .finally(() => { if (!cancelled) setEditCalcLoading(false); });
     return () => { cancelled = true; };
   }, [editing, editQuarto[0], editCheckin, editCheckout]);
+
+  // Recalculate price in view mode whenever people list changes
+  useEffect(() => {
+    if (editing) return;
+    let cancelled = false;
+    setViewCalcLoading(true);
+    const datas_nascimento = pessoas
+      .map((p) => p.dataNascimento)
+      .filter(Boolean)
+      .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
+    reservaApi.calcularPreco([{
+      fk_quarto:    parseInt(reserva.quarto),
+      data_entrada: toBrDate(reserva.dataInicio),
+      data_saida:   toBrDate(reserva.dataFim),
+      datas_nascimento,
+    }]).then((res) => { if (!cancelled) setViewCalc(Array.isArray(res) ? res[0] : res); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setViewCalcLoading(false); });
+    return () => { cancelled = true; };
+  }, [pessoas]); // eslint-disable-line
 
   // ── Edit save (quarto/datas) ───────────────────────────────────────────────
   const [editSaving,  setEditSaving]  = useState(false);
@@ -591,10 +670,15 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
 
   const canSave = editQuarto.length > 0 && editCheckin && editCheckout && editCheckout > editCheckin;
 
+  const hasChangedDatesOrRoom =
+    editQuarto[0] !== String(reserva.quarto) ||
+    (editCheckin  ? formatDate(editCheckin)  : '') !== reserva.dataInicio ||
+    (editCheckout ? formatDate(editCheckout) : '') !== reserva.dataFim;
+
   const TABS = [
     { key: 'dados',      label: 'Dados da Reserva' },
-    { key: 'pessoas',    label: `Pessoas (${pessoas.length})` },
-    { key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` },
+    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? (reserva.pessoasOrcamento?.length ?? 0) + (reserva.orcamentoInfo ? 1 : 0) : pessoas.length})` },
+    ...(reserva.status !== 'orcamento' ? [{ key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` }] : []),
   ];
 
   // ── Edit mode render ───────────────────────────────────────────────────────
@@ -612,7 +696,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
         }
       >
         <div className={styles.formStack}>
-          <FormField label="Quarto">
+          <FormField label="Apartamento">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
               availableRooms={allRoomIds} categorias={categorias} roomDescMap={roomDescMap} singleSelect
@@ -626,58 +710,131 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
             />
           </FormField>
 
-          {/* Price card */}
-          {(editCalc || editCalcLoading) && (
-            <div className={styles.priceCard}>
-              <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
-                <span className={styles.priceCardSummary}>
-                  <span className={styles.finStripItem}>
-                    Valor Total{' '}
-                    {editCalcLoading
-                      ? <b><Loader2 size={11} className={styles.spin} /></b>
-                      : <b>{fmtBRL(editCalc?.valor_total ?? 0)}</b>
+          {/* Price comparison / single card */}
+          {hasChangedDatesOrRoom ? (
+            /* ── Side-by-side comparison ── */
+            (origCalc || origCalcLoading || editCalc || editCalcLoading) && (
+              <div className={styles.editCompareGrid}>
+                {/* Anterior */}
+                <div className={styles.editComparePanel}>
+                  <div className={styles.editCompareBand}>
+                    <span className={styles.editCompareBandLabel}>Anterior</span>
+                    <span className={styles.editCompareBandInfo}>Apartamento {fmtRoom(reserva.quarto)} · {fmtDateBR(reserva.dataInicio)} → {fmtDateBR(reserva.dataFim)}</span>
+                  </div>
+                  <div className={styles.editCompareBody}>
+                    {origCalcLoading
+                      ? <div className={styles.editCompareLoading}><Loader2 size={11} className={styles.spin} /> calculando...</div>
+                      : origCalc && <>
+                          {origCalc.detalhes?.map((d, di) => (
+                            <div key={di} className={styles.editCompareRow}>
+                              <span className={styles.editCompareDesc}>{d.descricao}</span>
+                              <span className={styles.editCompareVal}>{fmtBRL(d.valor_final)}</span>
+                            </div>
+                          ))}
+                          <div className={styles.editCompareTotalRow}>
+                            <span>Total</span>
+                            <span>{fmtBRL(origCalc.valor_total)}</span>
+                          </div>
+                        </>
                     }
-                  </span>
-                  {editCalc && (
-                    <>
-                      <span className={styles.finStripDivider} />
-                      <span className={styles.finStripItem}>
-                        Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>
-                      </span>
-                      <span className={styles.finStripDivider} />
-                      <span className={styles.finStripItem}>
-                        Pendente <b style={{ color: (editCalc.valor_total - totalPago) > 0 ? '#f97316' : 'var(--emerald)' }}>
-                          {fmtBRL(Math.max(0, editCalc.valor_total - totalPago))}
-                        </b>
-                      </span>
-                    </>
-                  )}
-                </span>
-              </div>
-              {editCalc?.detalhes?.length > 0 && (
-                <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
-                  {editCalc.detalhes.map((d, di) => (
-                    <div key={di} className={styles.priceDetailItem}>
-                      <div className={styles.priceCardRow}>
-                        <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                        <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                      </div>
-                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
-                        <div className={styles.priceDetailSub}>
-                          <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                          {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                          {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <div className={styles.step3PriceTotal}>
-                    <span>Total</span>
-                    <span>{fmtBRL(editCalc.valor_total)}</span>
                   </div>
                 </div>
-              )}
-            </div>
+
+                {/* Novo */}
+                <div className={[styles.editComparePanel, styles.editComparePanelNew].join(' ')}>
+                  <div className={[styles.editCompareBand, styles.editCompareBandNew].join(' ')}>
+                    <span className={styles.editCompareBandLabel}>Novo</span>
+                    <span className={styles.editCompareBandInfo}>Apartamento {fmtRoom(parseInt(editQuarto[0]))} · {editCheckin ? fmtDateBR(formatDate(editCheckin)) : ''} → {editCheckout ? fmtDateBR(formatDate(editCheckout)) : ''}</span>
+                  </div>
+                  <div className={styles.editCompareBody}>
+                    {editCalcLoading
+                      ? <div className={styles.editCompareLoading}><Loader2 size={11} className={styles.spin} /> calculando...</div>
+                      : editCalc && <>
+                          {editCalc.detalhes?.map((d, di) => (
+                            <div key={di} className={styles.editCompareRow}>
+                              <span className={styles.editCompareDesc}>{d.descricao}</span>
+                              <span className={styles.editCompareVal}>{fmtBRL(d.valor_final)}</span>
+                            </div>
+                          ))}
+                          <div className={styles.editCompareTotalRow}>
+                            <span>Total</span>
+                            <span>{fmtBRL(editCalc.valor_total)}</span>
+                          </div>
+                          <div className={styles.editCompareFinRow}>
+                            <span className={styles.editCompareFinItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{editCalc.valor_total > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / editCalc.valor_total * 100)}%)</span>}</span>
+                            <span className={styles.editCompareFinItem}>Pendente <b style={{ color: Math.max(0, editCalc.valor_total - totalPago) > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(Math.max(0, editCalc.valor_total - totalPago))}</b>{editCalc.valor_total > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(Math.max(0, editCalc.valor_total - totalPago) / editCalc.valor_total * 100)}%)</span>}</span>
+                          </div>
+                        </>
+                    }
+                  </div>
+                </div>
+
+                {/* Diff */}
+                {!editCalcLoading && !origCalcLoading && editCalc && origCalc && (() => {
+                  const diff = editCalc.valor_total - origCalc.valor_total;
+                  if (diff === 0) return null;
+                  return (
+                    <div className={[styles.editCompareDiff, diff > 0 ? styles.editCompareDiffUp : styles.editCompareDiffDown].join(' ')}>
+                      {diff > 0 ? '▲' : '▼'} {fmtBRL(Math.abs(diff))} {diff > 0 ? 'a mais' : 'a menos'}
+                    </div>
+                  );
+                })()}
+              </div>
+            )
+          ) : (
+            /* ── Single price card (unchanged) ── */
+            (editCalc || editCalcLoading) && (
+              <div className={styles.priceCard}>
+                <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
+                  <span className={styles.priceCardSummary}>
+                    <span className={styles.finStripItem}>
+                      Valor Total{' '}
+                      {editCalcLoading
+                        ? <b><Loader2 size={11} className={styles.spin} /></b>
+                        : <b>{fmtBRL(editCalc?.valor_total ?? 0)}</b>
+                      }
+                    </span>
+                    {editCalc && (
+                      <>
+                        <span className={styles.finStripDivider} />
+                        <span className={styles.finStripItem}>
+                          Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{editCalc.valor_total > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / editCalc.valor_total * 100)}%)</span>}
+                        </span>
+                        <span className={styles.finStripDivider} />
+                        <span className={styles.finStripItem}>
+                          Pendente <b style={{ color: (editCalc.valor_total - totalPago) > 0 ? '#f97316' : 'var(--emerald)' }}>
+                            {fmtBRL(Math.max(0, editCalc.valor_total - totalPago))}
+                          </b>{editCalc.valor_total > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(Math.max(0, editCalc.valor_total - totalPago) / editCalc.valor_total * 100)}%)</span>}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {editCalc?.detalhes?.length > 0 && (
+                  <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
+                    {editCalc.detalhes.map((d, di) => (
+                      <div key={di} className={styles.priceDetailItem}>
+                        <div className={styles.priceCardRow}>
+                          <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                          <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                        </div>
+                        {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
+                          <div className={styles.priceDetailSub}>
+                            <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                            {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
+                            {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    <div className={styles.step3PriceTotal}>
+                      <span>Total</span>
+                      <span>{fmtBRL(editCalc.valor_total)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
           )}
         </div>
       </Modal>
@@ -689,7 +846,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
     <>
       <Modal open onClose={handleClose} size="md"
         bodyStyle={{ padding: 0, gap: 0 }}
-        title={<><BedDouble size={15} /> Quarto {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
+        title={<><BedDouble size={15} /> Apartamento {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
         footer={
           <div className={styles.footerSpread}>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -698,24 +855,24 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
                   <Button variant="primary" onClick={() => onActivate?.(reserva.id)}>
                     Ativar Reserva
                   </Button>
-                  <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                  <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
                     Cancelar Orçamento
                   </Button>
                 </>
-              ) : (
+              ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' ? (
                 <>
                   {reserva.status !== 'cancelado' && reserva.status !== 'finalizado' && (
-                    <Button variant="danger" onClick={() => { onCancel(reserva.id); onClose(); }}>
+                    <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
                       Cancelar Reserva
                     </Button>
                   )}
-                  <Button variant="secondary" onClick={() => onNotify({ type: 'info', message: 'Funcionalidade em breve.' })}>
+                  <Button variant="secondary" onClick={() => setConfirmPernoite(true)}>
                     Mover para Pernoites
                   </Button>
                 </>
-              )}
+              ) : null}
             </div>
-            {reserva.status !== 'orcamento' && (
+            {reserva.status !== 'orcamento' && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
               hasChanges ? (
                 <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
                   {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
@@ -757,26 +914,33 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
 
               <div className={styles.kvList}>
                 <div className={styles.kvRow}>
-                  <span className={styles.kvLabel}>Check-in</span>
-                  <span className={styles.kvVal}>
-                    {fmtDateBR(reserva.dataInicio)}
-                    {reserva.chegadaPrevista && (
-                      <span className={styles.kvMeta}> · {reserva.chegadaPrevista.split(' ')[1] ?? '14:00'}</span>
-                    )}
-                  </span>
+                  <span className={styles.kvLabel}>Reserva</span>
+                  <span className={styles.kvVal} style={{ fontVariantNumeric: 'tabular-nums' }}>#{reserva.id}</span>
                 </div>
-                <div className={styles.kvRow}>
-                  <span className={styles.kvLabel}>Check-out</span>
-                  <span className={styles.kvVal}>
-                    {fmtDateBR(reserva.dataFim)}
-                    {reserva.saidaPrevista && (
-                      <span className={styles.kvMeta}> · {reserva.saidaPrevista.split(' ')[1] ?? '12:00'}</span>
-                    )}
-                  </span>
-                </div>
-                <div className={styles.kvRow}>
-                  <span className={styles.kvLabel}>Duração</span>
-                  <span className={styles.kvVal}>{diariasTxt(dias)}</span>
+                <div className={styles.kvRowDates}>
+                  <div className={styles.kvDateCell}>
+                    <span className={styles.kvLabel}>Check-in</span>
+                    <span className={styles.kvVal}>
+                      {fmtDateBR(reserva.dataInicio)}
+                      {reserva.chegadaPrevista && (
+                        <span className={styles.kvMeta}> · {reserva.chegadaPrevista.split(' ')[1] ?? '14:00'}</span>
+                      )}
+                    </span>
+                  </div>
+                  <span className={styles.kvDateArrow}>→</span>
+                  <div className={styles.kvDateCell}>
+                    <span className={styles.kvLabel}>Check-out</span>
+                    <span className={styles.kvVal}>
+                      {fmtDateBR(reserva.dataFim)}
+                      {reserva.saidaPrevista && (
+                        <span className={styles.kvMeta}> · {reserva.saidaPrevista.split(' ')[1] ?? '12:00'}</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className={styles.kvDateCell} style={{ marginLeft: 'auto' }}>
+                    <span className={styles.kvLabel}>Duração</span>
+                    <span className={styles.kvVal}>{diariasTxt(dias)}</span>
+                  </div>
                 </div>
                 {reserva.empresaNome && (
                   <div className={styles.kvRow}>
@@ -808,8 +972,35 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
           {/* ── Pessoas ── */}
           {activeTab === 'pessoas' && (
             <div className={styles.detailBody}>
+              {/* Orçamento sem cadastro: show solicitante + acompanhantes */}
+              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                  <div className={styles.pessoaRow}>
+                    <div className={styles.pagRowTop}>
+                      <span className={styles.pagRowDesc}>{reserva.orcamentoInfo.nome_solicitante}</span>
+                      <span className={styles.titularBadge} style={{ marginLeft: 'auto' }}>Responsável</span>
+                    </div>
+                    {reserva.orcamentoInfo.data_hora_registro && (
+                      <div className={styles.pagRowMeta}>Solicitado em {reserva.orcamentoInfo.data_hora_registro}</div>
+                    )}
+                  </div>
+                  {reserva.pessoasOrcamento.map((p) => (
+                    <div key={p.id} className={styles.pessoaRow}>
+                      <div className={styles.pagRowTop}>
+                        <span className={styles.pagRowDesc}>{p.nome}</span>
+                        <span className={styles.acompanhanteBadge} style={{ marginLeft: 'auto' }}>Acompanhante</span>
+                      </div>
+                      {p.dataNascimento && <div className={styles.pagRowMeta}>{p.dataNascimento}</div>}
+                    </div>
+                  ))}
+                  {reserva.pessoasOrcamento.length === 0 && (
+                    <div className={styles.emptyState}>Sem acompanhantes informados.</div>
+                  )}
+                </div>
+              )}
+
               {/* Add button at top */}
-              {!showAddPessoa && (
+              {!showAddPessoa && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'orcamento' && (
                 <button className={styles.addLinkBtn} onClick={() => setShowAddPessoa(true)}>
                   <Plus size={13} /> Adicionar pessoa
                 </button>
@@ -891,11 +1082,11 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
                 </div>
               )}
 
-              {pessoas.length === 0 && (
+              {reserva.status !== 'orcamento' && pessoas.length === 0 && (
                 <div className={styles.emptyState}>Nenhuma pessoa vinculada.</div>
               )}
 
-              {pessoas.map((h, i) => (
+              {reserva.status !== 'orcamento' && pessoas.map((h, i) => (
                 <div key={h.id} className={styles.pessoaRow}>
                   <div className={styles.pagRowTop}>
                     <span className={styles.pagRowDesc}>{h.nome}</span>
@@ -905,7 +1096,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
                       </span>
                       {i > 0 && (
                         <button className={styles.removeIconBtn} title="Remover"
-                          onClick={() => handleRemovePessoa(h.id)}>
+                          onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}>
                           <X size={12} />
                         </button>
                       )}
@@ -923,17 +1114,31 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
           {activeTab === 'pagamentos' && (
             <div className={styles.detailBody}>
               {/* Summary strip */}
-              <div className={styles.finStrip}>
-                <span className={styles.finStripItem}>Total <b>{fmtBRL(reserva.valorTotal)}</b></span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b></span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(Math.max(0, pendente))}</b></span>
-              </div>
+              {(() => {
+                const displayTotal = viewCalc?.valor_total ?? reserva.valorTotal;
+                const displayPendente = displayTotal - totalPago;
+                return (
+                  <div className={styles.finStrip}>
+                    <span className={styles.finStripItem}>
+                      Total{' '}
+                      {viewCalcLoading
+                        ? <b><Loader2 size={11} className={styles.spin} /></b>
+                        : <b>{fmtBRL(displayTotal)}</b>
+                      }
+                    </span>
+                    <span className={styles.finStripDivider} />
+                    <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / displayTotal * 100)}%)</span>}</span>
+                    <span className={styles.finStripDivider} />
+                    <span className={styles.finStripItem}>Pendente <b style={{ color: displayPendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(Math.max(0, displayPendente))}</b>{displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(Math.max(0, displayPendente) / displayTotal * 100)}%)</span>}</span>
+                  </div>
+                );
+              })()}
 
-              <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}>
-                <Plus size={13} /> Adicionar pagamento
-              </button>
+              {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
+                <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}>
+                  <Plus size={13} /> Adicionar pagamento
+                </button>
+              )}
 
               {pagamentos.length === 0 && (
                 <div className={styles.emptyState}>Nenhum pagamento registrado.</div>
@@ -971,6 +1176,92 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
         </div>
       </Modal>
 
+      <Modal open={confirmPernoite} onClose={() => setConfirmPernoite(false)} size="sm"
+        title="Mover para Pernoites"
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmPernoite(false)}>Cancelar</Button>
+            <Button variant="primary" style={{ flex: 1 }} onClick={() => { setConfirmPernoite(false); onMoverPernoite?.(reserva.id); onClose(); }}>
+              Confirmar
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+          Tem certeza que deseja mover a reserva de <b>{reserva.titularNome}</b> para pernoites?
+          O status será alterado para <b>Hospedado</b> e a reserva não poderá mais ser editada por aqui.
+        </p>
+      </Modal>
+
+      <Modal open={confirmCancel} onClose={() => setConfirmCancel(false)} size="sm"
+        title={reserva.status === 'orcamento' ? 'Cancelar Orçamento' : 'Cancelar Reserva'}
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmCancel(false)}>Voltar</Button>
+            <Button variant="danger" style={{ flex: 1 }} disabled={!cancelMotivRes.trim()}
+              onClick={() => { setConfirmCancel(false); setConfirmCancel2(true); }}>
+              Avançar
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+            Informe o motivo do cancelamento da reserva de <b>{reserva.titularNome}</b>:
+          </p>
+          <textarea
+            style={{
+              width: '100%', boxSizing: 'border-box', minHeight: 80,
+              padding: '8px 10px', borderRadius: 'var(--radius)',
+              border: '1.5px solid var(--border)', background: 'var(--surface-2)',
+              color: 'var(--text)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit',
+            }}
+            placeholder="Ex: Solicitação do hóspede"
+            value={cancelMotivRes}
+            onChange={(e) => setCancelMotivRes(e.target.value)}
+            autoFocus
+          />
+        </div>
+      </Modal>
+
+      <Modal open={confirmCancel2} onClose={() => setConfirmCancel2(false)} size="sm"
+        title="Confirmar Cancelamento"
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => { setConfirmCancel2(false); setConfirmCancel(true); }}>Voltar</Button>
+            <Button variant="danger" style={{ flex: 1 }}
+              onClick={() => { setConfirmCancel2(false); onCancel(reserva.id, cancelMotivRes.trim()); onClose(); }}>
+              Cancelar Definitivamente
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+            Tem certeza? Esta ação não pode ser desfeita.
+          </p>
+          <div style={{ padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)' }}>
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Motivo: </span>{cancelMotivRes}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm"
+        title="Remover pessoa"
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button>
+            <Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>
+              Remover
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+          Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?
+        </p>
+      </Modal>
+
       <PaymentModal
         open={showPayModal}
         onClose={() => setShowPayModal(false)}
@@ -979,6 +1270,8 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onUpdate, onSync
         isSubmitting={false}
         titularNome={reserva.titularNome}
         canAplicarDesconto={false}
+        valorTotal={viewCalc?.valor_total ?? reserva.valorTotal}
+        valorPago={totalPago}
       />
 
       <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
@@ -1118,7 +1411,7 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva, categorias, onSele
       footer={
         <div className={styles.footerSpread}>
           <span className={styles.footerInfo}>
-            {availableRooms.length} quarto{availableRooms.length !== 1 ? 's' : ''} disponível{availableRooms.length !== 1 ? 'is' : ''}
+            {availableRooms.length} apartamento{availableRooms.length !== 1 ? 's' : ''} disponível{availableRooms.length !== 1 ? 'is' : ''}
           </span>
           <div className={styles.footerRight}>
             <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
@@ -1131,13 +1424,13 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva, categorias, onSele
     >
       {/* Minimalist stats strip */}
       <div className={styles.dayStatsStrip}>
-        <span className={styles.dayStatChip}><b>{occupiedRooms.size}</b>/{totalRooms} quartos ocupados</span>
+        <span className={styles.dayStatChip}><b>{occupiedRooms.size}</b>/{totalRooms} apartamentos ocupados</span>
         <span className={styles.dayStatDivider} />
         <span className={styles.dayStatChip}><b>{dayReservas.length}</b> reserva{dayReservas.length !== 1 ? 's' : ''} confirmada{dayReservas.length !== 1 ? 's' : ''}</span>
         <span className={styles.dayStatDivider} />
         <span className={styles.dayStatChip}><b>{totalPeople}</b> pessoa{totalPeople !== 1 ? 's' : ''}</span>
         <span className={styles.dayStatDivider} />
-        <span className={styles.dayStatChip} style={{ color: 'var(--emerald)' }}><b>{availableRooms.length}</b> quartos disponíveis</span>
+        <span className={styles.dayStatChip} style={{ color: 'var(--emerald)' }}><b>{availableRooms.length}</b> apartamentos disponíveis</span>
       </div>
 
       {dayReservas.length === 0 ? (
@@ -1173,7 +1466,7 @@ function RoomModal({ room, reservas, onClose, categorias, onSelectReserva }) {
   const totalPessoas = roomReservas.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
   return (
     <Modal open onClose={onClose} size="md"
-      title={<><BedDouble size={15} /> Quarto {fmtRoom(room)} — {cat?.nome || ''}</>}
+      title={<><BedDouble size={15} /> Apartamento {fmtRoom(room)} — {cat?.nome || ''}</>}
       footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
     >
       {/* Stats strip */}
@@ -1254,7 +1547,7 @@ function OrcamentosModal({ reservas, onClose, onActivate, roomDescMap }) {
                     <span className={styles.roomHistoryNights}>{diariasTxt(dias)}</span>
                   </div>
                   <div className={styles.roomHistoryTitle}>{r.titularNome}</div>
-                  <div className={styles.roomHistoryMeta}>Quarto {fmtRoom(r.quarto)}{r.valorTotal ? ` · ${fmtBRL(r.valorTotal)}` : ''}</div>
+                  <div className={styles.roomHistoryMeta}>Apartamento {fmtRoom(r.quarto)}{r.valorTotal ? ` · ${fmtBRL(r.valorTotal)}` : ''}</div>
                 </div>
                 <button className={styles.orcDownloadBtn} title="Baixar orçamento" onClick={() => handleDownload(r)}>
                   <FileDown size={15} />
@@ -1341,10 +1634,10 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
             </div>
           </div>
           <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Atribuir Quarto</span>
+            <span className={styles.detailLabel}>Atribuir Apartamento</span>
             <select className={styles.formSelect} value={sqQuarto} onChange={(e) => setSqQuarto(e.target.value)}>
-              <option value="">Selecione um quarto...</option>
-              {allRooms.map((r) => <option key={r} value={r}>Quarto {fmtRoom(r)}</option>)}
+              <option value="">Selecione um apartamento...</option>
+              {allRooms.map((r) => <option key={r} value={r}>Apartamento {fmtRoom(r)}</option>)}
             </select>
           </div>
           <div className={styles.detailBox}>
@@ -1395,7 +1688,7 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
 }
 
 // ─── Room Combobox (single or multi-select) ───────────────────────────────────
-function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap = {}, singleSelect = false, disabled = false }) {
+function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap = {}, singleSelect = false, disabled = false, loading = false }) {
   const [open,      setOpen]      = useState(false);
   const [filter,    setFilter]    = useState('');
   const [dropStyle, setDropStyle] = useState({});
@@ -1452,8 +1745,8 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
 
   const fl = filter.toLowerCase();
   const label = value.length === 0
-    ? (singleSelect ? 'Selecione um quarto...' : 'Selecione quarto(s)...')
-    : `Quarto ${fmtRoom(parseInt(value[0]))}${!singleSelect && value.length > 1 ? ` +${value.length - 1}` : ''}`;
+    ? (singleSelect ? 'Selecione um apartamento...' : 'Selecione apartamento(s)...')
+    : `Apartamento ${fmtRoom(parseInt(value[0]))}${!singleSelect && value.length > 1 ? ` +${value.length - 1}` : ''}`;
 
   const dropdown = open && createPortal(
     <div ref={dropRef} className={styles.comboDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
@@ -1463,7 +1756,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
           className={styles.comboSearchInput}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filtrar quarto..."
+          placeholder="Filtrar apartamento..."
           autoFocus
         />
       </div>
@@ -1486,7 +1779,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
                   {!singleSelect && (
                     <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
                   )}
-                  <span className={styles.comboItemNum}>Quarto {fmtRoom(r)}</span>
+                  <span className={styles.comboItemNum}>Apartamento {fmtRoom(r)}</span>
                   {roomDescMap[r] && <span className={styles.comboItemTipo}>{roomDescMap[r]}</span>}
                   {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
                 </div>
@@ -1502,33 +1795,44 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
   return (
     <div className={styles.comboWrap}>
       <button ref={triggerRef} type="button" className={styles.comboTrigger}
-        onClick={() => { if (!disabled) { setOpen((o) => !o); setFilter(''); } }}
-        disabled={disabled} style={disabled ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+        onClick={() => { if (!disabled && !loading) { setOpen((o) => !o); setFilter(''); } }}
+        disabled={disabled || loading} style={(disabled || loading) ? { opacity: loading ? 1 : 0.45, cursor: loading ? 'wait' : 'not-allowed' } : undefined}
       >
-        <span className={value.length === 0 ? styles.comboPlaceholder : ''}>{label}</span>
-        <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
+        {loading ? (
+          <span className={styles.comboPlaceholder} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Loader2 size={13} className={styles.spin} /> Verificando disponibilidade...
+          </span>
+        ) : !singleSelect && value.length > 0 ? (
+          <div className={styles.comboChipsInline}>
+            {value.map((q) => (
+              <div key={q} className={styles.hospedeChipRect}>
+                <span>Apartamento {fmtRoom(parseInt(q))}</span>
+                <button type="button" className={styles.chipRemove} onClick={(e) => { e.stopPropagation(); handleSelect(parseInt(q)); }}><X size={10} /></button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span className={styles.comboPlaceholder}>{label}</span>
+        )}
+        {loading
+          ? <Loader2 size={13} className={styles.spin} style={{ flexShrink: 0, opacity: 0 }} />
+          : <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
+        }
       </button>
       {dropdown}
-      {!singleSelect && value.length > 0 && (
-        <div className={styles.comboChips}>
-          {value.map((q) => (
-            <div key={q} className={styles.hospedeChipRect}>
-              <span>Quarto {fmtRoom(parseInt(q))}</span>
-              <button type="button" className={styles.chipRemove} onClick={() => handleSelect(parseInt(q))}><X size={10} /></button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
 // ─── Sem Cadastro Hospedes Picker (orçamento sem cadastro) ───────────────────
-function SemCadastroHospedesPicker({ value = [], onChange }) {
+function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
   const [nome, setNome] = useState('');
   const [dob,  setDob]  = useState(null);
 
   const canAdd = nome.trim().length > 0 && dob !== null;
+  const hasDraft = nome.trim().length > 0 || dob !== null;
+
+  useEffect(() => { onDraftChange?.(hasDraft); }, [hasDraft]); // eslint-disable-line
 
   const add = () => {
     if (!canAdd) return;
@@ -1541,21 +1845,20 @@ function SemCadastroHospedesPicker({ value = [], onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div className={styles.semCadastroAddRow}>
-        <div className={styles.hospSearchWrap} style={{ flex: 1, minWidth: 0 }}>
-          <input
-            className={styles.formInput}
-            type="text"
-            placeholder="Nome do hóspede"
-            value={nome}
-            onChange={(e) => setNome(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          />
-        </div>
+        <input
+          className={styles.formInput}
+          style={{ flex: 1, minWidth: 0 }}
+          type="text"
+          placeholder="Nome do hóspede"
+          value={nome}
+          onChange={(e) => setNome(e.target.value.toUpperCase())}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+        />
         <div style={{ width: 160, flexShrink: 0 }}>
           <DatePicker value={dob} onChange={setDob} placeholder="Nascimento" maxDate={new Date()} />
         </div>
         <button type="button" className={styles.addOrcGuestBtn} onClick={add} disabled={!canAdd}>
-          <Plus size={13} />
+          <Plus size={13} /> Adicionar Hóspede
         </button>
       </div>
       {value.length > 0 && (
@@ -1581,6 +1884,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
   const [dropStyle, setDropStyle] = useState({});
   const [pending,   setPending]   = useState(null); // { titular, selected: Set<id> }
   const inputRef = useRef(null);
+  const wrapRef  = useRef(null);
 
   useEffect(() => {
     if (search.trim().length < 2) { setResults([]); setPending(null); return; }
@@ -1608,10 +1912,11 @@ function RoomHospedesPicker({ value = [], onChange }) {
   }, [search]);
 
   const calcDropPos = (maxH = 260) => {
-    if (!inputRef.current) return;
-    const rect = inputRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom - 8;
-    setDropStyle({ position: 'fixed', zIndex: 99999, left: rect.left, top: rect.bottom + 4, width: rect.width, maxHeight: Math.min(maxH, spaceBelow) });
+    const el = wrapRef.current ?? inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceAbove = rect.top - 8;
+    setDropStyle({ position: 'fixed', zIndex: 99999, left: rect.left, bottom: window.innerHeight - rect.top + 4, width: rect.width, maxHeight: Math.min(maxH, spaceAbove) });
   };
 
   useEffect(() => { if (results.length) calcDropPos(); }, [results]);
@@ -1654,57 +1959,61 @@ function RoomHospedesPicker({ value = [], onChange }) {
 
   const showDrop = pending !== null || results.length > 0;
   const dropdown = showDrop && createPortal(
-    <div className={styles.searchResultsList} style={{ ...dropStyle, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.18)' }}>
+    <div className={styles.searchResultsList} style={{ ...dropStyle, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
       {pending ? (
         <>
           <div className={styles.companionHeader}>
             <button className={styles.companionBack} onClick={() => setPending(null)}><ChevronLeft size={12} /> Voltar</button>
           </div>
-          {/* Titular — always included */}
-          <div className={styles.companionRow}>
-            <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
-            <div className={styles.companionInfo}>
-              <span className={styles.companionName}>{pending.titular.nome}</span>
-              {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
-            </div>
-            <span className={styles.titularChip}>Titular</span>
-          </div>
-          {/* Companions */}
-          {pending.titular.acompanhantes.map((a) => (
-            <div key={a.id}
-              className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
-              onClick={() => !a.bloqueado && toggleCompanion(a.id)}>
-              <div className={[styles.companionCheck, pending.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
-                {pending.selected.has(a.id) && <Check size={11} />}
-              </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {/* Titular — always included */}
+            <div className={styles.companionRow}>
+              <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
               <div className={styles.companionInfo}>
-                <span className={styles.companionName}>{a.nome}</span>
-                <span className={styles.companionMeta}>
-                  {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
-                </span>
+                <span className={styles.companionName}>{pending.titular.nome}</span>
+                {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
               </div>
-              {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+              <span className={styles.titularChip}>Titular</span>
             </div>
-          ))}
+            {/* Companions */}
+            {pending.titular.acompanhantes.map((a) => (
+              <div key={a.id}
+                className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
+                onClick={() => !a.bloqueado && toggleCompanion(a.id)}>
+                <div className={[styles.companionCheck, pending.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
+                  {pending.selected.has(a.id) && <Check size={11} />}
+                </div>
+                <div className={styles.companionInfo}>
+                  <span className={styles.companionName}>{a.nome}</span>
+                  <span className={styles.companionMeta}>
+                    {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
+                  </span>
+                </div>
+                {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+              </div>
+            ))}
+          </div>
           <div className={styles.companionActions}>
             <button className={styles.companionBtnSecondary} onClick={() => confirmAdd(false)}>Só o titular</button>
             <button className={styles.companionBtnPrimary} onClick={() => confirmAdd(true)}>Adicionar →</button>
           </div>
         </>
       ) : (
-        results.map((h) => (
-          <div key={h.id}
-            className={[styles.searchResultItem, h.bloqueado ? styles.searchResultBlocked : ''].join(' ')}
-            onClick={() => handleResultClick(h)}>
-            <div className={styles.searchResultName}>{h.nome}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
-              {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
-              {h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {results.map((h) => (
+            <div key={h.id}
+              className={[styles.searchResultItem, h.bloqueado ? styles.searchResultBlocked : ''].join(' ')}
+              onClick={() => handleResultClick(h)}>
+              <div className={styles.searchResultName}>{h.nome}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
+                {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
+                {h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+              </div>
+              {!h.bloqueado && <ChevronRight size={13} className={styles.addIcon} />}
             </div>
-            {!h.bloqueado && <ChevronRight size={13} className={styles.addIcon} />}
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>,
     document.body
@@ -1712,31 +2021,29 @@ function RoomHospedesPicker({ value = [], onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div className={styles.hospSearchWrap}>
+      <div ref={wrapRef} className={styles.hospSearchWrap}>
         {searching
           ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
           : <Search size={13} className={styles.hospSearchIcon} />}
-        <input ref={inputRef} className={styles.formInput} style={{ paddingLeft: 30 }} value={search}
-          onChange={(e) => setSearch(e.target.value)} placeholder="Buscar hóspede..." />
-      </div>
-      {dropdown}
-      {value.length > 0 && (
-        <div className={styles.selectedChips}>
+        <div className={styles.hospInputInner}>
           {value.map((h) => (
             <div key={h.id} className={styles.hospedeChipRect}>
               <span>{h.nome}</span>
               <button type="button" className={styles.chipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
             </div>
           ))}
+          <input ref={inputRef} className={styles.hospInlineInput} value={search}
+            onChange={(e) => setSearch(e.target.value)} placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
         </div>
-      )}
+      </div>
+      {dropdown}
     </div>
   );
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
 function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {} }) {
-  const STEPS = ['Tipo', 'Quarto, Período & Hóspedes', 'Resumo & Pagamento'];
+  const STEPS = ['Tipo', 'Apartamento, Período & Hóspedes', 'Resumo & Pagamento'];
 
   const [step,        setStep]        = useState(initialRoom ? 2 : 1);
   const [tipo,        setTipo]        = useState('simples'); // 'simples' | 'grupo'
@@ -1771,6 +2078,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [calcLoading,      setCalcLoading]      = useState(false);
   const [showPriceDetails, setShowPriceDetails] = useState(false);
   const [roomPriceOpen,    setRoomPriceOpen]    = useState({}); // { [`${q}_${pi}`]: bool }
+  const [apiAvailability,      setApiAvailability]      = useState(null); // Set<roomId> | null
+  const [mpApiAvailability,    setMpApiAvailability]    = useState(null); // Set<roomId> | null
+  const [availLoading,         setAvailLoading]         = useState(false);
+  const [mpAvailLoading,       setMpAvailLoading]       = useState(false);
 
   // Derived
   const checkinStr  = checkin  ? formatDate(checkin)  : '';
@@ -1779,27 +2090,71 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   const allRoomIds = useMemo(() => categorias.flatMap((c) => c.quartos), [categorias]);
 
+  // Fetch availability from API whenever unico-mode dates change
+  useEffect(() => {
+    if (!checkin || !checkout || !allRoomIds.length) { setApiAvailability(null); setAvailLoading(false); return; }
+    let cancelled = false;
+    setAvailLoading(true);
+    setApiAvailability(null);
+    reservaApi.verificarDisponibilidade({
+      fk_quartos: allRoomIds,
+      data_entrada: toBrDate(checkinStr),
+      data_saida: toBrDate(checkoutStr),
+    }).then((results) => {
+      if (cancelled) return;
+      const avail = new Set(
+        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.fk_quarto)
+      );
+      setApiAvailability(avail);
+    }).catch(() => { if (!cancelled) setApiAvailability(null); })
+      .finally(() => { if (!cancelled) setAvailLoading(false); });
+    return () => { cancelled = true; };
+  }, [checkinStr, checkoutStr]); // eslint-disable-line
+
+  // Fetch availability for multiplos-mode form dates
+  useEffect(() => {
+    if (!mpCheckin || !mpCheckout || !allRoomIds.length) { setMpApiAvailability(null); setMpAvailLoading(false); return; }
+    let cancelled = false;
+    setMpAvailLoading(true);
+    setMpApiAvailability(null);
+    reservaApi.verificarDisponibilidade({
+      fk_quartos: allRoomIds,
+      data_entrada: toBrDate(formatDate(mpCheckin)),
+      data_saida: toBrDate(formatDate(mpCheckout)),
+    }).then((results) => {
+      if (cancelled) return;
+      const avail = new Set(
+        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.fk_quarto)
+      );
+      setMpApiAvailability(avail);
+    }).catch(() => { if (!cancelled) setMpApiAvailability(null); })
+      .finally(() => { if (!cancelled) setMpAvailLoading(false); });
+    return () => { cancelled = true; };
+  }, [mpCheckin, mpCheckout]); // eslint-disable-line
+
   const availableRooms = useMemo(() => {
     if (!checkinStr || !checkoutStr) return initialAvailable || allRoomIds;
+    if (apiAvailability) return allRoomIds.filter((r) => apiAvailability.has(r));
     return allRoomIds.filter(
       (r) => !reservas.some((res) => res.quarto === r && res.dataInicio < checkoutStr && res.dataFim > checkinStr)
     );
-  }, [checkinStr, checkoutStr, reservas, initialAvailable, allRoomIds]);
+  }, [checkinStr, checkoutStr, reservas, initialAvailable, allRoomIds, apiAvailability]);
 
   const mpAvailableRooms = useMemo(() => {
     if (!mpCheckin || !mpCheckout) return allRoomIds;
     const ci = formatDate(mpCheckin);
     const co = formatDate(mpCheckout);
     const alreadyPicked = periodos.flatMap((p, idx) => {
-      if (idx === editingPeriodoIdx) return []; // exclude own rooms when editing
+      if (idx === editingPeriodoIdx) return [];
       const pi = formatDate(p.checkin); const po = formatDate(p.checkout);
       if (pi < co && po > ci) return p.rooms.map((r) => parseInt(r));
       return [];
     });
-    return allRoomIds.filter(
-      (r) => !alreadyPicked.includes(r) && !reservas.some((res) => res.quarto === r && res.dataInicio < co && res.dataFim > ci)
-    );
-  }, [mpCheckin, mpCheckout, periodos, editingPeriodoIdx, reservas, allRoomIds]);
+    const baseAvail = mpApiAvailability
+      ? allRoomIds.filter((r) => mpApiAvailability.has(r))
+      : allRoomIds.filter((r) => !reservas.some((res) => res.quarto === r && res.dataInicio < co && res.dataFim > ci));
+    return baseAvail.filter((r) => !alreadyPicked.includes(r));
+  }, [mpCheckin, mpCheckout, periodos, editingPeriodoIdx, reservas, allRoomIds, mpApiAvailability]);
 
 
   const addPagamento = (payment) => {
@@ -1849,9 +2204,16 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     ? [...new Set(periodos.flatMap((p) => p.rooms))]
     : quartos;
 
+  const [semCadastroDraft, setSemCadastroDraft] = useState(false);
+  const mpFormDirty = periodoMode === 'multiplos' && (mpRooms.length > 0 || !!mpCheckin || !!mpCheckout || editingPeriodoIdx !== null);
+
+  const hasGuestsForAllRooms = periodoMode === 'unico'
+    ? quartos.length > 0 && quartos.every((q) => (quartoHospedes[q]?.length || 0) + (quartoHospedesOrc[q]?.length || 0) > 0)
+    : periodos.length > 0 && periodos.every((p) => p.rooms.every((r) => (p.roomHospedes?.[r]?.length || 0) + (p.roomHospedesOrc?.[r]?.length || 0) > 0));
+
   const canNext2 = periodoMode === 'unico'
-    ? quartos.length > 0 && checkinStr && checkoutStr && dias > 0
-    : periodos.length > 0;
+    ? quartos.length > 0 && checkinStr && checkoutStr && dias > 0 && hasGuestsForAllRooms && !semCadastroDraft
+    : periodos.length > 0 && !mpFormDirty && hasGuestsForAllRooms && !semCadastroDraft;
 
   // Derived: all unique hospedes across all rooms/periods
   const allHospedes = useMemo(() => {
@@ -1994,6 +2356,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || []), 0));
       }
       await onSave(reservasBody);
+    } catch (e) {
+      onNotify?.(e?.message || 'Erro ao salvar reserva.', 'error');
     } finally { setSaving(false); }
   };
 
@@ -2032,7 +2396,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {step !== 3 && (allSelectedRooms.length > 0 || checkinStr) && (
         <div className={styles.summaryBar}>
           {allSelectedRooms.length > 0 && (
-            <span>{allSelectedRooms.length === 1 ? `Quarto ${fmtRoom(parseInt(allSelectedRooms[0]))}` : `${allSelectedRooms.length} quartos`}</span>
+            <span>{allSelectedRooms.length === 1 ? `Apartamento ${fmtRoom(parseInt(allSelectedRooms[0]))}` : `${allSelectedRooms.length} apartamentos`}</span>
           )}
           {periodoMode === 'unico' && checkinStr && checkoutStr && dias > 0 && (
             <span>{fmtDateBR(checkinStr)} → {fmtDateBR(checkoutStr)} · {diariasTxt(dias)}</span>
@@ -2059,7 +2423,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         <div className={styles.formStack}>
           <FormField label="Tipo de Reserva">
             <div className={styles.tipoRow}>
-              {[['simples', 'Reserva Simples'], ['grupo', 'Múltiplas Reservas']].map(([v, l]) => (
+              {[['simples', 'Apartamento Único'], ['grupo', 'Vários Apartamentos']].map(([v, l]) => (
                 <button key={v} type="button"
                   className={[styles.tipoBtn, tipo === v ? styles.tipoBtnActive : ''].join(' ')}
                   onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
@@ -2074,12 +2438,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 <span>Simular Orçamento</span>
               </label>
               {isOrcamento && (
-                <div className={styles.tipoRow}>
+                <div style={{ display: 'flex', gap: 16, paddingLeft: 4 }}>
                   {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
-                    <button key={v} type="button"
-                      className={[styles.tipoBtn, orcMode === v ? styles.tipoBtnActive : ''].join(' ')}
-                      onClick={() => setOrcMode(v)}
-                    >{l}</button>
+                    <label key={v} className={styles.orcamentoToggle}>
+                      <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
+                      <span>{l}</span>
+                    </label>
                   ))}
                 </div>
               )}
@@ -2113,23 +2477,25 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                       placeholder="Check-in → Check-out" minDate={new Date()} />
                   </div>
                 </FormField>
-                <FormField label={tipo === 'grupo' ? 'Quartos (múltipla seleção)' : 'Quarto'}>
+                <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
                   <RoomCombobox value={quartos}
                     onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                     availableRooms={availableRooms}
                     categorias={categorias} roomDescMap={roomDescMap}
                     singleSelect={tipo !== 'grupo'}
-                    disabled={!checkinStr || !checkoutStr} />
+                    disabled={!checkinStr || !checkoutStr}
+                    loading={availLoading} />
                 </FormField>
               </div>
               {/* Per-room hospedes */}
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Quarto {fmtRoom(parseInt(q))}</div>
+                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Apartamento {fmtRoom(parseInt(q))}</div>
                   {isOrcSemCadastro ? (
                     <SemCadastroHospedesPicker
                       value={quartoHospedesOrc[q] || []}
-                      onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))} />
+                      onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
+                      onDraftChange={setSemCadastroDraft} />
                   ) : (
                     <RoomHospedesPicker
                       value={quartoHospedes[q] || []}
@@ -2190,21 +2556,23 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         placeholder="Check-in → Check-out" minDate={new Date()} />
                     </div>
                   </FormField>
-                  <FormField label="Quartos para este período">
+                  <FormField label="Apartamentos para este período">
                     <RoomCombobox value={mpRooms}
                       onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                       availableRooms={mpAvailableRooms} categorias={categorias} roomDescMap={roomDescMap}
-                      disabled={!mpCheckin || !mpCheckout} />
+                      disabled={!mpCheckin || !mpCheckout}
+                      loading={mpAvailLoading} />
                   </FormField>
                 </div>
                 {/* Per-room hospedes for this period */}
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Quarto {fmtRoom(parseInt(q))}</div>
+                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Apartamento {fmtRoom(parseInt(q))}</div>
                     {isOrcSemCadastro ? (
                       <SemCadastroHospedesPicker
                         value={mpRoomHospedesOrc[q] || []}
-                        onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))} />
+                        onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
+                        onDraftChange={setSemCadastroDraft} />
                     ) : (
                       <RoomHospedesPicker
                         value={mpRoomHospedes[q] || []}
@@ -2213,7 +2581,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   </div>
                 ))}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <Button variant={editingPeriodoIdx !== null ? 'primary' : 'secondary'} disabled={!mpRooms.length || !mpCheckin || !mpCheckout} onClick={addPeriodo}>
+                  <Button variant="primary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => isOrcSemCadastro ? !(mpRoomHospedesOrc[q]?.length > 0) : !(mpRoomHospedes[q]?.length > 0))} onClick={addPeriodo}>
                     {editingPeriodoIdx !== null ? <><Check size={13} /> Salvar Alterações</> : <><Plus size={13} /> Adicionar Período</>}
                   </Button>
                   {editingPeriodoIdx !== null && (
@@ -2258,9 +2626,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                     }
                   </span>
                   <span className={styles.finStripDivider} />
-                  <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b></span>
+                  <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / grandTotal * 100)}%)</span>}</span>
                   <span className={styles.finStripDivider} />
-                  <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b></span>
+                  <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(pendente / grandTotal * 100)}%)</span>}</span>
                 </span>
                 {!calcLoading && (
                   <ChevronDown size={14} className={showPriceDetails ? styles.priceCardChevronOpen : styles.priceCardChevron} />
@@ -2275,7 +2643,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                       if (!calc) return null;
                       return (
                         <div key={`${q}_${pi}`} className={styles.priceCardRoom}>
-                          <div className={styles.priceCardRoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
+                          <div className={styles.priceCardRoomLabel}>Apartamento {fmtRoom(parseInt(q))}</div>
                           {calc.detalhes?.map((d, di) => (
                             <div key={di} className={styles.priceDetailItem}>
                               <div className={styles.priceCardRow}>
@@ -2305,7 +2673,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
             {/* ── Tipo de reserva ── */}
             <div className={styles.kvList} style={{ padding: '0 0 14px' }}>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Múltiplas Reservas' : 'Reserva Simples'}{isOrcamento ? ` · Orçamento ${orcMode === 'sem_cadastro' ? 'sem Cadastro' : 'com Cadastro'}` : ''}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Vários Apartamentos' : 'Apartamento Único'}{isOrcamento ? ` · Orçamento ${orcMode === 'sem_cadastro' ? 'sem Cadastro' : 'com Cadastro'}` : ''}</span></div>
               <div className={styles.kvRow}><span className={styles.kvLabel}>Modo</span><span className={styles.kvVal}>{periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos'}</span></div>
             </div>
 
@@ -2331,7 +2699,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                     const multiRoom = periodoMode === 'multiplos' || quartos.length > 1;
                     return (
                       <div key={q} className={styles.step3RoomBlock}>
-                        <div className={styles.step3RoomLabel}>Quarto {fmtRoom(parseInt(q))}</div>
+                        <div className={styles.step3RoomLabel}>Hóspedes{multiRoom ? ` — Apartamento ${fmtRoom(parseInt(q))}` : ''}</div>
 
                         {/* Per-room price card (multi-room only) */}
                         {multiRoom && (rCalc || calcLoading) && (
@@ -2371,7 +2739,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                   </div>
                                 ))}
                                 <div className={styles.step3PriceTotal}>
-                                  <span>Total do quarto {fmtRoom(parseInt(q))}</span>
+                                  <span>Total do apartamento {fmtRoom(parseInt(q))}</span>
                                   <span>{fmtBRL(rCalc.valor_total)}</span>
                                 </div>
                               </div>
@@ -2451,7 +2819,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         {/* Observação */}
                         <div className={styles.step3RoomSection}>
                           <textarea className={styles.obsTextarea} rows={2}
-                            placeholder="Observação para este quarto (opcional)..."
+                            placeholder="Observação para este apartamento (opcional)..."
                             value={quartosObs[q] || ''}
                             onChange={(e) => setQuartosObs((prev) => ({ ...prev, [q]: e.target.value }))} />
                         </div>
@@ -2473,18 +2841,29 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       </div>{/* end outer flex column */}
 
       {/* Payment modal */}
-      <PaymentModal
-        open={showPagModal}
-        onClose={() => { setShowPagModal(false); setShowPagModalRoom(null); }}
-        onConfirm={addPagamento}
-        tiposPagamento={tiposPagamento}
-        titularNome={
-          showPagModalRoom !== null
-            ? ((quartoHospedes[showPagModalRoom] || [])[0]?.nome || allHospedes[0]?.nome || null)
-            : (allHospedes[0]?.nome || null)
-        }
-        canAplicarDesconto={false}
-      />
+      {(() => {
+        const rKey = showPagModalRoom !== null ? `${showPagModalRoom}_0` : null;
+        const pagVTotal = rKey ? (precosCalc[rKey]?.valor_total ?? null) : null;
+        const pagVPago  = showPagModalRoom !== null
+          ? (quartosPag[showPagModalRoom] || []).reduce((s, p) => s + (p.valor ?? 0), 0)
+          : null;
+        return (
+          <PaymentModal
+            open={showPagModal}
+            onClose={() => { setShowPagModal(false); setShowPagModalRoom(null); }}
+            onConfirm={addPagamento}
+            tiposPagamento={tiposPagamento}
+            titularNome={
+              showPagModalRoom !== null
+                ? ((quartoHospedes[showPagModalRoom] || [])[0]?.nome || allHospedes[0]?.nome || null)
+                : (allHospedes[0]?.nome || null)
+            }
+            canAplicarDesconto={false}
+            valorTotal={pagVTotal}
+            valorPago={pagVPago}
+          />
+        );
+      })()}
     </Modal>
   );
 }
@@ -2510,6 +2889,8 @@ export default function BookingCalendar() {
   const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
   const [showOrcamentos,     setShowOrcamentos]     = useState(false);
+  const [orcamentos,         setOrcamentos]         = useState([]);
+  const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
@@ -2565,30 +2946,38 @@ export default function BookingCalendar() {
     }).catch(() => {});
   }, []);
 
+  const flattenReservas = (data) => {
+    const groups = Array.isArray(data) ? data : [];
+    const seenIds = new Set();
+    const flat = [];
+    for (const group of groups) {
+      for (const r of (group.reservas ?? [])) {
+        if (!seenIds.has(r.id)) { seenIds.add(r.id); flat.push(r); }
+      }
+    }
+    return flat.map(normalizeReserva).filter((r) => r.dataInicio);
+  };
+
   // ── Reload reservations when month/year changes ───────────────────────────
   useEffect(() => {
-    setLoading(true);
     const mes = viewDate.getMonth() + 1;
     const ano = viewDate.getFullYear();
+
+    // Main calendar: default statuses (HOSPEDADO, ATIVO, FINALIZADO)
+    setLoading(true);
     reservaApi.listarPorMesAno({ mes, ano })
-      .then((data) => {
-        // Response shape: [{ data: "dd/MM/yyyy", reservas: [...] }]
-        // Flatten groups and deduplicate by id (a multi-day reserva appears in multiple groups)
-        const groups = Array.isArray(data) ? data : [];
-        const seenIds = new Set();
-        const flat = [];
-        for (const group of groups) {
-          for (const r of (group.reservas ?? [])) {
-            if (!seenIds.has(r.id)) {
-              seenIds.add(r.id);
-              flat.push(r);
-            }
-          }
-        }
-        setReservas(flat.map(normalizeReserva).filter((r) => r.dataInicio));
-      })
+      .then((data) => setReservas(flattenReservas(data)))
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Orcamentos + Solicitações: single call, split in frontend
+    reservaApi.listarPorMesAno({ mes, ano, status: ['ORCAMENTO', 'SOLICITADA'] })
+      .then((data) => {
+        const all = flattenReservas(data);
+        setOrcamentos(all.filter((r) => r.status === 'orcamento'));
+        setSolicitacoes(all.filter((r) => r.status === 'solicitada'));
+      })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate.getMonth(), viewDate.getFullYear()]);
 
@@ -2676,7 +3065,19 @@ export default function BookingCalendar() {
   const searchNorm = normalizeStr(searchTerm.trim());
 
   // Calendar always shows all reservations regardless of search
-  const filteredReservas = reservas;
+  const [statusFilter,     setStatusFilter]     = useState(new Set()); // empty = show all
+  const [showStatusFilter, setShowStatusFilter] = useState(false);
+  const statusFilterRef = useRef(null);
+
+  useEffect(() => {
+    const h = (e) => { if (statusFilterRef.current && !statusFilterRef.current.contains(e.target)) setShowStatusFilter(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const filteredReservas = statusFilter.size === 0
+    ? reservas
+    : reservas.filter((r) => statusFilter.has(r.status));
 
   const searchResults = searchNorm.length >= 2
     ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm))).slice(0, 8)
@@ -2698,18 +3099,20 @@ export default function BookingCalendar() {
 
   const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
 
-  const solicitadasCount = reservas.filter((r) => r.status === 'solicitada').length;
-  const orcamentosCount  = reservas.filter((r) => r.status === 'orcamento').length;
+  const solicitadasCount = solicitacoes.length;
+  const orcamentosCount  = orcamentos.length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
 
   const handleApproveSolicitacao = async (id, quarto) => {
     const upd = await reservaApi.atualizar({ id, fk_quarto: quarto });
-    setReservas((rs) => rs.map((r) => r.id === id ? normalizeReserva(upd) : r));
+    const normalized = normalizeReserva(upd);
+    setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
+    setReservas((rs) => [...rs.filter((r) => r.id !== id), normalized]);
     notify('Solicitação aprovada!'); setShowSolicitacoes(false);
   };
   const handleRejectSolicitacao = async (id) => {
     await reservaApi.cancelar(id);
-    setReservas((rs) => rs.filter((r) => r.id !== id));
+    setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
     notify('Solicitação rejeitada.'); setShowSolicitacoes(false);
   };
 
@@ -2799,29 +3202,46 @@ export default function BookingCalendar() {
   }, []);
 
   const handleSaveNew = async (reservasBody) => {
-    try {
-      const result = await reservaApi.criar({ reservas: reservasBody });
-      const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
-      setReservas((rs) => [...rs, ...novas]);
-      notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
-      setShowCreateModal(false);
-    } catch (e) {
-      notify(e.message || 'Erro ao criar reserva.', 'error');
-      throw e; // re-throw so CreateModal's finally runs setSaving(false)
-    }
+    const result = await reservaApi.criar({ reservas: reservasBody });
+    const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
+    const novasOrc = novas.filter((r) => r.status === 'orcamento');
+    const novasSol = novas.filter((r) => r.status === 'solicitada');
+    const novasReg = novas.filter((r) => r.status !== 'orcamento' && r.status !== 'solicitada');
+    if (novasReg.length)  setReservas((rs) => [...rs, ...novasReg]);
+    if (novasOrc.length)  setOrcamentos((rs) => [...rs, ...novasOrc]);
+    if (novasSol.length)  setSolicitacoes((rs) => [...rs, ...novasSol]);
+    notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
+    setShowCreateModal(false);
   };
-  const handleCancelReserva = async (id) => {
-    await reservaApi.cancelar(id);
+  const handleCancelReserva = async (id, motivo) => {
+    await reservaApi.cancelar(id, motivo);
     setReservas((rs) => rs.filter((r) => r.id !== id));
+    setOrcamentos((rs) => rs.filter((r) => r.id !== id));
+    setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
     notify('Reserva cancelada.');
+  };
+
+  const handleMoverPernoite = async (id) => {
+    try {
+      await reservaApi.atualizarStatus([id], 'HOSPEDADO');
+      const upd = await reservaApi.buscarPorId(id);
+      const normalized = normalizeReserva(upd);
+      setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
+      setSelectedReserva(normalized);
+      notify('Reserva movida para pernoites!');
+    } catch (e) {
+      notify(e?.message ?? 'Erro ao mover reserva.', 'error');
+    }
   };
 
   const handleActivateReserva = async (id) => {
     try {
-      let upd = await reservaApi.ativar(id);
-      if (!upd) upd = await reservaApi.buscarPorId(id);
+      await reservaApi.atualizarStatus([id], 'ATIVO');
+      const upd = await reservaApi.buscarPorId(id);
       const normalized = normalizeReserva(upd);
-      setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
+      // Move from orcamentos to reservas
+      setOrcamentos((rs) => rs.filter((r) => r.id !== id));
+      setReservas((rs) => [...rs.filter((r) => r.id !== id), normalized]);
       setSelectedReserva(normalized);
       notify('Reserva ativada!');
     } catch (e) {
@@ -2910,7 +3330,7 @@ export default function BookingCalendar() {
         onClick={(e) => { e.stopPropagation(); if (!dragState && !dragJustHappenedRef.current) setSelectedReserva(orig); }}
         title={`${orig.titularNome} — ${diariasTxt(dias)}`}
       >
-        {/* Floating status label */}
+        {/* Floating status label — always above the bar */}
         {!isGhost && (
           <div className={startInView ? styles.barStatusTag : styles.barStatusTagInline}>
             {orig.status === 'confirmada' && <><Check size={9} strokeWidth={3} /> Reserva confirmada</>}
@@ -3048,28 +3468,13 @@ export default function BookingCalendar() {
               )}
             </div>
 
-            {/* Orçamentos */}
-            <div className={styles.solBtnWrap}>
-              <Button variant="secondary" onClick={() => setShowOrcamentos(true)}><FileText size={14} /> Orçamentos</Button>
-              {orcamentosCount > 0 && <span className={styles.solBadge}>{orcamentosCount}</span>}
-            </div>
-
-            {/* Solicitações */}
-            <div className={styles.solBtnWrap}>
-              <Button variant="secondary" onClick={() => setShowSolicitacoes(true)}><Bell size={14} /> Solicitações</Button>
-              {solicitadasCount > 0 && <span className={styles.solBadge}>{solicitadasCount}</span>}
-            </div>
-
-            <Button variant="primary" onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
-              <Plus size={14} /> Nova Reserva
-            </Button>
           </div>
         </div>
 
         {/* Selection hint */}
         {selStart && (
           <div className={styles.selHint}>
-            <span>Quarto <strong>{fmtRoom(selRoom)}</strong> · a partir de <strong>{selStart}</strong> — clique outra data para definir fim</span>
+            <span>Apartamento <strong>{fmtRoom(selRoom)}</strong> · a partir de <strong>{selStart}</strong> — clique outra data para definir fim</span>
             <button className={styles.selHintClose} onClick={() => { setSelRoom(null); setSelStart(null); setSelHover(null); }}><X size={12} /></button>
           </div>
         )}
@@ -3096,7 +3501,7 @@ export default function BookingCalendar() {
                       title={`Ver reservas — ${fmtDateBR(dStr)}`}
                     >
                       <span className={[styles.dayWeekday, isWeekend ? styles.dayWeekdayRed : '', isToday ? styles.dayWeekdayToday : ''].join(' ')}>
-                        {isToday ? 'HOJE' : day.toLocaleDateString('pt-BR', { weekday: 'long' })}
+                        {isToday ? `${day.toLocaleDateString('pt-BR', { weekday: 'long' })} · Hoje` : day.toLocaleDateString('pt-BR', { weekday: 'long' })}
                       </span>
                       <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
                         {day.getDate()}
@@ -3179,16 +3584,85 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} />}
       {showOrcamentos && (
-        <OrcamentosModal reservas={reservas} onClose={() => setShowOrcamentos(false)}
+        <OrcamentosModal reservas={orcamentos} onClose={() => setShowOrcamentos(false)}
           roomDescMap={roomDescMap}
           onActivate={(r) => { setShowOrcamentos(false); setSelectedReserva(r); }} />
       )}
       {showSolicitacoes && (
-        <SolicitacoesModal reservas={reservas} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
+        <SolicitacoesModal reservas={solicitacoes} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
           onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
       )}
+
+      {/* ── Floating action panel ── */}
+      {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !dayModal && !showMonthPicker && !roomModal && <div className={styles.floatPanel}>
+        <button className={[styles.floatBtn, styles.floatBtnPrimary].join(' ')} onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
+          <Plus size={15} />
+          <span>Nova Reserva</span>
+        </button>
+
+        <div className={styles.floatDivider} />
+
+        <div className={styles.floatBtnWrap} ref={statusFilterRef}>
+          <button
+            className={[styles.floatBtn, statusFilter.size > 0 ? styles.floatBtnActive : ''].join(' ')}
+            onClick={() => setShowStatusFilter((v) => !v)}
+          >
+            <SlidersHorizontal size={15} />
+            <span>Filtrar Status</span>
+            {statusFilter.size > 0 && <span className={styles.floatBadge}>{statusFilter.size}</span>}
+          </button>
+          {showStatusFilter && (
+            <div className={styles.floatFilterDrop}>
+              {[
+                ['confirmada', 'Confirmada'],
+                ['hospedado',  'Hospedado'],
+                ['finalizado', 'Finalizado'],
+                ['cancelado',  'Cancelado'],
+              ].map(([key, label]) => (
+                <label key={key} className={styles.floatFilterRow}>
+                  <input type="checkbox"
+                    checked={statusFilter.has(key)}
+                    onChange={() => {
+                      setStatusFilter((prev) => {
+                        const next = new Set(prev);
+                        next.has(key) ? next.delete(key) : next.add(key);
+                        return next;
+                      });
+                    }}
+                  />
+                  <span className={[styles.statusDot, styles[`status_${key}`]].join(' ')} />
+                  {label}
+                </label>
+              ))}
+              {statusFilter.size > 0 && (
+                <button className={styles.floatFilterClear} onClick={() => setStatusFilter(new Set())}>
+                  Limpar filtro
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className={styles.floatDivider} />
+
+        <div className={styles.floatBtnWrap}>
+          <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>
+            <FileText size={15} />
+            <span>Orçamentos</span>
+            {orcamentosCount > 0 && <span className={styles.floatBadge}>{orcamentosCount}</span>}
+          </button>
+        </div>
+
+        <div className={styles.floatBtnWrap}>
+          <button className={styles.floatBtn} onClick={() => setShowSolicitacoes(true)}>
+            <Bell size={15} />
+            <span>Solicitações</span>
+            {solicitadasCount > 0 && <span className={styles.floatBadge}>{solicitadasCount}</span>}
+          </button>
+        </div>
+      </div>}
     </div>
   );
 }

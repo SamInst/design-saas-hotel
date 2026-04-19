@@ -126,6 +126,8 @@ export function PaymentModal({
   loggedUser         = null,
   titularNome        = null,
   canAplicarDesconto = true,
+  valorTotal         = null,
+  valorPago          = null,
 }) {
   const [tipoPagId,   setTipoPagId]   = useState('');
   const [nomePagador, setNomePagador] = useState('');
@@ -205,6 +207,25 @@ export function PaymentModal({
             </Button>
           </div>
         }>
+
+        {valorTotal !== null && valorPago !== null && (
+          <div className={styles.pagSummaryStrip}>
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Total</span>
+              <span className={styles.pagSummaryVal}>{fmtBRL(valorTotal)}</span>
+            </div>
+            <div className={styles.pagSummaryDivider} />
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Pago</span>
+              <span className={[styles.pagSummaryVal, styles.pagSummaryPago].join(' ')}>{fmtBRL(valorPago)}</span>
+            </div>
+            <div className={styles.pagSummaryDivider} />
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Pendente</span>
+              <span className={[styles.pagSummaryVal, valorTotal - valorPago > 0 ? styles.pagSummaryPendente : styles.pagSummaryPago].join(' ')}>{fmtBRL(Math.max(0, valorTotal - valorPago))}</span>
+            </div>
+          </div>
+        )}
 
         <FormField label="Tipo de Pagamento *">
           <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
