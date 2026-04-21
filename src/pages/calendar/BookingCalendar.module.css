@@ -34,7 +34,7 @@
 .navGroup {
   display: flex; align-items: center; gap: 0;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; overflow: hidden;
+  border-radius: 8px; overflow: visible;
 }
 .navBtn {
   display: flex; align-items: center; justify-content: center;
@@ -42,8 +42,8 @@
   background: transparent; color: var(--text-2); cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
-.navBtn:first-child { border-right: 1px solid var(--border); }
-.navBtn:last-child  { border-left:  1px solid var(--border); }
+.navBtn:first-child { border-right: 1px solid var(--border); border-radius: 7px 0 0 7px; }
+.navBtn:last-child  { border-left:  1px solid var(--border); border-radius: 0 7px 7px 0; }
 .navBtn:hover { background: var(--surface-2); color: var(--text); }
 .monthLabel {
   font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize;
@@ -113,9 +113,9 @@
 .searchDropDates { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 .searchDropMeta  { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .searchDropSeparator {
-  padding: 5px 12px 3px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2); border-top: 1px solid var(--border);
-  background: var(--surface-2);
+  padding: 6px 12px 5px; font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; color: rgba(255,255,255,0.85); border-top: none;
+  background: #1e1e2e;
 }
 .searchDropLoading {
   display: flex; align-items: center; gap: 6px; padding: 8px 12px;
@@ -311,8 +311,9 @@
   background: rgba(99,102,241,0.18);
   border: 1.5px dashed rgba(99,102,241,0.55);
 }
-.bar_orcamento .barName  { color: rgba(165,180,252,0.9); }
-.bar_orcamento .barBadge { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); color: rgba(165,180,252,0.85); }
+.bar_orcamento .barName     { color: rgba(99,102,241,1); }
+.bar_orcamento .barMetaItem { color: rgba(99,102,241,0.9); }
+.bar_orcamento .barBadge    { background: rgba(99,102,241,0.15); border-color: rgba(99,102,241,0.35); color: rgba(99,102,241,0.9); }
 
 /* Ghost bar */
 .barGhost {
@@ -621,9 +622,10 @@
 .dayRoomBadge { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; font-family: var(--font-mono), monospace; }
 .dayRoomBadge_confirmada { background: rgba(16,185,129,0.12); color: #10b981; }
 .dayRoomBadge_solicitada { background: rgba(245,158,11,0.12); color: #f59e0b; }
-.dayRoomBadge_hospedado  { background: rgba(139,92,246,0.12); color: #8b5cf6; }
-.dayRoomBadge_finalizado { background: rgba(15,118,110,0.12); color: #0f766e; }
+.dayRoomBadge_hospedado  { background: rgba(55,65,81,0.12); color: #374151; }
+.dayRoomBadge_finalizado { background: rgba(156,163,175,0.15); color: #9ca3af; }
 .dayRoomBadge_cancelado  { background: rgba(239,68,68,0.1); color: #ef4444; }
+.dayRoomBadge_orcamento  { background: rgba(99,102,241,0.12); color: #6366f1; }
 .dayRoomInfo     { flex: 1; min-width: 0; }
 .dayRoomTitular  { font-size: 14px; font-weight: 600; color: var(--text); }
 .dayRoomDates    { font-size: 11px; color: var(--text-2); margin-top: 1px; }

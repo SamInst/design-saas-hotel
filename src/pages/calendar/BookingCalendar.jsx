@@ -643,6 +643,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   // Recalculate price in view mode whenever people list changes
   useEffect(() => {
     if (editing) return;
+    if (reserva.status === 'orcamento') return;
     let cancelled = false;
     setViewCalcLoading(true);
     const datas_nascimento = pessoas
@@ -689,7 +690,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
   const TABS = [
     { key: 'dados',      label: 'Dados da Reserva' },
-    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? ((reserva.pessoasOrcamento?.length ?? 0) > 0 ? (reserva.pessoasOrcamento.length + (reserva.orcamentoInfo ? 1 : 0)) : pessoas.length) : pessoas.length})` },
+    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? ((reserva.pessoasOrcamento?.length ?? 0) > 0 ? reserva.pessoasOrcamento.length : pessoas.length) : pessoas.length})` },
     ...(reserva.status !== 'orcamento' ? [{ key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` }] : []),
   ];
 
@@ -879,7 +880,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     </Button>
                   )}
                   <Button variant="secondary" onClick={() => setConfirmPernoite(true)}>
-                    Mover para Pernoites
+                    Hospedar
                   </Button>
                 </>
               ) : null}
@@ -984,23 +985,16 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           {/* ── Pessoas ── */}
           {activeTab === 'pessoas' && (
             <div className={styles.detailBody}>
-              {/* Orçamento sem cadastro: solicitante + pessoasOrcamento */}
-              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (reserva.pessoasOrcamento?.length ?? 0) > 0 && (
+              {/* Orçamento sem cadastro: lista de pessoas_orcamento */}
+              {reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                  <div className={styles.pessoaRow}>
-                    <div className={styles.pagRowTop}>
-                      <span className={styles.pagRowDesc}>{reserva.orcamentoInfo.nome_solicitante}</span>
-                      <span className={styles.titularBadge} style={{ marginLeft: 'auto' }}>Responsável</span>
-                    </div>
-                    {reserva.orcamentoInfo.data_hora_registro && (
-                      <div className={styles.pagRowMeta}>Solicitado em {reserva.orcamentoInfo.data_hora_registro}</div>
-                    )}
-                  </div>
-                  {reserva.pessoasOrcamento.map((p) => (
+                  {reserva.pessoasOrcamento.map((p, i) => (
                     <div key={p.id} className={styles.pessoaRow}>
                       <div className={styles.pagRowTop}>
                         <span className={styles.pagRowDesc}>{p.nome}</span>
-                        <span className={styles.acompanhanteBadge} style={{ marginLeft: 'auto' }}>Acompanhante</span>
+                        <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge} style={{ marginLeft: 'auto' }}>
+                          {i === 0 ? 'Titular' : 'Acompanhante'}
+                        </span>
                       </div>
                       {p.dataNascimento && <div className={styles.pagRowMeta}>{p.dataNascimento}</div>}
                     </div>
@@ -1201,7 +1195,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
       </Modal>
 
       <Modal open={confirmPernoite} onClose={() => setConfirmPernoite(false)} size="sm"
-        title="Mover para Pernoites"
+        title="Hospedar"
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button style={{ flex: 1 }} onClick={() => setConfirmPernoite(false)}>Cancelar</Button>
@@ -1433,16 +1427,10 @@ function DayModal({ dateStr, reservas, onClose, onNewReserva, categorias, onSele
     <Modal open onClose={onClose} size="lg"
       title={<><CalendarDays size={15} /> {cap}, {fmtDateBR(dateStr)}</>}
       footer={
-        <div className={styles.footerSpread}>
-          <span className={styles.footerInfo}>
-            {availableRooms.length} apartamento{availableRooms.length !== 1 ? 's' : ''} disponível{availableRooms.length !== 1 ? 'is' : ''}
-          </span>
-          <div className={styles.footerRight}>
-            <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
-              <Plus size={13} /> Nova Reserva
-            </Button>
-            <Button variant="secondary" onClick={onClose}>Fechar</Button>
-          </div>
+        <div className={styles.footerRight}>
+          <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
+            <Plus size={13} /> Nova Reserva
+          </Button>
         </div>
       }
     >
@@ -3018,53 +3006,31 @@ export default function BookingCalendar() {
     return () => document.removeEventListener('mousedown', h);
   }, [showMonthPicker]);
 
-  // Remote search for other months
+  // Remote search — single request without mes/ano to cover all months
   useEffect(() => {
     const term = searchTerm.trim();
     if (term.length < 2) { setRemoteSearchResults([]); setRemoteSearchLoading(false); return; }
     setRemoteSearchLoading(true);
-    const viewMes = viewDate.getMonth() + 1;
-    const viewAno = viewDate.getFullYear();
-    const months = [];
-    for (let delta = -6; delta <= 6; delta++) {
-      if (delta === 0) continue; // skip current view month (already in-memory)
-      const d = new Date(viewAno, viewMes - 1 + delta, 1);
-      months.push({ mes: d.getMonth() + 1, ano: d.getFullYear() });
-    }
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
-        const allResults = await Promise.all(
-          months.map((m) =>
-            reservaApi.listarPorMesAno({ mes: m.mes, ano: m.ano, nome: term })
-              .then((data) => {
-                const groups = Array.isArray(data) ? data : [];
-                const seenIds = new Set();
-                const flat = [];
-                for (const group of groups) {
-                  for (const r of (group.reservas ?? [])) {
-                    if (!seenIds.has(r.id)) { seenIds.add(r.id); flat.push(r); }
-                  }
-                }
-                return flat.map(normalizeReserva).filter((r) => r.dataInicio);
-              })
-              .catch(() => [])
-          )
-        );
+        const data = await reservaApi.listarPorMesAno({ nome: term });
         if (cancelled) return;
-        const localIds = new Set(reservas.map((r) => r.id));
-        const merged = allResults.flat().filter((r) => !localIds.has(r.id));
-        // Deduplicate across months
+        const groups = Array.isArray(data) ? data : [];
         const seen = new Set();
-        const deduped = merged.filter((r) => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
-        setRemoteSearchResults(deduped);
+        const flat = [];
+        for (const group of groups) {
+          for (const r of (group.reservas ?? [])) {
+            if (!seen.has(r.id)) { seen.add(r.id); flat.push(normalizeReserva(r)); }
+          }
+        }
+        setRemoteSearchResults(flat.filter((r) => r.dataInicio));
       } catch { /* ignore */ } finally {
         if (!cancelled) setRemoteSearchLoading(false);
       }
     }, 600);
     return () => { cancelled = true; clearTimeout(timer); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, viewDate.getMonth(), viewDate.getFullYear()]);
+  }, [searchTerm]);
 
   const days        = Array.from({ length: VISIBLE_DAYS }, (_, i) => { const d = new Date(viewDate); d.setDate(d.getDate() + i); return d; });
   const daysStr     = days.map((d) => formatDate(d));
