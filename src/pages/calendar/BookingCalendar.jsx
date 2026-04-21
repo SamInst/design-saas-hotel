@@ -138,6 +138,18 @@ const diffDays  = (a, b) =>
 const fmtRoom   = (n) => String(n).padStart(2, '0');
 const fmtDateBR = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
 const fmtCpf = (v) => { const d = (v || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (v || ''); };
+const calcAge = (dob) => {
+  if (!dob) return null;
+  // accepts yyyy-MM-dd or dd/MM/yyyy
+  let y, m, d;
+  if (dob.includes('/')) { [d, m, y] = dob.split('/'); } else { [y, m, d] = dob.split('-'); }
+  const birth = new Date(+y, +m - 1, +d);
+  if (isNaN(birth)) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
+  return age;
+};
 const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
 
 const initials = (nome) => {
@@ -677,7 +689,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
   const TABS = [
     { key: 'dados',      label: 'Dados da Reserva' },
-    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? (reserva.pessoasOrcamento?.length ?? 0) + (reserva.orcamentoInfo ? 1 : 0) : pessoas.length})` },
+    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? ((reserva.pessoasOrcamento?.length ?? 0) > 0 ? (reserva.pessoasOrcamento.length + (reserva.orcamentoInfo ? 1 : 0)) : pessoas.length) : pessoas.length})` },
     ...(reserva.status !== 'orcamento' ? [{ key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` }] : []),
   ];
 
@@ -972,8 +984,8 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           {/* ── Pessoas ── */}
           {activeTab === 'pessoas' && (
             <div className={styles.detailBody}>
-              {/* Orçamento sem cadastro: show solicitante + acompanhantes */}
-              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (
+              {/* Orçamento sem cadastro: solicitante + pessoasOrcamento */}
+              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (reserva.pessoasOrcamento?.length ?? 0) > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
                   <div className={styles.pessoaRow}>
                     <div className={styles.pagRowTop}>
@@ -993,9 +1005,21 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                       {p.dataNascimento && <div className={styles.pagRowMeta}>{p.dataNascimento}</div>}
                     </div>
                   ))}
-                  {reserva.pessoasOrcamento.length === 0 && (
-                    <div className={styles.emptyState}>Sem acompanhantes informados.</div>
-                  )}
+                </div>
+              )}
+
+              {/* Orçamento com cadastro: solicitante info + registered hospedes list */}
+              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (reserva.pessoasOrcamento?.length ?? 0) === 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                  <div className={styles.pessoaRow}>
+                    <div className={styles.pagRowTop}>
+                      <span className={styles.pagRowDesc}>{reserva.orcamentoInfo.nome_solicitante}</span>
+                      <span className={styles.titularBadge} style={{ marginLeft: 'auto' }}>Responsável</span>
+                    </div>
+                    {reserva.orcamentoInfo.data_hora_registro && (
+                      <div className={styles.pagRowMeta}>Solicitado em {reserva.orcamentoInfo.data_hora_registro}</div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1082,11 +1106,11 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 </div>
               )}
 
-              {reserva.status !== 'orcamento' && pessoas.length === 0 && (
+              {(reserva.status !== 'orcamento' || (reserva.pessoasOrcamento?.length ?? 0) === 0) && pessoas.length === 0 && reserva.status !== 'orcamento' && (
                 <div className={styles.emptyState}>Nenhuma pessoa vinculada.</div>
               )}
 
-              {reserva.status !== 'orcamento' && pessoas.map((h, i) => (
+              {(reserva.status !== 'orcamento' || (reserva.pessoasOrcamento?.length ?? 0) === 0) && pessoas.map((h, i) => (
                 <div key={h.id} className={styles.pessoaRow}>
                   <div className={styles.pagRowTop}>
                     <span className={styles.pagRowDesc}>{h.nome}</span>
@@ -1094,7 +1118,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                       <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>
                         {i === 0 ? 'Titular' : 'Acompanhante'}
                       </span>
-                      {i > 0 && (
+                      {i > 0 && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
                         <button className={styles.removeIconBtn} title="Remover"
                           onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}>
                           <X size={12} />
@@ -1152,7 +1176,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                       <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
-                      {!p.cancelado && (
+                      {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
                         <button className={styles.removeIconBtn} title="Cancelar pagamento"
                           onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
                           <Trash2 size={12} />
@@ -2279,35 +2303,27 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
 
       if (isOrcamento) {
-        // Orçamento: send minimal body with orcamento: true + pessoas_orcamento
+        // Orçamento: send minimal body with orcamento: true
         const isoToBrLocal = (s) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split('-').reverse().join('/') : s);
         const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
-          let pessoasOrc;
-          if (isOrcSemCadastro) {
-            // Unregistered guests entered manually
-            if (orcGuests.length > 0) {
-              pessoasOrc = orcGuests.map((h) => ({
-                nome: h.nome,
-                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
-              }));
-            }
-          } else {
-            // Registered guests — map to { nome, data_nascimento }
-            if (registeredGuests.length > 0) {
-              pessoasOrc = registeredGuests.map((h) => ({
-                nome: h.nome,
-                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
-              }));
-            }
-          }
           return {
             fk_quarto:    parseInt(quartoId),
             data_entrada: toBrDate(dataEntrada),
             data_saida:   toBrDate(dataSaida),
             orcamento:    true,
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
-            ...(pessoasOrc?.length ? { pessoas_orcamento: pessoasOrc } : {}),
+            // Sem cadastro: pessoas_orcamento com nome + data_nascimento
+            ...(isOrcSemCadastro && orcGuests.length > 0 ? {
+              pessoas_orcamento: orcGuests.map((h) => ({
+                nome: h.nome,
+                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
+              })),
+            } : {}),
+            // Com cadastro: pessoas com IDs
+            ...(!isOrcSemCadastro && registeredGuests.length > 0 ? {
+              pessoas: registeredGuests.map((h) => ({ id: h.id })),
+            } : {}),
           };
         };
         const displayPeriodos = periodoMode === 'unico'
@@ -2757,7 +2773,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                     <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
                                     <div>
                                       <div className={styles.hospedeName}>{h.nome}</div>
-                                      {h.dataNascimento && <div className={styles.hospedeCpf}>{fmtDateBR(h.dataNascimento)}</div>}
+                                      {h.dataNascimento && <div className={styles.hospedeCpf}>{calcAge(h.dataNascimento) !== null ? `${calcAge(h.dataNascimento)} anos · ` : ''}{fmtDateBR(h.dataNascimento)}</div>}
                                     </div>
                                   </div>
                                 ))}
@@ -2771,7 +2787,13 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                 {qHosp.map((h) => (
                                   <div key={h.id} className={styles.hospedeRow}>
                                     <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                                    <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}</div>
+                                    <div>
+                                      <div className={styles.hospedeName}>{h.nome}</div>
+                                      <div className={styles.hospedeCpf}>
+                                        {calcAge(h.dataNascimento) !== null && <span>{calcAge(h.dataNascimento)} anos{h.cpf ? ' · ' : ''}</span>}
+                                        {h.cpf && <span>{fmtCpf(h.cpf)}</span>}
+                                      </div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -3075,9 +3097,10 @@ export default function BookingCalendar() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
+  const allReservas = [...reservas, ...orcamentos, ...solicitacoes];
   const filteredReservas = statusFilter.size === 0
-    ? reservas
-    : reservas.filter((r) => statusFilter.has(r.status));
+    ? allReservas
+    : allReservas.filter((r) => statusFilter.has(r.status));
 
   const searchResults = searchNorm.length >= 2
     ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm))).slice(0, 8)
@@ -3576,14 +3599,14 @@ export default function BookingCalendar() {
       {/* Modals */}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
-          reservas={reservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
+          reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
       )}
       {dayModal && (
         <DayModal dateStr={dayModal.dateStr} reservas={filteredReservas} onClose={() => setDayModal(null)} categorias={categorias}
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {roomModal && <RoomModal room={roomModal.room} reservas={reservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
+      {roomModal && <RoomModal room={roomModal.room} reservas={allReservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
       {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} />}
       {showOrcamentos && (
         <OrcamentosModal reservas={orcamentos} onClose={() => setShowOrcamentos(false)}
