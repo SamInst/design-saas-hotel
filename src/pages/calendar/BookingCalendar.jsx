@@ -10,7 +10,8 @@ import { FormField }     from '../../components/ui/Input';
 import { DatePicker }    from '../../components/ui/DatePicker';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
-import { addDaysStr }    from './calendarMocks';
+import { addDaysStr }        from './calendarMocks';
+import { gerarVoucherReserva } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
@@ -168,185 +169,6 @@ const STATUS_LABEL = {
   orcamento: 'Orçamento',
 };
 
-// ─── Orçamento PDF generator ─────────────────────────────────────────────────
-/**
- * @param {{
- *   tipo: string,
- *   periodoMode: 'unico'|'multiplos',
- *   displayPeriodos: Array<{ rooms: string[], checkin: string, checkout: string, roomHospedes: object }>,
- *   precosCalc: object,
- *   quartosObs: object,
- *   roomDescMap: object,
- * }} opts
- */
-const gerarOrcamentoPdf = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '' }) => {
-  const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const dt  = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
-  const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
-  const fn  = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
-  const rm  = (n) => String(n).padStart(2, '0');
-
-  const grandTotal = displayPeriodos.flatMap((p, pi) => p.rooms.map((q) => precosCalc[`${q}_${pi}`]?.valor_total ?? 0))
-    .reduce((a, b) => a + b, 0);
-
-  let periodsHtml = '';
-  let unicoRoomsHtml = '';
-  displayPeriodos.forEach((p, pi) => {
-    const d = dias(p.checkin, p.checkout);
-    const periodLabel = periodoMode === 'multiplos' ? `<div class="periodo-band">Período ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>` : '';
-    let roomsHtml = '';
-    p.rooms.forEach((quartoId) => {
-      const calc = precosCalc[`${quartoId}_${pi}`];
-      if (!calc) return;
-      const hospedes = p.roomHospedes?.[quartoId] || [];
-      const obs = quartosObs[quartoId] || '';
-      const desc = roomDescMap[quartoId] || '';
-
-      let detalhesHtml = '';
-      (calc.detalhes || []).forEach((det) => {
-        const hasSub = det.valor_base > 0 || det.acrescimo_sazonalidade > 0 || det.valor_criancas > 0;
-        detalhesHtml += `
-          <div class="price-row">
-            <span class="price-desc">${det.descricao}</span>
-            <span class="price-val">${brl(det.valor_final)}</span>
-          </div>
-          ${hasSub ? `<div class="price-sub">${brl((det.valor_base ?? 0) + (det.acrescimo_sazonalidade ?? 0))}${det.sazonalidade?.descricao ? ` <span class="saz-chip">${det.sazonalidade.descricao}</span>` : ''}${det.valor_criancas > 0 ? ` <span>+ Crianças ${brl(det.valor_criancas)}</span>` : ''}</div>` : ''}`;
-      });
-
-      const sazHtml = (calc.sazonalidades_aplicadas || []).length > 0
-        ? `<div class="saz-chips">${calc.sazonalidades_aplicadas.map((s) => `<span class="saz-chip">${s.descricao}</span>`).join('')}</div>` : '';
-
-      const hospedesHtml = hospedes.map((h) => {
-        const ini = initials(h.nome);
-        return `<div class="person-row">
-          <div class="person-avatar">${ini}</div>
-          <div>
-            <div class="person-name">${h.nome}</div>
-            ${h.cpf ? `<div class="person-cpf">${fmtCpf(h.cpf)}</div>` : ''}
-          </div>
-        </div>`;
-      }).join('');
-
-      const obsHtml = obs.trim() ? `<label class="obs-label">Observação</label><div class="obs-box">${obs.trim()}</div>` : '';
-
-      roomsHtml += `
-        <div class="room-block">
-          <div class="room-card">
-            <div class="room-label">Apartamento ${rm(quartoId)}${desc ? ` <span class="room-desc">${desc}</span>` : ''}</div>
-            ${detalhesHtml}
-            ${sazHtml}
-            <div class="total-row">
-              <span class="total-label">Total</span>
-              <span class="total-val">${brl(calc.valor_total)}</span>
-            </div>
-          </div>
-          ${hospedes.length > 0 ? `
-          <div class="quarto-section">
-            <div class="quarto-section-label">Hóspedes</div>
-            ${hospedesHtml}
-          </div>` : ''}
-          ${obsHtml}
-        </div>`;
-    });
-
-    if (periodoMode === 'unico') {
-      unicoRoomsHtml += roomsHtml;
-    } else {
-      periodsHtml += `${periodLabel}<div class="period-rooms">${roomsHtml}</div>`;
-    }
-  });
-
-  const unico = periodoMode === 'unico' && displayPeriodos[0];
-  const unicoD = unico ? dias(unico.checkin, unico.checkout) : 0;
-  const unicoBand = unico ? `<div class="periodo-band">${dt(unico.checkin)} → ${dt(unico.checkout)} · ${fn(unicoD)}</div>` : '';
-
-  const tipoLabel = tipo === 'grupo' ? 'Vários Apartamentos (Orçamento)' : 'Apartamento Único (Orçamento)';
-  const modoLabel = periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos';
-
-  const summaryHtml = `
-    <div class="price-strip">
-      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(grandTotal)}</b></div>
-      <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(0)}</b></div>
-      <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(grandTotal)}</b></div>
-    </div>`;
-
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
-  <meta charset="utf-8">
-  <title>Isto é Pousada | Orçamento de Reserva</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff;color:#0f172a;font-size:14px}
-    .page{max-width:740px;margin:0 auto;padding:32px 28px}
-    .doc-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px}
-    .doc-sub{font-size:12px;color:#94a3b8;margin-bottom:24px}
-    .periodo-band{background:#1e293b;color:#fff;padding:11px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.01em;margin-top:20px}
-    .price-strip{display:flex;align-items:center;padding:11px 16px;border:1px solid #e2e8f0;border-top:none;border-bottom:1px solid #e2e8f0;background:#f8fafc}
-    .price-strip-item{display:flex;align-items:center;gap:4px;font-size:12px;color:#64748b;flex:1}
-    .price-strip-item b{color:#0f172a;font-weight:700}
-    .price-strip-divider{width:1px;height:18px;background:#e2e8f0;margin:0 12px}
-    .pago-val{color:#10b981 !important}
-    .pendente-val{color:#f97316 !important}
-    .room-block{border:1px solid #e2e8f0;border-top:none;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
-    .room-block:last-child{border-radius:0 0 8px 8px}
-    .room-card{display:flex;flex-direction:column;gap:4px}
-    .room-label{font-size:13px;font-weight:700;color:#0f172a;margin-bottom:4px}
-    .room-desc{font-weight:400;color:#64748b;font-size:12px;margin-left:6px}
-    .price-row{display:flex;justify-content:space-between;align-items:flex-start}
-    .price-desc{font-size:12px;color:#475569}
-    .price-val{font-size:12px;font-weight:500;color:#475569;white-space:nowrap}
-    .price-sub{font-size:11px;color:#94a3b8;margin-bottom:2px}
-    .saz-chips{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
-    .saz-chip{font-size:10px;font-weight:700;color:#7c3aed;background:rgba(124,58,237,.1);padding:2px 8px;border-radius:4px;text-transform:uppercase;letter-spacing:.05em}
-    .total-row{display:flex;justify-content:space-between;align-items:center;padding-top:8px;margin-top:6px;border-top:1px solid #e2e8f0}
-    .total-label{font-size:13px;font-weight:700;color:#0f172a}
-    .total-val{font-size:14px;font-weight:800;color:#0f172a}
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
-    .info-item label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:4px;display:block}
-    .info-item span{font-size:14px;color:#0f172a;font-weight:500}
-    .quarto-section{margin-top:2px}
-    .quarto-section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#f97316;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #fed7aa}
-    .person-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-    .person-avatar{width:38px;height:38px;border-radius:50%;background:#ede9fe;color:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
-    .person-name{font-size:13px;font-weight:600;color:#0f172a}
-    .person-cpf{font-size:11px;color:#64748b;margin-top:1px}
-    .obs-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:5px;display:block}
-    .obs-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;font-size:13px;color:#64748b;min-height:50px}
-    .period-rooms{}
-    @media print{
-      body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      .page{padding:20px}
-    }
-  </style>
-</head><body>
-<div class="page">
-  <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; Orçamento de Reserva</div>
-  <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
-  ${periodoMode === 'unico' ? unicoBand : ''}
-  ${summaryHtml}
-  ${periodoMode === 'unico' ? unicoRoomsHtml : periodsHtml}
-  <div class="info-grid">
-    <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>
-    <div class="info-item"><label>Modo</label><span>${modoLabel}</span></div>
-  </div>
-</div>
-<script>window.onload=()=>{window.print();}<\/script>
-</body></html>`;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:none';
-  document.body.appendChild(iframe);
-  const doc = iframe.contentDocument || iframe.contentWindow.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-  iframe.contentWindow.onafterprint = () => document.body.removeChild(iframe);
-  setTimeout(() => {
-    iframe.contentWindow.focus();
-    iframe.contentWindow.print();
-  }, 250);
-};
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
 function ConfirmModal({ title, message, onConfirm, onCancel }) {
@@ -425,6 +247,35 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const dias       = diffDays(reserva.dataInicio, reserva.dataFim);
   const cat        = categorias.find((c) => c.quartos.includes(reserva.quarto));
   const allRoomIds = categorias.flatMap((c) => c.quartos);
+
+  // ── Voucher download ───────────────────────────────────────────────────────
+  const handleDownloadVoucher = () => {
+    const _u = userStorage.get();
+    const displayPeriodos = [{
+      checkin: reserva.dataInicio,
+      checkout: reserva.dataFim,
+      rooms: [String(reserva.quarto)],
+      roomHospedes: { [String(reserva.quarto)]: pessoas },
+    }];
+    const precosCalc = {
+      [`${reserva.quarto}_0`]: { valor_total: reserva.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] },
+    };
+    const quartosObs = {};
+    if (reserva.observacao) quartosObs[`${reserva.quarto}_0`] = reserva.observacao;
+    const solicitanteData = { nome: reserva.titularNome ?? '', cpf: pessoas[0]?.cpf ?? '' };
+    const pagsAtivos = pagamentos.filter((p) => !p.cancelado);
+    gerarVoucherReserva({
+      tipo: 'individual',
+      periodoMode: 'unico',
+      displayPeriodos,
+      precosCalc,
+      quartosObs,
+      roomDescMap,
+      userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
+      solicitante: solicitanteData,
+      pagamentos: pagsAtivos,
+    });
+  };
 
   // ── Phone display mask ─────────────────────────────────────────────────────
   const fmtPhone = (v) => {
@@ -665,7 +516,8 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   }, []); // eslint-disable-line
 
   // ── Edit save (quarto/datas) ───────────────────────────────────────────────
-  const [editSaving,  setEditSaving]  = useState(false);
+  const [editSaving,    setEditSaving]    = useState(false);
+  const [editActiveTab, setEditActiveTab] = useState('dados');
 
   const handleSaveEdit = async () => {
     setEditSaving(true);
@@ -691,27 +543,53 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     (editCheckin  ? formatDate(editCheckin)  : '') !== reserva.dataInicio ||
     (editCheckout ? formatDate(editCheckout) : '') !== reserva.dataFim;
 
-  const TABS = [
-    { key: 'dados',      label: 'Dados da Reserva' },
-    { key: 'pessoas',    label: `Pessoas (${reserva.status === 'orcamento' ? ((reserva.pessoasOrcamento?.length ?? 0) > 0 ? reserva.pessoasOrcamento.length : pessoas.length) : pessoas.length})` },
-    ...(reserva.status !== 'orcamento' ? [{ key: 'pagamentos', label: `Pagamentos (${pagamentos.length})` }] : []),
+  const EDIT_TABS = [
+    { key: 'dados',      label: 'Dados' },
+    { key: 'pessoas',    label: `Pessoas (${pessoas.length})` },
+    ...(reserva.status !== 'orcamento' ? [{ key: 'pagamentos', label: `Pagamentos` }] : []),
   ];
+
+  const goBackFromEdit = () => {
+    if (hasChanges) { setShowDiscard(true); return; }
+    setEditing(false); setEditActiveTab('dados');
+  };
 
   // ── Edit mode render ───────────────────────────────────────────────────────
   if (editing) {
     return (
-      <Modal open onClose={onClose} size="md"
-        title={<><Pencil size={15} /> Editar Reserva — {reserva.titularNome}</>}
+      <>
+      <Modal open onClose={goBackFromEdit} size="md"
+        title={<><Pencil size={15} /> Editar — {reserva.titularNome}</>}
+        bodyStyle={{ padding: 0, gap: 0 }}
         footer={
           <div className={styles.footerSpread}>
-            <Button variant="secondary" onClick={() => setEditing(false)}>← Voltar</Button>
-            <Button variant="primary" disabled={!canSave || editSaving} onClick={handleSaveEdit}>
-              {editSaving && <Loader2 size={13} className={styles.spin} />} Salvar
-            </Button>
+            <Button variant="secondary" onClick={goBackFromEdit}>← Voltar</Button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {hasChanges && (
+                <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
+                  {saving && <Loader2 size={13} className={styles.spin} />} Salvar
+                </Button>
+              )}
+              {editActiveTab === 'dados' && hasChangedDatesOrRoom && (
+                <Button variant="primary" disabled={!canSave || editSaving} onClick={handleSaveEdit}>
+                  {editSaving && <Loader2 size={13} className={styles.spin} />} Salvar Datas
+                </Button>
+              )}
+            </div>
           </div>
         }
       >
-        <div className={styles.formStack}>
+        <div className={styles.detailTabs}>
+          {EDIT_TABS.map((t) => (
+            <button key={t.key}
+              className={[styles.detailTab, editActiveTab === t.key ? styles.detailTabActive : ''].join(' ')}
+              onClick={() => setEditActiveTab(t.key)}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className={styles.detailTabContent}>
+        {editActiveTab === 'dados' && <div className={styles.formStack}>
           <FormField label="Apartamento">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
@@ -834,7 +712,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                           <span className={styles.step3PriceDesc}>{d.descricao}</span>
                           <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                         </div>
-                        {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
+                        {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
                           <div className={styles.priceDetailSub}>
                             <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
                             {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
@@ -852,377 +730,373 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
               </div>
             )
           )}
+        </div>}
+
+        {/* ── Pessoas tab ── */}
+        {editActiveTab === 'pessoas' && (
+          <div className={styles.detailBody}>
+            {reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
+                {reserva.pessoasOrcamento.map((p, i) => (
+                  <div key={p.id} className={styles.pessoaRow}>
+                    <div className={styles.pagRowTop}>
+                      <span className={styles.pagRowDesc}>{p.nome}</span>
+                      <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge} style={{ marginLeft: 'auto' }}>{i === 0 ? 'Titular' : 'Acompanhante'}</span>
+                    </div>
+                    {p.dataNascimento && <div className={styles.pagRowMeta}>{p.dataNascimento}</div>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {!showAddPessoa && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'orcamento' && reserva.status !== 'cancelado' && (
+              <button className={styles.addLinkBtn} onClick={() => setShowAddPessoa(true)}><Plus size={13} /> Adicionar pessoa</button>
+            )}
+            {showAddPessoa && (
+              <div className={styles.addInlineBox}>
+                <div className={styles.addInlineRow}>
+                  <Search size={13} />
+                  <input className={styles.addInlineInput} placeholder="Buscar por nome ou CPF..." value={pessoaQuery} onChange={(e) => handlePessoaQuery(e.target.value)} autoFocus />
+                  {pessoaSearching ? <Loader2 size={13} className={styles.spin} /> : <button className={styles.removeIconBtn} onClick={() => { setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]); }}><X size={12} /></button>}
+                </div>
+                {(pessoaResults.length > 0 || pendingPessoa) && (
+                  <div className={styles.inlineDropdown}>
+                    {pendingPessoa ? (
+                      <>
+                        <div className={styles.companionHeader}><button className={styles.companionBack} onClick={() => setPendingPessoa(null)}><ChevronLeft size={12} /> Voltar</button></div>
+                        <div className={styles.companionRow}>
+                          <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
+                          <div className={styles.companionInfo}><span className={styles.companionName}>{pendingPessoa.titular.nome}</span>{pendingPessoa.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pendingPessoa.titular.cpf)}</span>}</div>
+                          <span className={styles.titularChip}>Titular</span>
+                        </div>
+                        {pendingPessoa.titular.acompanhantes.map((a) => (
+                          <div key={a.id} className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')} onClick={() => !a.bloqueado && togglePendingAcomp(a.id)}>
+                            <div className={[styles.companionCheck, pendingPessoa.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>{pendingPessoa.selected.has(a.id) && <Check size={11} />}</div>
+                            <div className={styles.companionInfo}><span className={styles.companionName}>{a.nome}</span>{a.cpf && <span className={styles.companionMeta}>{fmtCpf(a.cpf)}{a.idade ? ` · ${a.idade} anos` : ''}</span>}</div>
+                            {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                          </div>
+                        ))}
+                        <div className={styles.companionActions}>
+                          <button className={styles.companionBtnSecondary} onClick={() => confirmAddPessoas(false)}>Só o titular</button>
+                          <button className={styles.companionBtnPrimary} onClick={() => confirmAddPessoas(true)}>Adicionar →</button>
+                        </div>
+                      </>
+                    ) : pessoaResults.map((p) => (
+                      <button key={p.id} className={[styles.inlineDropdownItem, p.bloqueado ? styles.inlineDropdownItemBlocked : ''].join(' ')} disabled={p.bloqueado} onClick={() => handlePessoaResultClick(p)}>
+                        <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
+                        <div style={{ flex: 1 }}><div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>{p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmtCpf(p.cpf)}</div>}</div>
+                        {p.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                        {p.acompanhantes?.length > 0 && !p.bloqueado && <span className={styles.companionCountChip}>{p.acompanhantes.length} acomp.</span>}
+                        {!p.bloqueado && <ChevronRight size={13} style={{ color: 'var(--text-2)', flexShrink: 0 }} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {pessoas.length === 0 && reserva.status !== 'orcamento' && <div className={styles.emptyState}>Nenhuma pessoa vinculada.</div>}
+            {pessoas.map((h, i) => (
+              <div key={h.id} className={styles.pessoaRow}>
+                <div className={styles.pagRowTop}>
+                  <span className={styles.pagRowDesc}>{h.nome}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                    <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>{i === 0 ? 'Titular' : 'Acompanhante'}</span>
+                    {i > 0 && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
+                      <button className={styles.removeIconBtn} title="Remover" onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}><X size={12} /></button>
+                    )}
+                  </div>
+                </div>
+                {h.telefone && <div className={styles.pagRowMeta}>{fmtPhone(h.telefone)}</div>}
+                {h.email && <div className={styles.pagRowMeta}>{h.email}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Pagamentos tab ── */}
+        {editActiveTab === 'pagamentos' && (
+          <div className={styles.detailBody}>
+            {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
+              <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}><Plus size={13} /> Adicionar pagamento</button>
+            )}
+            {pagamentos.length === 0 && <div className={styles.emptyState}>Nenhum pagamento registrado.</div>}
+            {pagamentos.map((p) => (
+              <div key={p.id} className={[styles.pagRow, p.cancelado ? styles.pagRowCancelado : '', styles.pagCardClickable].join(' ')} onClick={() => setViewPagamento(p)}>
+                <div className={styles.pagRowTop}>
+                  <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                    <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
+                    {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
+                      <button className={styles.removeIconBtn} title="Cancelar pagamento" onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}><Trash2 size={12} /></button>
+                    )}
+                  </div>
+                </div>
+                <div className={styles.pagRowMeta}>{p.dataRegistro && <span>{p.dataRegistro}</span>}{p.dataRegistro && <span className={styles.pagCard2Sep}>·</span>}<span>{p.formaPagamento || '—'}</span></div>
+                {p.nomePagador && <div className={styles.pagRowPagador}>{p.nomePagador}</div>}
+                {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+              </div>
+            ))}
+          </div>
+        )}
         </div>
       </Modal>
+
+      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title="Remover pessoa"
+        footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>Remover</Button></div>}
+      ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?</p></Modal>
+
+      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} canAplicarDesconto={false} valorTotal={viewCalc?.valor_total ?? reserva.valorTotal} valorPago={totalPago} />
+
+      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title="Cancelar Pagamento"
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>Confirmar</Button></div>}
+      >
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>Informe o motivo do cancelamento deste pagamento.</p>
+        <textarea className={styles.motivoTextarea} placeholder="Motivo do cancelamento..." rows={3} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
+      </Modal>
+
+      <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title="Descartar alterações?"
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setShowDiscard(false); setPendingOps([]); setHasChanges(false); setEditing(false); setEditActiveTab('dados'); }}>Descartar</Button></div>}
+      ><p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>Há alterações não salvas. Deseja descartá-las?</p></Modal>
+
+      <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm" title="Detalhes do Pagamento"
+        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>Fechar</Button></div>}
+      >
+        {viewPagamento && (
+          <div className={styles.kvDetailRoot}>
+            <div className={styles.kvSectionDivider}>Pagamento</div>
+            <div className={styles.kvList}>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Forma</span><span className={styles.kvVal}>{viewPagamento.formaPagamento || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Valor</span><span className={[styles.kvVal, viewPagamento.cancelado ? styles.pagCardValorCancelado : styles.finPago].join(' ')}>{fmtBRL(viewPagamento.valor)}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Pagador</span><span className={styles.kvVal}>{viewPagamento.nomePagador || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Situação</span><span className={viewPagamento.cancelado ? styles.pagCardCanceladoBadge : styles.pagStatusAtivo}>{viewPagamento.cancelado ? 'Cancelado' : 'Ativo'}</span></div>
+              {viewPagamento.descricao && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>Descrição</span><span className={styles.kvVal}>{viewPagamento.descricao}</span></div>}
+            </div>
+            <div className={styles.kvSectionDivider}>Registro</div>
+            <div className={styles.kvList}>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Registrado por</span><span className={styles.kvVal}>{viewPagamento.funcionario || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Data</span><span className={styles.kvVal}>{viewPagamento.dataRegistro || '—'}</span></div>
+            </div>
+            {viewPagamento.cancelado && (
+              <>
+                <div className={styles.kvSectionDividerCancel}>Cancelamento</div>
+                <div className={styles.kvListCancel}>
+                  <div className={styles.kvRow}><span className={styles.kvLabel}>Cancelado por</span><span className={styles.kvVal}>{viewPagamento.funcMotivo || '—'}</span></div>
+                  <div className={styles.kvRow}><span className={styles.kvLabel}>Data</span><span className={styles.kvVal}>{viewPagamento.dataMotivo || '—'}</span></div>
+                  {viewPagamento.motivoCancelamento && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>Motivo</span><span className={styles.kvVal}>{viewPagamento.motivoCancelamento}</span></div>}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+      </>
     );
   }
 
   // ── View mode render ───────────────────────────────────────────────────────
+  const fmtDateLong = (s) => {
+    if (!s) return '';
+    return new Date(s + 'T00:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+  const todayStr = formatDate(new Date());
+  const canCheckin = reserva.dataInicio === todayStr;
+  const roomDesc = roomDescMap[reserva.quarto] || roomDescMap[String(reserva.quarto)] || '';
+  const catNome = cat?.nome || reserva.categoria || '';
+  const roomDisplay = [roomDesc || `Ap. ${fmtRoom(reserva.quarto)}`, catNome].filter(Boolean).join(' · ');
+  const displayTotal = viewCalc?.valor_total ?? reserva.valorTotal;
+  const displayPendente = Math.max(0, displayTotal - totalPago);
+  const checkinTime = reserva.chegadaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
+  const checkoutTime = reserva.saidaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
+  const RV_STATUS = {
+    confirmada: 'Reserva Confirmada', solicitada: 'Solicitação Pendente',
+    hospedado: 'Hospedado', finalizado: 'Reserva Finalizada',
+    cancelado: 'Reserva Cancelada', orcamento: 'Orçamento',
+  };
+  const canEdit = reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && reserva.status !== 'orcamento' && reserva.status !== 'solicitada';
+
   return (
     <>
-      <Modal open onClose={handleClose} size="md"
-        bodyStyle={{ padding: 0, gap: 0 }}
+      <Modal open onClose={handleClose} size="md" hideHeader bodyStyle={{ padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
         title={<><BedDouble size={15} /> Apartamento {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
-        footer={
-          <div className={styles.footerSpread}>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {reserva.status === 'orcamento' ? (
-                <>
-                  <Button variant="primary" onClick={() => onActivate?.(reserva.id)}>
-                    Ativar Reserva
-                  </Button>
-                  <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
-                    Cancelar Orçamento
-                  </Button>
-                </>
-              ) : reserva.status === 'solicitada' ? (
-                <>
-                  <Button variant="danger" disabled={saving} onClick={async () => { setSaving(true); try { await onReject?.(reserva.id); onClose(); } finally { setSaving(false); } }}>
-                    {saving ? <Loader2 size={13} className={styles.spin} /> : null} Rejeitar
-                  </Button>
-                  <Button variant="secondary" disabled={saving} onClick={async () => { setSaving(true); try { await onApprove?.(reserva.id, editing && editQuarto[0] ? parseInt(editQuarto[0]) : reserva.quarto); onClose(); } finally { setSaving(false); } }}>
-                    {saving ? <Loader2 size={13} className={styles.spin} /> : null} Aprovar
-                  </Button>
-                </>
-              ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' ? (
-                <>
-                  <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
-                    Cancelar Reserva
-                  </Button>
-                  {(() => {
-                    const todayStr = formatDate(new Date());
-                    const canCheckin = reserva.dataInicio === todayStr;
-                    return (
-                      <Button variant="secondary" disabled={!canCheckin}
-                        title={!canCheckin ? `Check-in previsto para ${fmtDateBR(reserva.dataInicio)}` : undefined}
-                        onClick={() => setConfirmPernoite(true)}>
-                        Hospedar
-                      </Button>
-                    );
-                  })()}
-                </>
-              ) : null}
-            </div>
-            {reserva.status !== 'orcamento' && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-              hasChanges ? (
-                <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
-                  {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={() => setEditing(true)}>
-                  <Pencil size={13} /> Editar
-                </Button>
-              )
-            )}
-          </div>
-        }
       >
-        {/* Tab nav */}
-        <div className={styles.detailTabs}>
-          {TABS.map((t) => (
-            <button key={t.key}
-              className={[styles.detailTab, activeTab === t.key ? styles.detailTabActive : ''].join(' ')}
-              onClick={() => setActiveTab(t.key)}>
-              {t.label}
-            </button>
-          ))}
+        {/* ── Custom dark header ── */}
+        <div className={styles.rvHeader}>
+          <div className={styles.rvRoomCard}>
+            <div className={styles.rvRoomCardNum}>{fmtRoom(reserva.quarto)}</div>
+          </div>
+          <div className={styles.rvHeaderContent}>
+            <div className={styles.rvHeaderTopRow}>
+              <span className={styles.rvHeaderNum}>#{reserva.id}</span>
+              <span className={styles.rvHeaderDot}>·</span>
+              <span className={[styles.rvHeaderStatus, styles[`rvStatus_${reserva.status}`]].join(' ')}>
+                {RV_STATUS[reserva.status] ?? reserva.status}
+              </span>
+            </div>
+            <div className={styles.rvHeaderTitle}>{reserva.titularNome}</div>
+            {reserva.funcionario && <div className={styles.rvHeaderSub}>registrado por: {reserva.funcionario}</div>}
+          </div>
+          <button className={styles.rvCloseBtn} onClick={handleClose}><X size={16} /></button>
         </div>
 
-        {/* Fixed-height scrollable content area */}
-        <div className={styles.detailTabContent}>
+        {/* ── Scrollable body ── */}
+        <div className={styles.rvBody}>
+          {/* Dates + nights */}
+          <div className={styles.rvDatesRow}>
+            <div className={styles.rvDateCell}>
+              <div className={styles.rvDateLabel}>Check-in</div>
+              <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
+              <div className={styles.rvDateTime}>{checkinTime}h</div>
+            </div>
+            <div className={styles.rvDateArrow}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </div>
+            <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
+              <div className={styles.rvDateLabel}>Check-out</div>
+              <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
+              <div className={styles.rvDateTime}>{checkoutTime}h</div>
+            </div>
+            <div className={styles.rvDateCellNights}>
+              <div className={styles.rvNightsNum}>{dias}</div>
+              <div className={styles.rvNightsLabel}>Diárias</div>
+            </div>
+          </div>
 
-          {/* ── Dados da Reserva ── */}
-          {activeTab === 'dados' && (
-            <div className={styles.kvDetailRoot}>
-              {/* minimal room + status header */}
-              <div className={styles.dadosHeader}>
-                <div className={styles.dadosRoomPill}>{fmtRoom(reserva.quarto)}</div>
-                <span className={styles.dadosRoomCat}>{cat?.nome || reserva.categoria}</span>
-                <span className={[styles.statusBadge, styles[`status_${reserva.status}`]].join(' ')}>
-                  {STATUS_LABEL[reserva.status] ?? reserva.status}
-                </span>
-              </div>
+          {/* Meta line */}
+          {/* Observação */}
+          {reserva.observacao && (
+            <div className={styles.rvObsBox}>
+              <div className={styles.rvObsLabel}>Observação</div>
+              <div className={styles.rvObsText}>{reserva.observacao}</div>
+            </div>
+          )}
 
-              <div className={styles.kvList}>
-                <div className={styles.kvRow}>
-                  <span className={styles.kvLabel}>Reserva</span>
-                  <span className={styles.kvVal} style={{ fontVariantNumeric: 'tabular-nums' }}>#{reserva.id}</span>
-                </div>
-                <div className={styles.kvRowDates}>
-                  <div className={styles.kvDateCell}>
-                    <span className={styles.kvLabel}>Check-in</span>
-                    <span className={styles.kvVal}>
-                      {fmtDateBR(reserva.dataInicio)}
-                      {reserva.chegadaPrevista && (
-                        <span className={styles.kvMeta}> · {reserva.chegadaPrevista.split(' ')[1] ?? '14:00'}</span>
-                      )}
-                    </span>
-                  </div>
-                  <span className={styles.kvDateArrow}>→</span>
-                  <div className={styles.kvDateCell}>
-                    <span className={styles.kvLabel}>Check-out</span>
-                    <span className={styles.kvVal}>
-                      {fmtDateBR(reserva.dataFim)}
-                      {reserva.saidaPrevista && (
-                        <span className={styles.kvMeta}> · {reserva.saidaPrevista.split(' ')[1] ?? '12:00'}</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className={styles.kvDateCell} style={{ marginLeft: 'auto' }}>
-                    <span className={styles.kvLabel}>Duração</span>
-                    <span className={styles.kvVal}>{diariasTxt(dias)}</span>
-                  </div>
-                </div>
-                {reserva.empresaNome && (
-                  <div className={styles.kvRow}>
-                    <span className={styles.kvLabel}>Empresa</span>
-                    <span className={styles.kvVal}>{reserva.empresaNome}</span>
-                  </div>
-                )}
-              </div>
-
-              {reserva.observacao && (
-                <div className={styles.dadosRegistrado}>
-                  <span className={styles.kvLabel}>Observação</span>
-                  <span className={styles.kvVal} style={{ whiteSpace: 'pre-wrap' }}>{reserva.observacao}</span>
-                </div>
-              )}
-
-              {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
-                <div className={styles.cancelMotivBlock}>
-                  <div className={styles.cancelMotivHeader}>
-                    <XCircle size={13} style={{ flexShrink: 0 }} /> Motivo do cancelamento
-                  </div>
-                  <div className={styles.cancelMotivText}>{reserva.motivoCancelamento}</div>
-                  {(reserva.funcMotivo || reserva.dataMotivo) && (
-                    <div className={styles.cancelMotivMeta}>
-                      {reserva.funcMotivo}{reserva.funcMotivo && reserva.dataMotivo ? ' · ' : ''}{reserva.dataMotivo}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {reserva.funcionario && (
-                <div className={styles.dadosRegistrado}>
-                  <span className={styles.kvLabel}>Registrado por</span>
-                  <span className={styles.kvVal}>{reserva.funcionario}</span>
-                  {reserva.dataHoraRegistro && (
-                    <span className={styles.kvMeta}>{reserva.dataHoraRegistro}</span>
-                  )}
-                </div>
+          {/* Cancel reason */}
+          {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
+            <div className={styles.rvCancelBlock}>
+              <div className={styles.rvCancelHeader}><XCircle size={13} style={{flexShrink:0}}/> Cancelamento</div>
+              <div className={styles.rvCancelText}>{reserva.motivoCancelamento}</div>
+              {(reserva.funcMotivo || reserva.dataMotivo) && (
+                <div className={styles.rvCancelMeta}>{[reserva.funcMotivo, reserva.dataMotivo].filter(Boolean).join(' · ')}</div>
               )}
             </div>
           )}
 
-          {/* ── Pessoas ── */}
-          {activeTab === 'pessoas' && (
-            <div className={styles.detailBody}>
-              {/* Orçamento sem cadastro: lista de pessoas_orcamento */}
-              {reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                  {reserva.pessoasOrcamento.map((p, i) => (
-                    <div key={p.id} className={styles.pessoaRow}>
-                      <div className={styles.pagRowTop}>
-                        <span className={styles.pagRowDesc}>{p.nome}</span>
-                        <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge} style={{ marginLeft: 'auto' }}>
-                          {i === 0 ? 'Titular' : 'Acompanhante'}
-                        </span>
-                      </div>
-                      {p.dataNascimento && <div className={styles.pagRowMeta}>{p.dataNascimento}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Orçamento com cadastro: solicitante info + registered hospedes list */}
-              {reserva.status === 'orcamento' && reserva.orcamentoInfo && (reserva.pessoasOrcamento?.length ?? 0) === 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
-                  <div className={styles.pessoaRow}>
-                    <div className={styles.pagRowTop}>
-                      <span className={styles.pagRowDesc}>{reserva.orcamentoInfo.nome_solicitante}</span>
-                      <span className={styles.titularBadge} style={{ marginLeft: 'auto' }}>Responsável</span>
-                    </div>
-                    {reserva.orcamentoInfo.data_hora_registro && (
-                      <div className={styles.pagRowMeta}>Solicitado em {reserva.orcamentoInfo.data_hora_registro}</div>
+          {(() => {
+            const renderGuestTable = (list) => {
+              const titular = list[0];
+              const acomps = list.slice(1);
+              const renderRow = (h) => (
+                <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
+                  <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
+                  <div className={styles.rvGuestInfo}>
+                    <div className={styles.rvGuestName}>{h.nome}</div>
+                    {(h.telefone || h.dataNascimento) && (
+                      <div className={styles.rvGuestMeta}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
                     )}
+                    {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
                   </div>
                 </div>
-              )}
-
-              {/* Add button at top */}
-              {!showAddPessoa && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'orcamento' && reserva.status !== 'cancelado' && (
-                <button className={styles.addLinkBtn} onClick={() => setShowAddPessoa(true)}>
-                  <Plus size={13} /> Adicionar pessoa
-                </button>
-              )}
-
-              {/* Inline search */}
-              {showAddPessoa && (
-                <div className={styles.addInlineBox}>
-                  <div className={styles.addInlineRow}>
-                    <Search size={13} />
-                    <input className={styles.addInlineInput}
-                      placeholder="Buscar por nome ou CPF..."
-                      value={pessoaQuery}
-                      onChange={(e) => handlePessoaQuery(e.target.value)}
-                      autoFocus />
-                    {pessoaSearching
-                      ? <Loader2 size={13} className={styles.spin} />
-                      : <button className={styles.removeIconBtn}
-                          onClick={() => { setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]); }}>
-                          <X size={12} />
-                        </button>
-                    }
-                  </div>
-                  {(pessoaResults.length > 0 || pendingPessoa) && (
-                    <div className={styles.inlineDropdown}>
-                      {pendingPessoa ? (
-                        <>
-                          <div className={styles.companionHeader}>
-                            <button className={styles.companionBack} onClick={() => setPendingPessoa(null)}><ChevronLeft size={12} /> Voltar</button>
-                          </div>
-                          {/* Titular */}
-                          <div className={styles.companionRow}>
-                            <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
-                            <div className={styles.companionInfo}>
-                              <span className={styles.companionName}>{pendingPessoa.titular.nome}</span>
-                              {pendingPessoa.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pendingPessoa.titular.cpf)}</span>}
-                            </div>
-                            <span className={styles.titularChip}>Titular</span>
-                          </div>
-                          {/* Companions */}
-                          {pendingPessoa.titular.acompanhantes.map((a) => (
-                            <div key={a.id}
-                              className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
-                              onClick={() => !a.bloqueado && togglePendingAcomp(a.id)}>
-                              <div className={[styles.companionCheck, pendingPessoa.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
-                                {pendingPessoa.selected.has(a.id) && <Check size={11} />}
-                              </div>
-                              <div className={styles.companionInfo}>
-                                <span className={styles.companionName}>{a.nome}</span>
-                                {a.cpf && <span className={styles.companionMeta}>{fmtCpf(a.cpf)}{a.idade ? ` · ${a.idade} anos` : ''}</span>}
-                              </div>
-                              {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
-                            </div>
-                          ))}
-                          <div className={styles.companionActions}>
-                            <button className={styles.companionBtnSecondary} onClick={() => confirmAddPessoas(false)}>Só o titular</button>
-                            <button className={styles.companionBtnPrimary} onClick={() => confirmAddPessoas(true)}>Adicionar →</button>
-                          </div>
-                        </>
-                      ) : (
-                        pessoaResults.map((p) => (
-                          <button key={p.id}
-                            className={[styles.inlineDropdownItem, p.bloqueado ? styles.inlineDropdownItemBlocked : ''].join(' ')}
-                            disabled={p.bloqueado}
-                            onClick={() => handlePessoaResultClick(p)}>
-                            <div className={styles.initialsCircleSm}>{initials(p.nome)}</div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500 }}>{p.nome}</div>
-                              {p.cpf && <div style={{ fontSize: 11, color: 'var(--text-2)' }}>{fmtCpf(p.cpf)}</div>}
-                            </div>
-                            {p.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
-                            {p.acompanhantes?.length > 0 && !p.bloqueado && <span className={styles.companionCountChip}>{p.acompanhantes.length} acomp.</span>}
-                            {!p.bloqueado && <ChevronRight size={13} style={{ color: 'var(--text-2)', flexShrink: 0 }} />}
-                          </button>
-                        ))
-                      )}
-                    </div>
+              );
+              return (
+                <div className={styles.rvGuestTable}>
+                  <div className={styles.rvGuestSectionHeader}>Titular</div>
+                  {renderRow(titular)}
+                  {acomps.length > 0 && (
+                    <>
+                      <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
+                      {acomps.map(renderRow)}
+                    </>
                   )}
                 </div>
-              )}
+              );
+            };
 
-              {(reserva.status !== 'orcamento' || (reserva.pessoasOrcamento?.length ?? 0) === 0) && pessoas.length === 0 && reserva.status !== 'orcamento' && (
-                <div className={styles.emptyState}>Nenhuma pessoa vinculada.</div>
-              )}
+            if (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0) {
+              return renderGuestTable(reserva.pessoasOrcamento);
+            }
+            if (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0) {
+              return renderGuestTable([{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]);
+            }
+            if (pessoas.length === 0) {
+              return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
+            }
+            return renderGuestTable(pessoas);
+          })()}
 
-              {(reserva.status !== 'orcamento' || (reserva.pessoasOrcamento?.length ?? 0) === 0) && pessoas.map((h, i) => (
-                <div key={h.id} className={styles.pessoaRow}>
-                  <div className={styles.pagRowTop}>
-                    <span className={styles.pagRowDesc}>{h.nome}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-                      <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>
-                        {i === 0 ? 'Titular' : 'Acompanhante'}
-                      </span>
-                      {i > 0 && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-                        <button className={styles.removeIconBtn} title="Remover"
-                          onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}>
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {h.telefone && <div className={styles.pagRowMeta}>{fmtPhone(h.telefone)}</div>}
-                  {h.email && <div className={styles.pagRowMeta}>{h.email}</div>}
+          {/* Section: Pagamentos */}
+          {reserva.status !== 'orcamento' && (
+            <>
+              <div className={styles.rvPaySummary}>
+                <div className={styles.rvPaySumItem}>
+                  <span className={styles.rvPaySumLabel}>Pendente</span>
+                  <span className={[styles.rvPaySumValue, styles.rvPaySumPending].join(' ')}>{viewCalcLoading ? <Loader2 size={11} className={styles.spin}/> : fmtBRL(displayPendente)}</span>
                 </div>
-              ))}
-
-            </div>
-          )}
-
-          {/* ── Pagamentos ── */}
-          {activeTab === 'pagamentos' && (
-            <div className={styles.detailBody}>
-              {/* Summary strip */}
-              {(() => {
-                const displayTotal = viewCalc?.valor_total ?? reserva.valorTotal;
-                const displayPendente = displayTotal - totalPago;
-                return (
-                  <div className={styles.finStrip}>
-                    <span className={styles.finStripItem}>
-                      Total{' '}
-                      {viewCalcLoading
-                        ? <b><Loader2 size={11} className={styles.spin} /></b>
-                        : <b>{fmtBRL(displayTotal)}</b>
-                      }
-                    </span>
-                    <span className={styles.finStripDivider} />
-                    <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / displayTotal * 100)}%)</span>}</span>
-                    <span className={styles.finStripDivider} />
-                    <span className={styles.finStripItem}>Pendente <b style={{ color: displayPendente > 0 ? 'var(--violet)' : 'var(--emerald)' }}>{fmtBRL(Math.max(0, displayPendente))}</b>{displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(Math.max(0, displayPendente) / displayTotal * 100)}%)</span>}</span>
-                  </div>
-                );
-              })()}
-
-              {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-                <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}>
-                  <Plus size={13} /> Adicionar pagamento
-                </button>
-              )}
-
-              {pagamentos.length === 0 && (
-                <div className={styles.emptyState}>Nenhum pagamento registrado.</div>
-              )}
-
+                <div className={styles.rvPaySumItem}>
+                  <span className={styles.rvPaySumLabel}>Pago</span>
+                  <span className={[styles.rvPaySumValue, styles.rvPaySumPaid].join(' ')}>{fmtBRL(totalPago)}</span>
+                </div>
+                <div className={styles.rvPaySumItem}>
+                  <span className={styles.rvPaySumLabel}>Total</span>
+                  <span className={[styles.rvPaySumValue, styles.rvPaySumTotal].join(' ')}>{viewCalcLoading ? <Loader2 size={11} className={styles.spin}/> : fmtBRL(displayTotal)}</span>
+                </div>
+              </div>
+              <div className={styles.rvPayList}>
+              {pagamentos.length === 0 && <div className={styles.rvEmptyState}>Nenhum pagamento registrado.</div>}
               {pagamentos.map((p) => (
-                <div key={p.id}
-                  className={[styles.pagRow, p.cancelado ? styles.pagRowCancelado : '', styles.pagCardClickable].join(' ')}
-                  onClick={() => setViewPagamento(p)}>
-                  <div className={styles.pagRowTop}>
-                    <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-                      <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
-                      {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-                        <button className={styles.removeIconBtn} title="Cancelar pagamento"
-                          onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
-                          <Trash2 size={12} />
-                        </button>
-                      )}
-                    </div>
+                <div key={p.id} className={[styles.rvPayItem, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')} onClick={() => setViewPagamento(p)}>
+                  <div className={styles.rvPayInfo}>
+                    <div className={styles.rvPayDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</div>
+                    {p.nomePagador && <div className={styles.rvPayPayer}>{p.nomePagador}</div>}
+                    {(p.dataRegistro || p.formaPagamento) && <div className={styles.rvPayMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>}
+                    {p.funcionario && <div className={styles.rvPayFunc}>registrado por {p.funcionario}</div>}
                   </div>
-                  <div className={styles.pagRowMeta}>
-                    {p.dataRegistro && <span>{p.dataRegistro}</span>}
-                    {p.dataRegistro && <span className={styles.pagCard2Sep}>·</span>}
-                    <span>{p.formaPagamento || '—'}</span>
-                  </div>
-                  {p.nomePagador && <div className={styles.pagRowPagador}>{p.nomePagador}</div>}
-                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                  <span className={p.cancelado ? styles.rvPayAmountCancelado : styles.rvPayAmount}>{fmtBRL(p.valor)}</span>
                 </div>
               ))}
-
-            </div>
+              </div>
+            </>
           )}
+          <div style={{height:8}}/>
+        </div>
 
+        {/* ── Footer actions ── */}
+        <div className={styles.rvFooter}>
+          {reserva.status === 'orcamento' ? (
+            <>
+              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>Ativar Reserva</button>
+              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>Cancelar</button>
+            </>
+          ) : reserva.status === 'solicitada' ? (
+            <>
+              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onApprove?.(reserva.id, reserva.quarto); onClose(); } finally { setSaving(false); } }}>
+                {saving && <Loader2 size={14} className={styles.spin}/>} Aprovar
+              </button>
+              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onReject?.(reserva.id); onClose(); } finally { setSaving(false); } }}>
+                Rejeitar
+              </button>
+            </>
+          ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' ? (
+            <>
+              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} disabled={!canCheckin} title={!canCheckin ? `Check-in: ${fmtDateBR(reserva.dataInicio)}` : undefined} onClick={() => setConfirmPernoite(true)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:14,height:14}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                Hospedar
+              </button>
+              <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={handleDownloadVoucher}>
+                <FileDown size={14}/> Voucher
+              </button>
+              <button className={[styles.rvBtn, styles.rvBtnGhost].join(' ')} onClick={() => setEditing(true)}>
+                <Pencil size={14}/> Editar
+              </button>
+              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
+                <Trash2 size={13}/> Cancelar
+              </button>
+            </>
+          ) : (
+            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={handleDownloadVoucher}>
+              <FileDown size={14}/> Voucher
+            </button>
+          )}
         </div>
       </Modal>
 
@@ -1648,20 +1522,38 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
   const pendente   = Math.max(0, grandTotal - totalPago);
 
   const handleDownload = () => {
-    const displayPeriodos = reservas.map((r) => ({
-      rooms: [String(r.quarto)],
-      checkin: r.dataInicio,
-      checkout: r.dataFim,
-      roomHospedes: { [String(r.quarto)]: r.hospedes?.length > 0 ? r.hospedes : r.pessoasOrcamento ?? [] },
-    }));
-    const precosCalc = {};
-    reservas.forEach((r, i) => {
-      if (r.valorTotal) precosCalc[`${r.quarto}_${i}`] = { valor_total: r.valorTotal, detalhes: [], sazonalidades_aplicadas: [] };
+    // Group reservas by period (same checkin+checkout)
+    const periodMap = new Map();
+    reservas.forEach((r) => {
+      const key = `${r.dataInicio}_${r.dataFim}`;
+      if (!periodMap.has(key)) periodMap.set(key, { checkin: r.dataInicio, checkout: r.dataFim, rooms: [], roomHospedes: {} });
+      const p = periodMap.get(key);
+      p.rooms.push(String(r.quarto));
+      p.roomHospedes[String(r.quarto)] = r.hospedes?.length > 0 ? r.hospedes : (r.pessoasOrcamento ?? []);
     });
+    const displayPeriodos = [...periodMap.values()];
+    const periodoMode = displayPeriodos.length > 1 ? 'multiplos' : 'unico';
+
+    const precosCalc = {};
     const quartosObs = {};
-    reservas.forEach((r) => { if (r.observacao) quartosObs[String(r.quarto)] = r.observacao; });
+    displayPeriodos.forEach((p, pi) => {
+      p.rooms.forEach((quartoId) => {
+        const r = reservas.find((rv) => String(rv.quarto) === quartoId && rv.dataInicio === p.checkin && rv.dataFim === p.checkout);
+        precosCalc[`${quartoId}_${pi}`] = { valor_total: r?.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] };
+        if (r?.observacao) quartosObs[`${quartoId}_${pi}`] = r.observacao;
+      });
+    });
     const _u = userStorage.get();
-    gerarOrcamentoPdf({ tipo: 'grupo', periodoMode: 'unico', displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _u?.pessoa?.nome ?? _u?.nome ?? '' });
+    const titular = reservas[0]?.hospedes?.[0] ?? reservas[0]?.pessoasOrcamento?.[0] ?? null;
+    const solicitanteData = {
+      nome:           orc?.nome_solicitante ?? titular?.nome ?? '',
+      cpf:            titular?.cpf ?? '',
+      telefone:       titular?.telefone ?? '',
+      email:          titular?.email ?? '',
+      dataNascimento: titular?.dataNascimento ?? '',
+      dataRegistro:   orc?.data_hora_registro ?? '',
+    };
+    gerarVoucherReserva({ tipo: 'grupo', periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _u?.pessoa?.nome ?? _u?.nome ?? '', solicitante: solicitanteData });
   };
 
   const solicitante   = orc?.nome_solicitante ?? '';
@@ -1699,89 +1591,102 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
             </div>
           </div>
 
-          {/* ── One block per reserva ── */}
-          {reservas.map((r, i) => {
-            const dias    = diffDays(r.dataInicio, r.dataFim);
-            const hospedes = r.pessoasOrcamento?.length > 0 ? r.pessoasOrcamento : (r.hospedes ?? []);
-            const isOpen  = !!priceOpen[r.id];
-            return (
-              <div key={r.id} className={styles.step3RoomBlock}>
-                {/* Header band */}
-                <div className={styles.step3PeriodoBand} style={{ cursor: 'pointer', marginBottom: 10 }} onClick={() => onSelectReserva(r)}>
-                  <span className={styles.step3PeriodoBandLabel}>Apartamento {fmtRoom(r.quarto)}</span>
-                  <span className={styles.step3PeriodoBandDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)} · {diariasTxt(dias)}</span>
-                </div>
+          {/* ── Reservas grouped by period ── */}
+          {(() => {
+            // Group by period key
+            const periodMap = new Map();
+            reservas.forEach((r) => {
+              const key = `${r.dataInicio}_${r.dataFim}`;
+              if (!periodMap.has(key)) periodMap.set(key, { dataInicio: r.dataInicio, dataFim: r.dataFim, reservas: [] });
+              periodMap.get(key).reservas.push(r);
+            });
+            const periods = [...periodMap.values()];
+            const multiPeriod = periods.length > 1;
 
-                {/* Price card per room */}
-                {r.valorTotal > 0 && (
-                  <div className={styles.priceCard} style={{ marginBottom: 10 }}>
-                    <button className={styles.priceCardHeader} onClick={() => setPriceOpen((prev) => ({ ...prev, [r.id]: !prev[r.id] }))}>
-                      <span className={styles.priceCardSummary}>
-                        <span className={styles.finStripItem}>Total <b>{fmtBRL(r.valorTotal)}</b></span>
-                        {r.totalPago > 0 && <>
-                          <span className={styles.finStripDivider} />
-                          <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(r.totalPago)}</b></span>
-                        </>}
-                      </span>
-                      <ChevronDown size={13} className={isOpen ? styles.priceCardChevronOpen : styles.priceCardChevron} />
-                    </button>
-                    {isOpen && (
-                      <div className={styles.priceCardBody}>
-                        <div className={styles.priceCardRoom}>
-                          {dias > 0 && Array.from({ length: dias }).map((_, di) => {
-                            const dateStr = addDays(r.dataInicio, di);
-                            const valorDiaria = r.valorTotal / dias;
-                            return (
-                              <div key={di} className={styles.step3PriceRow}>
-                                <span className={styles.step3PriceDesc}>{fmtDateBR(dateStr)}</span>
-                                <span className={styles.step3PriceVal}>{fmtBRL(valorDiaria)}</span>
-                              </div>
-                            );
-                          })}
-                          <div className={styles.step3PriceTotal}>
-                            <span>{diariasTxt(dias)}</span>
-                            <span>{fmtBRL(r.valorTotal)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+            return periods.map((period) => {
+              const pDias = diffDays(period.dataInicio, period.dataFim);
+              return (
+                <div key={`${period.dataInicio}_${period.dataFim}`}>
+                  {/* Period band — only when multiple periods */}
+                  {multiPeriod && (
+                    <div className={styles.step3PeriodoBand} style={{ marginBottom: 0 }}>
+                      <span className={styles.step3PeriodoBandDates}>{fmtDateBR(period.dataInicio)} → {fmtDateBR(period.dataFim)} · {diariasTxt(pDias)}</span>
+                    </div>
+                  )}
 
-                {/* Hóspedes section */}
-                <div className={styles.step3RoomLabel}>Hóspedes</div>
-                <div className={styles.orcHospedeList} style={{ marginBottom: 4 }}>
-                  {hospedes.map((h, hi) => {
-                    const age = calcAge(h.dataNascimento);
+                  {period.reservas.map((r) => {
+                    const dias     = diffDays(r.dataInicio, r.dataFim);
+                    const hospedes = r.pessoasOrcamento?.length > 0 ? r.pessoasOrcamento : (r.hospedes ?? []);
+                    const isOpen   = !!priceOpen[r.id];
+                    const valorDiaria = dias > 0 ? r.valorTotal / dias : 0;
                     return (
-                      <div key={h.id ?? hi} className={styles.orcHospedeRow}>
-                        <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{h.nome}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
-                            {age !== null ? `${age} anos` : ''}
-                            {h.dataNascimento ? ` · ${h.dataNascimento}` : ''}
+                      <div key={r.id} className={styles.orcRoomCard}>
+                        {/* Room label */}
+                        <div className={styles.orcRoomCardLabel}>
+                          Apartamento {fmtRoom(r.quarto)}
+                          {!multiPeriod && <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 12, marginLeft: 8 }}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)} · {diariasTxt(dias)}</span>}
+                        </div>
+
+                        <div className={styles.orcRoomCardBody}>
+                          {/* Hóspedes */}
+                          {hospedes.length > 0 && (
+                            <div className={styles.orcHospedeList} style={{ marginTop: 0 }}>
+                              {hospedes.map((h, hi) => {
+                                const age = calcAge(h.dataNascimento);
+                                return (
+                                  <div key={h.id ?? hi} className={styles.orcHospedeRow}>
+                                    <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{h.nome}</div>
+                                      <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                                        {age !== null ? `${age} anos` : ''}
+                                        {h.dataNascimento ? ` · ${h.dataNascimento}` : ''}
+                                      </div>
+                                    </div>
+                                    {hi === 0 && <span className={styles.titularBadge} style={{ flexShrink: 0 }}>Titular</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Price breakdown */}
+                          {r.valorTotal > 0 && (
+                            <div className={styles.step3PriceBlock}>
+                              {dias > 0 && Array.from({ length: dias }).map((_, di) => {
+                                const from = addDays(r.dataInicio, di);
+                                const to   = addDays(r.dataInicio, di + 1);
+                                return (
+                                  <div key={di} className={styles.step3PriceRow}>
+                                    <span className={styles.step3PriceDesc}>Diária {di + 1} &nbsp;{fmtDateBR(from)} → {fmtDateBR(to)}</span>
+                                    <span className={styles.step3PriceVal}>{fmtBRL(valorDiaria)}</span>
+                                  </div>
+                                );
+                              })}
+                              <div className={styles.step3PriceTotal}>
+                                <span>Total</span>
+                                <span>{fmtBRL(r.valorTotal)}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {r.observacao && (
+                            <div style={{ fontSize: 12, color: 'var(--text-2)', fontStyle: 'italic' }}>{r.observacao}</div>
+                          )}
+
+                          <div style={{ textAlign: 'right' }}>
+                            <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => onSelectReserva(r)}>
+                              Ver reserva →
+                            </button>
                           </div>
                         </div>
-                        {hi === 0 && <span className={styles.titularBadge} style={{ flexShrink: 0 }}>Titular</span>}
                       </div>
                     );
                   })}
-                  {hospedes.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Sem hóspedes informados</div>}
                 </div>
-
-                {r.observacao && (
-                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontStyle: 'italic', marginTop: 4 }}>{r.observacao}</div>
-                )}
-
-                <div style={{ textAlign: 'right', marginTop: 6 }}>
-                  <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => onSelectReserva(r)}>
-                    Ver reserva →
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
 
           {dataRegistro && (
             <div className={styles.dadosRegistrado}>
@@ -1826,7 +1731,6 @@ function OrcamentosModal({ reservas, onClose, onSelectReserva, roomDescMap }) {
   return (
     <Modal open onClose={onClose} size="md"
       title={<><FileText size={15} /> Orçamentos ({groups.length})</>}
-      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
     >
       {groups.length === 0 ? (
         <div className={styles.emptyState}>Nenhum orçamento pendente.</div>
@@ -1837,9 +1741,6 @@ function OrcamentosModal({ reservas, onClose, onSelectReserva, roomDescMap }) {
             const grandTotal    = g.reservas.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
             return (
               <div key={g.id} className={styles.searchDropItem} style={{ cursor: 'pointer' }} onClick={() => setDetailOrc(g)}>
-                <div className={[styles.searchDropRoomCircle, styles.dayRoomBadge_orcamento].join(' ')}>
-                  {totalReservas}
-                </div>
                 <div className={styles.searchDropInfo}>
                   <div className={styles.searchDropName}>{g.solicitante}</div>
                   <div className={styles.searchDropDates}>{g.dataRegistro}</div>
@@ -2276,7 +2177,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [saving,      setSaving]      = useState(false);
   const [precosCalc,       setPrecosCalc]       = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
   const [calcLoading,      setCalcLoading]      = useState(false);
-  const [showPriceDetails, setShowPriceDetails] = useState(false);
+  const [showPriceDetails, setShowPriceDetails] = useState(true);
   const [roomPriceOpen,    setRoomPriceOpen]    = useState({}); // { [`${q}_${pi}`]: bool }
   const [apiAvailability,      setApiAvailability]      = useState(null); // Set<roomId> | null
   const [mpApiAvailability,    setMpApiAvailability]    = useState(null); // Set<roomId> | null
@@ -2483,12 +2384,14 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         const isoToBrLocal = (s) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split('-').reverse().join('/') : s);
         const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
+          const obs = quartosObs[quartoId]?.trim();
           return {
             fk_quarto:    parseInt(quartoId),
             data_entrada: toBrDate(dataEntrada),
             data_saida:   toBrDate(dataSaida),
             orcamento:    true,
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
+            ...(obs ? { observacao: obs } : {}),
             // Sem cadastro: pessoas_orcamento com nome + data_nascimento
             ...(isOrcSemCadastro && orcGuests.length > 0 ? {
               pessoas_orcamento: orcGuests.map((h) => ({
@@ -2517,7 +2420,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         // Generate PDF after successful save
         const _user = userStorage.get();
         const _userName = _user?.pessoa?.nome ?? _user?.nome ?? '';
-        gerarOrcamentoPdf({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _userName });
+        gerarVoucherReserva({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _userName });
         return;
       }
 
@@ -2584,21 +2487,6 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         ))}
       </div>
 
-      {/* Live summary bar — hidden on step 3 (replaced by period bands below) */}
-      {step !== 3 && (allSelectedRooms.length > 0 || checkinStr) && (
-        <div className={styles.summaryBar}>
-          {allSelectedRooms.length > 0 && (
-            <span>{allSelectedRooms.length === 1 ? `Apartamento ${fmtRoom(parseInt(allSelectedRooms[0]))}` : `${allSelectedRooms.length} apartamentos`}</span>
-          )}
-          {periodoMode === 'unico' && checkinStr && checkoutStr && dias > 0 && (
-            <span>{fmtDateBR(checkinStr)} → {fmtDateBR(checkoutStr)} · {diariasTxt(dias)}</span>
-          )}
-          {periodoMode === 'multiplos' && periodos.length > 0 && (
-            <span>{periodos.length} período{periodos.length !== 1 ? 's' : ''}</span>
-          )}
-          {isOrcamento && <span className={styles.orcamentoBadge}>Orçamento</span>}
-        </div>
-      )}
 
       {/* Period bands — shown on step 3 in place of summaryBar */}
       {step === 3 && periodoMode === 'unico' && checkinStr && checkoutStr && (
@@ -2662,10 +2550,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           {periodoMode === 'unico' && (
             <>
               <div className={styles.step2Grid}>
-                <FormField label="Período de estadia">
+                <FormField label={<>Período de estadia{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
                   <div className={styles.dateCompact}>
                     <DatePicker mode="range" startDate={checkin} endDate={checkout}
-                      onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); }}
+                      onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
                       placeholder="Check-in → Check-out" minDate={new Date()} />
                   </div>
                 </FormField>
@@ -2842,7 +2730,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                 <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                 <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                               </div>
-                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
+                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
                                 <div className={styles.priceDetailSub}>
                                   <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
                                   {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
@@ -2921,7 +2809,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                       <span className={styles.step3PriceDesc}>{d.descricao}</span>
                                       <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
                                     </div>
-                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0 || d.valor_base > 0) && (
+                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
                                       <div className={styles.priceDetailSub}>
                                         <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
                                         {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
@@ -3776,7 +3664,7 @@ export default function BookingCalendar() {
         <SolicitacoesModal reservas={solicitacoes} onClose={() => setShowSolicitacoes(false)}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />}
 
       {/* ── Floating action panel ── */}
       {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !dayModal && !showMonthPicker && !roomModal && <div className={styles.floatPanel}>
