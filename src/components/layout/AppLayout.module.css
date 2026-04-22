@@ -12,10 +12,13 @@
 }
 
 .main {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   margin-left: 220px; /* largura da sidebar expandida */
-  padding: 18px 22px 40px;
+  padding: 18px 22px 18px;
   transition: margin-left 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
 }
 
 .mainCollapsed {

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal,
+  ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -11,7 +11,7 @@ import { DatePicker }    from '../../components/ui/DatePicker';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }    from './calendarMocks';
-import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage } from '../../services/api';
+import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -100,6 +100,9 @@ const normalizeReserva = (r) => {
     }),
     valorTotal: r.valor_total ?? 0,
     totalPago,
+    motivoCancelamento: r.motivo_cancelamento?.motivo_cancelamento ?? null,
+    dataMotivo:         r.motivo_cancelamento?.data_hora_registro   ?? null,
+    funcMotivo:         r.motivo_cancelamento?.funcionario?.nome    ?? null,
     orcamentoInfo: r.orcamento_info ?? null,
     pessoasOrcamento: (r.pessoas_orcamento ?? []).map((p) => ({
       id:             p.id,
@@ -362,7 +365,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null }) {
+function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -640,13 +643,13 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     return () => { cancelled = true; };
   }, [editing, editQuarto[0], editCheckin, editCheckout]);
 
-  // Recalculate price in view mode whenever people list changes
+  // Calculate price on mount (view mode only)
   useEffect(() => {
-    if (editing) return;
     if (reserva.status === 'orcamento') return;
+    if (reserva.status === 'cancelado') return;
     let cancelled = false;
     setViewCalcLoading(true);
-    const datas_nascimento = pessoas
+    const datas_nascimento = (reserva.hospedes ?? [])
       .map((p) => p.dataNascimento)
       .filter(Boolean)
       .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
@@ -659,7 +662,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
       .catch(() => {})
       .finally(() => { if (!cancelled) setViewCalcLoading(false); });
     return () => { cancelled = true; };
-  }, [pessoas]); // eslint-disable-line
+  }, []); // eslint-disable-line
 
   // ── Edit save (quarto/datas) ───────────────────────────────────────────────
   const [editSaving,  setEditSaving]  = useState(false);
@@ -872,20 +875,35 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     Cancelar Orçamento
                   </Button>
                 </>
-              ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' ? (
+              ) : reserva.status === 'solicitada' ? (
                 <>
-                  {reserva.status !== 'cancelado' && reserva.status !== 'finalizado' && (
-                    <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
-                      Cancelar Reserva
-                    </Button>
-                  )}
-                  <Button variant="secondary" onClick={() => setConfirmPernoite(true)}>
-                    Hospedar
+                  <Button variant="danger" disabled={saving} onClick={async () => { setSaving(true); try { await onReject?.(reserva.id); onClose(); } finally { setSaving(false); } }}>
+                    {saving ? <Loader2 size={13} className={styles.spin} /> : null} Rejeitar
                   </Button>
+                  <Button variant="secondary" disabled={saving} onClick={async () => { setSaving(true); try { await onApprove?.(reserva.id, editing && editQuarto[0] ? parseInt(editQuarto[0]) : reserva.quarto); onClose(); } finally { setSaving(false); } }}>
+                    {saving ? <Loader2 size={13} className={styles.spin} /> : null} Aprovar
+                  </Button>
+                </>
+              ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' ? (
+                <>
+                  <Button variant="danger" onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>
+                    Cancelar Reserva
+                  </Button>
+                  {(() => {
+                    const todayStr = formatDate(new Date());
+                    const canCheckin = reserva.dataInicio === todayStr;
+                    return (
+                      <Button variant="secondary" disabled={!canCheckin}
+                        title={!canCheckin ? `Check-in previsto para ${fmtDateBR(reserva.dataInicio)}` : undefined}
+                        onClick={() => setConfirmPernoite(true)}>
+                        Hospedar
+                      </Button>
+                    );
+                  })()}
                 </>
               ) : null}
             </div>
-            {reserva.status !== 'orcamento' && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
+            {reserva.status !== 'orcamento' && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
               hasChanges ? (
                 <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
                   {saving ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Salvar'}
@@ -970,6 +988,20 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 </div>
               )}
 
+              {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
+                <div className={styles.cancelMotivBlock}>
+                  <div className={styles.cancelMotivHeader}>
+                    <XCircle size={13} style={{ flexShrink: 0 }} /> Motivo do cancelamento
+                  </div>
+                  <div className={styles.cancelMotivText}>{reserva.motivoCancelamento}</div>
+                  {(reserva.funcMotivo || reserva.dataMotivo) && (
+                    <div className={styles.cancelMotivMeta}>
+                      {reserva.funcMotivo}{reserva.funcMotivo && reserva.dataMotivo ? ' · ' : ''}{reserva.dataMotivo}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {reserva.funcionario && (
                 <div className={styles.dadosRegistrado}>
                   <span className={styles.kvLabel}>Registrado por</span>
@@ -1018,7 +1050,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
               )}
 
               {/* Add button at top */}
-              {!showAddPessoa && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'orcamento' && (
+              {!showAddPessoa && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'orcamento' && reserva.status !== 'cancelado' && (
                 <button className={styles.addLinkBtn} onClick={() => setShowAddPessoa(true)}>
                   <Plus size={13} /> Adicionar pessoa
                 </button>
@@ -1112,7 +1144,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                       <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>
                         {i === 0 ? 'Titular' : 'Acompanhante'}
                       </span>
-                      {i > 0 && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
+                      {i > 0 && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
                         <button className={styles.removeIconBtn} title="Remover"
                           onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}>
                           <X size={12} />
@@ -1152,7 +1184,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 );
               })()}
 
-              {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
+              {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
                 <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}>
                   <Plus size={13} /> Adicionar pagamento
                 </button>
@@ -1170,7 +1202,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                       <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
-                      {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && (
+                      {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
                         <button className={styles.removeIconBtn} title="Cancelar pagamento"
                           onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
                           <Trash2 size={12} />
@@ -1515,55 +1547,79 @@ function RoomModal({ room, reservas, onClose, categorias, onSelectReserva }) {
   );
 }
 
-// ─── Orçamentos Modal ────────────────────────────────────────────────────────
-function OrcamentosModal({ reservas, onClose, onActivate, roomDescMap }) {
-  const orcamentos = reservas.filter((r) => r.status === 'orcamento');
+// ─── Status Filter Modal ──────────────────────────────────────────────────────
+const STATUS_FILTER_OPTIONS = [
+  ['confirmada', 'Confirmada'],
+  ['hospedado',  'Hospedado'],
+  ['finalizado', 'Finalizado'],
+  ['cancelado',  'Cancelado'],
+  ['orcamento',  'Orçamento'],
+  ['solicitada', 'Solicitada'],
+];
+const STATUS_PAGE_SIZE = 10;
 
-  const handleDownload = (r) => {
-    // Build displayPeriodos from normalized reserva
-    const displayPeriodos = [{
-      rooms: [String(r.quarto)],
-      checkin: r.dataInicio,
-      checkout: r.dataFim,
-      roomHospedes: { [String(r.quarto)]: r.hospedes || [] },
-    }];
-    // Build precosCalc from valorTotal if available (no detalhes, just total)
-    const precosCalc = {};
-    if (r.valorTotal) {
-      precosCalc[`${r.quarto}_0`] = { valor_total: r.valorTotal, detalhes: [], sazonalidades_aplicadas: [] };
-    }
-    const quartosObs = r.observacao ? { [String(r.quarto)]: r.observacao } : {};
-    const _u = userStorage.get();
-    const _uName = _u?.pessoa?.nome ?? _u?.nome ?? '';
-    gerarOrcamentoPdf({ tipo: 'simples', periodoMode: 'unico', displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _uName });
-  };
+function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
+  const [page,    setPage]    = useState(1);
+  const [list,    setList]    = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    reservaApi.listarPorMesAno({ status: [status.toUpperCase()] })
+      .then((data) => {
+        const groups = Array.isArray(data) ? data : [];
+        const seen = new Set();
+        const flat = [];
+        for (const group of groups) {
+          for (const r of (group.reservas ?? [])) {
+            if (!seen.has(r.id)) { seen.add(r.id); flat.push(normalizeReserva(r)); }
+          }
+        }
+        setList(flat.filter((r) => r.dataInicio));
+      })
+      .catch(() => setList([]))
+      .finally(() => setLoading(false));
+  }, [status]);
+
+  const total = list.length;
+  const pages = Math.max(1, Math.ceil(total / STATUS_PAGE_SIZE));
+  const slice = list.slice((page - 1) * STATUS_PAGE_SIZE, page * STATUS_PAGE_SIZE);
 
   return (
     <Modal open onClose={onClose} size="md"
-      title={<><FileText size={15} /> Orçamentos ({orcamentos.length})</>}
-      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
+      title={<><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
+      footer={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? 'carregando...' : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
+          {!loading && pages > 1 && (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button className={styles.pageBtn} disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
+              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                <button key={p} className={[styles.pageBtn, p === page ? styles.pageBtnActive : ''].join(' ')} onClick={() => setPage(p)}>{p}</button>
+              ))}
+              <button className={styles.pageBtn} disabled={page === pages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={13} /></button>
+            </div>
+          )}
+        </div>
+      }
     >
-      {orcamentos.length === 0 ? (
-        <div className={styles.emptyState}>Nenhum orçamento pendente.</div>
+      {loading ? (
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Buscando reservas...</div>
+      ) : total === 0 ? (
+        <div className={styles.emptyState}>Nenhuma reserva com status "{label}".</div>
       ) : (
-        <div className={styles.roomHistoryList}>
-          {orcamentos.map((r) => {
-            const dias = diffDays(r.dataInicio, r.dataFim);
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {slice.map((r) => {
+            const dias     = diffDays(r.dataInicio, r.dataFim);
+            const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
             return (
-              <div key={r.id} className={styles.roomHistoryRow}>
-                <div className={styles.roomHistoryLeft} style={{ cursor: 'pointer' }} onClick={() => onActivate?.(r)}>
-                  <div className={styles.roomHistoryDates}>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataInicio)}</span>
-                    <span className={styles.roomHistoryArrow}>→</span>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataFim)}</span>
-                    <span className={styles.roomHistoryNights}>{diariasTxt(dias)}</span>
-                  </div>
-                  <div className={styles.roomHistoryTitle}>{r.titularNome}</div>
-                  <div className={styles.roomHistoryMeta}>Apartamento {fmtRoom(r.quarto)}{r.valorTotal ? ` · ${fmtBRL(r.valorTotal)}` : ''}</div>
+              <div key={r.id} className={styles.searchDropItem} onClick={() => onSelectReserva(r)}>
+                <div className={[styles.searchDropRoomCircle, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
+                <div className={styles.searchDropInfo}>
+                  <div className={styles.searchDropName}>{r.titularNome}</div>
+                  <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
                 </div>
-                <button className={styles.orcDownloadBtn} title="Baixar orçamento" onClick={() => handleDownload(r)}>
-                  <FileDown size={15} />
-                </button>
               </div>
             );
           })}
@@ -1573,94 +1629,235 @@ function OrcamentosModal({ reservas, onClose, onActivate, roomDescMap }) {
   );
 }
 
-// ─── Solicitações Modal — list style like RoomModal ───────────────────────────
-function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject }) {
-  const [view,     setView]     = useState('list');
-  const [selected, setSelected] = useState(null);
-  const [sqQuarto, setSqQuarto] = useState('');
-  const [sqObs,    setSqObs]    = useState('');
-  const [saving,   setSaving]   = useState(false);
+// ─── Orçamento Detail Modal ───────────────────────────────────────────────────
+function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescMap }) {
+  const [orc,      setOrc]      = useState(null);
+  const [loading,  setLoading]  = useState(true);
+  const [priceOpen, setPriceOpen] = useState({});
 
-  const solicitadas = reservas.filter((r) => r.status === 'solicitada');
+  useEffect(() => {
+    orcamentoApi.buscarPorId(orcamentoId)
+      .then((data) => setOrc(data))
+      .catch(() => setOrc(null))
+      .finally(() => setLoading(false));
+  }, [orcamentoId]);
 
-  const openDetail = (r) => {
-    setSelected(r); setSqQuarto(''); setSqObs(''); setView('detail');
+  const reservas   = useMemo(() => (orc?.reservas ?? []).map(normalizeReserva).filter((r) => r.dataInicio), [orc]);
+  const grandTotal = reservas.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
+  const totalPago  = reservas.reduce((s, r) => s + (r.totalPago  ?? 0), 0);
+  const pendente   = Math.max(0, grandTotal - totalPago);
+
+  const handleDownload = () => {
+    const displayPeriodos = reservas.map((r) => ({
+      rooms: [String(r.quarto)],
+      checkin: r.dataInicio,
+      checkout: r.dataFim,
+      roomHospedes: { [String(r.quarto)]: r.hospedes?.length > 0 ? r.hospedes : r.pessoasOrcamento ?? [] },
+    }));
+    const precosCalc = {};
+    reservas.forEach((r, i) => {
+      if (r.valorTotal) precosCalc[`${r.quarto}_${i}`] = { valor_total: r.valorTotal, detalhes: [], sazonalidades_aplicadas: [] };
+    });
+    const quartosObs = {};
+    reservas.forEach((r) => { if (r.observacao) quartosObs[String(r.quarto)] = r.observacao; });
+    const _u = userStorage.get();
+    gerarOrcamentoPdf({ tipo: 'grupo', periodoMode: 'unico', displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _u?.pessoa?.nome ?? _u?.nome ?? '' });
   };
 
-  const handleApprove = async () => {
-    if (!sqQuarto) return;
-    setSaving(true);
-    try { await onApprove(selected.id, parseInt(sqQuarto), sqObs); }
-    finally { setSaving(false); }
-  };
+  const solicitante   = orc?.nome_solicitante ?? '';
+  const dataRegistro  = orc?.data_hora_registro ?? '';
 
-  const handleReject = async () => {
-    setSaving(true);
-    try { await onReject(selected.id); }
-    finally { setSaving(false); }
-  };
-
-  if (view === 'detail' && selected) {
-    const dias     = diffDays(selected.dataInicio, selected.dataFim);
-    const pendente = Math.max(0, (selected.valorTotal || 0) - (selected.totalPago || 0));
-    return (
-      <Modal open onClose={onClose} size="md"
-        title={<><Bell size={15} /> Solicitação — {selected.titularNome}</>}
-        footer={
-          <div className={styles.footerSpread}>
-            <Button variant="secondary" onClick={() => setView('list')}>← Voltar</Button>
-            <div className={styles.footerRight}>
-              <Button variant="danger" disabled={saving} onClick={handleReject}>
-                {saving && <Loader2 size={13} className={styles.spin} />} Rejeitar
-              </Button>
-              <Button variant="primary" disabled={!sqQuarto || saving} onClick={handleApprove}>
-                {saving && <Loader2 size={13} className={styles.spin} />} Aprovar
-              </Button>
-            </div>
-          </div>
-        }
-      >
-        <div className={styles.detailBody}>
-          <div className={styles.detailGrid2}>
-            <div className={styles.detailBox}><span className={styles.detailLabel}>Check-in</span><span className={styles.detailValue}>{fmtDateBR(selected.dataInicio)}</span></div>
-            <div className={styles.detailBox}><span className={styles.detailLabel}>Check-out</span><span className={styles.detailValue}>{fmtDateBR(selected.dataFim)}</span></div>
-          </div>
-          <div className={styles.detailBox}><span className={styles.detailLabel}>Período</span><span className={styles.detailValue}>{diariasTxt(dias)}</span></div>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Hóspedes ({selected.hospedes?.length ?? 0})</span>
-            <div className={styles.hospedeList}>
-              {(selected.hospedes || []).map((h) => (
-                <div key={h.id} className={styles.hospedeRow}>
-                  <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                  <div><div className={styles.hospedeName}>{h.nome}</div>{h.cpf && <div className={styles.hospedeCpf}>{h.cpf}</div>}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Financeiro</span>
-            <div className={styles.finGrid}>
-              <div className={styles.finBox}><span className={styles.finBoxLabel}>Total</span><span className={styles.finTotal}>{fmtBRL(selected.valorTotal)}</span></div>
-              <div className={styles.finBox}><span className={styles.finBoxLabel}>Pago</span><span className={styles.finPago}>{fmtBRL(selected.totalPago)}</span></div>
-              <div className={styles.finBox}><span className={styles.finBoxLabel}>Pendente</span><span className={pendente > 0 ? styles.finPendente : styles.finPago}>{fmtBRL(pendente)}</span></div>
-            </div>
-          </div>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Atribuir Apartamento</span>
-            <select className={styles.formSelect} value={sqQuarto} onChange={(e) => setSqQuarto(e.target.value)}>
-              <option value="">Selecione um apartamento...</option>
-              {allRooms.map((r) => <option key={r} value={r}>Apartamento {fmtRoom(r)}</option>)}
-            </select>
-          </div>
-          <div className={styles.detailBox}>
-            <span className={styles.detailLabel}>Observação (opcional)</span>
-            <textarea className={styles.obsTextarea} value={sqObs} onChange={(e) => setSqObs(e.target.value)} placeholder="Mensagem para o hóspede..." rows={3} />
-          </div>
+  return (
+    <Modal open onClose={onClose} size="md"
+      title={<><FileText size={15} /> Orçamento {solicitante ? `— ${solicitante}` : ''}</>}
+      footer={
+        <div className={styles.footerSpread}>
+          <Button variant="secondary" onClick={onClose}>← Voltar</Button>
+          <button className={styles.orcDownloadBtn} onClick={handleDownload} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', width: 'auto' }}>
+            <FileDown size={15} /> <span style={{ fontSize: 12 }}>Baixar PDF</span>
+          </button>
         </div>
-      </Modal>
+      }
+    >
+      {loading ? (
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Carregando...</div>
+      ) : !orc ? (
+        <div className={styles.emptyState}>Não foi possível carregar o orçamento.</div>
+      ) : (
+        <div className={styles.step3Root} style={{ padding: '14px 16px' }}>
+
+          {/* ── Financial summary strip ── */}
+          <div className={styles.priceCard} style={{ marginBottom: 14 }}>
+            <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
+              <span className={styles.priceCardSummary}>
+                <span className={styles.finStripItem}>Valor Total <b>{fmtBRL(grandTotal)}</b></span>
+                <span className={styles.finStripDivider} />
+                <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / grandTotal * 100)}%)</span>}</span>
+                <span className={styles.finStripDivider} />
+                <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(pendente / grandTotal * 100)}%)</span>}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* ── One block per reserva ── */}
+          {reservas.map((r, i) => {
+            const dias    = diffDays(r.dataInicio, r.dataFim);
+            const hospedes = r.pessoasOrcamento?.length > 0 ? r.pessoasOrcamento : (r.hospedes ?? []);
+            const isOpen  = !!priceOpen[r.id];
+            return (
+              <div key={r.id} className={styles.step3RoomBlock}>
+                {/* Header band */}
+                <div className={styles.step3PeriodoBand} style={{ cursor: 'pointer', marginBottom: 10 }} onClick={() => onSelectReserva(r)}>
+                  <span className={styles.step3PeriodoBandLabel}>Apartamento {fmtRoom(r.quarto)}</span>
+                  <span className={styles.step3PeriodoBandDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)} · {diariasTxt(dias)}</span>
+                </div>
+
+                {/* Price card per room */}
+                {r.valorTotal > 0 && (
+                  <div className={styles.priceCard} style={{ marginBottom: 10 }}>
+                    <button className={styles.priceCardHeader} onClick={() => setPriceOpen((prev) => ({ ...prev, [r.id]: !prev[r.id] }))}>
+                      <span className={styles.priceCardSummary}>
+                        <span className={styles.finStripItem}>Total <b>{fmtBRL(r.valorTotal)}</b></span>
+                        {r.totalPago > 0 && <>
+                          <span className={styles.finStripDivider} />
+                          <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(r.totalPago)}</b></span>
+                        </>}
+                      </span>
+                      <ChevronDown size={13} className={isOpen ? styles.priceCardChevronOpen : styles.priceCardChevron} />
+                    </button>
+                    {isOpen && (
+                      <div className={styles.priceCardBody}>
+                        <div className={styles.priceCardRoom}>
+                          {dias > 0 && Array.from({ length: dias }).map((_, di) => {
+                            const dateStr = addDays(r.dataInicio, di);
+                            const valorDiaria = r.valorTotal / dias;
+                            return (
+                              <div key={di} className={styles.step3PriceRow}>
+                                <span className={styles.step3PriceDesc}>{fmtDateBR(dateStr)}</span>
+                                <span className={styles.step3PriceVal}>{fmtBRL(valorDiaria)}</span>
+                              </div>
+                            );
+                          })}
+                          <div className={styles.step3PriceTotal}>
+                            <span>{diariasTxt(dias)}</span>
+                            <span>{fmtBRL(r.valorTotal)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Hóspedes section */}
+                <div className={styles.step3RoomLabel}>Hóspedes</div>
+                <div className={styles.orcHospedeList} style={{ marginBottom: 4 }}>
+                  {hospedes.map((h, hi) => {
+                    const age = calcAge(h.dataNascimento);
+                    return (
+                      <div key={h.id ?? hi} className={styles.orcHospedeRow}>
+                        <div className={styles.initialsCircleSm}>{initials(h.nome)}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{h.nome}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                            {age !== null ? `${age} anos` : ''}
+                            {h.dataNascimento ? ` · ${h.dataNascimento}` : ''}
+                          </div>
+                        </div>
+                        {hi === 0 && <span className={styles.titularBadge} style={{ flexShrink: 0 }}>Titular</span>}
+                      </div>
+                    );
+                  })}
+                  {hospedes.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-2)' }}>Sem hóspedes informados</div>}
+                </div>
+
+                {r.observacao && (
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', fontStyle: 'italic', marginTop: 4 }}>{r.observacao}</div>
+                )}
+
+                <div style={{ textAlign: 'right', marginTop: 6 }}>
+                  <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => onSelectReserva(r)}>
+                    Ver reserva →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {dataRegistro && (
+            <div className={styles.dadosRegistrado}>
+              <span className={styles.kvLabel}>Solicitado em</span>
+              <span className={styles.kvVal}>{dataRegistro}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Orçamentos Modal (list grouped by orcamento) ─────────────────────────────
+function OrcamentosModal({ reservas, onClose, onSelectReserva, roomDescMap }) {
+  const [detailOrc, setDetailOrc] = useState(null); // { id, solicitante, dataRegistro }
+
+  // Group by orcamentoInfo.id
+  const groups = useMemo(() => {
+    const map = new Map();
+    reservas.filter((r) => r.status === 'orcamento').forEach((r) => {
+      const oid = r.orcamentoInfo?.id ?? r.id;
+      if (!map.has(oid)) map.set(oid, { id: oid, solicitante: r.orcamentoInfo?.nome_solicitante ?? r.titularNome, dataRegistro: r.orcamentoInfo?.data_hora_registro ?? '', reservas: [] });
+      map.get(oid).reservas.push(r);
+    });
+    return [...map.values()];
+  }, [reservas]);
+
+  if (detailOrc) {
+    return (
+      <OrcamentoDetailModal
+        orcamentoId={detailOrc.id}
+        solicitante={detailOrc.solicitante}
+        dataRegistro={detailOrc.dataRegistro}
+        onClose={() => setDetailOrc(null)}
+        onSelectReserva={(r) => { setDetailOrc(null); onSelectReserva(r); }}
+        roomDescMap={roomDescMap}
+      />
     );
   }
 
+  return (
+    <Modal open onClose={onClose} size="md"
+      title={<><FileText size={15} /> Orçamentos ({groups.length})</>}
+      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
+    >
+      {groups.length === 0 ? (
+        <div className={styles.emptyState}>Nenhum orçamento pendente.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {groups.map((g) => {
+            const totalReservas = g.reservas.length;
+            const grandTotal    = g.reservas.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
+            return (
+              <div key={g.id} className={styles.searchDropItem} style={{ cursor: 'pointer' }} onClick={() => setDetailOrc(g)}>
+                <div className={[styles.searchDropRoomCircle, styles.dayRoomBadge_orcamento].join(' ')}>
+                  {totalReservas}
+                </div>
+                <div className={styles.searchDropInfo}>
+                  <div className={styles.searchDropName}>{g.solicitante}</div>
+                  <div className={styles.searchDropDates}>{g.dataRegistro}</div>
+                  <div className={styles.searchDropMeta}>{totalReservas} reserva{totalReservas !== 1 ? 's' : ''}{grandTotal > 0 ? ` · ${fmtBRL(grandTotal)}` : ''}</div>
+                </div>
+                <ChevronRight size={14} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Solicitações Modal ───────────────────────────────────────────────────────
+function SolicitacoesModal({ reservas, onClose, onSelectReserva }) {
+  const solicitadas = reservas.filter((r) => r.status === 'solicitada');
   return (
     <Modal open onClose={onClose} size="md"
       title={<><Bell size={15} /> Solicitações ({solicitadas.length})</>}
@@ -1669,27 +1866,18 @@ function SolicitacoesModal({ reservas, allRooms, onClose, onApprove, onReject })
       {solicitadas.length === 0 ? (
         <div className={styles.emptyState}>Nenhuma solicitação pendente.</div>
       ) : (
-        <div className={styles.roomHistoryList}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           {solicitadas.map((r) => {
-            const dias = diffDays(r.dataInicio, r.dataFim);
+            const dias     = diffDays(r.dataInicio, r.dataFim);
+            const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
             return (
-              <div key={r.id} className={styles.roomHistoryRow} style={{ cursor: 'pointer' }} onClick={() => openDetail(r)}>
-                <div className={styles.roomHistoryLeft}>
-                  <div className={styles.roomHistoryDates}>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataInicio)}</span>
-                    <span className={styles.roomHistoryArrow}>→</span>
-                    <span className={styles.roomHistoryDate}>{fmtDateBR(r.dataFim)}</span>
-                    <span className={styles.roomHistoryNights}>{diariasTxt(dias)}</span>
-                  </div>
-                  <div className={styles.roomHistoryTitle}>{r.titularNome}</div>
+              <div key={r.id} className={styles.searchDropItem} style={{ cursor: 'pointer' }} onClick={() => onSelectReserva(r)}>
+                <div className={[styles.searchDropRoomCircle, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
+                <div className={styles.searchDropInfo}>
+                  <div className={styles.searchDropName}>{r.titularNome}</div>
+                  <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
                 </div>
-                <div className={styles.roomHistoryHospedes}>
-                  {(r.hospedes || []).slice(0, 4).map((h) => (
-                    <div key={h.id} className={styles.initialsCircleSm} title={h.nome}>{initials(h.nome)}</div>
-                  ))}
-                  {(r.hospedes || []).length > 4 && <div className={styles.initialsCircleSm}>+{r.hospedes.length - 4}</div>}
-                </div>
-                <span className={[styles.statusBadgeSm, styles.status_solicitada].join(' ')}>Solicitada</span>
               </div>
             );
           })}
@@ -3053,8 +3241,8 @@ export default function BookingCalendar() {
   const searchNorm = normalizeStr(searchTerm.trim());
 
   // Calendar always shows all reservations regardless of search
-  const [statusFilter,     setStatusFilter]     = useState(new Set()); // empty = show all
-  const [showStatusFilter, setShowStatusFilter] = useState(false);
+  const [showStatusFilter,   setShowStatusFilter]   = useState(false);
+  const [statusModalFilter,  setStatusModalFilter]  = useState(null); // { key, label }
   const statusFilterRef = useRef(null);
 
   useEffect(() => {
@@ -3064,9 +3252,7 @@ export default function BookingCalendar() {
   }, []);
 
   const allReservas = [...reservas, ...orcamentos, ...solicitacoes];
-  const filteredReservas = statusFilter.size === 0
-    ? allReservas
-    : allReservas.filter((r) => statusFilter.has(r.status));
+  const filteredReservas = allReservas;
 
   const searchResults = searchNorm.length >= 2
     ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm))).slice(0, 8)
@@ -3089,7 +3275,7 @@ export default function BookingCalendar() {
   const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
 
   const solicitadasCount = solicitacoes.length;
-  const orcamentosCount  = orcamentos.length;
+  const orcamentosCount  = new Set(orcamentos.map((r) => r.orcamentoInfo?.id ?? r.id)).size;
   const allRooms         = categorias.flatMap((c) => c.quartos);
 
   const handleApproveSolicitacao = async (id, quarto) => {
@@ -3573,16 +3759,24 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {roomModal && <RoomModal room={roomModal.room} reservas={allReservas} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} />}
+      {statusModalFilter && (
+        <StatusFilterModal
+          status={statusModalFilter.key}
+          label={statusModalFilter.label}
+          onClose={() => setStatusModalFilter(null)}
+          onSelectReserva={(r) => setSelectedReserva(r)}
+        />
+      )}
       {showOrcamentos && (
         <OrcamentosModal reservas={orcamentos} onClose={() => setShowOrcamentos(false)}
           roomDescMap={roomDescMap}
-          onActivate={(r) => { setShowOrcamentos(false); setSelectedReserva(r); }} />
+          onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {showSolicitacoes && (
-        <SolicitacoesModal reservas={solicitacoes} allRooms={allRooms} onClose={() => setShowSolicitacoes(false)}
-          onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />
+        <SolicitacoesModal reservas={solicitacoes} onClose={() => setShowSolicitacoes(false)}
+          onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />}
 
       {/* ── Floating action panel ── */}
       {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !dayModal && !showMonthPicker && !roomModal && <div className={styles.floatPanel}>
@@ -3595,41 +3789,21 @@ export default function BookingCalendar() {
 
         <div className={styles.floatBtnWrap} ref={statusFilterRef}>
           <button
-            className={[styles.floatBtn, statusFilter.size > 0 ? styles.floatBtnActive : ''].join(' ')}
+            className={[styles.floatBtn, showStatusFilter ? styles.floatBtnActive : ''].join(' ')}
             onClick={() => setShowStatusFilter((v) => !v)}
           >
             <SlidersHorizontal size={15} />
             <span>Filtrar Status</span>
-            {statusFilter.size > 0 && <span className={styles.floatBadge}>{statusFilter.size}</span>}
           </button>
           {showStatusFilter && (
             <div className={styles.floatFilterDrop}>
-              {[
-                ['confirmada', 'Confirmada'],
-                ['hospedado',  'Hospedado'],
-                ['finalizado', 'Finalizado'],
-                ['cancelado',  'Cancelado'],
-              ].map(([key, label]) => (
-                <label key={key} className={styles.floatFilterRow}>
-                  <input type="checkbox"
-                    checked={statusFilter.has(key)}
-                    onChange={() => {
-                      setStatusFilter((prev) => {
-                        const next = new Set(prev);
-                        next.has(key) ? next.delete(key) : next.add(key);
-                        return next;
-                      });
-                    }}
-                  />
+              {STATUS_FILTER_OPTIONS.map(([key, label]) => (
+                <button key={key} className={styles.floatFilterRow}
+                  onClick={() => { setStatusModalFilter({ key, label }); setShowStatusFilter(false); }}>
                   <span className={[styles.statusDot, styles[`status_${key}`]].join(' ')} />
                   {label}
-                </label>
-              ))}
-              {statusFilter.size > 0 && (
-                <button className={styles.floatFilterClear} onClick={() => setStatusFilter(new Set())}>
-                  Limpar filtro
                 </button>
-              )}
+              ))}
             </div>
           )}
         </div>

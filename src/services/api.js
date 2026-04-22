@@ -440,6 +440,12 @@ export const reservaApi = {
   },
 };
 
+export const orcamentoApi = {
+  buscarPorId(orcamentoId) {
+    return request(`/reserva/orcamento/${orcamentoId}`);
+  },
+};
+
 // ─────────────────────────────────────────────────────────────
 //  ITENS / INVENTÁRIO
 // ─────────────────────────────────────────────────────────────

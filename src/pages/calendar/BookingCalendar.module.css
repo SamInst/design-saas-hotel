@@ -1,5 +1,5 @@
 /* ── Page ──────────────────────────────────────────────────────────────────── */
-.page { height: 100%; display: flex; flex-direction: column; gap: 12px; padding-bottom: 0; }
+.page { height: 100%; display: flex; flex-direction: column; gap: 12px; padding-bottom: 0; overflow: hidden; }
 
 /* ── Calendar card ─────────────────────────────────────────────────────────── */
 .card {
@@ -547,6 +547,23 @@
   display: flex; flex-direction: column; gap: 2px;
   margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
 }
+
+/* Cancellation reason block */
+.cancelMotivBlock {
+  display: flex; flex-direction: column; gap: 4px;
+  margin-top: 12px; padding: 10px 14px;
+  background: rgba(239,68,68,0.07); border: 1px solid rgba(239,68,68,0.25);
+  border-left: 4px solid #ef4444; border-radius: 8px;
+}
+.cancelMotivHeader {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: #ef4444;
+}
+.cancelMotivText {
+  font-size: 13px; font-weight: 500; color: var(--text); white-space: pre-wrap;
+}
+.cancelMotivMeta { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 .kvMeta { color: var(--text-2); font-size: 12px; }
 
 .kvSectionDivider {
@@ -646,11 +663,14 @@
 .roomHistoryHospedes { display: flex; align-items: center; gap: 4px; }
 .orcDownloadBtn {
   display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid var(--border);
-  background: var(--surface-2); color: var(--text-2); cursor: pointer; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid #ef4444;
+  background: color-mix(in srgb, #ef4444 12%, transparent); color: #ef4444; cursor: pointer; flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.orcDownloadBtn:hover { background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--violet); border-color: var(--violet); }
+.orcDownloadBtn:hover { background: color-mix(in srgb, #ef4444 22%, transparent); color: #ef4444; border-color: #ef4444; }
+
+.orcHospedeList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.orcHospedeRow  { display: flex; align-items: center; gap: 8px; }
 
 /* ── Create Modal — step bar ───────────────────────────────────────────────── */
 .stepBar { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); flex-shrink: 0; }
@@ -672,7 +692,7 @@
   flex-shrink: 0;
 }
 .summaryTotal   { font-weight: 700; color: var(--text); margin-left: auto; }
-.orcamentoBadge { background: #8b5cf6; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.orcamentoBadge { background: #ef4444; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 
 /* ── Form helpers ──────────────────────────────────────────────────────────── */
 .formStack { display: flex; flex-direction: column; gap: 14px; }
@@ -1249,7 +1269,7 @@
 .floatBtnPrimary:hover { background: color-mix(in srgb, var(--violet) 85%, #000) !important; color: #fff !important; }
 .floatBadge {
   margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: 999px; background: var(--violet); color: #fff;
+  border-radius: 999px; background: #ef4444; color: #fff;
   font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
 }
 .floatDivider { height: 1px; background: var(--border); margin: 2px 0; }
@@ -1271,17 +1291,23 @@
   display: flex; flex-direction: column; gap: 2px;
 }
 .floatFilterRow {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 8px; border-radius: 8px;
-  font-size: 12px; color: var(--text);
-  cursor: pointer; user-select: none;
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 10px; border-radius: 8px; border: none; background: none;
+  font-size: 12px; color: var(--text); font-family: inherit;
+  cursor: pointer; user-select: none; text-align: left;
+  transition: background 0.12s;
 }
 .floatFilterRow:hover { background: var(--surface-2); }
-.floatFilterRow input { accent-color: var(--violet); width: 14px; height: 14px; cursor: pointer; }
-.floatFilterClear {
-  margin-top: 4px; padding: 5px 8px;
-  border: none; background: none; border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--text-2); cursor: pointer; text-align: left;
-  border-radius: 0 0 8px 8px;
+
+/* Pagination buttons */
+.pageBtn {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 28px; padding: 0 6px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text-2);
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: background 0.12s, color 0.12s;
 }
-.floatFilterClear:hover { color: var(--violet); }
+.pageBtn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.pageBtn:disabled { opacity: 0.35; cursor: default; }
+.pageBtnActive { background: var(--violet) !important; color: #fff !important; border-color: var(--violet) !important; }
