@@ -320,9 +320,12 @@ function KV({ label, value }) {
 }
 
 // ── Formulário de pessoa ──────────────────────────────────────
-function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false }) {
+function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null }) {
   const [cepLoading, setCepLoading] = useState(false);
   const [cpfStatus,  setCpfStatus]  = useState(null);
+  const [useTitularTel,  setUseTitularTel]  = useState(false);
+  const [useTitularEmail, setUseTitularEmail] = useState(false);
+  const [useTitularEnd,  setUseTitularEnd]  = useState(false);
 
   const set      = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
   const hasErr   = field => showErrors && !data[field];
@@ -345,6 +348,31 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       setCepLoading(true);
       try { await onFetchCEP(masked, onChange); }
       finally { setCepLoading(false); }
+    }
+  };
+
+  const toggleTitularTel = (checked) => {
+    setUseTitularTel(checked);
+    if (checked && titular?.telefone) set('telefone', titular.telefone);
+  };
+  const toggleTitularEmail = (checked) => {
+    setUseTitularEmail(checked);
+    if (checked && titular?.email) set('email', titular.email);
+  };
+  const toggleTitularEnd = (checked) => {
+    setUseTitularEnd(checked);
+    if (checked && titular) {
+      onChange(prev => ({
+        ...prev,
+        cep: titular.cep ?? prev.cep,
+        endereco: titular.endereco ?? prev.endereco,
+        bairro: titular.bairro ?? prev.bairro,
+        municipio: titular.municipio ?? prev.municipio,
+        estado: titular.estado ?? prev.estado,
+        pais: titular.pais ?? prev.pais,
+        numero: titular.numero ?? prev.numero,
+        complemento: titular.complemento ?? prev.complemento,
+      }));
     }
   };
 
@@ -438,8 +466,14 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
           <div className={styles.grid3}>
             <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
               <FormField label="Telefone *">
-                <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
+                <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" disabled={useTitularTel} />
               </FormField>
+              {titular && (
+                <label className={styles.useTitularRow}>
+                  <input type="checkbox" checked={useTitularTel} onChange={e => toggleTitularTel(e.target.checked)} />
+                  <span>Usar do titular</span>
+                </label>
+              )}
             </div>
             <FormField label="Sexo">
               <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
@@ -457,8 +491,14 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       <div className={styles.grid2}>
         <div>
           <FormField label="Email">
-            <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+            <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" disabled={useTitularEmail} />
           </FormField>
+          {titular && (
+            <label className={styles.useTitularRow}>
+              <input type="checkbox" checked={useTitularEmail} onChange={e => toggleTitularEmail(e.target.checked)} />
+              <span>Usar do titular</span>
+            </label>
+          )}
         </div>
         <FormField label="Profissão">
           <Input value={data.profissao ?? ''} onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
@@ -466,14 +506,22 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       </div>
 
       {/* ── Endereço ── */}
-      <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
+      <div className={styles.sectionDividerRow}>
+        <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
+        {titular && (
+          <label className={styles.useTitularRow} style={{ marginBottom: 0 }}>
+            <input type="checkbox" checked={useTitularEnd} onChange={e => toggleTitularEnd(e.target.checked)} />
+            <span>Usar endereço do titular</span>
+          </label>
+        )}
+      </div>
 
       <div className={styles.grid3}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
           <label className={[styles.fieldLabel, hasErr('cep') ? styles.labelErr : ''].join(' ')}>CEP *</label>
           <div className={styles.inputWithSpinner}>
             <Input value={data.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
-              className={hasErr('cep') ? styles.inputErr : ''} />
+              className={hasErr('cep') ? styles.inputErr : ''} disabled={useTitularEnd} />
             {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
           </div>
         </div>
@@ -677,6 +725,9 @@ export default function RegistersPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMode, setFilterMode] = useState('todos');
+  const [ordenacao,  setOrdenacao]  = useState('DATA_CADASTRO');
+  const [direcao,    setDirecao]    = useState('DESC');
+  const sortRef = useRef({ ordenacao: 'DATA_CADASTRO', direcao: 'DESC' });
   const searchDebounce = useRef(null);
 
   // modais
@@ -785,6 +836,7 @@ export default function RegistersPage() {
     try {
       const sp   = buildSearchParams(term);
       const base = { size: 15, page: pg };
+      const { ordenacao: ord, direcao: dir } = sortRef.current;
 
       let res;
       if (mode === 'empresas' || sp.cnpj) {
@@ -794,7 +846,7 @@ export default function RegistersPage() {
         res = await cadastroApi.listarEmpresas(params);
         setItems((res?.content ?? []).map(e => ({ ...e, _type: 'empresa' })));
       } else {
-        const params = { ...base, ...sp };
+        const params = { ...base, ...sp, ordenacao: ord, direcao: dir };
         if (mode === 'bloqueados') params.status = 'BLOQUEADO';
         if (mode === 'hospedados') params.status = 'HOSPEDADO';
         res = await cadastroApi.listarPessoas(params);
@@ -952,6 +1004,11 @@ export default function RegistersPage() {
 
   const changeFilter = mode => { setFilterMode(mode); setPage(0); fetchData(searchTerm, mode, 0); };
   const goToPage     = pg   => { setPage(pg); fetchData(searchTerm, filterMode, pg); };
+  const changeSort   = (ord, dir) => {
+    sortRef.current = { ordenacao: ord, direcao: dir };
+    setOrdenacao(ord); setDirecao(dir);
+    setPage(0); fetchData(searchTerm, filterMode, 0);
+  };
 
   const handleAddDependente = () => {
     setDependentes(prev => {
@@ -1356,7 +1413,7 @@ export default function RegistersPage() {
             </div>
           </div>
 
-          {/* Filtros */}
+          {/* Filtros + Ordenação */}
           <div className={styles.filterRow}>
             {filterTabs.map(({ id, label, Icon }) => (
               <button key={id}
@@ -1365,6 +1422,20 @@ export default function RegistersPage() {
                 <Icon size={12} /> {label}
               </button>
             ))}
+            {filterMode !== 'empresas' && (
+              <div className={styles.sortGroup}>
+                <select
+                  className={styles.sortSelect}
+                  value={`${ordenacao}|${direcao}`}
+                  onChange={e => { const [ord, dir] = e.target.value.split('|'); changeSort(ord, dir); }}
+                >
+                  <option value="DATA_CADASTRO|DESC">Mais recentes</option>
+                  <option value="DATA_CADASTRO|ASC">Mais antigos</option>
+                  <option value="NOME|ASC">Nome A→Z</option>
+                  <option value="NOME|DESC">Nome Z→A</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Tabela */}
@@ -1383,9 +1454,19 @@ export default function RegistersPage() {
                   <th style={{ width: 100 }}>Status</th>
                 </tr></thead>
                 <tbody>
-                  {items.map(item => {
+                  {(() => {
+                    const _t = new Date();
+                    const todayISO = `${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
+                    const toISO = reg => {
+                      if (!reg) return '';
+                      if (/^\d{4}-\d{2}-\d{2}/.test(reg)) return reg.slice(0, 10);
+                      if (/^\d{2}\/\d{2}\/\d{4}/.test(reg)) { const [d,m,y] = reg.slice(0,10).split('/'); return `${y}-${m}-${d}`; }
+                      return '';
+                    };
+                    return items.map(item => {
                     const name = nomeListing(item);
                     const { bg, fg } = avatarColor(name);
+                    const isNew = toISO(item.data_hora_registro) === todayISO;
                     return (
                       <tr key={`${item._type}-${item.id}`} className={styles.row} onClick={() => openDetail(item)}>
                         <td>
@@ -1394,7 +1475,10 @@ export default function RegistersPage() {
                           </div>
                         </td>
                         <td>
-                          <div className={styles.nome}>{name}</div>
+                          <div className={styles.nomeRow}>
+                            <span className={styles.nome}>{name}</span>
+                            {isNew && <span className={styles.badgeNovo}>Novo</span>}
+                          </div>
                           {item._type === 'pessoa' && item.titularNome && (
                             <div className={styles.sub}>Dep. de {item.titularNome}</div>
                           )}
@@ -1423,7 +1507,8 @@ export default function RegistersPage() {
                         <td><StatusBadge status={item.status} /></td>
                       </tr>
                     );
-                  })}
+                  });
+                  })()}
                 </tbody>
               </table>
             )}
@@ -1958,6 +2043,7 @@ export default function RegistersPage() {
                   onFetchCEP={fetchCEP}
                   onCheckCPF={checkCPF}
                   showErrors={showErrors}
+                  titular={titular}
                 />
               )}
             </div>

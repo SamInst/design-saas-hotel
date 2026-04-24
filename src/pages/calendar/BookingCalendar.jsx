@@ -1927,17 +1927,24 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
 
 // ─── Sem Cadastro Hospedes Picker (orçamento sem cadastro) ───────────────────
 function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
-  const [nome, setNome] = useState('');
-  const [dob,  setDob]  = useState(null);
+  const [nome,     setNome]     = useState('');
+  const [dob,      setDob]      = useState(null);
+  const [isAdulto, setIsAdulto] = useState(true);
 
-  const canAdd = nome.trim().length > 0 && dob !== null;
+  const canAdd   = nome.trim().length > 0 && (isAdulto || dob !== null);
   const hasDraft = nome.trim().length > 0 || dob !== null;
 
   useEffect(() => { onDraftChange?.(hasDraft); }, [hasDraft]); // eslint-disable-line
 
+  const adulto18Date = () => {
+    const t = new Date();
+    return formatDate(new Date(t.getFullYear() - 18, t.getMonth(), t.getDate()));
+  };
+
   const add = () => {
     if (!canAdd) return;
-    onChange([...value, { nome: nome.trim(), dataNascimento: formatDate(dob) }]);
+    const dataNascimento = isAdulto ? adulto18Date() : formatDate(dob);
+    onChange([...value, { nome: nome.trim(), dataNascimento, _adulto: isAdulto }]);
     setNome(''); setDob(null);
   };
 
@@ -1955,9 +1962,15 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
           onChange={(e) => setNome(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
         />
-        <div style={{ width: 160, flexShrink: 0 }}>
-          <DatePicker value={dob} onChange={setDob} placeholder="Nascimento" maxDate={new Date()} />
-        </div>
+        <label className={styles.empresaModeToggle}>
+          <input type="checkbox" checked={isAdulto} onChange={(e) => { setIsAdulto(e.target.checked); if (e.target.checked) setDob(null); }} />
+          <span>Adulto</span>
+        </label>
+        {!isAdulto && (
+          <div style={{ width: 150, flexShrink: 0 }}>
+            <DatePicker value={dob} onChange={setDob} placeholder="Nascimento" maxDate={new Date()} />
+          </div>
+        )}
         <button type="button" className={styles.addOrcGuestBtn} onClick={add} disabled={!canAdd}>
           <Plus size={13} /> Adicionar Hóspede
         </button>
@@ -1967,7 +1980,10 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
           {value.map((p, i) => (
             <div key={i} className={styles.hospedeChipRect}>
               <span>{p.nome}</span>
-              {p.dataNascimento && <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{fmtDateBR(p.dataNascimento)}</span>}
+              {p._adulto
+                ? <span style={{ color: 'var(--text-2)', fontSize: 11 }}>Adulto</span>
+                : p.dataNascimento && <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{fmtDateBR(p.dataNascimento)}</span>
+              }
               <button type="button" className={styles.chipRemove} onClick={() => rem(i)}><X size={10} /></button>
             </div>
           ))}
@@ -1979,11 +1995,12 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
 
 // ─── Room Hospedes Picker ─────────────────────────────────────────────────────
 function RoomHospedesPicker({ value = [], onChange }) {
-  const [search,    setSearch]    = useState('');
-  const [results,   setResults]   = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [dropStyle, setDropStyle] = useState({});
-  const [pending,   setPending]   = useState(null); // { titular, selected: Set<id> }
+  const [search,        setSearch]        = useState('');
+  const [results,       setResults]       = useState([]);
+  const [searching,     setSearching]     = useState(false);
+  const [dropStyle,     setDropStyle]     = useState({});
+  const [pending,       setPending]       = useState(null); // { type:'pessoa'|'empresa', ... }
+  const [isEmpresaMode, setIsEmpresaMode] = useState(false);
   const inputRef = useRef(null);
   const wrapRef  = useRef(null);
 
@@ -1992,25 +2009,36 @@ function RoomHospedesPicker({ value = [], onChange }) {
     setSearching(true);
     const t = setTimeout(async () => {
       try {
-        const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
-        const list = Array.isArray(res) ? res : (res.content ?? []);
-        const mapPessoa = (p) => ({
-          id: p.id, nome: p.nome, cpf: p.cpf ?? '',
-          dataNascimento: p.data_nascimento ?? '',
-          bloqueado: p.status === 'BLOQUEADO',
-          acompanhantes: (p.acompanhantes ?? []).map((a) => ({
-            id: a.id, nome: a.nome, cpf: a.cpf ?? '',
-            dataNascimento: a.data_nascimento ?? '',
-            bloqueado: a.status === 'BLOQUEADO',
-            idade: a.idade ?? null,
-          })),
-        });
-        setResults(list.map(mapPessoa));
+        if (isEmpresaMode) {
+          const res  = await cadastroApi.listarEmpresas({ termo: search.trim(), size: 15, page: 0 });
+          const list = Array.isArray(res) ? res : (res.content ?? []);
+          setResults(list.map((e) => ({
+            id: e.id,
+            nome: e.razao_social ?? e.razaoSocial ?? e.nome_fantasia ?? e.nomeFantasia ?? '',
+            nomeFantasia: e.nome_fantasia ?? e.nomeFantasia ?? '',
+            isEmpresa: true,
+          })));
+        } else {
+          const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
+          const list = Array.isArray(res) ? res : (res.content ?? []);
+          const mapPessoa = (p) => ({
+            id: p.id, nome: p.nome, cpf: p.cpf ?? '',
+            dataNascimento: p.data_nascimento ?? '',
+            bloqueado: p.status === 'BLOQUEADO',
+            acompanhantes: (p.acompanhantes ?? []).map((a) => ({
+              id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+              dataNascimento: a.data_nascimento ?? '',
+              bloqueado: a.status === 'BLOQUEADO',
+              idade: a.idade ?? null,
+            })),
+          });
+          setResults(list.map(mapPessoa));
+        }
       } catch { setResults([]); }
       finally  { setSearching(false); }
     }, 300);
     return () => clearTimeout(t);
-  }, [search]);
+  }, [search, isEmpresaMode]);
 
   const calcDropPos = (maxH = 260) => {
     const el = wrapRef.current ?? inputRef.current;
@@ -2028,10 +2056,27 @@ function RoomHospedesPicker({ value = [], onChange }) {
     if (toAdd.length) onChange([...value, ...toAdd]);
   };
 
-  const handleResultClick = (h) => {
+  const handleResultClick = async (h) => {
+    if (h.isEmpresa) {
+      setSearching(true);
+      try {
+        const res     = await cadastroApi.buscarEmpresaPorId(h.id);
+        const empresa = res?.content?.[0] ?? res;
+        const vinculados = (empresa.pessoas_vinculadas ?? empresa.pessoasVinculadas ?? []).map((p) => ({
+          id: p.id, nome: p.nome, cpf: p.cpf ?? '',
+          dataNascimento: p.data_nascimento ?? '',
+          bloqueado: p.status === 'BLOQUEADO',
+        }));
+        if (vinculados.length === 0) { setSearch(''); setResults([]); return; }
+        const allActive = new Set(vinculados.filter((v) => !v.bloqueado).map((v) => v.id));
+        setPending({ type: 'empresa', empresa: { id: empresa.id, nome: h.nome }, vinculados, selected: allActive });
+        calcDropPos(320);
+      } catch { /* silent */ } finally { setSearching(false); }
+      return;
+    }
     if (h.bloqueado) return;
     if (h.acompanhantes?.length > 0) {
-      setPending({ titular: h, selected: new Set() });
+      setPending({ type: 'pessoa', titular: h, selected: new Set() });
       calcDropPos(320);
     } else {
       addMany([h]);
@@ -2045,18 +2090,30 @@ function RoomHospedesPicker({ value = [], onChange }) {
     return { ...prev, selected: next };
   });
 
-  const confirmAdd = (withCompanions) => {
-    const toAdd = [pending.titular];
-    if (withCompanions) {
-      pending.titular.acompanhantes
-        .filter((a) => !a.bloqueado && pending.selected.has(a.id))
-        .forEach((a) => toAdd.push(a));
+  const confirmAdd = () => {
+    if (pending.type === 'empresa') {
+      const toAdd = pending.vinculados.filter((v) => !v.bloqueado && pending.selected.has(v.id));
+      addMany(toAdd);
+    } else {
+      const toAdd = [pending.titular,
+        ...pending.titular.acompanhantes.filter((a) => !a.bloqueado && pending.selected.has(a.id)),
+      ];
+      addMany(toAdd);
     }
-    addMany(toAdd);
+    setPending(null); setSearch(''); setResults([]);
+  };
+
+  const confirmPessoaOnly = () => {
+    addMany([pending.titular]);
     setPending(null); setSearch(''); setResults([]);
   };
 
   const rem = (id) => onChange(value.filter((x) => x.id !== id));
+
+  const toggleEmpresaMode = (checked) => {
+    setIsEmpresaMode(checked);
+    setSearch(''); setResults([]); setPending(null);
+  };
 
   const showDrop = pending !== null || results.length > 0;
   const dropdown = showDrop && createPortal(
@@ -2065,53 +2122,86 @@ function RoomHospedesPicker({ value = [], onChange }) {
         <>
           <div className={styles.companionHeader}>
             <button className={styles.companionBack} onClick={() => setPending(null)}><ChevronLeft size={12} /> Voltar</button>
+            {pending.type === 'empresa' && (
+              <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {pending.empresa.nome}
+              </span>
+            )}
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
-            {/* Titular — always included */}
-            <div className={styles.companionRow}>
-              <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
-              <div className={styles.companionInfo}>
-                <span className={styles.companionName}>{pending.titular.nome}</span>
-                {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
-              </div>
-              <span className={styles.titularChip}>Titular</span>
-            </div>
-            {/* Companions */}
-            {pending.titular.acompanhantes.map((a) => (
-              <div key={a.id}
-                className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
-                onClick={() => !a.bloqueado && toggleCompanion(a.id)}>
-                <div className={[styles.companionCheck, pending.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
-                  {pending.selected.has(a.id) && <Check size={11} />}
+            {pending.type === 'empresa' ? (
+              pending.vinculados.map((v) => (
+                <div key={v.id}
+                  className={[styles.companionRow, v.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
+                  onClick={() => !v.bloqueado && toggleCompanion(v.id)}>
+                  <div className={[styles.companionCheck, pending.selected.has(v.id) ? styles.companionChecked : ''].join(' ')}>
+                    {pending.selected.has(v.id) && <Check size={11} />}
+                  </div>
+                  <div className={styles.companionInfo}>
+                    <span className={styles.companionName}>{v.nome}</span>
+                    {v.cpf && <span className={styles.companionMeta}>{fmtCpf(v.cpf)}</span>}
+                  </div>
+                  {v.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
                 </div>
-                <div className={styles.companionInfo}>
-                  <span className={styles.companionName}>{a.nome}</span>
-                  <span className={styles.companionMeta}>
-                    {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
-                  </span>
+              ))
+            ) : (
+              <>
+                <div className={styles.companionRow}>
+                  <div className={[styles.companionCheck, styles.companionChecked].join(' ')}><Check size={11} /></div>
+                  <div className={styles.companionInfo}>
+                    <span className={styles.companionName}>{pending.titular.nome}</span>
+                    {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
+                  </div>
+                  <span className={styles.titularChip}>Titular</span>
                 </div>
-                {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
-              </div>
-            ))}
+                {pending.titular.acompanhantes.map((a) => (
+                  <div key={a.id}
+                    className={[styles.companionRow, a.bloqueado ? styles.searchResultBlocked : styles.companionRowClickable].join(' ')}
+                    onClick={() => !a.bloqueado && toggleCompanion(a.id)}>
+                    <div className={[styles.companionCheck, pending.selected.has(a.id) ? styles.companionChecked : ''].join(' ')}>
+                      {pending.selected.has(a.id) && <Check size={11} />}
+                    </div>
+                    <div className={styles.companionInfo}>
+                      <span className={styles.companionName}>{a.nome}</span>
+                      <span className={styles.companionMeta}>
+                        {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
+                      </span>
+                    </div>
+                    {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
           <div className={styles.companionActions}>
-            <button className={styles.companionBtnSecondary} onClick={() => confirmAdd(false)}>Só o titular</button>
-            <button className={styles.companionBtnPrimary} onClick={() => confirmAdd(true)}>Adicionar →</button>
+            {pending.type === 'empresa' ? (
+              <>
+                <button className={styles.companionBtnSecondary} onClick={() => setPending(null)}>Cancelar</button>
+                <button className={styles.companionBtnPrimary} onClick={confirmAdd} disabled={pending.selected.size === 0}>
+                  Adicionar{pending.selected.size > 0 ? ` (${pending.selected.size})` : ''} →
+                </button>
+              </>
+            ) : (
+              <>
+                <button className={styles.companionBtnSecondary} onClick={confirmPessoaOnly}>Só o titular</button>
+                <button className={styles.companionBtnPrimary} onClick={confirmAdd}>Adicionar →</button>
+              </>
+            )}
           </div>
         </>
       ) : (
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {results.map((h) => (
             <div key={h.id}
-              className={[styles.searchResultItem, h.bloqueado ? styles.searchResultBlocked : ''].join(' ')}
+              className={[styles.searchResultItem, !h.isEmpresa && h.bloqueado ? styles.searchResultBlocked : ''].join(' ')}
               onClick={() => handleResultClick(h)}>
               <div className={styles.searchResultName}>{h.nome}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
-                {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
-                {h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                {!h.isEmpresa && h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
+                {!h.isEmpresa && h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
+                {!h.isEmpresa && h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
               </div>
-              {!h.bloqueado && <ChevronRight size={13} className={styles.addIcon} />}
+              <ChevronRight size={13} className={styles.addIcon} />
             </div>
           ))}
         </div>
@@ -2122,20 +2212,27 @@ function RoomHospedesPicker({ value = [], onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div ref={wrapRef} className={styles.hospSearchWrap}>
-        {searching
-          ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
-          : <Search size={13} className={styles.hospSearchIcon} />}
-        <div className={styles.hospInputInner}>
-          {value.map((h) => (
-            <div key={h.id} className={styles.hospedeChipRect}>
-              <span>{h.nome}</span>
-              <button type="button" className={styles.chipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
-            </div>
-          ))}
-          <input ref={inputRef} className={styles.hospInlineInput} value={search}
-            onChange={(e) => setSearch(e.target.value)} placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div ref={wrapRef} className={styles.hospSearchWrap} style={{ flex: 1 }}>
+          {searching
+            ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
+            : <Search size={13} className={styles.hospSearchIcon} />}
+          <div className={styles.hospInputInner}>
+            {value.map((h) => (
+              <div key={h.id} className={styles.hospedeChipRect}>
+                <span>{h.nome}</span>
+                <button type="button" className={styles.chipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
+              </div>
+            ))}
+            <input ref={inputRef} className={styles.hospInlineInput} value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={value.length === 0 ? (isEmpresaMode ? 'Buscar empresa...' : 'Buscar hóspede...') : ''} />
+          </div>
         </div>
+        <label className={styles.empresaModeToggle}>
+          <input type="checkbox" checked={isEmpresaMode} onChange={(e) => toggleEmpresaMode(e.target.checked)} />
+          <span>Empresa</span>
+        </label>
       </div>
       {dropdown}
     </div>
@@ -2268,7 +2365,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   };
 
   // Derived orcamento flags
-  const isOrcSemCadastro = isOrcamento && orcMode === 'sem_cadastro';
+  const isOrcSemCadastro = orcMode === 'sem_cadastro';
 
   const resetMpForm = () => {
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
@@ -2509,24 +2606,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
                 >{l}</button>
               ))}
-            </div>
-          </FormField>
-          <FormField label="">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <label className={styles.orcamentoToggle}>
+              <label className={styles.orcamentoToggle} style={{ marginLeft: 'auto' }}>
                 <input type="checkbox" checked={isOrcamento} onChange={(e) => setIsOrcamento(e.target.checked)} />
                 <span>Simular Orçamento</span>
               </label>
-              {isOrcamento && (
-                <div style={{ display: 'flex', gap: 16, paddingLeft: 4 }}>
-                  {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
-                    <label key={v} className={styles.orcamentoToggle}>
-                      <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
-                      <span>{l}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
+            </div>
+          </FormField>
+          <FormField label="">
+            <div style={{ display: 'flex', gap: 16 }}>
+              {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
+                <label key={v} className={styles.orcamentoToggle}>
+                  <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
+                  <span>{l}</span>
+                </label>
+              ))}
             </div>
           </FormField>
         </div>

@@ -851,6 +851,13 @@
 .companionBtnPrimary:hover { opacity: 0.88; }
 .titularChip { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--violet); padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--violet) 10%, transparent); flex-shrink: 0; }
 .companionCountChip { font-size: 10px; font-weight: 600; color: var(--text-2); padding: 1px 5px; border-radius: 4px; background: var(--surface-2); flex-shrink: 0; }
+.empresaModeToggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+  cursor: pointer; user-select: none; flex-shrink: 0; white-space: nowrap;
+}
+.empresaModeToggle input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--violet); cursor: pointer; }
+.empresaModeToggle:hover { color: var(--violet); }
 
 .blockedChip {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
@@ -1453,9 +1460,6 @@
   color: var(--text-2);
   margin-bottom: 8px;
 }
-.rvBody::-webkit-scrollbar { width: 5px; }
-.rvBody::-webkit-scrollbar-track { background: transparent; }
-.rvBody::-webkit-scrollbar-thumb { background: rgba(107,114,128,0.25); border-radius: 999px; }
 
 /* Dates row */
 .rvDatesRow {

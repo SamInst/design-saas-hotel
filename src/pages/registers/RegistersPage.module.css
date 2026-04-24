@@ -1,9 +1,10 @@
 /* ── Layout ── */
-.page      { min-height: 100vh; }
-.container { max-width: 1400px; margin: 0 auto; padding: 0; }
+.page      { height: 100%; display: flex; flex-direction: column; }
+.container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ── Card principal ── */
 .card {
+  flex: 1; display: flex; flex-direction: column; min-height: 0;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
 }
@@ -43,7 +44,7 @@
 .filterTabActive    { background: var(--violet); color: #fff; border-color: var(--violet); }
 
 /* ── Table ── */
-.tableWrap { overflow-x: auto; min-height: 180px; }
+.tableWrap { flex: 1; overflow: auto; min-height: 0; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .table th {
   padding: 9px 16px; text-align: left;
@@ -602,3 +603,38 @@
   .regFormArea { max-height: none; padding: 12px 16px; }
   .regEmpresaBar { padding: 12px 16px; }
 }
+
+/* ── Novo badge ── */
+.nomeRow { display: flex; align-items: center; gap: 6px; }
+.badgeNovo {
+  display: inline-flex; align-items: center;
+  font-size: 9px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .07em;
+  padding: 1px 6px; border-radius: 999px;
+  background: rgba(16,185,129,.12); color: #10b981;
+  border: 1px solid rgba(16,185,129,.25);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+/* ── Sort select ── */
+.sortGroup { margin-left: auto; }
+.sortSelect {
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 5px 10px;
+  cursor: pointer; font-family: inherit;
+  transition: border-color .12s, color .12s;
+}
+.sortSelect:hover { border-color: var(--violet); color: var(--text); }
+
+/* ── Usar do titular (checkbox) ── */
+.useTitularRow {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 5px; cursor: pointer;
+  font-size: 11px; color: var(--text-2);
+  user-select: none;
+}
+.useTitularRow input[type="checkbox"] {
+  width: 13px; height: 13px; accent-color: var(--violet); cursor: pointer;
+}
+.useTitularRow:hover { color: var(--violet); }
