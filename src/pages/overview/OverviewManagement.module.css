@@ -1,64 +1,6 @@
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 .page { min-height: 100%; display: flex; flex-direction: column; gap: 12px; }
 
-/* ── Stats bar (above the card) ─────────────────────────────────────────────── */
-.statsBar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.statCards {
-  display: flex;
-  gap: 8px;
-}
-
-.statCard {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 16px;
-  min-width: 120px;
-  box-shadow: var(--shadow);
-}
-
-.statCardBody {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.statCardValue {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1.1;
-}
-
-.statCardLabel {
-  font-size: 11px;
-  color: var(--text-2);
-  font-weight: 500;
-}
-
-.statCardIconGreen { color: #059669; flex-shrink: 0; }
-.statCardIconAmber { color: #d97706; flex-shrink: 0; }
-
-.statsBarActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.tipoSelectBar { width: 160px; flex-shrink: 0; }
-
 /* ── Main card ─────────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
@@ -67,7 +9,7 @@
   overflow: hidden;
 }
 
-/* ── Header (simplified — only title + search) ────────────────────────────── */
+/* ── Header ─────────────────────────────────────────────────────────────────── */
 .tableHeader {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -75,6 +17,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tableHeaderLeft { flex-shrink: 0; }
+
+.tableHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -93,29 +44,12 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-wrap: wrap;
-}
-
-/* ── Search wrap (inside simplified header) ─────────────────────────────────── */
-/* .tableTools / .toolsRow / .toolsRowActions kept for backward compat but unused */
-.tableTools { display: flex; align-items: center; gap: 8px; }
-.toolsRow   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-/* Row 1: search + tipo + date range */
-
-/* Row 2: action buttons */
-.toolsRowActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
 .searchWrap {
   position: relative;
-  flex: 1;
   min-width: 160px;
-  max-width: 240px;
+  width: 200px;
 }
 .searchIcon {
   position: absolute; left: 10px; top: 50%;
@@ -124,19 +58,15 @@
 }
 .searchInput { padding-left: 30px !important; }
 
-.tipoSelect { width: 150px; flex-shrink: 0; }
+.tipoSelectBar { width: 150px; flex-shrink: 0; }
+.dateRangeWrap { flex-shrink: 0; min-width: 180px; max-width: 240px; }
 
-.dateRangeWrap { flex-shrink: 0; min-width: 200px; max-width: 260px; flex: 1; }
-
-/* Responsive: on narrow screens stack title + tools full width */
-@media (max-width: 700px) {
+@media (max-width: 900px) {
   .tableHeader { flex-direction: column; align-items: stretch; }
-  .tableTools  { align-items: stretch; }
-  .toolsRow    { justify-content: flex-start; }
-  .toolsRowActions { justify-content: flex-start; }
-  .searchWrap  { max-width: 100%; }
+  .tableHeaderActions { flex-wrap: wrap; }
+  .searchWrap { width: 100%; }
   .dateRangeWrap { max-width: 100%; }
-  .tipoSelect  { width: 100%; }
+  .tipoSelectBar { width: 100%; }
 }
 
 /* ── Filter tabs ───────────────────────────────────────────────────────────── */
@@ -242,98 +172,158 @@
   color: var(--text-2);
 }
 
-.catBody { }
-.catEmpty {
-  padding: 12px 20px;
-  font-size: 12px;
-  color: var(--text-2);
-  font-style: italic;
+.catBody  { padding: 12px 16px 16px; }
+.catEmpty { font-size: 13px; color: var(--text-2); padding: 8px 0; font-style: italic; }
+
+/* ── Room card grid ─────────────────────────────────────────────────────────── */
+.roomGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
 }
 
-/* ── Room row ──────────────────────────────────────────────────────────────── */
-.roomRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 11px 20px;
+.roomCard {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 12px;
   cursor: pointer;
-  border-top: 1px solid var(--border);
-  border-left: 3px solid transparent;
-  transition: background 0.13s;
-  gap: 12px;
-}
-.roomRow:hover { background: var(--surface-2); }
-
-/* Left accent by status */
-.roomRow_disponivel { border-left-color: rgba(16, 185, 129, 0.4); }
-.roomRow_ocupado    { border-left-color: rgba(220, 38, 38, 0.4);   }
-.roomRow_reservado  { border-left-color: rgba(249, 115, 22, 0.4);  }
-.roomRow_limpeza    { border-left-color: rgba(37, 99, 235, 0.4);   }
-.roomRow_manutencao { border-left-color: rgba(124, 58, 237, 0.4);  }
-.roomRow_fora       { border-left-color: rgba(239, 68, 68, 0.4);   }
-
-.roomRowLeft {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 130px;
+  transition: transform .12s, box-shadow .12s;
+}
+.roomCard:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+
+.roomCard_disponivel { background: rgba(16,185,129,.05);  border-color: rgba(16,185,129,.25); }
+.roomCard_ocupado    { background: rgba(220,38,38,.05);   border-color: rgba(220,38,38,.25);  }
+.roomCard_reservado  { background: rgba(249,115,22,.05);  border-color: rgba(249,115,22,.25); }
+.roomCard_limpeza    { background: rgba(37,99,235,.05);   border-color: rgba(37,99,235,.25);  }
+.roomCard_manutencao { background: rgba(124,58,237,.05);  border-color: rgba(124,58,237,.25); }
+.roomCard_fora       { background: rgba(100,116,139,.05); border-color: rgba(100,116,139,.25);}
+
+.roomCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.roomCardNum {
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.roomCardNum_disponivel { color: #059669; }
+.roomCardNum_ocupado    { color: #dc2626; }
+.roomCardNum_reservado  { color: #ea580c; }
+.roomCardNum_limpeza    { color: #2563eb; }
+.roomCardNum_manutencao { color: #7c3aed; }
+.roomCardNum_fora       { color: #64748b; }
+:root[data-theme="dark"] .roomCardNum_disponivel { color: #34d399; }
+:root[data-theme="dark"] .roomCardNum_ocupado    { color: #f87171; }
+:root[data-theme="dark"] .roomCardNum_reservado  { color: #fb923c; }
+:root[data-theme="dark"] .roomCardNum_limpeza    { color: #60a5fa; }
+:root[data-theme="dark"] .roomCardNum_manutencao { color: #a78bfa; }
+:root[data-theme="dark"] .roomCardNum_fora       { color: #94a3b8; }
+
+.roomCardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   flex: 1;
 }
 
-.roomRowInfo { min-width: 0; flex: 1; }
-
-/* Room number badge */
-.roomNumBadge {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-.numBadge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; }
-.numBadge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; }
-.numBadge_reservado  { background: rgba(249, 115, 22, 0.12);  color: #ea580c; }
-.numBadge_limpeza    { background: rgba(37, 99, 235, 0.12);   color: #2563eb; }
-.numBadge_manutencao { background: rgba(124, 58, 237, 0.12);  color: #7c3aed; }
-.numBadge_fora       { background: rgba(239, 68, 68, 0.12);   color: #dc2626; }
-
-:root[data-theme="dark"] .numBadge_disponivel { color: #34d399; }
-:root[data-theme="dark"] .numBadge_ocupado    { color: #f87171; }
-:root[data-theme="dark"] .numBadge_reservado  { color: #fb923c; }
-:root[data-theme="dark"] .numBadge_limpeza    { color: #60a5fa; }
-:root[data-theme="dark"] .numBadge_manutencao { color: #a78bfa; }
-:root[data-theme="dark"] .numBadge_fora       { color: #f87171; }
-
-.roomName {
+/* Guest name (main content) */
+.roomCardGuest {
   font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Status label (limpeza/manutenção) */
+.roomCardLabel {
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
 }
-.roomNamePending {
-  font-size: 13px;
-  font-weight: 400;
+
+/* Period / timer line */
+.roomCardPeriod {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
   color: var(--text-2);
-  font-style: italic;
 }
+
+/* Tipo ocupação (disponível) */
+.roomCardTipo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-2);
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+
+/* Meta text (responsável) */
+.roomCardMeta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+/* Description (manutenção) */
+.roomCardDesc {
+  font-size: 10px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Badges row (pernoite / dayuse) */
+.roomCardBadges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* Pendente amount */
+.roomCardPendente {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d97706;
+  margin-top: 1px;
+}
+:root[data-theme="dark"] .roomCardPendente { color: #fbbf24; }
 
 /* Beds row (available rooms) */
 .bedsRow {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 3px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .bedItem {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-2);
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 /* Meta row (period / timer) */

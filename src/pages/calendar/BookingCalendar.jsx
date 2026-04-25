@@ -2365,7 +2365,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   };
 
   // Derived orcamento flags
-  const isOrcSemCadastro = orcMode === 'sem_cadastro';
+  const isOrcSemCadastro = isOrcamento && orcMode === 'sem_cadastro';
 
   const resetMpForm = () => {
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
@@ -2525,7 +2525,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
         .map((h) => ({ id: h.id }));
 
-      const buildItem = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx) => {
+      const fmtOrcDate = (s) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split('-').reverse().join('/') : s);
+
+      const buildItem = (quartoId, dataEntrada, dataSaida, hospedes, orcGuests, periodoIdx) => {
         const roomPags   = cleanPags(quartosPag[quartoId] || []);
         const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
         return {
@@ -2533,7 +2535,13 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           data_entrada: toBrDate(dataEntrada),
           data_saida:   toBrDate(dataSaida),
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
-          ...(hospedes?.length ? { pessoas: hospedes } : {}),
+          ...(isOrcSemCadastro && orcGuests?.length ? {
+            pessoas_orcamento: orcGuests.map((h) => ({
+              nome: h.nome,
+              ...(h.dataNascimento ? { data_nascimento: fmtOrcDate(h.dataNascimento) } : {}),
+            })),
+          } : {}),
+          ...(!isOrcSemCadastro && hospedes?.length ? { pessoas: hospedes } : {}),
           ...(roomPags.length  ? { pagamentos: roomPags } : {}),
           ...(quartosObs[quartoId]?.trim() ? { observacao: quartosObs[quartoId].trim() } : {}),
         };
@@ -2542,10 +2550,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       let reservasBody;
       if (periodoMode === 'multiplos') {
         reservasBody = periodos.flatMap((p, pi) =>
-          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout), toIds(p.roomHospedes?.[q] || []), pi))
+          p.rooms.map((q) => buildItem(q, formatDate(p.checkin), formatDate(p.checkout), toIds(p.roomHospedes?.[q] || []), p.roomHospedesOrc?.[q] || [], pi))
         );
       } else {
-        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || []), 0));
+        reservasBody = quartos.map((q) => buildItem(q, checkinStr, checkoutStr, toIds(quartoHospedes[q] || []), quartoHospedesOrc[q] || [], 0));
       }
       await onSave(reservasBody);
     } catch (e) {
@@ -2612,16 +2620,18 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               </label>
             </div>
           </FormField>
-          <FormField label="">
-            <div style={{ display: 'flex', gap: 16 }}>
-              {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
-                <label key={v} className={styles.orcamentoToggle}>
-                  <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
-                  <span>{l}</span>
-                </label>
-              ))}
-            </div>
-          </FormField>
+          {isOrcamento && (
+            <FormField label="">
+              <div style={{ display: 'flex', gap: 16 }}>
+                {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
+                  <label key={v} className={styles.orcamentoToggle}>
+                    <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
+                    <span>{l}</span>
+                  </label>
+                ))}
+              </div>
+            </FormField>
+          )}
         </div>
       )}
 

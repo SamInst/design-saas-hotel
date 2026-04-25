@@ -1711,101 +1711,96 @@ export default function OverviewManagement() {
   };
 
   // ── Room Row ──────────────────────────────────────────────────────────────
-  const RoomRow = ({ room }) => {
+  const RoomCard = ({ room }) => {
     const sk        = roomStatusKey(room.status);
     const sv        = room.servico;
     const isDuAtivo = sv?.tipo === 'dayuse' && sv.status === DAYUSE_STATUS.ATIVO;
     const elapsed   = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
-
-    let nameNode;
-    if (room.status === ROOM_STATUS.DISPONIVEL) {
-      nameNode = <span className={styles.roomName}>{room.tipoOcupacao}</span>;
-    } else if (room.status === ROOM_STATUS.LIMPEZA) {
-      nameNode = <span className={styles.roomName}>Em Limpeza</span>;
-    } else if (room.status === ROOM_STATUS.MANUTENCAO) {
-      nameNode = <span className={styles.roomName}>Manutenção</span>;
-    } else if (room.status === ROOM_STATUS.FORA_DE_SERVICO) {
-      nameNode = <span className={styles.roomName}>Fora de Serviço</span>;
-    } else if (sv?.tipo === 'dayuse') {
-      const duName = sv.status === DAYUSE_STATUS.ENCERRADO   ? 'Day use encerrado'
-                   : sv.status === DAYUSE_STATUS.FINALIZADO  ? 'Day use finalizado'
-                   : sv.titularNome || 'Day Use em andamento';
-      nameNode = <span className={sv.status === DAYUSE_STATUS.ATIVO && !sv.titularNome ? styles.roomNamePending : styles.roomName}>{duName}</span>;
-    } else if (sv?.titularNome) {
-      nameNode = <span className={styles.roomName}>{sv.titularNome}</span>;
-    } else {
-      nameNode = <span className={styles.roomNamePending}>—</span>;
-    }
-
-    const guestCount = sv?.hospedes?.length ?? 0;
+    const guestCount  = sv?.hospedes?.length ?? 0;
     const hasDesconto = !!(sv?.desconto?.valor);
 
-    let metaNode = null;
-    if (room.status === ROOM_STATUS.DISPONIVEL) {
-      metaNode = <BedsRow camas={room.camas} />;
-    } else if (sv?.tipo === 'pernoite') {
-      metaNode = (
-        <div>
-          <div className={styles.metaRow}>
-            <Calendar size={12} /><span>{sv.periodo}</span>
-          </div>
-          <div className={styles.metaServiceBadge}>
-            {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={11} />{guestCount}</span>}
-            {sv.totalDiarias > 0 && (
-              <span className={styles.diariaBadge}><Calendar size={10} />{sv.diariaAtual}/{sv.totalDiarias}</span>
-            )}
-            <span className={styles.pernoiteBadge}>Pernoite</span>
-            {hasDesconto && (
-              <span className={styles.descontoBadge}>
-                <Tag size={9} />
-                {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
-              </span>
-            )}
-            {sv.pagamentoPendente > 0 && <span className={styles.metaPendente}>• {fmtBRL(sv.pagamentoPendente)}</span>}
-          </div>
-        </div>
-      );
-    } else if (sv?.tipo === 'dayuse') {
-      metaNode = (
-        <div>
-          <div className={styles.metaRow}>
-            {isDuAtivo
-              ? <><Clock size={12} /><span className={styles.timerLive}>{sv.horaEntrada} · {fmtElapsed(elapsed)}</span></>
-              : <><Clock size={12} /><span>{sv.horaEntrada}{sv.horaSaida ? ` → ${sv.horaSaida} (${fmtElapsed(calcElapsedMinutes(sv.dataUso, sv.horaEntrada, sv.horaSaida))})` : ''}</span></>
-            }
-            {sv.pagamentoPendente > 0 && <span className={styles.metaPendente}>• Pendente: {fmtBRL(sv.pagamentoPendente)}</span>}
-          </div>
-          <div className={styles.metaServiceBadge}>
-            {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={11} />{guestCount}</span>}
-            <span className={styles.dayuseBadge}>Day Use</span>
-            {hasDesconto && (
-              <span className={styles.descontoBadge}>
-                <Tag size={9} />
-                {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
-              </span>
-            )}
-          </div>
-        </div>
-      );
-    } else if (sv?.tipo === 'reserva') {
-      metaNode = <div className={styles.metaRow}><Calendar size={12} /><span>{sv.chegadaPrevista}</span></div>;
-    } else if (room.status === ROOM_STATUS.LIMPEZA && room.limpeza) {
-      metaNode = <div className={styles.metaRow}><User size={12} /><span>{room.limpeza.responsavel || 'Sem responsável'}</span></div>;
-    } else if ((room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) && room.manutencao) {
-      metaNode = <div className={styles.metaRow}><Wrench size={12} /><span>{room.manutencao.responsavel || '—'}</span><span className={styles.metaDesc}>{room.manutencao.descricao ? ` · ${room.manutencao.descricao.slice(0, 35)}` : ''}</span></div>;
-    }
-
     return (
-      <div className={[styles.roomRow, styles[`roomRow_${sk}`]].join(' ')} onClick={() => openDetail(room)}>
-        <div className={styles.roomRowLeft}>
-          <div className={[styles.roomNumBadge, styles[`numBadge_${sk}`]].join(' ')}>{room.numero}</div>
-          <div className={styles.roomRowInfo}>
-            {nameNode}
-            {metaNode}
-          </div>
-        </div>
-        <div className={styles.roomRowRight}>
+      <div className={[styles.roomCard, styles[`roomCard_${sk}`]].join(' ')} onClick={() => openDetail(room)}>
+        {/* Top row: number + status badge */}
+        <div className={styles.roomCardTop}>
+          <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
           <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
+        </div>
+
+        {/* Content by status */}
+        <div className={styles.roomCardBody}>
+          {room.status === ROOM_STATUS.DISPONIVEL && (
+            <>
+              <span className={styles.roomCardTipo}>{room.tipoOcupacao}</span>
+              <BedsRow camas={room.camas} />
+            </>
+          )}
+
+          {room.status === ROOM_STATUS.LIMPEZA && (
+            <>
+              <span className={styles.roomCardLabel}>Em Limpeza</span>
+              {room.limpeza?.responsavel && <span className={styles.roomCardMeta}><User size={10} /> {room.limpeza.responsavel}</span>}
+            </>
+          )}
+
+          {(room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) && (
+            <>
+              <span className={styles.roomCardLabel}>{room.status === ROOM_STATUS.MANUTENCAO ? 'Manutenção' : 'Fora de Serviço'}</span>
+              {room.manutencao?.responsavel && <span className={styles.roomCardMeta}><Wrench size={10} /> {room.manutencao.responsavel}</span>}
+              {room.manutencao?.descricao   && <span className={styles.roomCardDesc}>{room.manutencao.descricao.slice(0, 50)}</span>}
+            </>
+          )}
+
+          {sv?.tipo === 'pernoite' && (
+            <>
+              <span className={styles.roomCardGuest}>{sv.titularNome || '—'}</span>
+              {sv.periodo && (
+                <span className={styles.roomCardPeriod}><Calendar size={10} /> {sv.periodo}</span>
+              )}
+              <div className={styles.roomCardBadges}>
+                {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
+                {sv.totalDiarias > 0 && <span className={styles.diariaBadge}><Calendar size={9} />{sv.diariaAtual}/{sv.totalDiarias}</span>}
+                <span className={styles.pernoiteBadge}>Pernoite</span>
+                {hasDesconto && (
+                  <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
+                )}
+              </div>
+              {sv.pagamentoPendente > 0 && (
+                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
+              )}
+            </>
+          )}
+
+          {sv?.tipo === 'dayuse' && (
+            <>
+              <span className={styles.roomCardGuest}>
+                {sv.titularNome || (sv.status === DAYUSE_STATUS.ENCERRADO ? 'Day use encerrado' : sv.status === DAYUSE_STATUS.FINALIZADO ? 'Day use finalizado' : 'Day Use')}
+              </span>
+              <span className={styles.roomCardPeriod}>
+                {isDuAtivo
+                  ? <><Clock size={10} /> <span className={styles.timerLive}>{sv.horaEntrada} · {fmtElapsed(elapsed)}</span></>
+                  : <><Clock size={10} /> {sv.horaEntrada}{sv.horaSaida ? ` → ${sv.horaSaida}` : ''}</>
+                }
+              </span>
+              <div className={styles.roomCardBadges}>
+                {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
+                <span className={styles.dayuseBadge}>Day Use</span>
+                {hasDesconto && (
+                  <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
+                )}
+              </div>
+              {sv.pagamentoPendente > 0 && (
+                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
+              )}
+            </>
+          )}
+
+          {sv?.tipo === 'reserva' && (
+            <>
+              <span className={styles.roomCardGuest}>{sv.titularNome || '—'}</span>
+              {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> {sv.chegadaPrevista}</span>}
+            </>
+          )}
         </div>
       </div>
     );
@@ -1829,67 +1824,41 @@ export default function OverviewManagement() {
     <div className={styles.page}>
       <Notification notification={notif} />
 
-      {/* ── Stats bar ── */}
-      <div className={styles.statsBar}>
-        <div className={styles.statCards}>
-          <div className={styles.statCard}>
-            <Users size={16} className={styles.statCardIconGreen} />
-            <div className={styles.statCardBody}>
-              <span className={styles.statCardValue}>{totalHospedados}</span>
-              <span className={styles.statCardLabel}>hospedado{totalHospedados !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-          <div className={styles.statCard}>
-            <BedDouble size={16} className={styles.statCardIconAmber} />
-            <div className={styles.statCardBody}>
-              <span className={styles.statCardValue}>{quartosOcupados}/{quartos.length}</span>
-              <span className={styles.statCardLabel}>ocupação</span>
-            </div>
-          </div>
-        </div>
-        <div className={styles.statsBarActions}>
-          <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelectBar}>
-            <option value="">Tipo de ocupação</option>
-            {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
-          </Select>
-          <div className={styles.dateRangeWrap}>
-            <DatePicker
-              mode="range"
-              startDate={filterDateStart}
-              endDate={filterDateEnd}
-              onRangeChange={({ start, end }) => {
-                setFilterDateStart(start);
-                setFilterDateEnd(end);
-                setDateGroupCollapsed({});
-              }}
-              placeholder="Período de check-in..."
-            />
-          </div>
-          <Button
-            variant="secondary"
-            className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
-            onClick={clearAllFilters}
-          >
-            <X size={12} /> Limpar filtros
-          </Button>
-          <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
-            <Plus size={14} /> Adicionar Quarto
-          </Button>
-        </div>
-      </div>
-
       <div className={styles.card}>
         {/* ── Header ── */}
         <div className={styles.tableHeader}>
-          <div>
+          <div className={styles.tableHeaderLeft}>
             <h2 className={styles.h2}>Recepção</h2>
-            <p className={styles.subtitle}>
-              <Building2 size={13} /> Visão geral de quartos, hóspedes e day use
-            </p>
+            <p className={styles.subtitle}><Building2 size={13} /> Visão geral de quartos, hóspedes e day use</p>
           </div>
-          <div className={styles.searchWrap}>
-            <Search size={13} className={styles.searchIcon} />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+          <div className={styles.tableHeaderActions}>
+            <div className={styles.searchWrap}>
+              <Search size={13} className={styles.searchIcon} />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+            </div>
+            <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelectBar}>
+              <option value="">Tipo de ocupação</option>
+              {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+            </Select>
+            <div className={styles.dateRangeWrap}>
+              <DatePicker
+                mode="range"
+                startDate={filterDateStart}
+                endDate={filterDateEnd}
+                onRangeChange={({ start, end }) => { setFilterDateStart(start); setFilterDateEnd(end); setDateGroupCollapsed({}); }}
+                placeholder="Período de check-in..."
+              />
+            </div>
+            <Button
+              variant="secondary"
+              className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
+              onClick={clearAllFilters}
+            >
+              <X size={12} /> Limpar
+            </Button>
+            <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
+              <Plus size={14} /> Adicionar Quarto
+            </Button>
           </div>
         </div>
 
@@ -1926,7 +1895,9 @@ export default function OverviewManagement() {
                 </button>
                 {!isDateGroupCollapsed(group.date) && (
                   <div className={styles.catBody}>
-                    {group.rooms.map((room) => <RoomRow key={room.id} room={room} />)}
+                    <div className={styles.roomGrid}>
+                      {group.rooms.map((room) => <RoomCard key={room.id} room={room} />)}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1976,7 +1947,7 @@ export default function OverviewManagement() {
                 <div className={styles.catBody}>
                   {cat.rooms.length === 0
                     ? <div className={styles.catEmpty}>Nenhum quarto com os filtros aplicados.</div>
-                    : cat.rooms.map((room) => <RoomRow key={room.id} room={room} />)
+                    : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
                   }
                 </div>
               )}

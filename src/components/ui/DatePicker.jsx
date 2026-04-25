@@ -128,6 +128,8 @@ export function DatePicker({
     }
     if (!startDate || (startDate && endDate)) {
       onRangeChange?.({ start: d, end: null });
+    } else if (sod(d).getTime() === sod(startDate).getTime()) {
+      onRangeChange?.({ start: d, end: null }); // same day — restart selection
     } else {
       onRangeChange?.(d < startDate ? { start: d, end: startDate } : { start: startDate, end: d });
       setOpen(false); setViewMode('days');
