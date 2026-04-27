@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
-  ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal,
+  ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -915,7 +915,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
   return (
     <>
-      <Modal open onClose={handleClose} size="md" hideHeader bodyStyle={{ padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      <Modal open onClose={handleClose} size="lg" hideHeader bodyStyle={{ padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 0 }}
         title={<><BedDouble size={15} /> Apartamento {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
       >
         {/* ── Custom dark header ── */}
@@ -939,125 +939,180 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
         {/* ── Scrollable body ── */}
         <div className={styles.rvBody}>
-          {/* Dates + nights */}
-          <div className={styles.rvDatesRow}>
-            <div className={styles.rvDateCell}>
-              <div className={styles.rvDateLabel}>Check-in</div>
-              <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
-              <div className={styles.rvDateTime}>{checkinTime}h</div>
-            </div>
-            <div className={styles.rvDateArrow}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-              </svg>
-            </div>
-            <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
-              <div className={styles.rvDateLabel}>Check-out</div>
-              <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
-              <div className={styles.rvDateTime}>{checkoutTime}h</div>
-            </div>
-            <div className={styles.rvDateCellNights}>
-              <div className={styles.rvNightsNum}>{dias}</div>
-              <div className={styles.rvNightsLabel}>Diárias</div>
-            </div>
-          </div>
+          <div className={styles.rvTwoCol}>
 
-          {/* Meta line */}
-          {/* Observação */}
-          {reserva.observacao && (
-            <div className={styles.rvObsBox}>
-              <div className={styles.rvObsLabel}>Observação</div>
-              <div className={styles.rvObsText}>{reserva.observacao}</div>
-            </div>
-          )}
+            {/* ── Left column: obs, guests (+ dates when orcamento) ── */}
+            <div className={[styles.rvLeft, reserva.status === 'orcamento' ? styles.rvLeftFull : ''].join(' ')}>
 
-          {/* Cancel reason */}
-          {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
-            <div className={styles.rvCancelBlock}>
-              <div className={styles.rvCancelHeader}><XCircle size={13} style={{flexShrink:0}}/> Cancelamento</div>
-              <div className={styles.rvCancelText}>{reserva.motivoCancelamento}</div>
-              {(reserva.funcMotivo || reserva.dataMotivo) && (
-                <div className={styles.rvCancelMeta}>{[reserva.funcMotivo, reserva.dataMotivo].filter(Boolean).join(' · ')}</div>
-              )}
-            </div>
-          )}
-
-          {(() => {
-            const renderGuestTable = (list) => {
-              const titular = list[0];
-              const acomps = list.slice(1);
-              const renderRow = (h) => (
-                <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
-                  <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
-                  <div className={styles.rvGuestInfo}>
-                    <div className={styles.rvGuestName}>{h.nome}</div>
-                    {(h.telefone || h.dataNascimento) && (
-                      <div className={styles.rvGuestMeta}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
-                    )}
-                    {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
+              {/* Dates shown here only for orcamento (no right column) */}
+              {reserva.status === 'orcamento' && (
+                <div className={styles.rvDatesRow}>
+                  <div className={styles.rvDateCell}>
+                    <div className={styles.rvDateLabel}>Check-in</div>
+                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
+                    <div className={styles.rvDateTime}>{checkinTime}h</div>
+                  </div>
+                  <div className={styles.rvDateArrow}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                  </div>
+                  <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
+                    <div className={styles.rvDateLabel}>Check-out</div>
+                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
+                    <div className={styles.rvDateTime}>{checkoutTime}h</div>
+                  </div>
+                  <div className={styles.rvDateCellNights}>
+                    <div className={styles.rvNightsNum}>{dias}</div>
+                    <div className={styles.rvNightsLabel}>Diárias</div>
                   </div>
                 </div>
-              );
-              return (
-                <div className={styles.rvGuestTable}>
-                  <div className={styles.rvGuestSectionHeader}>Titular</div>
-                  {renderRow(titular)}
-                  {acomps.length > 0 && (
-                    <>
-                      <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
-                      {acomps.map(renderRow)}
-                    </>
+              )}
+
+              {/* Observação */}
+              {reserva.observacao && (
+                <div className={styles.rvObsBox}>
+                  <div className={styles.rvObsLabel}>Observação</div>
+                  <div className={styles.rvObsText}>{reserva.observacao}</div>
+                </div>
+              )}
+
+              {/* Cancel reason */}
+              {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
+                <div className={styles.rvCancelBlock}>
+                  <div className={styles.rvCancelHeader}><XCircle size={13} style={{flexShrink:0}}/> Cancelamento</div>
+                  <div className={styles.rvCancelText}>{reserva.motivoCancelamento}</div>
+                  {(reserva.funcMotivo || reserva.dataMotivo) && (
+                    <div className={styles.rvCancelMeta}>{[reserva.funcMotivo, reserva.dataMotivo].filter(Boolean).join(' · ')}</div>
                   )}
                 </div>
-              );
-            };
+              )}
 
-            if (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0) {
-              return renderGuestTable(reserva.pessoasOrcamento);
-            }
-            if (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0) {
-              return renderGuestTable([{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]);
-            }
-            if (pessoas.length === 0) {
-              return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
-            }
-            return renderGuestTable(pessoas);
-          })()}
+              {/* Guests */}
+              {(() => {
+                const renderGuestTable = (list) => {
+                  const titular = list[0];
+                  const acomps = list.slice(1);
+                  const renderRow = (h) => (
+                    <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
+                      <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
+                      <div className={styles.rvGuestInfo}>
+                        <div className={styles.rvGuestName}>{h.nome}</div>
+                        {(h.telefone || h.dataNascimento) && (
+                          <div className={styles.rvGuestMeta}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
+                        )}
+                        {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
+                      </div>
+                    </div>
+                  );
+                  return (
+                    <div className={styles.rvGuestTable}>
+                      <div className={styles.rvGuestSectionHeader}>Titular</div>
+                      {renderRow(titular)}
+                      {acomps.length > 0 && (
+                        <>
+                          <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
+                          {acomps.map(renderRow)}
+                        </>
+                      )}
+                    </div>
+                  );
+                };
 
-          {/* Section: Pagamentos */}
-          {reserva.status !== 'orcamento' && (
-            <>
-              <div className={styles.rvPaySummary}>
-                <div className={styles.rvPaySumItem}>
-                  <span className={styles.rvPaySumLabel}>Pendente</span>
-                  <span className={[styles.rvPaySumValue, styles.rvPaySumPending].join(' ')}>{viewCalcLoading ? <Loader2 size={11} className={styles.spin}/> : fmtBRL(displayPendente)}</span>
-                </div>
-                <div className={styles.rvPaySumItem}>
-                  <span className={styles.rvPaySumLabel}>Pago</span>
-                  <span className={[styles.rvPaySumValue, styles.rvPaySumPaid].join(' ')}>{fmtBRL(totalPago)}</span>
-                </div>
-                <div className={styles.rvPaySumItem}>
-                  <span className={styles.rvPaySumLabel}>Total</span>
-                  <span className={[styles.rvPaySumValue, styles.rvPaySumTotal].join(' ')}>{viewCalcLoading ? <Loader2 size={11} className={styles.spin}/> : fmtBRL(displayTotal)}</span>
-                </div>
-              </div>
-              <div className={styles.rvPayList}>
-              {pagamentos.length === 0 && <div className={styles.rvEmptyState}>Nenhum pagamento registrado.</div>}
-              {pagamentos.map((p) => (
-                <div key={p.id} className={[styles.rvPayItem, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')} onClick={() => setViewPagamento(p)}>
-                  <div className={styles.rvPayInfo}>
-                    <div className={styles.rvPayDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</div>
-                    {p.nomePagador && <div className={styles.rvPayPayer}>{p.nomePagador}</div>}
-                    {(p.dataRegistro || p.formaPagamento) && <div className={styles.rvPayMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>}
-                    {p.funcionario && <div className={styles.rvPayFunc}>registrado por {p.funcionario}</div>}
+                if (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0) {
+                  return renderGuestTable(reserva.pessoasOrcamento);
+                }
+                if (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0) {
+                  return renderGuestTable([{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]);
+                }
+                if (pessoas.length === 0) {
+                  return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
+                }
+                return renderGuestTable(pessoas);
+              })()}
+            </div>
+
+            {/* ── Right column: period + financial summary + payments ── */}
+            {reserva.status !== 'orcamento' && (
+              <div className={styles.rvRight}>
+                {/* Dates + nights */}
+                <div className={styles.rvDatesRow}>
+                  <div className={styles.rvDateCell}>
+                    <div className={styles.rvDateLabel}>Check-in</div>
+                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
+                    <div className={styles.rvDateTime}>{checkinTime}h</div>
                   </div>
-                  <span className={p.cancelado ? styles.rvPayAmountCancelado : styles.rvPayAmount}>{fmtBRL(p.valor)}</span>
+                  <div className={styles.rvDateArrow}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                  </div>
+                  <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
+                    <div className={styles.rvDateLabel}>Check-out</div>
+                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
+                    <div className={styles.rvDateTime}>{checkoutTime}h</div>
+                  </div>
+                  <div className={styles.rvDateCellNights}>
+                    <div className={styles.rvNightsNum}>{dias}</div>
+                    <div className={styles.rvNightsLabel}>Diárias</div>
+                  </div>
                 </div>
-              ))}
+                <div className={styles.rvFinCard}>
+                  <div className={styles.rvFinHeader}>
+                    <DollarSign size={13} className={styles.rvFinIcon} />
+                    <span className={styles.rvFinTitle}>Resumo Financeiro</span>
+                  </div>
+                  <div className={styles.rvFinRow}>
+                    <div className={styles.rvFinItem}>
+                      <span className={styles.rvFinLabel}>Valor Total</span>
+                      <span className={styles.rvFinValue}>
+                        {viewCalcLoading ? <Loader2 size={11} className={styles.spin} /> : fmtBRL(displayTotal)}
+                      </span>
+                    </div>
+                    <div className={styles.rvFinItem}>
+                      <span className={styles.rvFinLabel}>Total Pago</span>
+                      <span className={styles.rvFinValue}>{fmtBRL(totalPago)}</span>
+                    </div>
+                    <div className={styles.rvFinItem}>
+                      <span className={styles.rvFinLabel}>Pendente</span>
+                      <span className={[styles.rvFinValue, displayPendente > 0 ? styles.rvFinPending : styles.rvFinPaid].join(' ')}>
+                        {viewCalcLoading ? <Loader2 size={11} className={styles.spin} /> : fmtBRL(displayPendente)}
+                      </span>
+                    </div>
+                  </div>
+                  {displayTotal > 0 && (() => {
+                    const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
+                    return (
+                      <div className={styles.rvFinProgress}>
+                        <div className={styles.rvFinProgressMeta}>
+                          <span>Progresso de pagamento</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className={styles.rvFinBar}>
+                          <div className={styles.rvFinBarFill} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className={styles.rvPayList}>
+                  {pagamentos.length === 0 && <div className={styles.rvEmptyState}>Nenhum pagamento registrado.</div>}
+                  {pagamentos.map((p) => (
+                    <div key={p.id} className={[styles.rvPayItem, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')} onClick={() => setViewPagamento(p)}>
+                      <div className={styles.rvPayInfo}>
+                        <div className={styles.rvPayDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</div>
+                        {p.nomePagador && <div className={styles.rvPayPayer}>{p.nomePagador}</div>}
+                        {(p.dataRegistro || p.formaPagamento) && <div className={styles.rvPayMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>}
+                        {p.funcionario && <div className={styles.rvPayFunc}>registrado por {p.funcionario}</div>}
+                      </div>
+                      <span className={p.cancelado ? styles.rvPayAmountCancelado : styles.rvPayAmount}>{fmtBRL(p.valor)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </>
-          )}
-          <div style={{height:8}}/>
+            )}
+
+          </div>
         </div>
 
         {/* ── Footer actions ── */}
@@ -3152,17 +3207,33 @@ export default function BookingCalendar() {
     const mes = viewDate.getMonth() + 1;
     const ano = viewDate.getFullYear();
 
+    // The 31-day window almost always spans into the next month, so fetch both
+    const nextMonthDate = new Date(ano, mes, 1);
+    const nextMes = nextMonthDate.getMonth() + 1;
+    const nextAno = nextMonthDate.getFullYear();
+
+    const mergeFlat = (a, b) => {
+      const seen = new Set(a.map((r) => r.id));
+      return [...a, ...b.filter((r) => !seen.has(r.id))];
+    };
+
     // Main calendar: default statuses (HOSPEDADO, ATIVO, FINALIZADO)
     setLoading(true);
-    reservaApi.listarPorMesAno({ mes, ano })
-      .then((data) => setReservas(flattenReservas(data)))
+    Promise.all([
+      reservaApi.listarPorMesAno({ mes, ano }),
+      reservaApi.listarPorMesAno({ mes: nextMes, ano: nextAno }),
+    ])
+      .then(([curr, next]) => setReservas(mergeFlat(flattenReservas(curr), flattenReservas(next))))
       .catch(() => {})
       .finally(() => setLoading(false));
 
     // Orcamentos + Solicitações: single call, split in frontend
-    reservaApi.listarPorMesAno({ mes, ano, status: ['ORCAMENTO', 'SOLICITADA'] })
-      .then((data) => {
-        const all = flattenReservas(data);
+    Promise.all([
+      reservaApi.listarPorMesAno({ mes, ano, status: ['ORCAMENTO', 'SOLICITADA'] }),
+      reservaApi.listarPorMesAno({ mes: nextMes, ano: nextAno, status: ['ORCAMENTO', 'SOLICITADA'] }),
+    ])
+      .then(([curr, next]) => {
+        const all = mergeFlat(flattenReservas(curr), flattenReservas(next));
         setOrcamentos(all.filter((r) => r.status === 'orcamento'));
         setSolicitacoes(all.filter((r) => r.status === 'solicitada'));
       })
