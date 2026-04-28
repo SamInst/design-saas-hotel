@@ -96,7 +96,9 @@
 
 /* ── Search dropdown ───────────────────────────────────────────────────────── */
 .searchDropdown {
-  position: absolute; top: calc(100% + 4px); left: 0; right: 0; min-width: 400px;
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  min-width: min(400px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(0,0,0,0.14); z-index: 100; max-height: 300px; overflow-y: auto;
 }
@@ -856,6 +858,9 @@
   font-size: 12px; font-weight: 500; color: var(--text-2);
   cursor: pointer; user-select: none; flex-shrink: 0; white-space: nowrap;
 }
+@media (max-width: 600px) {
+  .empresaModeToggle { flex-basis: 100%; justify-content: flex-start; }
+}
 .empresaModeToggle input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--violet); cursor: pointer; }
 .empresaModeToggle:hover { color: var(--violet); }
 
@@ -1295,6 +1300,9 @@
   font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
 }
 .floatDivider { height: 1px; background: var(--border); margin: 2px 0; }
+.floatToggleMobile { display: none; }
+.floatSecondary { display: contents; }
+.floatSecondaryOpen { display: contents; }
 .statusDot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
 }
@@ -1462,11 +1470,11 @@
   min-height: 0;
 }
 .rvLeft {
-  width: 260px;
+  width: clamp(200px, 36vw, 260px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 14px 16px 20px;
+  padding: clamp(12px, 2vw, 16px) clamp(10px, 1.5vw, 14px) clamp(12px, 2vw, 16px) clamp(14px, 2.5vw, 20px);
   border-right: 1px solid var(--border);
   min-height: 100%;
   box-sizing: border-box;
@@ -1782,13 +1790,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 0;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.1s;
 }
 .rvPayList .rvPayItem:last-child { border-bottom: none; }
-.rvPayItem:hover { background: var(--surface-2); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
+.rvPayItem:hover { background: var(--surface-2); border-radius: 6px; }
 .rvPayItemCancelado { opacity: 0.45; }
 .rvPayInfo { flex: 1; min-width: 0; }
 .rvPayDesc { font-size: 12px; font-weight: 700; color: var(--text); }
@@ -1804,6 +1812,7 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
+  margin-top: 12px;
   margin-bottom: 12px;
 }
 .rvObsLabel {
@@ -1896,3 +1905,126 @@
 .rvBtnDanger:hover:not(:disabled) { background: rgba(239,68,68,0.18); }
 :root[data-theme="dark"] .rvBtnDanger { color: #f87171; }
 .rvBtnSm { padding: 8px 10px; font-size: 12px; }
+
+/* ── Calendar header + float panel mobile ────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Stack title block and tools into separate rows */
+  .tableHeader {
+    padding: 12px;
+    gap: 8px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* Nav row + search stack vertically, each full width */
+  .tableTools {
+    width: 100%;
+    gap: 6px;
+  }
+  .navGroup   { flex-shrink: 0; }
+  .monthLabel { min-width: 100px; font-size: 12px; padding: 6px 8px; }
+  .todayBtn   { flex-shrink: 0; }
+  .searchWrap {
+    min-width: unset;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  /* Search dropdown bounded to viewport */
+  .searchDropdown { min-width: unset; max-width: 100%; }
+
+  /* Float panel: show toggle, hide secondary until expanded */
+  .floatPanel        { right: 12px; bottom: 14px; padding: 6px; min-width: 148px; gap: 2px; }
+  .floatToggleMobile { display: flex; }
+  .floatSecondary    { display: none; }
+  .floatSecondaryOpen{ display: contents; }
+  .floatFilterDrop   { right: 0; bottom: calc(100% + 8px); left: auto; }
+}
+
+/* ── CreateModal mobile responsive ──────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Step 2: single-column layout for dates + rooms */
+  .step2Grid { grid-template-columns: 1fr; gap: 10px; }
+
+  /* Prevent any formStack child from overflowing horizontally */
+  .formStack { overflow-x: hidden; max-width: 100%; }
+
+  /* Periodo tabs fill width */
+  .periodoTabs { width: 100%; }
+  .periodoTab  { flex: 1; text-align: center; }
+
+  /* Room buttons grid wraps tightly */
+  .roomBtnRow { gap: 4px; }
+  .roomBtn    { min-width: 40px; padding: 4px 5px; font-size: 11px; }
+
+  /* Summary bar wraps cleanly */
+  .summaryBar { font-size: 11px; padding: 6px 10px; }
+
+  /* Step 3 */
+  .step3Root  { padding: 10px 12px 14px; }
+}
+
+/* ── ReservaModal mobile responsive ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Stack columns vertically */
+  .rvTwoCol { flex-direction: column; }
+
+  .rvLeft {
+    width: 100%;
+    min-height: unset;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+  .rvLeftFull { border-bottom: none; }
+
+  .rvRight {
+    padding: 14px 16px 16px;
+    overflow-y: unset;
+  }
+
+  /* Header */
+  .rvHeader { padding: 12px 46px 12px 14px; }
+  .rvHeaderTitle { font-size: 14px; }
+  .rvRoomCard { min-width: 44px; width: 44px; height: 44px; }
+  .rvRoomCardNum { font-size: 17px; }
+
+  /* Dates row — shrink text to fit */
+  .rvDateValue { font-size: 13px; }
+  .rvDateTime  { font-size: 10px; }
+  .rvNightsNum { font-size: 16px; }
+
+  /* Footer buttons wrap */
+  .rvFooter { flex-wrap: wrap; padding: 10px 12px; gap: 6px; }
+  .rvBtn { flex: 1; min-width: 72px; font-size: 12px; padding: 7px 10px; }
+}
+
+/* ── Status filter modal search ──────────────────────────────────────────── */
+.statusFilterSearch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.statusFilterSearchIcon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-2);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.statusFilterSearchInput {
+  width: 100%;
+  padding: 6px 8px 6px 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.statusFilterSearchInput:focus { border-color: var(--violet); }

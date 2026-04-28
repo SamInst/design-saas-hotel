@@ -449,8 +449,6 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const [editCalcLoading, setEditCalcLoading] = useState(false);
   const [origCalc,        setOrigCalc]        = useState(null);
   const [origCalcLoading, setOrigCalcLoading] = useState(false);
-  const [viewCalc,        setViewCalc]        = useState(null);
-  const [viewCalcLoading, setViewCalcLoading] = useState(false);
 
   // Fetch original price once when editing starts
   useEffect(() => {
@@ -493,27 +491,6 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
       .finally(() => { if (!cancelled) setEditCalcLoading(false); });
     return () => { cancelled = true; };
   }, [editing, editQuarto[0], editCheckin, editCheckout]);
-
-  // Calculate price on mount (view mode only)
-  useEffect(() => {
-    if (reserva.status === 'orcamento') return;
-    if (reserva.status === 'cancelado') return;
-    let cancelled = false;
-    setViewCalcLoading(true);
-    const datas_nascimento = (reserva.hospedes ?? [])
-      .map((p) => p.dataNascimento)
-      .filter(Boolean)
-      .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn);
-    reservaApi.calcularPreco([{
-      fk_quarto:    parseInt(reserva.quarto),
-      data_entrada: toBrDate(reserva.dataInicio),
-      data_saida:   toBrDate(reserva.dataFim),
-      datas_nascimento,
-    }]).then((res) => { if (!cancelled) setViewCalc(Array.isArray(res) ? res[0] : res); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setViewCalcLoading(false); });
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line
 
   // ── Edit save (quarto/datas) ───────────────────────────────────────────────
   const [editSaving,    setEditSaving]    = useState(false);
@@ -844,7 +821,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
         footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>Remover</Button></div>}
       ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?</p></Modal>
 
-      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} canAplicarDesconto={false} valorTotal={viewCalc?.valor_total ?? reserva.valorTotal} valorPago={totalPago} />
+      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
 
       <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title="Cancelar Pagamento"
         footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>Confirmar</Button></div>}
@@ -902,7 +879,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const roomDesc = roomDescMap[reserva.quarto] || roomDescMap[String(reserva.quarto)] || '';
   const catNome = cat?.nome || reserva.categoria || '';
   const roomDisplay = [roomDesc || `Ap. ${fmtRoom(reserva.quarto)}`, catNome].filter(Boolean).join(' · ');
-  const displayTotal = viewCalc?.valor_total ?? reserva.valorTotal;
+  const displayTotal = reserva.valorTotal;
   const displayPendente = Math.max(0, displayTotal - totalPago);
   const checkinTime = reserva.chegadaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
   const checkoutTime = reserva.saidaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
@@ -969,14 +946,6 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 </div>
               )}
 
-              {/* Observação */}
-              {reserva.observacao && (
-                <div className={styles.rvObsBox}>
-                  <div className={styles.rvObsLabel}>Observação</div>
-                  <div className={styles.rvObsText}>{reserva.observacao}</div>
-                </div>
-              )}
-
               {/* Cancel reason */}
               {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
                 <div className={styles.rvCancelBlock}>
@@ -1030,6 +999,14 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 }
                 return renderGuestTable(pessoas);
               })()}
+
+              {/* Observação */}
+              {reserva.observacao && (
+                <div className={styles.rvObsBox}>
+                  <div className={styles.rvObsLabel}>Observação</div>
+                  <div className={styles.rvObsText}>{reserva.observacao}</div>
+                </div>
+              )}
             </div>
 
             {/* ── Right column: period + financial summary + payments ── */}
@@ -1065,9 +1042,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                   <div className={styles.rvFinRow}>
                     <div className={styles.rvFinItem}>
                       <span className={styles.rvFinLabel}>Valor Total</span>
-                      <span className={styles.rvFinValue}>
-                        {viewCalcLoading ? <Loader2 size={11} className={styles.spin} /> : fmtBRL(displayTotal)}
-                      </span>
+                      <span className={styles.rvFinValue}>{fmtBRL(displayTotal)}</span>
                     </div>
                     <div className={styles.rvFinItem}>
                       <span className={styles.rvFinLabel}>Total Pago</span>
@@ -1076,7 +1051,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     <div className={styles.rvFinItem}>
                       <span className={styles.rvFinLabel}>Pendente</span>
                       <span className={[styles.rvFinValue, displayPendente > 0 ? styles.rvFinPending : styles.rvFinPaid].join(' ')}>
-                        {viewCalcLoading ? <Loader2 size={11} className={styles.spin} /> : fmtBRL(displayPendente)}
+                        {fmtBRL(displayPendente)}
                       </span>
                     </div>
                   </div>
@@ -1249,7 +1224,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
         isSubmitting={false}
         titularNome={reserva.titularNome}
         canAplicarDesconto={false}
-        valorTotal={viewCalc?.valor_total ?? reserva.valorTotal}
+        valorTotal={reserva.valorTotal}
         valorPago={totalPago}
       />
 
@@ -1491,10 +1466,12 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
   const [page,    setPage]    = useState(1);
   const [list,    setList]    = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search,  setSearch]  = useState('');
 
+  const API_STATUS = { confirmada: 'ATIVO', hospedado: 'HOSPEDADO', finalizado: 'FINALIZADO', cancelado: 'CANCELADO', orcamento: 'ORCAMENTO', solicitada: 'SOLICITADA' };
   useEffect(() => {
     setLoading(true);
-    reservaApi.listarPorMesAno({ status: [status.toUpperCase()] })
+    reservaApi.listarPorMesAno({ status: [API_STATUS[status] ?? status.toUpperCase()] })
       .then((data) => {
         const groups = Array.isArray(data) ? data : [];
         const seen = new Set();
@@ -1510,39 +1487,66 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
       .finally(() => setLoading(false));
   }, [status]);
 
-  const total = list.length;
+  const norm     = normalizeStr(search.trim());
+  const filtered = norm.length >= 1
+    ? list.filter((r) =>
+        normalizeStr(r.titularNome).includes(norm) ||
+        (r.empresaNome && normalizeStr(r.empresaNome).includes(norm)) ||
+        (r.pessoasOrcamento ?? []).some((p) => normalizeStr(p.nome).includes(norm))
+      )
+    : list;
+
+  const total = filtered.length;
   const pages = Math.max(1, Math.ceil(total / STATUS_PAGE_SIZE));
-  const slice = list.slice((page - 1) * STATUS_PAGE_SIZE, page * STATUS_PAGE_SIZE);
+  const safePage = Math.min(page, pages);
+  const slice = filtered.slice((safePage - 1) * STATUS_PAGE_SIZE, safePage * STATUS_PAGE_SIZE);
+
+  const handleSearch = (v) => { setSearch(v); setPage(1); };
 
   return (
     <Modal open onClose={onClose} size="md"
+      bodyStyle={{ flexShrink: 0, flexGrow: 0, flexBasis: 'clamp(200px, 48vh, 360px)' }}
       title={<><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
       footer={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? 'carregando...' : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
           {!loading && pages > 1 && (
             <div style={{ display: 'flex', gap: 4 }}>
-              <button className={styles.pageBtn} disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
+              <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
               {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <button key={p} className={[styles.pageBtn, p === page ? styles.pageBtnActive : ''].join(' ')} onClick={() => setPage(p)}>{p}</button>
+                <button key={p} className={[styles.pageBtn, p === safePage ? styles.pageBtnActive : ''].join(' ')} onClick={() => setPage(p)}>{p}</button>
               ))}
-              <button className={styles.pageBtn} disabled={page === pages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={13} /></button>
+              <button className={styles.pageBtn} disabled={safePage === pages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={13} /></button>
             </div>
           )}
         </div>
       }
     >
+      {/* Search field */}
+      <div className={styles.statusFilterSearch}>
+        <Search size={13} className={styles.statusFilterSearchIcon} />
+        <input
+          className={styles.statusFilterSearchInput}
+          placeholder="Buscar por nome..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+        />
+        {search && (
+          <button className={styles.clearSearch} onClick={() => handleSearch('')}><X size={12} /></button>
+        )}
+      </div>
+
       {loading ? (
         <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Buscando reservas...</div>
       ) : total === 0 ? (
-        <div className={styles.emptyState}>Nenhuma reserva com status "{label}".</div>
+        <div className={styles.emptyState}>{search ? `Nenhum resultado para "${search}".` : `Nenhuma reserva com status "${label}".`}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {slice.map((r) => {
             const dias     = diffDays(r.dataInicio, r.dataFim);
             const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
             return (
-              <div key={r.id} className={styles.searchDropItem} onClick={() => onSelectReserva(r)}>
+              <div key={r.id} className={styles.searchDropItem} onClick={() => { onSelectReserva(r); onClose(); }}>
                 <div className={[styles.searchDropRoomCircle, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
                 <div className={styles.searchDropInfo}>
                   <div className={styles.searchDropName}>{r.titularNome}</div>
@@ -1857,11 +1861,13 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
     const spaceBelow = window.innerHeight - rect.bottom;
     const dropH = Math.min(280, 400);
     const openAbove = spaceBelow < dropH && rect.top > dropH;
+    const w    = Math.min(rect.width, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8));
     setDropStyle({
       position: 'fixed',
       zIndex: 9999,
-      width: rect.width,
-      left: rect.left,
+      width: w,
+      left,
       top: openAbove ? rect.top - dropH - 4 : rect.bottom + 4,
       maxHeight: openAbove ? rect.top - 8 : spaceBelow - 8,
     });
@@ -2267,8 +2273,8 @@ function RoomHospedesPicker({ value = [], onChange }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <div ref={wrapRef} className={styles.hospSearchWrap} style={{ flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div ref={wrapRef} className={styles.hospSearchWrap} style={{ flex: 1, minWidth: 0 }}>
           {searching
             ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
             : <Search size={13} className={styles.hospSearchIcon} />}
@@ -3306,6 +3312,7 @@ export default function BookingCalendar() {
   const [showStatusFilter,   setShowStatusFilter]   = useState(false);
   const [statusModalFilter,  setStatusModalFilter]  = useState(null); // { key, label }
   const statusFilterRef = useRef(null);
+  const [floatExpanded,      setFloatExpanded]      = useState(false);
 
   useEffect(() => {
     const h = (e) => { if (statusFilterRef.current && !statusFilterRef.current.contains(e.target)) setShowStatusFilter(false); };
@@ -3317,7 +3324,11 @@ export default function BookingCalendar() {
   const filteredReservas = allReservas;
 
   const searchResults = searchNorm.length >= 2
-    ? reservas.filter((r) => normalizeStr(r.titularNome).includes(searchNorm) || (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm))).slice(0, 8)
+    ? allReservas.filter((r) =>
+        normalizeStr(r.titularNome).includes(searchNorm) ||
+        (r.empresaNome && normalizeStr(r.empresaNome).includes(searchNorm)) ||
+        (r.pessoasOrcamento ?? []).some((p) => normalizeStr(p.nome).includes(searchNorm))
+      ).slice(0, 8)
     : [];
 
   // Remote results grouped by month for the dropdown separator
@@ -3847,45 +3858,57 @@ export default function BookingCalendar() {
           <span>Nova Reserva</span>
         </button>
 
-        <div className={styles.floatDivider} />
+        {/* Mobile-only toggle */}
+        <button
+          className={[styles.floatBtn, styles.floatToggleMobile, floatExpanded ? styles.floatBtnActive : ''].join(' ')}
+          onClick={() => setFloatExpanded((v) => !v)}
+        >
+          {floatExpanded ? <X size={14} /> : <SlidersHorizontal size={14} />}
+          <span>{floatExpanded ? 'Fechar' : 'Mais opções'}</span>
+        </button>
 
-        <div className={styles.floatBtnWrap} ref={statusFilterRef}>
-          <button
-            className={[styles.floatBtn, showStatusFilter ? styles.floatBtnActive : ''].join(' ')}
-            onClick={() => setShowStatusFilter((v) => !v)}
-          >
-            <SlidersHorizontal size={15} />
-            <span>Filtrar Status</span>
-          </button>
-          {showStatusFilter && (
-            <div className={styles.floatFilterDrop}>
-              {STATUS_FILTER_OPTIONS.map(([key, label]) => (
-                <button key={key} className={styles.floatFilterRow}
-                  onClick={() => { setStatusModalFilter({ key, label }); setShowStatusFilter(false); }}>
-                  <span className={[styles.statusDot, styles[`status_${key}`]].join(' ')} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Secondary buttons — always visible on desktop, toggled on mobile */}
+        <div className={[styles.floatSecondary, floatExpanded ? styles.floatSecondaryOpen : ''].join(' ')}>
+          <div className={styles.floatDivider} />
 
-        <div className={styles.floatDivider} />
+          <div className={styles.floatBtnWrap} ref={statusFilterRef}>
+            <button
+              className={[styles.floatBtn, showStatusFilter ? styles.floatBtnActive : ''].join(' ')}
+              onClick={() => setShowStatusFilter((v) => !v)}
+            >
+              <SlidersHorizontal size={15} />
+              <span>Filtrar Status</span>
+            </button>
+            {showStatusFilter && (
+              <div className={styles.floatFilterDrop}>
+                {STATUS_FILTER_OPTIONS.map(([key, label]) => (
+                  <button key={key} className={styles.floatFilterRow}
+                    onClick={() => { setStatusModalFilter({ key, label }); setShowStatusFilter(false); }}>
+                    <span className={[styles.statusDot, styles[`status_${key}`]].join(' ')} />
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className={styles.floatBtnWrap}>
-          <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>
-            <FileText size={15} />
-            <span>Orçamentos</span>
-            {orcamentosCount > 0 && <span className={styles.floatBadge}>{orcamentosCount}</span>}
-          </button>
-        </div>
+          <div className={styles.floatDivider} />
 
-        <div className={styles.floatBtnWrap}>
-          <button className={styles.floatBtn} onClick={() => setShowSolicitacoes(true)}>
-            <Bell size={15} />
-            <span>Solicitações</span>
-            {solicitadasCount > 0 && <span className={styles.floatBadge}>{solicitadasCount}</span>}
-          </button>
+          <div className={styles.floatBtnWrap}>
+            <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>
+              <FileText size={15} />
+              <span>Orçamentos</span>
+              {orcamentosCount > 0 && <span className={styles.floatBadge}>{orcamentosCount}</span>}
+            </button>
+          </div>
+
+          <div className={styles.floatBtnWrap}>
+            <button className={styles.floatBtn} onClick={() => setShowSolicitacoes(true)}>
+              <Bell size={15} />
+              <span>Solicitações</span>
+              {solicitadasCount > 0 && <span className={styles.floatBadge}>{solicitadasCount}</span>}
+            </button>
+          </div>
         </div>
       </div>}
     </div>

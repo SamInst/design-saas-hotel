@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
+  padding: clamp(6px, 2vw, 16px);
   z-index: 50;
   animation: backdropIn 0.18s ease-out;
 }
@@ -19,7 +19,7 @@
 
 .modal {
   width: 100%;
-  max-height: 90vh;
+  max-height: min(90vh, 96svh);
   overflow: hidden;
 
   background: var(--surface);
@@ -40,10 +40,10 @@
 }
 
 /* sizes */
-.sm { max-width: 420px; }
-.md { max-width: 520px; }
-.lg { max-width: 720px; }
-.xl { max-width: 1080px; }
+.sm { max-width: min(420px, 96vw); }
+.md { max-width: min(520px, 96vw); }
+.lg { max-width: min(720px, 96vw); }
+.xl { max-width: min(1080px, 96vw); }
 
 .header {
   display: flex;
