@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Building2, Plus, Search, BedDouble, BedSingle, Layers, Waves,
   Clock, User, CreditCard, ChevronDown, Wrench, Sparkles,
   CheckCircle, XCircle, DollarSign, Calendar, Square, Loader2,
   AlertTriangle, ShoppingCart, Package, Trash2, Phone, Mail,
   RefreshCw, ArrowLeftRight, Minus, RotateCcw, Users, X,
-  Percent, Tag,
+  Percent, Tag, ChevronRight, Check,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -20,6 +21,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO, OVERVIEW_ROOMS_CATS,
 } from './overviewMocks';
+import { cadastroApi } from '../../services/api';
 import styles from './OverviewManagement.module.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -113,6 +115,177 @@ const blankNduForm = () => ({ horaEntrada: nowTime(), hospedes: [], hospedeSearc
 const blankPagForm = () => ({ descricao: '', formaPagamento: 'PIX', valor: '' });
 const blankSvcForm = () => ({ responsavel: '', descricao: '', previsaoFim: '', dataHoraInicio: '', dataHoraFim: '' });
 
+// ── NhHospedesPicker ─────────────────────────────────────────────────────────
+const fmtCpf = (v) => v ? v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '';
+
+function NhHospedesPicker({ value = [], onChange }) {
+  const [search,    setSearch]    = useState('');
+  const [results,   setResults]   = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [dropStyle, setDropStyle] = useState({});
+  const [pending,   setPending]   = useState(null);
+  const inputRef = useRef(null);
+  const wrapRef  = useRef(null);
+
+  useEffect(() => {
+    if (search.trim().length < 2) { setResults([]); setPending(null); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 8 });
+        const list = Array.isArray(res) ? res : (res.content ?? []);
+        setResults(list.map((p) => ({
+          id: p.id,
+          nome: p.nome,
+          cpf: p.cpf ?? '',
+          bloqueado: p.status === 'BLOQUEADO',
+          acompanhantes: (p.acompanhantes ?? []).map((a) => ({
+            id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+            bloqueado: a.status === 'BLOQUEADO',
+          })),
+        })));
+      } catch { setResults([]); }
+      finally  { setSearching(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const calcPos = () => {
+    const el = wrapRef.current ?? inputRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const spaceAbove = rect.top - 8;
+    setDropStyle({ position: 'fixed', zIndex: 99999, left: rect.left, bottom: window.innerHeight - rect.top + 4, width: rect.width, maxHeight: Math.min(260, spaceAbove) });
+  };
+
+  useEffect(() => { if (results.length) calcPos(); }, [results]);
+
+  const addMany = (list) => {
+    const existing = new Set(value.map((x) => x.id));
+    const toAdd = list.filter((h) => !existing.has(h.id));
+    if (toAdd.length) onChange([...value, ...toAdd]);
+  };
+
+  const handleClick = (h) => {
+    if (h.bloqueado) return;
+    if (h.acompanhantes?.length > 0) {
+      setPending({ titular: h, selected: new Set() });
+      calcPos();
+    } else {
+      addMany([h]);
+      setSearch(''); setResults([]);
+    }
+  };
+
+  const toggleComp = (id) => setPending((prev) => {
+    const next = new Set(prev.selected);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return { ...prev, selected: next };
+  });
+
+  const confirmAdd = () => {
+    addMany([pending.titular, ...pending.titular.acompanhantes.filter((a) => !a.bloqueado && pending.selected.has(a.id))]);
+    setPending(null); setSearch(''); setResults([]);
+  };
+
+  const rem = (id) => onChange(value.filter((x) => x.id !== id));
+
+  const showDrop = pending !== null || results.length > 0;
+  const dropdown = showDrop && createPortal(
+    <div className={styles.nhPickerDrop} style={dropStyle}>
+      {pending ? (
+        <>
+          <div className={styles.nhPickerBack}>
+            <button className={styles.nhPickerBackBtn} onClick={() => setPending(null)}><ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} /> Voltar</button>
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            <div className={styles.nhPickerRow}>
+              <div className={[styles.nhPickerCheck, styles.nhPickerChecked].join(' ')}><Check size={11} /></div>
+              <div className={styles.nhPickerInfo}>
+                <span className={styles.nhPickerName}>{pending.titular.nome}</span>
+                {pending.titular.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(pending.titular.cpf)}</span>}
+              </div>
+              <span className={styles.titularTag}>Titular</span>
+            </div>
+            {pending.titular.acompanhantes.map((a) => (
+              <div key={a.id} className={[styles.nhPickerRow, a.bloqueado ? styles.nhPickerBlocked : styles.nhPickerRowClick].join(' ')}
+                onClick={() => !a.bloqueado && toggleComp(a.id)}>
+                <div className={[styles.nhPickerCheck, pending.selected.has(a.id) ? styles.nhPickerChecked : ''].join(' ')}>
+                  {pending.selected.has(a.id) && <Check size={11} />}
+                </div>
+                <div className={styles.nhPickerInfo}>
+                  <span className={styles.nhPickerName}>{a.nome}</span>
+                  {a.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(a.cpf)}</span>}
+                </div>
+                {a.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+              </div>
+            ))}
+          </div>
+          <div className={styles.nhPickerActions}>
+            <button className={styles.nhPickerBtnSec} onClick={() => { addMany([pending.titular]); setPending(null); setSearch(''); setResults([]); }}>Só o titular</button>
+            <button className={styles.nhPickerBtnPrim} onClick={confirmAdd}>Adicionar →</button>
+          </div>
+        </>
+      ) : (
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {results.map((h) => (
+            <div key={h.id} className={[styles.nhPickerResult, h.bloqueado ? styles.nhPickerBlocked : ''].join(' ')} onClick={() => handleClick(h)}>
+              <div className={styles.nhPickerInfo}>
+                <span className={styles.nhPickerName}>{h.nome}</span>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {h.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(h.cpf)}</span>}
+                  {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.nhPickerAcompChip}>{h.acompanhantes.length} acomp.</span>}
+                  {h.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+                </div>
+              </div>
+              <ChevronRight size={13} className={styles.nhPickerArrow} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div ref={wrapRef} className={styles.nhPickerWrap}>
+        {searching
+          ? <Loader2 size={13} className={[styles.nhPickerIcon, styles.spin].join(' ')} />
+          : <Search size={13} className={styles.nhPickerIcon} />}
+        <div className={styles.nhPickerInner}>
+          {value.map((h) => (
+            <div key={h.id} className={styles.nhPickerChip}>
+              <span>{h.nome}</span>
+              <button type="button" className={styles.nhPickerChipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
+            </div>
+          ))}
+          <input ref={inputRef} className={styles.nhPickerInput} value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
+        </div>
+      </div>
+      {dropdown}
+      {value.length > 0 && (
+        <div className={styles.nhPickerList}>
+          {value.map((h, i) => (
+            <div key={h.id} className={styles.nhPickerListItem}>
+              <div className={styles.nhPickerListLeft}>
+                <User size={14} className={i === 0 ? styles.listItemIconGreen : styles.listItemIcon} />
+                <div>
+                  <div className={styles.listItemName}>{h.nome}{i === 0 && <span className={styles.titularTag}>Titular</span>}</div>
+                  {h.cpf && <div className={styles.listItemSub}>{fmtCpf(h.cpf)}</div>}
+                </div>
+              </div>
+              <button className={styles.removeBtn} onClick={() => rem(h.id)}><Trash2 size={13} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function OverviewManagement() {
   const [quartos, setQuartos]           = useState([]);
@@ -156,7 +329,6 @@ export default function OverviewManagement() {
 
   // Nova Hospedagem (full 5-section pernoite create modal)
   const [nhHospedes, setNhHospedes]         = useState([]);
-  const [nhHospedeSearch, setNhHospedeSearch] = useState('');
   const [nhCheckinDate, setNhCheckinDate]   = useState(null);
   const [nhCheckinHora, setNhCheckinHora]   = useState('14:00');
   const [nhCheckoutDate, setNhCheckoutDate] = useState(null);
@@ -235,6 +407,9 @@ export default function OverviewManagement() {
   // Confirm (finalizar / cancelar)
   const [confirmModal, setConfirmModal] = useState(null); // { action: 'finalizar'|'cancelar' }
 
+  // Ações dropdown (pernoite footer)
+  const [ovAcoesOpen, setOvAcoesOpen] = useState(false);
+
   // Saving
   const [saving, setSaving] = useState(false);
 
@@ -275,12 +450,6 @@ export default function OverviewManagement() {
   const nhTotalHosp  = nhPrecoDiaria * nhTotalDias;
   const nhTotalPago  = nhPagamentos.reduce((s, p) => s + p.valor, 0);
   const nhPendente   = Math.max(0, nhTotalHosp - nhTotalPago);
-
-  const nhPersonResults = useMemo(() => {
-    const selectedIds = new Set(nhHospedes.map((h) => h.id));
-    const term = nhHospedeSearch.toLowerCase();
-    return HOSPEDES_CADASTRADOS.filter((h) => !selectedIds.has(h.id) && (!term || h.nome.toLowerCase().includes(term) || h.cpf.includes(term)));
-  }, [nhHospedes, nhHospedeSearch]);
 
   // ── Detail add consumo computed ───────────────────────────────────────────────
   const detailConsumoCatSel  = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(detailConsumoCat));
@@ -412,7 +581,7 @@ export default function OverviewManagement() {
     setSelectedRoom(room);
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
-    setDiariaTab('detalhes');
+    setDiariaTab('hospedes');
   };
 
   const closeDetail = () => setSelectedRoom(null);
@@ -421,7 +590,7 @@ export default function OverviewManagement() {
     setNovoRoom(room);
     if (tipo === 'pernoite') {
       // Full Nova Hospedagem modal
-      setNhHospedes([]); setNhHospedeSearch('');
+      setNhHospedes([]);
       setNhCheckinDate(new Date()); setNhCheckinHora('14:00');
       setNhCheckoutDate(null); setNhCheckoutHora('12:00');
       setNhPagamentos([]); setNhPagDesc(''); setNhPagForma('PIX'); setNhPagValor('');
@@ -1100,91 +1269,199 @@ export default function OverviewManagement() {
       const diarias = sv.diarias || [];
       const curDiaria = diarias[detailDiariaIdx];
       const progressPercent = sv.valorTotal > 0 ? Math.min(100, (sv.totalPago / sv.valorTotal) * 100) : 0;
+      const allPagamentos = diarias.flatMap((d) => d.pagamentos || []);
       return (
         <>
-          <div className={styles.detailTabs}>
-            {[['dados', 'Dados do Pernoite'], ['diarias', 'Diárias']].map(([t, label]) => (
-              <button key={t} className={[styles.detailTab, detailTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDetailTab(t)}>
+          {/* ── Custom header ── */}
+          <div className={styles.ovHeader}>
+            <div className={styles.ovRoomBadge}>{s.numero}</div>
+            <div className={styles.ovHeaderContent}>
+              <div className={styles.ovHeaderTopRow}>
+                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_${sk}`]].join(' ')}>{s.status}</span>
+              </div>
+              <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
+              <div className={styles.ovHeaderSub}>
+                {s.categoria} · {s.tipoOcupacao}{sv.periodo ? ` · ${sv.periodo}` : ''} · Pernoite
+              </div>
+            </div>
+            <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
+          </div>
+
+          {/* ── Tabs ── */}
+          <div className={styles.ovTabs}>
+            {[
+              ['dados', 'Dados do Pernoite'],
+              ['diarias', 'Diárias'],
+              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
+            ].map(([t, label]) => (
+              <button key={t} className={[styles.ovTab, detailTab === t ? styles.ovTabActive : ''].join(' ')} onClick={() => setDetailTab(t)}>
                 {label}
               </button>
             ))}
           </div>
 
-          <div className={styles.detailTabBody}>
+          {/* ── Scrollable body ── */}
+          <div className={styles.ovBody}>
             {detailTab === 'dados' && (
-              <div className={[styles.tabContent, styles.tabBody].join(' ')}>
-                <div className={styles.dataGrid2}>
-                  <div className={styles.infoBox}>
-                    <div className={styles.infoBoxHeader}>
-                      <Calendar size={14} className={styles.infoBoxIcon} />
-                      <span className={styles.infoBoxLabel}>Período</span>
+              <div className={styles.ovTwoCol}>
+
+                {/* ── Left: guests ── */}
+                <div className={styles.ovLeft}>
+                  {curDiaria && (curDiaria.hospedes || []).length > 0 ? (() => {
+                    const hospedes = curDiaria.hospedes || [];
+                    const titular  = hospedes[0];
+                    const acomps   = hospedes.slice(1);
+                    const initials = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                    const renderRow = (h) => (
+                      <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                        <div className={styles.ovGuestAvatar}>{initials(h.nome)}</div>
+                        <div className={styles.ovGuestInfo}>
+                          <div className={styles.ovGuestName}>{h.nome}</div>
+                          {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                          {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <div className={styles.ovGuestTable}>
+                        <div className={styles.ovGuestSectionHeader}>Titular</div>
+                        {renderRow(titular)}
+                        {acomps.length > 0 && (
+                          <>
+                            <div className={styles.ovGuestSectionHeader}>Acompanhantes</div>
+                            {acomps.map(renderRow)}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede na diária atual.</div>
+                  )}
+                </div>
+
+                {/* ── Right: dates + financial + actions ── */}
+                <div className={styles.ovRight}>
+                  {/* Dates row */}
+                  <div className={styles.ovDatesRow}>
+                    <div className={styles.ovDateCell}>
+                      <div className={styles.ovDateLabel}>Check-in</div>
+                      <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
+                      <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
                     </div>
-                    <p className={styles.infoBoxValue}>{sv.periodo}</p>
-                    <p className={styles.infoBoxSub}>{sv.totalDiarias} diária{sv.totalDiarias !== 1 ? 's' : ''}</p>
+                    <div className={styles.ovDateArrow}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </div>
+                    <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                      <div className={styles.ovDateLabel}>Check-out</div>
+                      <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
+                      <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
+                    </div>
+                    <div className={styles.ovNightsCell}>
+                      <div className={styles.ovNightsNum}>{sv.diariaAtual}/{sv.totalDiarias}</div>
+                      <div className={styles.ovNightsLabel}>Diárias</div>
+                    </div>
                   </div>
-                  <div className={styles.infoBox}>
-                    <div className={styles.infoBoxHeader}>
-                      <Clock size={14} className={styles.infoBoxIconGreen} />
-                      <span className={styles.infoBoxLabel}>Check-in / Check-out</span>
+
+                  {/* Financial card */}
+                  <div className={styles.ovFinCard}>
+                    <div className={styles.ovFinHeader}>
+                      <DollarSign size={13} className={styles.ovFinIcon} />
+                      <span className={styles.ovFinTitle}>Resumo Financeiro</span>
                     </div>
-                    <p className={styles.infoBoxValue}>Entrada: {sv.chegadaPrevista}</p>
-                    <p className={styles.infoBoxValue}>Saída: {sv.saidaPrevista}</p>
+                    <div className={styles.ovFinRow}>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Valor Total</span>
+                        <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Total Pago</span>
+                        <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Pendente</span>
+                        <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                          {fmtBRL(sv.pagamentoPendente)}
+                        </span>
+                      </div>
+                    </div>
+                    {sv.valorTotal > 0 && (
+                      <div className={styles.ovFinProgress}>
+                        <div className={styles.ovFinProgressMeta}>
+                          <span>Progresso de pagamento</span>
+                          <span>{progressPercent.toFixed(0)}%</span>
+                        </div>
+                        <div className={styles.ovFinBar}>
+                          <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {curDiaria?.valor != null && (
+                      <div className={styles.ovFinDiariaRow}>
+                        <span className={styles.ovFinLabel}>Valor da Diária</span>
+                        <span className={styles.ovFinDiariaVal}>{fmtBRL(curDiaria.valor)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className={styles.ovActionsRow}>
+                    <Button variant="secondary" size="sm" onClick={() => openService('limpeza', s)}>
+                      <Sparkles size={13} /> Limpeza
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => openService('manutencao', s)}>
+                      <Wrench size={13} /> Manutenção
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={openGerenciarDiarias}>
+                      <RefreshCw size={13} /> Ger. Diárias
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={openTrocarQuarto}>
+                      <ArrowLeftRight size={13} /> Trocar Quarto
+                    </Button>
+                    <Button variant="secondary" size="sm" onClick={() => {
+                      setDescontoScope('global'); setDescontoTipo('percentual');
+                      setDescontoValor(''); setDescontoDescricao('');
+                      setShowDescontoModal(true);
+                    }}>
+                      <Tag size={13} /> Desconto
+                    </Button>
                   </div>
                 </div>
-                <div className={styles.financialBox}>
-                  <div className={styles.infoBoxHeader}>
-                    <DollarSign size={14} className={styles.infoBoxIconAmber} />
-                    <span className={styles.infoBoxLabel}>Resumo Financeiro</span>
+
+              </div>
+            )}
+            {detailTab === 'pagamentos' && (
+              <div className={styles.ovBodyPad}>
+                <Button variant="primary" size="sm" onClick={() => openPayModal(async (pag) => {
+                  const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+                  setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                  notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                }, sv.titularNome)}>
+                  <Plus size={14} /> Adicionar Pagamento
+                </Button>
+                {allPagamentos.length === 0 ? (
+                  <div className={styles.emptyList}><CreditCard size={20} color="var(--text-2)" /><span>Nenhum pagamento registrado.</span></div>
+                ) : (
+                  <div className={styles.itemList}>
+                    {allPagamentos.map((p, i) => (
+                      <div key={p.id || i} className={styles.listItem}>
+                        <div className={styles.listItemLeft}>
+                          <CreditCard size={14} className={styles.listItemIconGreen} />
+                          <div>
+                            <div className={styles.listItemName}>{p.descricao}</div>
+                            <div className={styles.listItemSub}>{p.forma || p.formaPagamento} · {p.data}</div>
+                          </div>
+                        </div>
+                        <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <div className={styles.financialGrid}>
-                    <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>Valor Total</span>
-                      <span className={styles.financialValue}>{fmtBRL(sv.valorTotal)}</span>
-                    </div>
-                    <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>Total Pago</span>
-                      <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(sv.totalPago)}</span>
-                    </div>
-                    <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>Pendente</span>
-                      <span className={[styles.financialValue, sv.pagamentoPendente > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>{fmtBRL(sv.pagamentoPendente)}</span>
-                    </div>
-                  </div>
-                  <div className={styles.progressWrap}>
-                    <div className={styles.progressLabels}>
-                      <span>Progresso de pagamento</span>
-                      <span>{progressPercent.toFixed(0)}%</span>
-                    </div>
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: `${progressPercent}%` }} />
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.pernoiteActionsRow}>
-                  <Button variant="secondary" size="sm" onClick={() => openService('limpeza', s)}>
-                    <Sparkles size={13} /> Limpeza
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => openService('manutencao', s)}>
-                    <Wrench size={13} /> Manutenção
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={openGerenciarDiarias}>
-                    <RefreshCw size={13} /> Ger. Diárias
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={openTrocarQuarto}>
-                    <ArrowLeftRight size={13} /> Trocar Quarto
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => {
-                    setDescontoScope('global'); setDescontoTipo('percentual');
-                    setDescontoValor(''); setDescontoDescricao('');
-                    setShowDescontoModal(true);
-                  }}>
-                    <Tag size={13} /> Desconto
-                  </Button>
-                </div>
+                )}
               </div>
             )}
             {detailTab === 'diarias' && (
-              <div className={[styles.tabContent, styles.tabBody].join(' ')}>
+              <div className={[styles.ovBodyPad, styles.tabBody].join(' ')}>
                 {diarias.length === 0 ? (
                   <div className={styles.emptyList}><Calendar size={24} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
                 ) : (
@@ -1200,7 +1477,7 @@ export default function OverviewManagement() {
                           const isSel   = detailDiariaIdx === idx;
                           return (
                             <button key={idx} type="button"
-                              onClick={() => { setDetailDiariaIdx(idx); setDiariaTab('detalhes'); }}
+                              onClick={() => { setDetailDiariaIdx(idx); setDiariaTab('hospedes'); }}
                               className={[styles.diariaPill, isSel ? styles.diariaPillActive : '', !isSel && isAtual ? styles.diariaPillAtual : ''].join(' ')}
                             >
                               <span>Diária {d.num}{isAtual ? ' ●' : ''}</span>
@@ -1213,32 +1490,14 @@ export default function OverviewManagement() {
                       <>
                         <div className={styles.subTabs}>
                           {[
-                            ['detalhes', 'Detalhes'],
                             ['hospedes', `Hóspedes (${(curDiaria.hospedes || []).length})`],
                             ['consumos', `Consumo (${(curDiaria.consumos || []).length})`],
-                            ['pagamentos', `Pagamentos (${(curDiaria.pagamentos || []).length})`],
                           ].map(([t, label]) => (
                             <button key={t} type="button" className={[styles.subTab, diariaTab === t ? styles.subTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
                               {label}
                             </button>
                           ))}
                         </div>
-                        {diariaTab === 'detalhes' && (
-                          <div className={styles.subTabContent}>
-                            <div className={styles.diariaDetailsBox}>
-                              {[
-                                { label: 'Valor da Diária', value: fmtBRL(curDiaria.valor) },
-                                { label: 'Início',          value: curDiaria.dataInicio },
-                                { label: 'Fim',             value: curDiaria.dataFim },
-                              ].map(({ label, value }) => (
-                                <div key={label} className={styles.diariaDetailRow}>
-                                  <span className={styles.diariaDetailLabel}>{label}</span>
-                                  <span className={styles.diariaDetailValue}>{value}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                         {diariaTab === 'hospedes' && (
                           <div className={styles.subTabContent}>
                             <Button variant="primary" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
@@ -1303,41 +1562,24 @@ export default function OverviewManagement() {
                             )}
                           </div>
                         )}
-                        {diariaTab === 'pagamentos' && (
-                          <div className={styles.subTabContent}>
-                            <Button variant="primary" onClick={() => openPayModal(async (pag) => {
-                              const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
-                              setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                              notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
-                            }, s.servico?.titularNome)}>
-                              <Plus size={14} /> Adicionar Pagamento
-                            </Button>
-                            {(curDiaria.pagamentos || []).length === 0 ? (
-                              <div className={styles.emptyList}><CreditCard size={20} color="var(--text-2)" /><span>Nenhum pagamento nesta diária.</span></div>
-                            ) : (
-                              <div className={styles.itemList}>
-                                {(curDiaria.pagamentos || []).map((p, i) => (
-                                  <div key={p.id || i} className={styles.listItem}>
-                                    <div className={styles.listItemLeft}>
-                                      <CreditCard size={14} className={styles.listItemIconGreen} />
-                                      <div>
-                                        <div className={styles.listItemName}>{p.descricao}</div>
-                                        <div className={styles.listItemSub}>{p.forma || p.formaPagamento} • {p.data}</div>
-                                      </div>
-                                    </div>
-                                    <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </>
                     )}
                   </>
                 )}
               </div>
             )}
+          </div>
+
+          {/* ── Footer ── */}
+          <div className={styles.ovFooter}>
+            <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
+              <XCircle size={14} /> Cancelar
+            </Button>
+            <div style={{ flex: 1 }} />
+            <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
+              {saving && <Loader2 size={14} className={styles.spin} />}
+              <CheckCircle size={14} /> Finalizar
+            </Button>
           </div>
         </>
       );
@@ -1964,8 +2206,12 @@ export default function OverviewManagement() {
           open={!!selectedRoom}
           onClose={closeDetail}
           size="lg"
+          hideHeader={selectedRoom?.servico?.tipo === 'pernoite'}
           title={renderDetailTitle()}
-          footer={renderDetailFooter()}
+          footer={selectedRoom?.servico?.tipo === 'pernoite' ? undefined : renderDetailFooter()}
+          bodyStyle={selectedRoom?.servico?.tipo === 'pernoite'
+            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 'clamp(380px, 62vh, 520px)' }
+            : undefined}
         >
           {renderDetailContent()}
         </Modal>
@@ -2003,21 +2249,39 @@ export default function OverviewManagement() {
         >
           {/* ── Resumo financeiro fixo no topo ── */}
           <div className={styles.nhFinancialFixed}>
-            <div className={styles.financialGrid}>
-              <div className={styles.financialItem}>
-                <span className={styles.financialLabel}>Total</span>
-                <span className={styles.financialValue}>{fmtBRL(nhTotalHosp)}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-2)' }}>{nhTotalDias}d × {fmtBRL(nhPrecoDiaria)}</span>
+            <div className={styles.ovFinHeader}>
+              <DollarSign size={13} className={styles.ovFinIcon} />
+              <span className={styles.ovFinTitle}>Resumo Financeiro</span>
+            </div>
+            <div className={styles.ovFinRow}>
+              <div className={styles.ovFinItem}>
+                <span className={styles.ovFinLabel}>Total</span>
+                <span className={styles.ovFinValue}>{fmtBRL(nhTotalHosp)}</span>
+                {nhTotalDias > 0 && <span className={styles.nhFinSub}>{nhTotalDias}d × {fmtBRL(nhPrecoDiaria)}</span>}
               </div>
-              <div className={styles.financialItem}>
-                <span className={styles.financialLabel}>Pago</span>
-                <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(nhTotalPago)}</span>
+              <div className={styles.ovFinItem}>
+                <span className={styles.ovFinLabel}>Pago</span>
+                <span className={styles.ovFinValue}>{fmtBRL(nhTotalPago)}</span>
               </div>
-              <div className={styles.financialItem}>
-                <span className={styles.financialLabel}>Pendente</span>
-                <span className={[styles.financialValue, nhPendente > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>{fmtBRL(nhPendente)}</span>
+              <div className={styles.ovFinItem}>
+                <span className={styles.ovFinLabel}>Pendente</span>
+                <span className={[styles.ovFinValue, nhPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>{fmtBRL(nhPendente)}</span>
               </div>
             </div>
+            {nhTotalHosp > 0 && (() => {
+              const pct = Math.min(100, Math.round(nhTotalPago / nhTotalHosp * 100));
+              return (
+                <div className={styles.ovFinProgress}>
+                  <div className={styles.ovFinProgressMeta}>
+                    <span>Progresso de pagamento</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className={styles.ovFinBar}>
+                    <div className={styles.ovFinBarFill} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── Step tabs ── */}
@@ -2041,44 +2305,7 @@ export default function OverviewManagement() {
           {/* ── Step 0: Hóspedes ── */}
           {nhStep === 0 && (
             <div className={styles.nhStepContent}>
-              <Input value={nhHospedeSearch} onChange={(e) => setNhHospedeSearch(e.target.value)} placeholder="Buscar hóspede cadastrado..." />
-              {nhPersonResults.length > 0 && (
-                <div className={styles.guestList}>
-                  {nhPersonResults.map((h) => (
-                    <button
-                      key={h.id}
-                      className={[styles.guestItem, nhHospedes.some((x) => x.id === h.id) ? styles.guestItemActive : ''].join(' ')}
-                      onClick={() => {
-                        if (!nhHospedes.some((x) => x.id === h.id)) {
-                          setNhHospedes((p) => [...p, h]);
-                        }
-                        setNhHospedeSearch('');
-                      }}
-                    >
-                      <span className={styles.guestName}>{h.nome}</span>
-                      <span className={styles.guestSub}>{h.cpf} · {h.telefone}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-              {nhHospedes.length > 0 && (
-                <div className={styles.itemList}>
-                  {nhHospedes.map((h, i) => (
-                    <div key={h.id} className={styles.listItem}>
-                      <div className={styles.listItemLeft}>
-                        <User size={14} className={i === 0 ? styles.listItemIconGreen : styles.listItemIcon} />
-                        <div>
-                          <div className={styles.listItemName}>{h.nome} {i === 0 && <span className={styles.titularTag}>Titular</span>}</div>
-                          <div className={styles.listItemSub}>{h.cpf} · {h.telefone}</div>
-                        </div>
-                      </div>
-                      <button className={styles.removeBtn} onClick={() => setNhHospedes((p) => p.filter((x) => x.id !== h.id))}>
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <NhHospedesPicker value={nhHospedes} onChange={setNhHospedes} />
             </div>
           )}
 

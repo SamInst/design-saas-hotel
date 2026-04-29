@@ -1337,10 +1337,14 @@
 
 /* ── Nova Hospedagem: fixed summary + step tabs ──────────────────────────────── */
 .nhFinancialFixed {
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
+.nhFinSub { font-size: 10px; color: var(--text-2); margin-top: 1px; }
 .nhStepTabs {
   display: flex;
   gap: 0;
@@ -1389,6 +1393,81 @@
   color: var(--violet);
 }
 .nhStepContent { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ── NhHospedesPicker ───────────────────────────────────────────────────────── */
+.nhPickerWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 4px 8px 4px 30px;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-height: 36px;
+  transition: border-color 0.15s;
+}
+.nhPickerWrap:focus-within { border-color: var(--violet); }
+.nhPickerIcon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; }
+.nhPickerInner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; flex: 1; min-width: 0; }
+.nhPickerInput { border: none; outline: none; background: transparent; font-size: 13px; color: var(--text); font-family: inherit; min-width: 80px; flex: 1; padding: 0; }
+.nhPickerChip {
+  display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--violet) 25%, transparent);
+  border-radius: 5px; font-size: 12px; color: var(--text); font-weight: 500;
+}
+.nhPickerChipRemove { background: none; border: none; cursor: pointer; color: var(--text-2); display: flex; align-items: center; padding: 1px; border-radius: 50%; transition: color 0.12s; }
+.nhPickerChipRemove:hover { color: #ef4444; }
+
+.nhPickerDrop {
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+}
+.nhPickerResult {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.nhPickerResult:last-child { border-bottom: none; }
+.nhPickerResult:not(.nhPickerBlocked):hover { background: var(--surface-2); }
+.nhPickerBlocked { opacity: 0.55; cursor: not-allowed; }
+.nhPickerInfo { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.nhPickerName { font-size: 13px; font-weight: 500; color: var(--text); }
+.nhPickerMeta { font-size: 11px; color: var(--text-2); }
+.nhPickerArrow { margin-left: auto; color: var(--violet); flex-shrink: 0; }
+.nhPickerAcompChip { font-size: 10px; font-weight: 600; color: var(--text-2); padding: 1px 5px; border-radius: 4px; background: var(--surface-2); flex-shrink: 0; }
+.nhPickerBlockedChip { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #ef4444; padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, #ef4444 12%, transparent); flex-shrink: 0; }
+
+.nhPickerBack { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.nhPickerBackBtn { display: flex; align-items: center; gap: 4px; background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text-2); padding: 2px 0; font-family: inherit; }
+.nhPickerBackBtn:hover { color: var(--text); }
+.nhPickerRow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.nhPickerRow:last-of-type { border-bottom: none; }
+.nhPickerRowClick { cursor: pointer; }
+.nhPickerRowClick:hover { background: var(--surface-2); }
+.nhPickerCheck { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.nhPickerChecked { background: var(--violet); border-color: var(--violet); color: #fff; }
+.nhPickerActions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); }
+.nhPickerBtnSec { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; font-family: inherit; }
+.nhPickerBtnSec:hover { background: var(--surface-2); }
+.nhPickerBtnPrim { padding: 5px 12px; border: none; border-radius: 6px; background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.nhPickerBtnPrim:hover { opacity: 0.88; }
+
+.nhPickerList { display: flex; flex-direction: column; gap: 6px; }
+.nhPickerListItem {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; gap: 8px;
+}
+.nhPickerListLeft { display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 /* ── Guest list (add hospede modal) ─────────────────────────────────────────── */
 .guestList {
@@ -2041,4 +2120,327 @@
   .tipoSelectBar    { width: 100%; }
   .statCards        { width: 100%; }
   .statCard         { flex: 1; }
+}
+
+/* ── Pernoite modal redesign (ov* = overview custom) ───────────────────────── */
+.ovHeader {
+  position: relative;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  padding: 16px 52px 16px 16px;
+  flex-shrink: 0;
+  border-radius: 16px 16px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.ovRoomBadge {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 10px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+}
+
+.ovHeaderContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ovHeaderTopRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.ovHeaderStatusPill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.ovStatus_ocupado    { background: rgba(220,38,38,0.20);  color: #f87171; border: 1px solid rgba(220,38,38,0.35); }
+.ovStatus_reservado  { background: rgba(249,115,22,0.20); color: #fb923c; border: 1px solid rgba(249,115,22,0.35); }
+.ovStatus_limpeza    { background: rgba(37,99,235,0.20);  color: #60a5fa; border: 1px solid rgba(37,99,235,0.35); }
+.ovStatus_manutencao { background: rgba(124,58,237,0.20); color: #a78bfa; border: 1px solid rgba(124,58,237,0.35); }
+.ovStatus_disponivel { background: rgba(16,185,129,0.20); color: #34d399; border: 1px solid rgba(16,185,129,0.35); }
+
+.ovHeaderName {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ovHeaderSub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  margin-top: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ovCloseBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.65);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ovCloseBtn:hover { background: rgba(239,68,68,0.25); color: #f87171; border-color: rgba(239,68,68,0.3); }
+
+.ovTabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.ovTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  border-radius: 6px 6px 0 0;
+}
+.ovTab:hover { color: var(--text); }
+.ovTabActive {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.ovBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ovBody::-webkit-scrollbar       { width: 6px; }
+.ovBody::-webkit-scrollbar-track  { background: transparent; }
+.ovBody::-webkit-scrollbar-thumb  { background: rgba(107, 114, 128, 0.3); border-radius: 999px; }
+
+/* Padded wrapper for non-two-column tab content */
+.ovBodyPad {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+
+/* Dates row */
+.ovDatesRow {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  flex-shrink: 0;
+}
+.ovDateCell { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.ovDateCellRight { text-align: right; }
+.ovDateLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+.ovDateValue { font-size: 14px; font-weight: 700; color: var(--text); }
+.ovDateTime  { font-size: 11px; color: var(--text-2); }
+.ovDateArrow {
+  display: flex;
+  align-items: center;
+  color: var(--text-2);
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+.ovNightsCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 0 16px;
+  border-left: 1px solid var(--border);
+  margin-left: 4px;
+  min-width: 56px;
+}
+.ovNightsNum   { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
+.ovNightsLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+/* Guest card */
+/* Two-column layout */
+.ovTwoCol {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+.ovLeft {
+  width: clamp(180px, 34vw, 240px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(12px,2vw,16px) clamp(10px,1.5vw,14px) clamp(12px,2vw,16px) clamp(14px,2.5vw,18px);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.ovRight {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px 16px 16px;
+  overflow-y: auto;
+}
+
+/* Guest table (matches rvGuestTable aesthetic) */
+.ovGuestTable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ovGuestSectionHeader {
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: rgba(255,255,255,0.75);
+  background: #1e293b;
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="dark"] .ovGuestSectionHeader {
+  background: #0f172a;
+  color: rgba(255,255,255,0.6);
+}
+.ovGuestRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.ovGuestRow:last-child { border-bottom: none; }
+.ovGuestAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.ovGuestInfo { flex: 1; min-width: 0; }
+.ovGuestName { font-size: 12px; font-weight: 600; color: var(--text); }
+.ovGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+/* Financial card */
+.ovFinCard {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ovFinHeader { display: flex; align-items: center; gap: 7px; }
+.ovFinIcon   { color: #d97706; flex-shrink: 0; }
+:root[data-theme="dark"] .ovFinIcon { color: #fbbf24; }
+.ovFinTitle  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.ovFinRow    { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.ovFinItem   { display: flex; flex-direction: column; gap: 2px; }
+.ovFinLabel  { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+.ovFinValue  { font-size: 16px; font-weight: 700; color: var(--text); }
+.ovFinPending { color: #d97706; }
+.ovFinPaid    { color: #059669; }
+:root[data-theme="dark"] .ovFinPending { color: #fbbf24; }
+:root[data-theme="dark"] .ovFinPaid    { color: #34d399; }
+.ovFinProgress { display: flex; flex-direction: column; gap: 5px; }
+.ovFinProgressMeta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
+.ovFinBar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.ovFinBarFill { height: 100%; background: #059669; border-radius: 3px; transition: width 0.3s ease; }
+:root[data-theme="dark"] .ovFinBarFill { background: #34d399; }
+.ovFinDiariaRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.ovFinDiariaVal { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* Action buttons row */
+.ovActionsRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+/* Footer */
+.ovFooter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+  border-radius: 0 0 16px 16px;
 }
