@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, DollarSign, Calendar, Square, Loader2,
   AlertTriangle, ShoppingCart, Package, Trash2, Phone, Mail,
   RefreshCw, ArrowLeftRight, Minus, RotateCcw, Users, X,
-  Percent, Tag, ChevronRight, Check,
+  Percent, Tag, ChevronRight, ChevronLeft, Check, FileText,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -22,6 +22,7 @@ import {
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO, OVERVIEW_ROOMS_CATS,
 } from './overviewMocks';
 import { cadastroApi } from '../../services/api';
+import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -408,7 +409,15 @@ export default function OverviewManagement() {
   const [confirmModal, setConfirmModal] = useState(null); // { action: 'finalizar'|'cancelar' }
 
   // Ações dropdown (pernoite footer)
-  const [ovAcoesOpen, setOvAcoesOpen] = useState(false);
+  const [ovAcoesOpen, setOvAcoesOpen]       = useState(false);
+  const [voucherPicking, setVoucherPicking] = useState(false);
+
+  // Diária combobox
+  const [diariaComboOpen, setDiariaComboOpen] = useState(false);
+  const [showAlterarPessoas, setShowAlterarPessoas] = useState(false);
+  const [apDiariaIdx, setApDiariaIdx]               = useState(0);
+  const [apComboOpen, setApComboOpen]               = useState(false);
+  const [apSearch, setApSearch]                     = useState('');
 
   // Saving
   const [saving, setSaving] = useState(false);
@@ -584,7 +593,8 @@ export default function OverviewManagement() {
     setDiariaTab('hospedes');
   };
 
-  const closeDetail = () => setSelectedRoom(null);
+  const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); };
+  const closeAcoes  = () => { setOvAcoesOpen(false); setVoucherPicking(false); };
 
   const openNovoServico = (tipo, room) => {
     setNovoRoom(room);
@@ -1291,7 +1301,6 @@ export default function OverviewManagement() {
           <div className={styles.ovTabs}>
             {[
               ['dados', 'Dados do Pernoite'],
-              ['diarias', 'Diárias'],
               ['pagamentos', `Pagamentos (${allPagamentos.length})`],
             ].map(([t, label]) => (
               <button key={t} className={[styles.ovTab, detailTab === t ? styles.ovTabActive : ''].join(' ')} onClick={() => setDetailTab(t)}>
@@ -1309,29 +1318,33 @@ export default function OverviewManagement() {
                 <div className={styles.ovLeft}>
                   {curDiaria && (curDiaria.hospedes || []).length > 0 ? (() => {
                     const hospedes = curDiaria.hospedes || [];
-                    const titular  = hospedes[0];
-                    const acomps   = hospedes.slice(1);
-                    const initials = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-                    const renderRow = (h) => (
-                      <div key={h.id || h.nome} className={styles.ovGuestRow}>
-                        <div className={styles.ovGuestAvatar}>{initials(h.nome)}</div>
-                        <div className={styles.ovGuestInfo}>
-                          <div className={styles.ovGuestName}>{h.nome}</div>
-                          {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
-                          {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
-                        </div>
-                      </div>
-                    );
+                    const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
                     return (
                       <div className={styles.ovGuestTable}>
-                        <div className={styles.ovGuestSectionHeader}>Titular</div>
-                        {renderRow(titular)}
-                        {acomps.length > 0 && (
-                          <>
-                            <div className={styles.ovGuestSectionHeader}>Acompanhantes</div>
-                            {acomps.map(renderRow)}
-                          </>
-                        )}
+                        {hospedes.map((h) => (
+                          <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                            <div className={styles.ovGuestInfo}>
+                              <div className={styles.ovGuestName}>{h.nome}</div>
+                              {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                              {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                            </div>
+                            <div className={styles.contactActions}>
+                              {h.telefone && (
+                                <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                  className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                  <Phone size={11} />
+                                </a>
+                              )}
+                              {h.email && (
+                                <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
+                                  className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                  <Mail size={11} />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     );
                   })() : (
@@ -1339,7 +1352,7 @@ export default function OverviewManagement() {
                   )}
                 </div>
 
-                {/* ── Right: dates + financial + actions ── */}
+                {/* ── Middle: dates + financial ── */}
                 <div className={styles.ovRight}>
                   {/* Dates row */}
                   <div className={styles.ovDatesRow}>
@@ -1359,7 +1372,7 @@ export default function OverviewManagement() {
                       <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
                     </div>
                     <div className={styles.ovNightsCell}>
-                      <div className={styles.ovNightsNum}>{sv.diariaAtual}/{sv.totalDiarias}</div>
+                      <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
                       <div className={styles.ovNightsLabel}>Diárias</div>
                     </div>
                   </div>
@@ -1404,29 +1417,37 @@ export default function OverviewManagement() {
                       </div>
                     )}
                   </div>
+                </div>
 
-                  {/* Action buttons */}
-                  <div className={styles.ovActionsRow}>
-                    <Button variant="secondary" size="sm" onClick={() => openService('limpeza', s)}>
-                      <Sparkles size={13} /> Limpeza
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => openService('manutencao', s)}>
-                      <Wrench size={13} /> Manutenção
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={openGerenciarDiarias}>
-                      <RefreshCw size={13} /> Ger. Diárias
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={openTrocarQuarto}>
-                      <ArrowLeftRight size={13} /> Trocar Quarto
-                    </Button>
-                    <Button variant="secondary" size="sm" onClick={() => {
-                      setDescontoScope('global'); setDescontoTipo('percentual');
-                      setDescontoValor(''); setDescontoDescricao('');
-                      setShowDescontoModal(true);
-                    }}>
-                      <Tag size={13} /> Desconto
-                    </Button>
-                  </div>
+                {/* ── Right: consumo ── */}
+                <div className={styles.ovConsumoSide}>
+                  {(sv.consumos || []).length === 0 ? (
+                    <div className={styles.ovConsumoSideEmpty}>
+                      <ShoppingCart size={18} color="var(--text-2)" />
+                      <span>Sem consumo</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.ovConsumoSideHeader}>
+                        <ShoppingCart size={12} /> Consumo
+                      </div>
+                      <div className={styles.ovConsumoTable}>
+                        {(sv.consumos || []).map((c, i) => (
+                          <div key={c.id || i} className={styles.ovConsumoRow}>
+                            <div className={styles.ovConsumoInfo}>
+                              <div className={styles.ovConsumoName}>{c.item}</div>
+                              <div className={styles.ovConsumoMeta}>{c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}</div>
+                            </div>
+                            <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className={styles.ovConsumoSideTotal}>
+                        <span>Total</span>
+                        <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? c.valor ?? 0), 0))}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
 
               </div>
@@ -1460,126 +1481,70 @@ export default function OverviewManagement() {
                 )}
               </div>
             )}
-            {detailTab === 'diarias' && (
-              <div className={[styles.ovBodyPad, styles.tabBody].join(' ')}>
-                {diarias.length === 0 ? (
-                  <div className={styles.emptyList}><Calendar size={24} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
-                ) : (
-                  <>
-                    <div className={styles.diariasNavBox}>
-                      <div className={styles.diariasNavTop}>
-                        <span className={styles.diariasNavLabel}>Selecione a diária</span>
-                        <span className={styles.diariaAtualBadge}>Diária atual: {sv.diariaAtual}</span>
-                      </div>
-                      <div className={styles.diariasPills}>
-                        {diarias.map((d, idx) => {
-                          const isAtual = idx + 1 === sv.diariaAtual;
-                          const isSel   = detailDiariaIdx === idx;
-                          return (
-                            <button key={idx} type="button"
-                              onClick={() => { setDetailDiariaIdx(idx); setDiariaTab('hospedes'); }}
-                              className={[styles.diariaPill, isSel ? styles.diariaPillActive : '', !isSel && isAtual ? styles.diariaPillAtual : ''].join(' ')}
-                            >
-                              <span>Diária {d.num}{isAtual ? ' ●' : ''}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    {curDiaria && (
-                      <>
-                        <div className={styles.subTabs}>
-                          {[
-                            ['hospedes', `Hóspedes (${(curDiaria.hospedes || []).length})`],
-                            ['consumos', `Consumo (${(curDiaria.consumos || []).length})`],
-                          ].map(([t, label]) => (
-                            <button key={t} type="button" className={[styles.subTab, diariaTab === t ? styles.subTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                        {diariaTab === 'hospedes' && (
-                          <div className={styles.subTabContent}>
-                            <Button variant="primary" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
-                              <Plus size={14} /> Adicionar Hóspede
-                            </Button>
-                            {(curDiaria.hospedes || []).length === 0 ? (
-                              <div className={styles.emptyList}><User size={20} color="var(--text-2)" /><span>Nenhum hóspede nesta diária.</span></div>
-                            ) : (
-                              <div className={styles.itemList}>
-                                {(curDiaria.hospedes || []).map((h, i) => (
-                                  <div key={h.id || i} className={styles.listItem}>
-                                    <div className={styles.listItemLeft}>
-                                      <User size={14} className={i === 0 ? styles.listItemIconGreen : styles.listItemIcon} />
-                                      <div>
-                                        <div className={styles.listItemName}>{h.nome} {i === 0 && <span className={styles.titularTag}>Titular</span>}</div>
-                                        <div className={styles.listItemSub}>{h.telefone || '—'} · {h.email || '—'}</div>
-                                      </div>
-                                    </div>
-                                    <div className={styles.contactActions}>
-                                      {h.telefone && (
-                                        <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                          className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
-                                          <Phone size={11} />
-                                        </a>
-                                      )}
-                                      {h.email && (
-                                        <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
-                                          className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
-                                          <Mail size={11} />
-                                        </a>
-                                      )}
-                                      <button type="button" className={styles.removeBtn} onClick={() => notify('Funcionalidade em desenvolvimento.', 'info')}><Trash2 size={13} /></button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {diariaTab === 'consumos' && (
-                          <div className={styles.subTabContent}>
-                            <Button variant="primary" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
-                              <Plus size={14} /> Adicionar Consumo
-                            </Button>
-                            {(sv.consumos || []).length === 0 ? (
-                              <div className={styles.emptyList}><ShoppingCart size={20} color="var(--text-2)" /><span>Nenhum consumo registrado.</span></div>
-                            ) : (
-                              <div className={styles.itemList}>
-                                {(sv.consumos || []).map((c, i) => (
-                                  <div key={c.id || i} className={styles.listItem}>
-                                    <div className={styles.listItemLeft}>
-                                      <ShoppingCart size={14} className={c.tipo === 'interno' ? styles.listItemIconGreen : styles.listItemIcon} />
-                                      <div>
-                                        <div className={styles.listItemName}>{c.item}</div>
-                                        <div className={styles.listItemSub}>{c.categoria} · Qtd: {c.quantidade}{c.formaPagamento ? ` · ${c.formaPagamento}` : ''}</div>
-                                      </div>
-                                    </div>
-                                    <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
           </div>
 
           {/* ── Footer ── */}
           <div className={styles.ovFooter}>
-            <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
-              <XCircle size={14} /> Cancelar
-            </Button>
-            <div style={{ flex: 1 }} />
-            <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
-              {saving && <Loader2 size={14} className={styles.spin} />}
-              <CheckCircle size={14} /> Finalizar
-            </Button>
+            <div className={styles.ovAcoesWrap}>
+              {ovAcoesOpen && (
+                <>
+                  <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
+                  <div className={styles.ovAcoesMenu}>
+                    {voucherPicking ? (
+                      <>
+                        <button className={styles.ovAcoesSubBack} onClick={() => setVoucherPicking(false)}>
+                          <ChevronLeft size={12} /> Voucher de Hospedagem
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { gerarVoucherHospedagem({ quarto: s, servico: sv, incluirConsumo: false }); closeAcoes(); }}>
+                          <FileText size={14} /> Sem Consumo
+                        </button>
+                        {(sv.consumos || []).length > 0 && (
+                          <button className={styles.ovAcoesItem} onClick={() => { gerarVoucherHospedagem({ quarto: s, servico: sv, incluirConsumo: true }); closeAcoes(); }}>
+                            <FileText size={14} /> Com Consumo
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
+                          <Sparkles size={14} /> Limpeza
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
+                          <Wrench size={14} /> Manutenção
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openGerenciarDiarias(); }}>
+                          <RefreshCw size={14} /> Gerenciar Diárias
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openTrocarQuarto(); }}>
+                          <ArrowLeftRight size={14} /> Trocar Quarto
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
+                          <ShoppingCart size={14} /> Adicionar Consumo
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx(sv.diariaAtual ?? 1); setApComboOpen(false); setShowAlterarPessoas(true); }}>
+                          <Users size={14} /> Alterar Pessoas
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => setVoucherPicking(true)}>
+                          <FileText size={14} /> Gerar Voucher
+                          <ChevronRight size={12} className={styles.ovAcoesItemArrow} />
+                        </button>
+                        <div className={styles.ovAcoesDiv} />
+                        <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
+                          <XCircle size={14} /> Cancelar Pernoite
+                        </button>
+                        <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'finalizar' }); }} disabled={saving}>
+                          {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Finalizar
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+              <button className={styles.ovAcoesBtn} onClick={() => { setOvAcoesOpen((v) => !v); setVoucherPicking(false); }}>
+                Ações
+                <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
+              </button>
+            </div>
           </div>
         </>
       );
@@ -1692,41 +1657,48 @@ export default function OverviewManagement() {
               </div>
             )}
             {detailTab === 'hospedes' && (
-              <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
+              <div className={styles.ovBodyPad}>
+                <Button variant="secondary" size="sm" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
                   <Plus size={13} /> Adicionar Hóspede
                 </Button>
-                <div className={styles.itemList}>
-                  {(sv.hospedes || []).length === 0
-                    ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
-                    : (sv.hospedes || []).map((h, i) => (
-                      <div key={h.id} className={styles.listItem}>
-                        <div className={styles.listItemLeft}>
-                          <User size={15} className={i === 0 ? styles.listItemIconGreen : styles.listItemIcon} />
-                          <div>
-                            <div className={styles.listItemName}>{h.nome} {i === 0 && <span className={styles.titularTag}>Titular</span>}</div>
-                            <div className={styles.listItemSub}>{h.telefone || '—'} · {h.email || '—'}</div>
+                {(sv.hospedes || []).length === 0
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  : (
+                    <div className={styles.ovGuestTable}>
+                      {(sv.hospedes || []).map((h) => {
+                        const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+                        return (
+                          <div key={h.id} className={styles.ovGuestRow}>
+                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                            <div className={styles.ovGuestInfo}>
+                              <div className={styles.ovGuestName}>{h.nome}</div>
+                              {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                              {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                            </div>
+                            <div className={styles.contactActions}>
+                              {h.telefone && (
+                                <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                  className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                  <Phone size={11} />
+                                </a>
+                              )}
+                              {h.email && (
+                                <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
+                                  className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                  <Mail size={11} />
+                                </a>
+                              )}
+                              <button type="button" className={styles.removeBtn}
+                                onClick={() => { if (window.confirm(`Remover ${h.nome}?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <div className={styles.contactActions}>
-                          {h.telefone && (
-                            <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                              className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
-                              <Phone size={11} />
-                            </a>
-                          )}
-                          {h.email && (
-                            <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
-                              className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
-                              <Mail size={11} />
-                            </a>
-                          )}
-                          <button className={styles.removeBtn} onClick={() => notify('Em desenvolvimento')}><Trash2 size={13} /></button>
-                        </div>
-                      </div>
-                    ))
-                  }
-                </div>
+                        );
+                      })}
+                    </div>
+                  )
+                }
               </div>
             )}
             {detailTab === 'consumos' && (
@@ -2209,8 +2181,11 @@ export default function OverviewManagement() {
           hideHeader={selectedRoom?.servico?.tipo === 'pernoite'}
           title={renderDetailTitle()}
           footer={selectedRoom?.servico?.tipo === 'pernoite' ? undefined : renderDetailFooter()}
+          containerStyle={selectedRoom?.servico?.tipo === 'pernoite'
+            ? { height: 'clamp(480px, 74vh, 640px)', width: 'min(1060px, 96vw)', maxWidth: 'min(1060px, 96vw)' }
+            : undefined}
           bodyStyle={selectedRoom?.servico?.tipo === 'pernoite'
-            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 'clamp(380px, 62vh, 520px)' }
+            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 0 }
             : undefined}
         >
           {renderDetailContent()}
@@ -2809,6 +2784,18 @@ export default function OverviewManagement() {
           }
         >
           <div className={styles.consumoModalBody}>
+            {/* ── Diária atual ── */}
+            {selectedRoom.servico?.tipo === 'pernoite' && (() => {
+              const _sv = selectedRoom.servico;
+              const _d  = (_sv.diarias || [])[(_sv.diariaAtual || 1) - 1];
+              return _d ? (
+                <div className={styles.diariaInfoStrip}>
+                  <span className={styles.diariaInfoLabel}>Diária {_sv.diariaAtual}</span>
+                  {_d.dataInicio && <span className={styles.diariaInfoDates}>{_d.dataInicio} → {_d.dataFim}</span>}
+                  <span className={styles.diariaAtualChip}>Atual</span>
+                </div>
+              ) : null;
+            })()}
             {/* ── Consumo interno (minibar) ── */}
             <div className={styles.consumoModalSection}>
               <div className={styles.consumoModalSectionTitle}><Package size={13} /> Consumo interno</div>
@@ -2900,6 +2887,123 @@ export default function OverviewManagement() {
           </div>
         </Modal>
       )}
+
+      {/* ═══════════════════════════════════════════════════════
+          SUB-MODAL — Alterar Pessoas nas Diárias
+      ═══════════════════════════════════════════════════════ */}
+      {showAlterarPessoas && selectedRoom && (() => {
+        const _sv      = selectedRoom.servico;
+        const _diarias = _sv?.diarias || [];
+        const _atual   = _sv?.diariaAtual || 1;
+        const _futureDiarias = _diarias.filter((_, i) => i >= _atual);
+        const _selDiaria = _diarias[apDiariaIdx];
+        const _hospedes  = _selDiaria?.hospedes || [];
+        const _ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+        const _searchResults = apSearch.length >= 2
+          ? HOSPEDES_CADASTRADOS.filter((h) => h.nome.toLowerCase().includes(apSearch.toLowerCase()))
+          : [];
+        return (
+          <Modal
+            open
+            onClose={() => { setShowAlterarPessoas(false); setApSearch(''); }}
+            size="md"
+            bodyStyle={{ padding: 0 }}
+            title={<><Users size={15} /> Alterar Pessoas</>}
+          >
+            {/* Diária selector (future only) */}
+            <div className={styles.diariaSelectBar}>
+              {apComboOpen && <div className={styles.diariaComboBackdrop} onClick={() => setApComboOpen(false)} />}
+              <div className={styles.diariaCombo}>
+                <button type="button" className={styles.diariaComboTrigger} onClick={() => setApComboOpen((v) => !v)}>
+                  <span className={styles.diariaComboLabel}>
+                    {_selDiaria
+                      ? `Diária ${_selDiaria.num ?? apDiariaIdx + 1}${_selDiaria.dataInicio ? ` — ${_selDiaria.dataInicio} → ${_selDiaria.dataFim}` : ''}`
+                      : 'Selecione uma diária'}
+                  </span>
+                  <ChevronDown size={13} className={apComboOpen ? styles.diariaComboChevronOpen : styles.diariaComboChevron} />
+                </button>
+                {apComboOpen && (
+                  <div className={styles.diariaComboDropdown}>
+                    {_futureDiarias.length === 0
+                      ? <div className={styles.diariaComboOption} style={{ color: 'var(--text-2)', pointerEvents: 'none' }}>Sem diárias futuras</div>
+                      : _futureDiarias.map((d, i) => {
+                          const absIdx = _atual + i;
+                          const isSel  = absIdx === apDiariaIdx;
+                          return (
+                            <div key={absIdx}
+                              className={[styles.diariaComboOption, isSel ? styles.diariaComboOptionActive : ''].join(' ')}
+                              onClick={() => { setApDiariaIdx(absIdx); setApComboOpen(false); }}>
+                              <span className={styles.diariaComboOptionLabel}>
+                                Diária {d.num ?? absIdx + 1}{d.dataInicio ? ` — ${d.dataInicio} → ${d.dataFim}` : ''}
+                              </span>
+                            </div>
+                          );
+                        })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className={styles.apSearchWrap}>
+              <Input
+                value={apSearch}
+                onChange={(e) => setApSearch(e.target.value)}
+                placeholder="Buscar pessoa por nome..."
+              />
+              {_searchResults.length > 0 && (
+                <div className={styles.guestList}>
+                  {_searchResults.map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className={styles.guestItem}
+                      onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setApSearch(''); }}
+                    >
+                      <span className={styles.guestName}>{h.nome}</span>
+                      <span className={styles.guestSub}>{h.cpf} · {h.telefone}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Guests in selected diária */}
+            <div className={styles.apHospedesBody}>
+              {_hospedes.length === 0 ? (
+                <div className={styles.emptyList}><User size={20} color="var(--text-2)" /><span>Sem hóspedes nesta diária</span></div>
+              ) : (
+                <div className={styles.ovGuestTable}>
+                  {_hospedes.map((h, idx) => (
+                    <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                      <div className={styles.ovGuestAvatar}>{_ini(h.nome)}</div>
+                      <div className={styles.ovGuestInfo}>
+                        <div className={styles.ovGuestName}>
+                          {h.nome}
+                          {idx === 0 && <span className={styles.titularTag}>Titular</span>}
+                        </div>
+                        {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                      </div>
+                      <div className={styles.contactActions}>
+                        {idx > 0 && (
+                          <button type="button" className={styles.quickBtn} title="Tornar Titular"
+                            onClick={() => { if (window.confirm(`Tornar ${h.nome} o titular desta diária?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                            <ArrowLeftRight size={11} />
+                          </button>
+                        )}
+                        <button type="button" className={styles.removeBtn}
+                          onClick={() => { if (window.confirm(`Remover ${h.nome} desta diária?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           SUB-MODAL — Adicionar Pagamento (detail)

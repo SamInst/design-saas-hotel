@@ -2266,6 +2266,169 @@
   flex: 1;
 }
 
+/* ── Diária combobox bar ──────────────────────────────────────────────────── */
+.diariaSelectBar {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.diariaComboBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+}
+
+.diariaCombo {
+  position: relative;
+  flex: 1;
+}
+
+.diariaComboTrigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.12s;
+}
+.diariaComboTrigger:hover { border-color: color-mix(in srgb, var(--violet) 60%, transparent); }
+
+.diariaComboLabel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diariaComboChevron { color: var(--text-2); flex-shrink: 0; transition: transform 0.2s; }
+.diariaComboChevronOpen { color: var(--text-2); flex-shrink: 0; transform: rotate(180deg); transition: transform 0.2s; }
+
+.diariaComboDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  z-index: 20;
+  overflow: hidden;
+  animation: ovMenuIn 0.14s ease-out;
+}
+
+.diariaComboOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.diariaComboOption:hover { background: var(--surface-2); }
+.diariaComboOptionActive { background: rgba(124,58,237,0.07); }
+.diariaComboOptionActive:hover { background: rgba(124,58,237,0.11); }
+
+.diariaComboOptionLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diariaComboOptionActive .diariaComboOptionLabel { color: var(--violet); font-weight: 600; }
+
+.diariaAtualChip {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: #059669;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+:root[data-theme="dark"] .diariaAtualChip { color: #34d399; }
+
+/* ── Consumo table (mirrors ovGuestTable) ────────────────────────────────── */
+.ovConsumoTable {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.ovConsumoRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.ovConsumoRow:last-child { border-bottom: none; }
+.ovConsumoInfo { flex: 1; min-width: 0; }
+.ovConsumoName { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovConsumoMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.ovConsumoVal  { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+
+/* ── Diárias tab column variants ─────────────────────────────────────────── */
+.ovColWide {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.ovColNarrow {
+  width: clamp(240px, 38vw, 320px);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* ── Empty column placeholder ─────────────────────────────────────────────── */
+.ovColEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 12px;
+  color: var(--text-2);
+  font-size: 12px;
+  flex: 1;
+}
+
 /* Dates row */
 .ovDatesRow {
   display: flex;
@@ -2318,7 +2481,7 @@
   min-height: 0;
 }
 .ovLeft {
-  width: clamp(180px, 34vw, 240px);
+  width: clamp(240px, 38vw, 324px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -2335,7 +2498,51 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px 18px 16px 16px;
+  border-right: 1px solid var(--border);
   overflow-y: auto;
+}
+
+/* ── Consumo side column ─────────────────────────────────────────────────── */
+.ovConsumoSide {
+  width: 253px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.ovConsumoSideHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-2);
+}
+.ovConsumoSideEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.ovConsumoSideTotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  margin-top: auto;
 }
 
 /* Guest table (matches rvGuestTable aesthetic) */
@@ -2388,6 +2595,25 @@
 .ovGuestName { font-size: 12px; font-weight: 600; color: var(--text); }
 .ovGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 
+/* Guest card with buttons below email */
+.ovGuestContent { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.contactActionsCenter { display: flex; align-items: center; justify-content: center; gap: 4px; }
+
+/* Diária info strip (consumo modal + alterar pessoas modal) */
+.diariaInfoStrip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; background: var(--surface-2);
+  border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.diariaInfoLabel { font-weight: 700; color: var(--text); }
+.diariaInfoDates { color: var(--text-2); }
+
+/* Alterar Pessoas modal body */
+.apEmptyFuture { padding: 24px 16px; }
+.apSearchWrap { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+.apHospedesBody { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.apHospedesHeader { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--text); }
+
 /* Financial card */
 .ovFinCard {
   background: var(--surface-2);
@@ -2437,10 +2663,114 @@
 .ovFooter {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: flex-end;
   padding: 12px 16px;
   border-top: 1px solid var(--border);
   background: var(--surface-2);
   flex-shrink: 0;
   border-radius: 0 0 16px 16px;
 }
+
+/* Ações dropdown */
+.ovAcoesWrap {
+  position: relative;
+}
+
+.ovAcoesBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--violet);
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ovAcoesBtn:hover { background: #6d28d9; }
+
+.ovAcoesBtnChevron { transition: transform 0.2s; }
+.ovAcoesBtnChevronOpen { transform: rotate(180deg); transition: transform 0.2s; }
+
+.ovAcoesBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+
+.ovAcoesMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 210px;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.12), 0 -2px 8px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 10;
+  animation: ovMenuIn 0.15s ease-out;
+}
+@keyframes ovMenuIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.ovAcoesItem {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: background 0.1s, color 0.1s;
+}
+.ovAcoesItem:hover { background: var(--surface-2); }
+
+.ovAcoesDiv {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 4px;
+}
+
+.ovAcoesItemDanger { color: #ef4444; }
+.ovAcoesItemDanger:hover { background: #fef2f2; color: #dc2626; }
+:root[data-theme="dark"] .ovAcoesItemDanger:hover { background: rgba(239,68,68,0.10); color: #f87171; }
+
+.ovAcoesItemPrimary { color: var(--violet); font-weight: 600; }
+.ovAcoesItemPrimary:hover { background: rgba(124,58,237,0.08); }
+
+.ovAcoesItemArrow { margin-left: auto; color: var(--text-2); }
+
+.ovAcoesSubBack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: none;
+  cursor: pointer;
+  margin-bottom: 3px;
+  transition: color 0.1s;
+}
+.ovAcoesSubBack:hover { color: var(--text); }
