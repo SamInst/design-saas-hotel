@@ -2375,9 +2375,6 @@
 .ovConsumoTable {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
 }
 .ovConsumoRow {
   display: flex;
@@ -2385,7 +2382,6 @@
   gap: 10px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
 }
 .ovConsumoRow:last-child { border-bottom: none; }
 .ovConsumoInfo { flex: 1; min-width: 0; }

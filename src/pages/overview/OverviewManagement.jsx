@@ -593,7 +593,7 @@ export default function OverviewManagement() {
     setDiariaTab('hospedes');
   };
 
-  const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); };
+  const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
   const closeAcoes  = () => { setOvAcoesOpen(false); setVoucherPicking(false); };
 
   const openNovoServico = (tipo, room) => {
