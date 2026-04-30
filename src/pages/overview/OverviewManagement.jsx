@@ -13,6 +13,7 @@ import { Button }                   from '../../components/ui/Button';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { TimeInput }                from '../../components/ui/TimeInput';
+import { PaymentModal }             from '../../components/ui/PaymentModal';
 import { Notification }             from '../../components/ui/Notification';
 import {
   overviewApi,
@@ -21,7 +22,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO, OVERVIEW_ROOMS_CATS,
 } from './overviewMocks';
-import { cadastroApi, reservaApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
@@ -110,11 +111,204 @@ const FILTER_OPTIONS = [
   { id: 'servico',   label: 'Manutenção/Fora' },
 ];
 
+// ── Mock itens do quarto ──────────────────────────────────────────────────────
+const MOCK_ITENS_QUARTO = [
+  { id: 1, nome: 'Cerveja Heineken 350ml', categoria: 'Bebidas',    preco: 12.00, qtdAtual: 4, qtdBase: 6 },
+  { id: 2, nome: 'Água Mineral 500ml',     categoria: 'Bebidas',    preco: 4.50,  qtdAtual: 3, qtdBase: 4 },
+  { id: 3, nome: 'Amendoim Salgado 100g',  categoria: 'Petiscos',   preco: 8.00,  qtdAtual: 2, qtdBase: 2 },
+  { id: 4, nome: 'Kit Higiene Completo',   categoria: 'Higiene',    preco: 25.00, qtdAtual: 1, qtdBase: 1 },
+];
+
 // ── Blank forms ───────────────────────────────────────────────────────────────
 const blankNpForm  = () => ({ chegadaDate: new Date(), chegadaHora: '14:00', saidaDate: null, saidaHora: '12:00', tipoAcomodacao: 'Casal', hospedes: [], hospedeSearch: '' });
 const blankNduForm = () => ({ horaEntrada: nowTime(), hospedes: [], hospedeSearch: '' });
 const blankPagForm = () => ({ descricao: '', formaPagamento: 'PIX', valor: '' });
 const blankSvcForm = () => ({ responsavel: '', descricao: '', previsaoFim: '', dataHoraInicio: '', dataHoraFim: '' });
+
+// ── QuartoCombobox ────────────────────────────────────────────────────────────
+function QuartoCombobox({ value, onChange, quartos = [], categorias = [], currentNumero = null }) {
+  const [open,      setOpen]      = useState(false);
+  const [filter,    setFilter]    = useState('');
+  const [dropStyle, setDropStyle] = useState({});
+  const triggerRef = useRef(null);
+  const dropRef    = useRef(null);
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropH = 260;
+    const openAbove = spaceBelow < dropH && rect.top > dropH;
+    const w    = Math.min(rect.width, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8));
+    setDropStyle({
+      position: 'fixed', zIndex: 9999, width: w, left,
+      top: openAbove ? rect.top - dropH - 4 : rect.bottom + 4,
+      maxHeight: openAbove ? rect.top - 8 : spaceBelow - 8,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => { window.removeEventListener('scroll', updatePos, true); window.removeEventListener('resize', updatePos); };
+  }, [open, updatePos]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (triggerRef.current?.contains(e.target) || dropRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const fl = filter.toLowerCase();
+  const selected = quartos.find((q) => q.id === value);
+
+  const dropdown = open && createPortal(
+    <div ref={dropRef} className={styles.qcDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
+      <div className={styles.qcSearchWrap}>
+        <Search size={12} className={styles.qcSearchIcon} />
+        <input className={styles.qcSearchInput} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrar apartamento..." autoFocus />
+      </div>
+      {categorias.map((cat) => {
+        const rows = cat.quartos.filter((n) => {
+          if (n === currentNumero) return false;
+          if (fl && !String(n).includes(fl) && !cat.nome.toLowerCase().includes(fl)) return false;
+          return true;
+        });
+        if (!rows.length) return null;
+        return (
+          <div key={cat.nome}>
+            <div className={styles.qcGroupLabel}>{cat.nome}</div>
+            {rows.map((n) => {
+              const q = quartos.find((r) => r.numero === n);
+              const avail = q && q.status === ROOM_STATUS.DISPONIVEL;
+              const sel   = q && q.id === value;
+              return (
+                <div key={n}
+                  className={[styles.qcItem, sel ? styles.qcItemSel : '', !avail ? styles.qcItemUnavail : ''].join(' ')}
+                  onClick={() => { if (!avail) return; onChange(q.id); setOpen(false); setFilter(''); }}
+                >
+                  <span className={styles.qcItemNum}>Apt. {n}</span>
+                  {q && <span className={styles.qcItemTipo}>{q.categoria}</span>}
+                  {!avail && <span className={styles.qcItemOcupado}>Ocupado</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>,
+    document.body
+  );
+
+  return (
+    <div className={styles.qcWrap}>
+      <button ref={triggerRef} type="button" className={styles.qcTrigger}
+        onClick={() => { setOpen((o) => !o); setFilter(''); }}
+      >
+        {selected
+          ? <span className={styles.qcSelected}>Apt. {selected.numero} — {selected.categoria}</span>
+          : <span className={styles.qcPlaceholder}>Selecione um apartamento...</span>
+        }
+        <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
+      </button>
+      {dropdown}
+    </div>
+  );
+}
+
+// ── DiariasCombobox ───────────────────────────────────────────────────────────
+function DiariasCombobox({ value = [], onChange, diarias = [], atualNum = 1 }) {
+  const [open,      setOpen]      = useState(false);
+  const [dropStyle, setDropStyle] = useState({});
+  const triggerRef = useRef(null);
+  const dropRef    = useRef(null);
+
+  const updatePos = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const dropH = 260;
+    const openAbove = spaceBelow < dropH && rect.top > dropH;
+    const w    = Math.min(rect.width, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - w - 8));
+    setDropStyle({
+      position: 'fixed', zIndex: 9999, width: w, left,
+      top: openAbove ? rect.top - dropH - 4 : rect.bottom + 4,
+      maxHeight: openAbove ? rect.top - 8 : spaceBelow - 8,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePos();
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => { window.removeEventListener('scroll', updatePos, true); window.removeEventListener('resize', updatePos); };
+  }, [open, updatePos]);
+
+  useEffect(() => {
+    const h = (e) => {
+      if (triggerRef.current?.contains(e.target) || dropRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+
+  const allSelected = diarias.length > 0 && value.length === diarias.length;
+  const label = value.length === 0
+    ? 'Selecione as diárias...'
+    : value.length === diarias.length
+      ? `Todas as diárias (${diarias.length})`
+      : `${value.length} de ${diarias.length} diária(s)`;
+
+  const toggle = (idx) => onChange(value.includes(idx) ? value.filter((x) => x !== idx) : [...value, idx]);
+  const toggleAll = () => onChange(allSelected ? [] : diarias.map((d) => d.idx));
+
+  const dropdown = open && createPortal(
+    <div ref={dropRef} className={styles.qcDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
+      <div
+        className={[styles.qcItem, allSelected ? styles.qcItemSel : ''].join(' ')}
+        onClick={toggleAll}
+        style={{ borderBottom: '1px solid var(--border)', marginBottom: 6, paddingBottom: 10 }}
+      >
+        <div className={[styles.qcCheck, allSelected ? styles.qcCheckSel : ''].join(' ')}>{allSelected ? '✓' : ''}</div>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Selecionar todas</span>
+      </div>
+      {diarias.map((d) => {
+        const sel = value.includes(d.idx);
+        const isCurrent = d.num === atualNum;
+        return (
+          <div key={d.idx} className={[styles.qcItem, sel ? styles.qcItemSel : ''].join(' ')} onClick={() => toggle(d.idx)}>
+            <div className={[styles.qcCheck, sel ? styles.qcCheckSel : ''].join(' ')}>{sel ? '✓' : ''}</div>
+            <span className={styles.qcItemNum}>Diária {d.num}</span>
+            {isCurrent && <span className={styles.qcItemTipo}>atual</span>}
+            <span style={{ fontSize: 11, color: 'var(--text-2)', marginLeft: 'auto' }}>{d.dataInicio?.split(' ')[0]}</span>
+          </div>
+        );
+      })}
+    </div>,
+    document.body
+  );
+
+  return (
+    <div className={styles.qcWrap}>
+      <button ref={triggerRef} type="button" className={styles.qcTrigger}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className={value.length === 0 ? styles.qcPlaceholder : styles.qcSelected}>{label}</span>
+        <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
+      </button>
+      {dropdown}
+    </div>
+  );
+}
 
 // ── NhHospedesPicker ─────────────────────────────────────────────────────────
 const fmtCpf = (v) => v ? v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '';
@@ -353,6 +547,14 @@ export default function OverviewManagement() {
   const [detailConsumoQty, setDetailConsumoQty]             = useState(1);
   const [detailConsumoForma, setDetailConsumoForma]         = useState('');
 
+  // Consumir item (pernoite)
+  const [consumoItemSel,  setConsumoItemSel]  = useState(null);
+  const [consumoQtd,      setConsumoQtd]      = useState('');
+  const [consumoDespesa,  setConsumoDespesa]  = useState(false);
+  const [consumoPagOv,    setConsumoPagOv]    = useState(null);
+  const [showConsumoItemPag, setShowConsumoItemPag] = useState(false);
+  const [consumoSavingItem, setConsumoSavingItem]   = useState(false);
+
   // Detail — Add Pagamento (pernoite/dayuse existing)
   const [showDetailAddPag, setShowDetailAddPag]             = useState(false);
   const [detailPagDesc, setDetailPagDesc]                   = useState('');
@@ -375,6 +577,9 @@ export default function OverviewManagement() {
   // Service actions (limpeza/manutencao/fora)
   const [serviceModal, setServiceModal] = useState(null); // { type, room }
   const [svcForm, setSvcForm]           = useState(blankSvcForm());
+  const [funcList, setFuncList]         = useState([]);
+  const [funcLoading, setFuncLoading]   = useState(false);
+  const [funcSelected, setFuncSelected] = useState(null);
 
   // Minibar add item modal (quarto disponível only)
   const [showAddMinibar, setShowAddMinibar]       = useState(false);
@@ -389,12 +594,13 @@ export default function OverviewManagement() {
 
   // Gerenciar Diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
-  const [gdDataInicio, setGdDataInicio]                 = useState(null);
-  const [gdHoraInicio, setGdHoraInicio]                 = useState('14:00');
-  const [gdDataFim, setGdDataFim]                       = useState(null);
-  const [gdHoraFim, setGdHoraFim]                       = useState('12:00');
+  const [gdStartDate, setGdStartDate]                   = useState(null);
+  const [gdEndDate, setGdEndDate]                       = useState(null);
   const [gdValor, setGdValor]                           = useState('');
+  const [gdDiariaPendentes, setGdDiariaPendentes]       = useState([]);
   const [savingGd, setSavingGd]                         = useState(false);
+  const [gdRemoverConfirm, setGdRemoverConfirm]         = useState(null); // { diariaIdx, diariaNum }
+  const gdDiariaListRef                                 = useRef(null);
 
   // Trocar Quarto modal
   const [showTrocarQuarto, setShowTrocarQuarto]   = useState(false);
@@ -577,6 +783,17 @@ export default function OverviewManagement() {
     if (fresh) setSelectedRoom(fresh);
   }, [quartos]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (serviceModal?.type !== 'limpeza') return;
+    setFuncLoading(true);
+    (async () => {
+      try {
+        const res = await funcionarioApi.listar({ size: 100 });
+        setFuncList(res?.content ?? []);
+      } catch { setFuncList([]); }
+      finally { setFuncLoading(false); }
+    })();
+  }, [serviceModal?.type]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const toggleCollapse = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
@@ -611,7 +828,7 @@ export default function OverviewManagement() {
   const openService = (type, room) => {
     setServiceModal({ type, room });
     setSvcForm(blankSvcForm());
-    setSelectedRoom(null);
+    setFuncSelected(null);
   };
 
   const handleMarcarDisponivel = async (room) => {
@@ -867,26 +1084,46 @@ export default function OverviewManagement() {
 
   // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
   const openGerenciarDiarias = () => {
-    setGdDataInicio(null); setGdHoraInicio('14:00');
-    setGdDataFim(null); setGdHoraFim('12:00'); setGdValor('');
+    setGdStartDate(null); setGdEndDate(null); setGdDiariaPendentes([]);
     setShowGerenciarDiarias(true);
   };
 
-  const handleAdicionarDiaria = async () => {
-    if (!selectedRoom || !gdDataInicio || !gdDataFim) { notify('Preencha as datas da nova diária.', 'error'); return; }
-    const valor = parseBRL(gdValor);
-    if (!valor || valor <= 0) { notify('Informe o valor da diária.', 'error'); return; }
+  const handleAdicionarDiaria = (dataInicio, dataFim) => {
+    if (!dataInicio || !dataFim) { notify('Preencha o período da nova diária.', 'error'); return; }
+    const formatDate = (d) => {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    };
+    const novaDiaria = {
+      dataInicio: formatDate(dataInicio),
+      dataFim: formatDate(dataFim),
+      valor: 0, hospedes: selectedRoom.servico?.hospedes || [], consumos: [], pagamentos: [],
+    };
+    setGdDiariaPendentes((prev) => [...prev, novaDiaria]);
+    setTimeout(() => {
+      if (gdDiariaListRef.current) {
+        gdDiariaListRef.current.scrollTop = gdDiariaListRef.current.scrollHeight;
+      }
+    }, 50);
+  };
+
+  const handleConfirmarDiarias = async () => {
+    if (!selectedRoom || gdDiariaPendentes.length === 0) return;
     setSavingGd(true);
     try {
-      const novaDiaria = {
-        dataInicio: `${dateToDisplay(gdDataInicio)} ${gdHoraInicio}`,
-        dataFim: `${dateToDisplay(gdDataFim)} ${gdHoraFim}`,
-        valor, hospedes: selectedRoom.servico?.hospedes || [], consumos: [], pagamentos: [],
-      };
-      const updated = await overviewApi.adicionarDiaria(selectedRoom.id, novaDiaria);
+      let updated = selectedRoom;
+      for (const diaria of gdDiariaPendentes) {
+        updated = await overviewApi.adicionarDiaria(selectedRoom.id, {
+          ...diaria,
+          dataInicio: `${diaria.dataInicio} 14:00`,
+          dataFim: `${diaria.dataFim} 12:00`,
+        });
+      }
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Diária adicionada.');
-      setGdDataInicio(null); setGdDataFim(null); setGdValor('');
+      notify(`${gdDiariaPendentes.length} diária(s) adicionada(s).`);
+      setGdDiariaPendentes([]);
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSavingGd(false); }
   };
@@ -949,21 +1186,29 @@ export default function OverviewManagement() {
   };
 
   // ── Adicionar Pagamento ───────────────────────────────────────────────────────
-  const handleAddPagamento = async () => {
-    const valor = parseBRL(pagForm.valor);
-    if (!valor || valor <= 0) { notify('Informe um valor válido.', 'error'); return; }
-    if (!pagForm.descricao.trim()) { notify('Informe uma descrição.', 'error'); return; }
+  const tiposPagamentoOv = FORMAS_PAGAMENTO.map((f, i) => ({ id: i + 1, descricao: f }));
+  const pagamentoFromPaymentModal = (payment) => {
+    const forma = tiposPagamentoOv.find((t) => t.id === Number(payment.tipo_pagamento?.id))?.descricao ?? '';
+    const now = new Date();
+    return { descricao: payment.descricao ?? '', nomePagador: payment.nome_pagador ?? '', formaPagamento: forma, valor: payment.valor, data: `${dateToDisplay(now)} ${now.toTimeString().slice(0, 5)}` };
+  };
+
+  const handleAddPagamento = async (payment) => {
+    const pag = pagamentoFromPaymentModal(payment);
     setSaving(true);
     try {
-      const now     = new Date();
-      const dataStr = `${dateToDisplay(now)} ${now.toTimeString().slice(0,5)}`;
-      const updated = await overviewApi.adicionarPagamento(selectedRoom.id, { descricao: pagForm.descricao, formaPagamento: pagForm.formaPagamento, valor, data: dataStr });
+      const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Pagamento de ${fmtBRL(valor)} registrado.`);
+      notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
       setPagModal(false);
-      setPagForm(blankPagForm());
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSaving(false); }
+  };
+
+  const handlePayConfirmNew = async (payment) => {
+    const pag = pagamentoFromPaymentModal(payment);
+    if (payOnConfirm) await payOnConfirm(pag);
+    setPayModal(false);
   };
 
 
@@ -2612,96 +2857,32 @@ export default function OverviewManagement() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Pagamento Unificado
       ═══════════════════════════════════════════════════════ */}
-      {payModal && (
-        <Modal
-          open
-          onClose={() => setPayModal(false)}
-          size="sm"
-          title={<><CreditCard size={15} /> Registrar Pagamento</>}
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setPayModal(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={handlePayConfirm} disabled={saving}>
-                {saving && <Loader2 size={14} className={styles.spin} />}
-                Confirmar
-              </Button>
-            </div>
-          }
-        >
-          <div className={styles.formStack}>
-            {selectedRoom?.servico?.pagamentoPendente > 0 && (
-              <div className={styles.pricingHint}>
-                <span className={styles.pricingHintLabel}>Pendente:</span>
-                <strong className={styles.textAmber}>{fmtBRL(selectedRoom.servico.pagamentoPendente)}</strong>
-              </div>
-            )}
-            <FormField label="Nome do pagador *">
-              <Input value={payNomePagador} onChange={(e) => setPayNomePagador(e.target.value)} placeholder="Nome do responsável pelo pagamento" />
-            </FormField>
-            {selectedRoom?.servico?.titularNome && (
-              <label className={styles.payCheckboxRow}>
-                <input type="checkbox" checked={payAutoFill} onChange={(e) => {
-                  setPayAutoFill(e.target.checked);
-                  if (e.target.checked) setPayNomePagador(selectedRoom.servico.titularNome);
-                  else setPayNomePagador('');
-                }} />
-                Usar nome do titular ({selectedRoom.servico.titularNome})
-              </label>
-            )}
-            <FormField label="Descrição *">
-              <Input value={payDescricao} onChange={(e) => setPayDescricao(e.target.value)} placeholder="Ex: Pagamento final, Entrada 50%..." />
-            </FormField>
-            <FormField label="Forma de Pagamento *">
-              <Select value={payTipo} onChange={(e) => setPayTipo(e.target.value)}>
-                <option value="">Selecione...</option>
-                {FORMAS_PAGAMENTO.map((fp) => <option key={fp} value={fp}>{fp}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Valor *">
-              <Input value={payValor} onChange={(e) => setPayValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
-            </FormField>
-          </div>
-        </Modal>
-      )}
+      <PaymentModal
+        open={!!payModal}
+        onClose={() => setPayModal(false)}
+        onConfirm={handlePayConfirmNew}
+        tiposPagamento={tiposPagamentoOv}
+        isSubmitting={saving}
+        titularNome={selectedRoom?.servico?.titularNome ?? null}
+        valorTotal={selectedRoom?.servico?.valorTotal ?? null}
+        valorPago={selectedRoom?.servico?.totalPago ?? null}
+        canAplicarDesconto={false}
+      />
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Adicionar Pagamento
       ═══════════════════════════════════════════════════════ */}
-      {pagModal && selectedRoom && (
-        <Modal
-          open
-          onClose={() => setPagModal(false)}
-          size="sm"
-          title={<><CreditCard size={15} /> Registrar Pagamento</>}
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setPagModal(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={handleAddPagamento} disabled={saving}>
-                {saving && <Loader2 size={14} className={styles.spin} />}
-                Confirmar
-              </Button>
-            </div>
-          }
-        >
-          <div className={styles.formStack}>
-            <div className={styles.pricingHint}>
-              <span className={styles.pricingHintLabel}>Pendente:</span>
-              <strong className={styles.textAmber}>{fmtBRL(selectedRoom.servico?.pagamentoPendente)}</strong>
-            </div>
-            <FormField label="Descrição *">
-              <Input value={pagForm.descricao} onChange={(e) => setPagForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Ex: Pagamento final, Entrada..." />
-            </FormField>
-            <FormField label="Forma de Pagamento *">
-              <Select value={pagForm.formaPagamento} onChange={(e) => setPagForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
-                {FORMAS_PAGAMENTO.map((fp) => <option key={fp} value={fp}>{fp}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Valor *">
-              <Input value={pagForm.valor} onChange={(e) => setPagForm((f) => ({ ...f, valor: maskBRL(e.target.value) }))} placeholder="R$ 0,00" />
-            </FormField>
-          </div>
-        </Modal>
-      )}
+      <PaymentModal
+        open={!!pagModal}
+        onClose={() => setPagModal(false)}
+        onConfirm={handleAddPagamento}
+        tiposPagamento={tiposPagamentoOv}
+        isSubmitting={saving}
+        titularNome={selectedRoom?.servico?.titularNome ?? null}
+        valorTotal={selectedRoom?.servico?.valorTotal ?? null}
+        valorPago={selectedRoom?.servico?.totalPago ?? null}
+        canAplicarDesconto={false}
+      />
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Acionar Serviço (Limpeza / Manutenção / Fora)
@@ -2720,7 +2901,6 @@ export default function OverviewManagement() {
           }
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setServiceModal(null)}>Cancelar</Button>
               <Button variant="primary" onClick={handleService} disabled={saving}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
                 Confirmar
@@ -2729,23 +2909,45 @@ export default function OverviewManagement() {
           }
         >
           <div className={styles.formStack}>
-            <FormField label="Responsável">
-              <Input value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
-            </FormField>
-            <div className={styles.grid2}>
-              <FormField label="Data/Hora de início">
-                <Input type="datetime-local" value={svcForm.dataHoraInicio} onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
+            {serviceModal.type === 'limpeza' ? (
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Selecione o funcionário</label>
+                {funcLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-2)', fontSize: 13 }}>
+                    <Loader2 size={13} className={styles.spin} /> Carregando...
+                  </div>
+                ) : funcList.length === 0 ? (
+                  <div style={{ color: 'var(--text-2)', fontSize: 13 }}>Nenhum funcionário disponível</div>
+                ) : (
+                  <div className={styles.funcList}>
+                    {funcList.map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`${styles.funcListItem} ${funcSelected?.id === f.id ? styles.funcListItemActive : ''}`}
+                        onClick={() => { setFuncSelected(f); setSvcForm((fm) => ({ ...fm, responsavel: f.pessoa?.nome || f.nome })); }}
+                      >
+                        {f.pessoa?.nome || f.nome}
+                        {funcSelected?.id === f.id && <Check size={14} style={{ marginLeft: 'auto' }} />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (<>
+              <FormField label="Responsável">
+                <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
               </FormField>
-              <FormField label="Data/Hora de fim">
-                <Input type="datetime-local" value={svcForm.dataHoraFim} onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
-              </FormField>
-            </div>
-            {serviceModal.type !== 'limpeza' && (<>
+              <div className={styles.grid2}>
+                <FormField label="Data de início">
+                  <DatePicker className={styles.modalInput} value={svcForm.dataHoraInicio ? svcForm.dataHoraInicio.split('T')[0] : ''} onChange={(d) => setSvcForm((f) => ({ ...f, dataHoraInicio: d ? `${d}T${(f.dataHoraInicio || '').split('T')[1] || '09:00'}` : '' }))} />
+                </FormField>
+                <FormField label="Data de fim">
+                  <DatePicker className={styles.modalInput} value={svcForm.dataHoraFim ? svcForm.dataHoraFim.split('T')[0] : ''} onChange={(d) => setSvcForm((f) => ({ ...f, dataHoraFim: d ? `${d}T${(f.dataHoraFim || '').split('T')[1] || '18:00'}` : '' }))} />
+                </FormField>
+              </div>
               <FormField label="Descrição">
-                <Input value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
-              </FormField>
-              <FormField label="Previsão de término">
-                <Input type="date" value={svcForm.previsaoFim} onChange={(e) => setSvcForm((f) => ({ ...f, previsaoFim: e.target.value }))} />
+                <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
               </FormField>
             </>)}
           </div>
@@ -2891,56 +3093,41 @@ export default function OverviewManagement() {
                 </div>
               ) : null;
             })()}
-            {/* ── Consumo interno (minibar) ── */}
+            {/* ── Itens do quarto ── */}
             <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><Package size={13} /> Consumo interno</div>
-              {(!selectedRoom.minibar || selectedRoom.minibar.length === 0) ? (
-                <div className={styles.emptyList}><Package size={20} color="var(--text-2)" /><span>Nenhum item no minibar</span></div>
-              ) : (
-                <div className={styles.minibarList}>
-                  {selectedRoom.minibar.map((item) => {
-                    const ratio   = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
-                    const isLow   = ratio < 0.5;
-                    const esgotado = item.qtdAtual === 0;
-                    return (
-                      <div key={item.produtoId} className={[styles.minibarCard, isLow ? styles.minibarCardLow : ''].join(' ')}>
-                        <div className={styles.minibarCardLeft}>
-                          <span className={styles.minibarCardName}>{item.nome}</span>
-                          <div className={styles.minibarQtyRow}>
-                            <span className={[styles.minibarQtyCurrent, isLow ? styles.minibarQtyLow : ''].join(' ')}>{item.qtdAtual}</span>
-                            <span className={styles.minibarQtySep}>/</span>
-                            <span className={styles.minibarQtyBase}>{item.qtdBase} disp.</span>
-                          </div>
-                        </div>
-                        <div className={styles.minibarProgressWrap}>
-                          <div className={styles.minibarProgressBar}>
-                            <div className={[styles.minibarProgressFill, isLow ? styles.minibarProgressFillLow : ''].join(' ')}
-                              style={{ width: `${Math.min(100, ratio * 100)}%` }} />
-                          </div>
-                        </div>
-                        <div className={styles.minibarCardActions}>
-                          <Button
-                            variant="primary"
-                            style={{ padding: '4px 12px', fontSize: 12 }}
-                            disabled={esgotado || consumoSaving}
-                            onClick={() => handleConsumoInterno(item)}
-                          >
-                            {consumoSaving ? <Loader2 size={12} className={styles.spin} /> : <Minus size={12} />}
-                            {esgotado ? 'Esgotado' : 'Consumir'}
-                          </Button>
-                        </div>
+              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
+              <div className={styles.consumoItemList}>
+                {MOCK_ITENS_QUARTO.map((item) => {
+                  const esgotado = item.qtdAtual === 0;
+                  const ratio    = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
+                  const isLow    = ratio < 0.5;
+                  return (
+                    <div key={item.id} className={styles.consumoItemRow}>
+                      <div className={styles.consumoItemInfo}>
+                        <span className={styles.consumoItemNome}>{item.nome}</span>
+                        <span className={styles.consumoItemMeta}>{item.categoria} · {fmtBRL(item.preco)}/un.</span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <span className={[styles.consumoItemQtd, isLow ? styles.consumoItemQtdLow : ''].join(' ')}>
+                        {item.qtdAtual}/{item.qtdBase} disp.
+                      </span>
+                      <button
+                        className={styles.consumoItemBtn}
+                        disabled={esgotado}
+                        onClick={() => { setConsumoItemSel(item); setConsumoQtd('1'); setConsumoDespesa(false); setConsumoPagOv(null); }}
+                      >
+                        {esgotado ? 'Esgotado' : <><Minus size={11} /> Consumir</>}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div className={styles.consumoModalDivider} />
 
-            {/* ── Consumo externo (form) ── */}
+            {/* ── Consumo externo (dispensa) ── */}
             <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo</div>
+              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo (dispensa)</div>
               <div className={styles.formStack}>
                 <FormField label="Categoria">
                   <Select value={detailConsumoCat} onChange={(e) => { setDetailConsumoCat(e.target.value); setDetailConsumoProd(''); }}>
@@ -2973,7 +3160,7 @@ export default function OverviewManagement() {
                     </div>
                     <Button variant="primary" disabled={consumoSaving} onClick={handleConsumoExterno}>
                       {consumoSaving && <Loader2 size={13} className={styles.spin} />}
-                      <Plus size={13} /> Adicionar consumo externo
+                      <Plus size={13} /> Adicionar
                     </Button>
                   </>
                 )}
@@ -2982,6 +3169,106 @@ export default function OverviewManagement() {
           </div>
         </Modal>
       )}
+
+      {/* ═══════════════════════════════════════════════════════
+          SUB-MODAL — Consumir Item do Quarto
+      ═══════════════════════════════════════════════════════ */}
+      {consumoItemSel && (() => {
+        const item    = consumoItemSel;
+        const qty     = Number(consumoQtd) || 0;
+        const esperado = qty * item.preco;
+        const pago     = consumoPagOv?.valor ?? null;
+        const diverge  = pago !== null && Math.abs(esperado - pago) > 0.01;
+        return (
+          <>
+            <Modal
+              open
+              onClose={() => setConsumoItemSel(null)}
+              size="sm"
+              title={<><Minus size={15} /> Consumir Item</>}
+              footer={
+                <div className={styles.footerRight}>
+                  <Button variant="secondary" onClick={() => setConsumoItemSel(null)}>Cancelar</Button>
+                  <Button variant="primary" disabled={consumoSavingItem || (!consumoDespesa && !consumoPagOv) || qty <= 0}
+                    onClick={async () => {
+                      setConsumoSavingItem(true);
+                      try {
+                        const consumo = { item: item.nome, categoria: item.categoria, quantidade: qty, valorUnitario: item.preco, valorTotal: esperado, formaPagamento: tiposPagamentoOv.find((t) => t.id === Number(consumoPagOv?.tipo_pagamento?.id))?.descricao ?? '', tipo: 'externo' };
+                        const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
+                        setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                        notify(`${item.nome} consumido.`);
+                        setConsumoItemSel(null);
+                      } catch (e) { notify('Erro: ' + e.message, 'error'); }
+                      finally { setConsumoSavingItem(false); }
+                    }}>
+                    {consumoSavingItem && <Loader2 size={14} className={styles.spin} />}
+                    Confirmar
+                  </Button>
+                </div>
+              }
+            >
+              <div className={styles.formStack}>
+                <div className={styles.itemInfoBox}>
+                  <span className={styles.itemInfoLabel}>Item selecionado</span>
+                  <span className={styles.itemInfoName}>{item.nome}</span>
+                  <span className={styles.itemInfoSub}>
+                    Qtd disponível: <strong>{item.qtdAtual}</strong> · Valor un.: <strong>{fmtBRL(item.preco)}</strong>
+                  </span>
+                </div>
+
+                <FormField label="Quantidade a consumir *">
+                  <Input type="number" placeholder="0" min="1" value={consumoQtd} onChange={(e) => setConsumoQtd(e.target.value)} />
+                </FormField>
+
+                <label className={styles.consumoCheckRow}>
+                  <input type="checkbox" checked={consumoDespesa} onChange={(e) => setConsumoDespesa(e.target.checked)} />
+                  <span>Despesa pessoal</span>
+                </label>
+
+                {consumoPagOv ? (
+                  <div className={styles.pagamentoChipOv}>
+                    <CreditCard size={13} />
+                    <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoPagOv.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoPagOv.nome_pagador ?? '—'} · {fmtBRL(pago)}</span>
+                    <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoItemPag(true)}>Alterar</button>
+                  </div>
+                ) : (
+                  <button className={styles.definePagamentoOv} onClick={() => setShowConsumoItemPag(true)}>
+                    <CreditCard size={13} /> Definir Pagamento{consumoDespesa ? '' : ' *'}
+                  </button>
+                )}
+
+                {qty > 0 && (
+                  <div className={diverge ? styles.consumoAlertDivergOv : styles.consumoAlertOv}>
+                    <div className={styles.consumoAlertRowOv}>
+                      <span>Valor esperado</span>
+                      <strong>{fmtBRL(esperado)}</strong>
+                    </div>
+                    {pago !== null && (
+                      <div className={styles.consumoAlertRowOv}>
+                        <span>Valor informado</span>
+                        <strong style={{ color: diverge ? '#ef4444' : '#059669' }}>{fmtBRL(pago)}</strong>
+                      </div>
+                    )}
+                    {diverge && !consumoDespesa && (
+                      <p style={{ fontSize: 11, color: '#ef4444', margin: '2px 0 0', lineHeight: 1.4 }}>
+                        Os valores divergem. Corrija o pagamento ou marque como despesa pessoal.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Modal>
+            <PaymentModal
+              open={showConsumoItemPag}
+              onClose={() => setShowConsumoItemPag(false)}
+              onConfirm={(pag) => { setConsumoPagOv(pag); setShowConsumoItemPag(false); }}
+              tiposPagamento={tiposPagamentoOv}
+              initialPayment={consumoPagOv ?? undefined}
+              canAplicarDesconto={false}
+            />
+          </>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           SUB-MODAL — Alterar Pessoas nas Diárias
@@ -3103,53 +3390,21 @@ export default function OverviewManagement() {
       {/* ═══════════════════════════════════════════════════════
           SUB-MODAL — Adicionar Pagamento (detail)
       ═══════════════════════════════════════════════════════ */}
-      {showDetailAddPag && selectedRoom && (
-        <Modal
-          open
-          onClose={() => setShowDetailAddPag(false)}
-          size="sm"
-          title={<><CreditCard size={15} /> Adicionar Pagamento</>}
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowDetailAddPag(false)}>Cancelar</Button>
-              <Button
-                variant="primary"
-                disabled={!detailPagValor || !detailPagDesc.trim()}
-                onClick={() => { notify('Em desenvolvimento'); setShowDetailAddPag(false); }}
-              >
-                Registrar
-              </Button>
-            </div>
-          }
-        >
-          <div className={styles.formStack}>
-            <FormField label="Descrição *">
-              <Input value={detailPagDesc} onChange={(e) => setDetailPagDesc(e.target.value)} placeholder="Ex: Pagamento total..." />
-            </FormField>
-            <FormField label="Forma de Pagamento">
-              <Select value={detailPagForma} onChange={(e) => setDetailPagForma(e.target.value)}>
-                <option value="">Selecione...</option>
-                {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Valor *">
-              <Input value={detailPagValor} onChange={(e) => setDetailPagValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
-            </FormField>
-            {detailPagValor && (
-              <div className={styles.pagamentoResume}>
-                <div className={styles.pagamentoResumeRow}>
-                  <span>Valor pendente</span>
-                  <span style={{ color: '#d97706' }}>{fmtBRL(selectedRoom.servico?.pagamentoPendente || 0)}</span>
-                </div>
-                <div className={[styles.pagamentoResumeRow, styles.pagamentoResumeTotal].join(' ')}>
-                  <span>Este pagamento</span>
-                  <span style={{ color: '#059669' }}>{fmtBRL(parseBRL(detailPagValor))}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
+      <PaymentModal
+        open={!!showDetailAddPag && !!selectedRoom}
+        onClose={() => setShowDetailAddPag(false)}
+        onConfirm={async (payment) => {
+          const pag = pagamentoFromPaymentModal(payment);
+          if (payOnConfirm) await payOnConfirm(pag);
+          setShowDetailAddPag(false);
+        }}
+        tiposPagamento={tiposPagamentoOv}
+        isSubmitting={saving}
+        titularNome={selectedRoom?.servico?.titularNome ?? null}
+        valorTotal={selectedRoom?.servico?.valorTotal ?? null}
+        valorPago={selectedRoom?.servico?.totalPago ?? null}
+        canAplicarDesconto={false}
+      />
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Gerenciar Diárias
@@ -3159,6 +3414,14 @@ export default function OverviewManagement() {
         const diarias = sv.diarias || [];
         const atualNum = sv.diariaAtual || 1;
         const novoTotal = diarias.reduce((s, d) => s + (d.valor || 0), 0) + (parseBRL(gdValor) || 0);
+        const ultimaDiaria = gdDiariaPendentes.length > 0
+          ? gdDiariaPendentes[gdDiariaPendentes.length - 1]
+          : (diarias.length > 0 ? diarias[diarias.length - 1] : null);
+        const minDataDiaria = ultimaDiaria?.dataFim ? (() => {
+          const datePart = ultimaDiaria.dataFim.split(' ')[0]; // "dd/MM/yyyy" only
+          const [dd, mm, yyyy] = datePart.split('/');
+          return new Date(+yyyy, +mm - 1, +dd);
+        })() : null;
         return (
           <Modal
             open
@@ -3166,65 +3429,105 @@ export default function OverviewManagement() {
             size="md"
             title={<><RefreshCw size={15} /> Gerenciar Diárias — Apt. {selectedRoom.numero}</>}
             footer={
-              <div className={styles.footerRight}>
-                <Button variant="secondary" onClick={() => setShowGerenciarDiarias(false)}>Fechar</Button>
-              </div>
+              <div className={styles.footerRight} />
             }
           >
             <div className={styles.formStack}>
-              <div className={styles.sectionTitle}><Calendar size={13} /> Diárias existentes</div>
-              {diarias.length === 0
+              <Button variant="primary" onClick={() => {
+                if (!minDataDiaria) { notify('Nenhuma diária registrada.', 'error'); return; }
+                const fim = new Date(minDataDiaria);
+                fim.setDate(fim.getDate() + 1);
+                handleAdicionarDiaria(minDataDiaria, fim);
+              }} disabled={savingGd || !minDataDiaria} style={{ width: '100%', marginBottom: 16 }}>
+                {savingGd && <Loader2 size={14} className={styles.spin} />}
+                <Plus size={14} /> Adicionar Diária
+              </Button>
+              {diarias.length === 0 && gdDiariaPendentes.length === 0
                 ? <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
                 : (
-                  <div className={styles.gdDiariaList}>
+                  <div className={styles.gdDiariaList} ref={gdDiariaListRef}>
                     {diarias.map((d) => {
                       const isCurrent = d.num === atualNum;
+                      const isPast = d.num < atualNum;
                       const canRemove = d.num >= atualNum;
                       return (
-                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : ''].join(' ')}>
-                          <span className={styles.gdDiariaNum}>Diária {d.num}</span>
-                          <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
-                          <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
-                          {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
+                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className={styles.gdDiariaNum}>Diária {d.num}</span>
+                                {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
+                              </div>
+                              <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
+                            </div>
+                            <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
+                          </div>
                           {canRemove && !isCurrent && (
-                            <button className={styles.removeBtn} onClick={() => handleRemoverDiaria(d.idx)} disabled={savingGd} title="Remover diária">
+                            <button className={styles.removeBtn} onClick={() => setGdRemoverConfirm({ diariaIdx: d.idx, diariaNum: d.num })} disabled={savingGd} title="Remover diária">
                               <Trash2 size={13} />
                             </button>
                           )}
                         </div>
                       );
                     })}
+                    {gdDiariaPendentes.map((d, idx) => (
+                      <div key={`pending-${idx}`} className={styles.gdDiariaItem} style={{ opacity: 0.7, borderColor: 'var(--violet)' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span className={styles.gdDiariaNum} style={{ color: 'var(--violet)' }}>Diária {diarias.length + idx + 1}</span>
+                              <span className={styles.gdCurrentTag} style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--violet)' }}>Pendente</span>
+                            </div>
+                            <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
+                          </div>
+                          <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
+                        </div>
+                        <button className={styles.removeBtn} onClick={() => setGdDiariaPendentes((prev) => prev.filter((_, i) => i !== idx))} title="Remover da lista">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )
               }
-              <div className={styles.sectionTitle} style={{ marginTop: 8 }}><Plus size={13} /> Adicionar nova diária</div>
-              <div className={styles.gdAddForm}>
-                <div className={styles.grid2}>
-                  <FormField label="Início *"><DatePicker mode="single" value={gdDataInicio} onChange={setGdDataInicio} /></FormField>
-                  <FormField label="Hora"><TimeInput value={gdHoraInicio} onChange={setGdHoraInicio} /></FormField>
+              {gdDiariaPendentes.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <Button variant="secondary" onClick={() => setGdDiariaPendentes([])} style={{ flex: 1 }}>Cancelar</Button>
+                  <Button variant="primary" onClick={handleConfirmarDiarias} disabled={savingGd} style={{ flex: 1 }}>
+                    {savingGd && <Loader2 size={14} className={styles.spin} />}
+                    Confirmar {gdDiariaPendentes.length} diária(s)
+                  </Button>
                 </div>
-                <div className={styles.grid2}>
-                  <FormField label="Fim *"><DatePicker mode="single" value={gdDataFim} onChange={setGdDataFim} minDate={gdDataInicio} /></FormField>
-                  <FormField label="Hora"><TimeInput value={gdHoraFim} onChange={setGdHoraFim} /></FormField>
-                </div>
-                <FormField label="Valor da diária *">
-                  <Input value={gdValor} onChange={(e) => setGdValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
-                </FormField>
-                {gdValor && (
-                  <div className={styles.gdTotalPreview}>
-                    <span className={styles.gdTotalLabel}>Novo total (com esta diária)</span>
-                    <span className={styles.gdTotalValue}>{fmtBRL(novoTotal)}</span>
-                  </div>
-                )}
-                <Button variant="primary" onClick={handleAdicionarDiaria} disabled={savingGd || !gdDataInicio || !gdDataFim || !gdValor}>
-                  {savingGd && <Loader2 size={14} className={styles.spin} />}
-                  <Plus size={14} /> Adicionar Diária
-                </Button>
-              </div>
+              )}
             </div>
           </Modal>
         );
       })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Confirmação Remover Diária
+      ═══════════════════════════════════════════════════════ */}
+      {gdRemoverConfirm && (
+        <Modal
+          open
+          onClose={() => setGdRemoverConfirm(null)}
+          size="sm"
+          title={<><AlertTriangle size={15} /> Remover Diária</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setGdRemoverConfirm(null)} disabled={savingGd}>Cancelar</Button>
+              <Button variant="danger" onClick={async () => { await handleRemoverDiaria(gdRemoverConfirm.diariaIdx); setGdRemoverConfirm(null); }} disabled={savingGd}>
+                {savingGd && <Loader2 size={14} className={styles.spin} />}
+                Remover
+              </Button>
+            </div>
+          }
+        >
+          <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14 }}>
+            Tem certeza que deseja remover a <strong>Diária {gdRemoverConfirm.diariaNum}</strong>?
+          </p>
+        </Modal>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Trocar Quarto
@@ -3252,62 +3555,26 @@ export default function OverviewManagement() {
             }
           >
             <div className={styles.formStack}>
-              <div className={styles.sectionTitle}><Calendar size={13} /> Diárias afetadas</div>
-              {futureDiarias.length === 0 ? (
-                <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária futura disponível</span></div>
-              ) : (
-                <>
-                  <label className={styles.tqSelectAllRow}>
-                    <input
-                      type="checkbox"
-                      checked={tqDiariasIdxs.length === futureDiarias.length}
-                      onChange={(e) => setTqDiariasIdxs(e.target.checked ? futureDiarias.map((d) => d.idx) : [])}
-                    />
-                    Selecionar todas ({futureDiarias.length})
-                  </label>
-                  <div className={styles.tqDiariaPickerList}>
-                    {futureDiarias.map((d) => {
-                      const sel = tqDiariasIdxs.includes(d.idx);
-                      return (
-                        <div
-                          key={d.idx}
-                          className={[styles.tqDiariaItem, sel ? styles.tqDiariaItemSelected : ''].join(' ')}
-                          onClick={() => setTqDiariasIdxs((prev) => sel ? prev.filter((x) => x !== d.idx) : [...prev, d.idx])}
-                        >
-                          <input type="checkbox" checked={sel} onChange={() => {}} onClick={(e) => e.stopPropagation()} />
-                          <span className={styles.tqDiariaLabel}>Diária {d.num}{d.num === atualNum ? ' (atual)' : ''}</span>
-                          <span className={styles.tqDiariaDate}>{d.dataInicio}</span>
-                          <span style={{ color: '#059669', fontWeight: 600, fontSize: 12 }}>{fmtBRL(d.valor)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              <div className={styles.sectionTitle} style={{ marginTop: 8 }}><BedDouble size={13} /> Novo Quarto</div>
-              {OVERVIEW_ROOMS_CATS.map((cat) => (
-                <div key={cat.nome} className={styles.roomPickerCat}>
-                  <div className={styles.roomPickerCatName}>{cat.nome}</div>
-                  <div className={styles.roomPillGroup}>
-                    {cat.quartos.filter((n) => n !== selectedRoom.numero).map((n) => {
-                      const q = quartos.find((r) => r.numero === n);
-                      if (!q || q.status !== ROOM_STATUS.DISPONIVEL) return null;
-                      return (
-                        <button
-                          key={n}
-                          className={[styles.roomPill, tqNovoQuartoId === q.id ? styles.roomPillActive : ''].join(' ')}
-                          onClick={() => setTqNovoQuartoId(q.id)}
-                        >
-                          {n}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+              <FormField label="Diárias afetadas">
+                <DiariasCombobox
+                  value={tqDiariasIdxs}
+                  onChange={setTqDiariasIdxs}
+                  diarias={futureDiarias}
+                  atualNum={atualNum}
+                />
+              </FormField>
+              <FormField label="Novo apartamento">
+                <QuartoCombobox
+                  value={tqNovoQuartoId}
+                  onChange={setTqNovoQuartoId}
+                  quartos={quartos}
+                  categorias={OVERVIEW_ROOMS_CATS}
+                  currentNumero={selectedRoom.numero}
+                />
+              </FormField>
               {novoQuarto && (
-                <div className={styles.pricingHint} style={{ marginTop: 4 }}>
-                  <span className={styles.pricingHintLabel}>Destino:</span>
+                <div className={styles.pricingHint} style={{ marginTop: 12 }}>
+                  <span className={styles.pricingHintLabel}>Selecionado:</span>
                   <span>Apt. {novoQuarto.numero} — {novoQuarto.categoria} · {novoQuarto.tipoOcupacao}</span>
                 </div>
               )}

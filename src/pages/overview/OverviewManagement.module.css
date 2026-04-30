@@ -1,6 +1,7 @@
 /* ── Page ──────────────────────────────────────────────────────────────────── */
 .page {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1316,6 +1317,52 @@
 /* ── Categoria stat red (ocupado) ────────────────────────────────────────────── */
 .catStatRed { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
 
+/* ── Modal service inputs ──────────────────────────────────────────────────── */
+.modalInput {
+  background: color-mix(in srgb, var(--surface) 90%, transparent) !important;
+  border-color: color-mix(in srgb, var(--border) 84%, transparent) !important;
+  outline: none !important;
+  transition: background 0.12s, border-color 0.12s !important;
+  text-transform: uppercase !important;
+}
+.modalInput:hover:not(:focus) {
+  border-color: color-mix(in srgb, var(--border) 84%, transparent) !important;
+  background: color-mix(in srgb, var(--surface) 85%, transparent) !important;
+}
+.modalInput:focus {
+  border-color: rgba(124, 58, 237, 0.42) !important;
+  box-shadow: none !important;
+}
+
+/* ── Funcionário list (modal limpeza) ──────────────────────────────────────── */
+.funcList {
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.funcListItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  transition: color 0.12s, background 0.12s;
+}
+.funcListItem:last-child { border-bottom: none; }
+.funcListItem:hover { background: color-mix(in srgb, var(--border) 20%, transparent); }
+.funcListItemActive {
+  background: none;
+  color: var(--violet);
+  font-weight: 600;
+}
+
 /* ── Meta service badge (inline, under date/timer) ───────────────────────────── */
 .metaServiceBadge {
   display: inline-flex;
@@ -2010,31 +2057,33 @@
 .gdDiariaList {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 220px;
+  max-height: 300px;
   overflow-y: auto;
 }
 .gdDiariaItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 13px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  gap: 10px;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
 }
+.gdDiariaItem:last-child { border-bottom: none; }
 .gdDiariaItemCurrent {
-  border-color: rgba(124, 58, 237, 0.3);
-  background: rgba(124, 58, 237, 0.04);
+  background: none;
+  border-color: var(--border);
+}
+.gdDiariaItemPast {
+  opacity: 0.45;
 }
 .gdDiariaNum {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
-  min-width: 60px;
 }
-.gdDiariaDate { font-size: 12px; color: var(--text-2); flex: 1; }
+.gdDiariaDate { font-size: 12px; color: var(--text-2); }
 .gdDiariaVal  { font-size: 13px; font-weight: 600; color: #059669; }
 :root[data-theme="dark"] .gdDiariaVal { color: #34d399; }
 .gdCurrentTag {
@@ -3091,3 +3140,121 @@
   font-size: 12px; font-weight: 700; color: var(--text);
   background: var(--surface-2);
 }
+
+/* ── Consumo itens do quarto ─────────────────────────────────────────────────── */
+.consumoItemList { display: flex; flex-direction: column; }
+.consumoItemRow {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.consumoItemRow:last-child { border-bottom: none; }
+.consumoItemInfo { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.consumoItemNome { font-size: 13px; font-weight: 600; color: var(--text); }
+.consumoItemMeta { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 6px; }
+.consumoItemQtd  { font-size: 11px; font-weight: 600; color: var(--emerald); white-space: nowrap; flex-shrink: 0; }
+.consumoItemQtdLow { color: #ef4444; }
+.consumoItemBtn {
+  padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0;
+  border: 1px solid rgba(239,68,68,0.4); background: rgba(239,68,68,0.06);
+  color: #ef4444; cursor: pointer; transition: all .15s;
+}
+.consumoItemBtn:hover:not(:disabled) { background: rgba(239,68,68,0.12); border-color: #ef4444; }
+.consumoItemBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Sub-modal consumir item (padrão Inventory) ──────────────────────────────── */
+.itemInfoBox {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 12px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.itemInfoLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
+.itemInfoName  { font-size: 14px; font-weight: 700; color: var(--text); }
+.itemInfoSub   { font-size: 12px; color: var(--text-2); }
+.consumoCheckRow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text); cursor: pointer; user-select: none;
+}
+.consumoCheckRow input { accent-color: var(--violet); width: 15px; height: 15px; cursor: pointer; }
+.definePagamentoOv {
+  display: flex; align-items: center; justify-content: center;
+  gap: 7px; width: 100%; padding: 10px; margin-top: 2px;
+  border: 1.5px dashed var(--border); border-radius: var(--radius);
+  background: none; color: var(--text-2); font-size: 12px; cursor: pointer; transition: all .15s;
+}
+.definePagamentoOv:hover { border-color: var(--violet); color: var(--violet); }
+.pagamentoChipOv {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius);
+  background: rgba(139,92,246,.07); border: 1px solid rgba(139,92,246,.25);
+  color: var(--text); font-size: 12px; margin-top: 2px;
+}
+.pagamentoChipOv span { flex: 1; }
+.pagamentoEditOv {
+  background: none; border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px);
+  color: var(--text-2); font-size: 11px; padding: 3px 8px; cursor: pointer; white-space: nowrap; transition: all .15s;
+}
+.pagamentoEditOv:hover { border-color: var(--violet); color: var(--violet); }
+.consumoAlertOv {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px;
+  background: var(--surface-2); border: 1px solid var(--border); font-size: 12px;
+}
+.consumoAlertDivergOv {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.25); font-size: 12px;
+}
+.consumoAlertRowOv { display: flex; justify-content: space-between; align-items: center; color: var(--text-2); }
+.consumoAlertRowOv strong { color: var(--text); }
+
+/* ── QuartoCombobox ─────────────────────────────────────────────────────────── */
+.qcWrap { position: relative; }
+.qcTrigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 5px 10px; min-height: 36px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); color: var(--text); font-size: 13px; font-family: inherit;
+  cursor: pointer; text-align: left; box-sizing: border-box; transition: border-color 0.15s;
+}
+.qcTrigger:hover, .qcTrigger:focus { border-color: var(--violet); outline: none; }
+.qcPlaceholder { color: var(--text-2); font-size: 13px; }
+.qcSelected { font-size: 13px; color: var(--text); }
+.qcDropdown {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.13); max-height: 260px; overflow-y: auto; padding: 8px;
+}
+.qcSearchWrap {
+  position: relative; display: flex; align-items: center;
+  margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px;
+}
+.qcSearchIcon { position: absolute; left: 8px; color: var(--text-2); pointer-events: none; }
+.qcSearchInput {
+  width: 100%; padding: 6px 8px 6px 28px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-2); color: var(--text); font-size: 12px; font-family: inherit;
+  outline: none; box-sizing: border-box; transition: border-color 0.15s;
+}
+.qcSearchInput:focus { border-color: var(--violet); }
+.qcGroupLabel {
+  font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-2); background: var(--surface-2);
+  padding: 5px 10px; margin: 0 0 2px 0;
+  position: sticky; top: 0; z-index: 1;
+}
+.qcItem {
+  display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px;
+  cursor: pointer; transition: background 0.1s; margin-bottom: 2px;
+}
+.qcItem:hover:not(.qcItemUnavail) { background: color-mix(in srgb, var(--violet) 8%, transparent); }
+.qcItemSel { background: color-mix(in srgb, var(--violet) 10%, transparent); }
+.qcItemUnavail { opacity: 0.45; cursor: not-allowed; }
+.qcItemNum { font-size: 13px; font-weight: 400; color: var(--text); font-family: var(--font-mono), monospace; min-width: 72px; }
+.qcItemTipo { font-size: 10px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.qcItemOcupado {
+  font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 999px;
+  background: rgba(239,68,68,0.1); color: #ef4444; border: 1px solid rgba(239,68,68,0.25);
+  margin-left: auto;
+}
+.qcCheck {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+  flex-shrink: 0; color: transparent; transition: all 0.12s; background: var(--surface);
+}
+.qcCheckSel { background: var(--violet); border-color: var(--violet); color: #fff; }
