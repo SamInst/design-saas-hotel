@@ -2519,13 +2519,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       });
 
       if (indexed.length === 0) return;
+      const resArray = await reservaApi.calcularPreco(indexed.map((x) => x.item));
       const results = {};
-      await Promise.all(indexed.map(async ({ key, item }) => {
-        try {
-          const res = await reservaApi.calcularPreco(item);
-          results[key] = res;
-        } catch { /* silent — show nothing if calc fails for this room */ }
-      }));
+      (Array.isArray(resArray) ? resArray : []).forEach((r, i) => {
+        if (indexed[i]) results[indexed[i].key] = r;
+      });
       setPrecosCalc(results);
     } finally {
       setCalcLoading(false);

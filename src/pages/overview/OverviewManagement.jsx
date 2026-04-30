@@ -21,7 +21,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO, OVERVIEW_ROOMS_CATS,
 } from './overviewMocks';
-import { cadastroApi } from '../../services/api';
+import { cadastroApi, reservaApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
@@ -419,6 +419,11 @@ export default function OverviewManagement() {
   const [apComboOpen, setApComboOpen]               = useState(false);
   const [apSearch, setApSearch]                     = useState('');
 
+  // Price breakdown (pernoite detail)
+  const [ovPriceOpen, setOvPriceOpen] = useState(false);
+  const [ovPricePos,  setOvPricePos]  = useState({ top: 0, left: 0, width: 300 });
+  const ovFinCardRef = useRef(null);
+
   // Saving
   const [saving, setSaving] = useState(false);
 
@@ -583,6 +588,7 @@ export default function OverviewManagement() {
     if (fresh) setSelectedRoom(fresh);
   }, [quartos]); // eslint-disable-line react-hooks/exhaustive-deps
 
+
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const toggleCollapse = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
@@ -591,6 +597,7 @@ export default function OverviewManagement() {
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
     setDiariaTab('hospedes');
+    setOvPriceOpen(false);
   };
 
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
@@ -1297,22 +1304,9 @@ export default function OverviewManagement() {
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
           </div>
 
-          {/* ── Tabs ── */}
-          <div className={styles.ovTabs}>
-            {[
-              ['dados', 'Dados do Pernoite'],
-              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
-            ].map(([t, label]) => (
-              <button key={t} className={[styles.ovTab, detailTab === t ? styles.ovTabActive : ''].join(' ')} onClick={() => setDetailTab(t)}>
-                {label}
-              </button>
-            ))}
-          </div>
-
           {/* ── Scrollable body ── */}
           <div className={styles.ovBody}>
-            {detailTab === 'dados' && (
-              <div className={styles.ovTwoCol}>
+            <div className={styles.ovTwoCol}>
 
                 {/* ── Left: guests ── */}
                 <div className={styles.ovLeft}>
@@ -1378,44 +1372,131 @@ export default function OverviewManagement() {
                   </div>
 
                   {/* Financial card */}
-                  <div className={styles.ovFinCard}>
-                    <div className={styles.ovFinHeader}>
-                      <DollarSign size={13} className={styles.ovFinIcon} />
-                      <span className={styles.ovFinTitle}>Resumo Financeiro</span>
-                    </div>
-                    <div className={styles.ovFinRow}>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Valor Total</span>
-                        <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                  <div ref={ovFinCardRef} style={{ position: 'relative' }}>
+                    <div className={styles.ovFinCard}>
+                      <div className={styles.ovFinHeader}>
+                        <DollarSign size={13} className={styles.ovFinIcon} />
+                        <span className={styles.ovFinTitle}>Resumo Financeiro</span>
                       </div>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Total Pago</span>
-                        <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
-                      </div>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Pendente</span>
-                        <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
-                          {fmtBRL(sv.pagamentoPendente)}
-                        </span>
-                      </div>
-                    </div>
-                    {sv.valorTotal > 0 && (
-                      <div className={styles.ovFinProgress}>
-                        <div className={styles.ovFinProgressMeta}>
-                          <span>Progresso de pagamento</span>
-                          <span>{progressPercent.toFixed(0)}%</span>
+                      <div className={styles.ovFinRow}>
+                        <div className={styles.ovFinItem}>
+                          <span className={styles.ovFinLabel}>Valor Total</span>
+                          <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
                         </div>
-                        <div className={styles.ovFinBar}>
-                          <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                        <div className={styles.ovFinItem}>
+                          <span className={styles.ovFinLabel}>Total Pago</span>
+                          <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
+                        </div>
+                        <div className={styles.ovFinItem}>
+                          <span className={styles.ovFinLabel}>Pendente</span>
+                          <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                            {fmtBRL(sv.pagamentoPendente)}
+                          </span>
                         </div>
                       </div>
-                    )}
-                    {curDiaria?.valor != null && (
-                      <div className={styles.ovFinDiariaRow}>
-                        <span className={styles.ovFinLabel}>Valor da Diária</span>
-                        <span className={styles.ovFinDiariaVal}>{fmtBRL(curDiaria.valor)}</span>
-                      </div>
-                    )}
+                      {sv.valorTotal > 0 && (
+                        <div className={styles.ovFinProgress}>
+                          <div className={styles.ovFinProgressMeta}>
+                            <span>Progresso de pagamento</span>
+                            <span>{progressPercent.toFixed(0)}%</span>
+                          </div>
+                          <div className={styles.ovFinBar}>
+                            <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                          </div>
+                        </div>
+                      )}
+                      {sv.diarias?.length > 0 && (
+                        <div className={styles.ovFinDiariaRow}>
+                          <span className={styles.ovFinLabel}>Valor da Diária</span>
+                          <span className={styles.ovFinValueRow}>
+                            <span className={styles.ovFinDiariaVal}>{fmtBRL(curDiaria?.valor ?? sv.diarias[0]?.valor)}</span>
+                            <button
+                              className={styles.ovPriceToggle}
+                              onClick={() => {
+                                if (!ovPriceOpen && ovFinCardRef.current) {
+                                  const r = ovFinCardRef.current.getBoundingClientRect();
+                                  setOvPricePos({ top: r.top, right: window.innerWidth - r.left + 6, width: r.width });
+                                }
+                                setOvPriceOpen((v) => !v);
+                              }}
+                              title="Ver detalhes do preço"
+                            >
+                              <ChevronDown size={12} className={ovPriceOpen ? styles.priceCardChevronOpen : ''} />
+                            </button>
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Floating price breakdown — rendered via portal to escape modal overflow */}
+                    {ovPriceOpen && (() => {
+                      const consumos      = sv.consumos || [];
+                      const pagamentos    = allPagamentos;
+                      const consumoTotal  = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
+                      const pagamentoTotal = pagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
+                      const grandTotal    = (sv.valorTotal || 0) + consumoTotal;
+                      return createPortal(
+                        <>
+                          <div className={styles.ovPriceBackdrop} onClick={() => setOvPriceOpen(false)} />
+                          <div
+                            className={styles.ovPriceCardFloat}
+                            style={{ top: ovPricePos.top, right: ovPricePos.right, width: ovPricePos.width }}
+                          >
+                            {sv.diarias.map((d) => {
+                              const dateFrom = d.dataInicio?.split(' ')[0] || '';
+                              const dateTo   = d.dataFim?.split(' ')[0] || '';
+                              const nHosp    = (d.hospedes || []).length || 1;
+                              const label    = `Diária ${d.num} - (${dateFrom} → ${dateTo}) ${nHosp} Adulto${nHosp !== 1 ? 's' : ''}`;
+                              return (
+                                <div key={d.num} className={styles.ovPriceCardRow}>
+                                  <span className={styles.step3PriceDesc}>{label}</span>
+                                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
+                                </div>
+                              );
+                            })}
+                            {consumos.length > 0 && (
+                              <>
+                                <div className={styles.ovPriceSection}>Consumo</div>
+                                {consumos.map((c, i) => (
+                                  <div key={c.id || i} className={styles.ovPriceCardRow}>
+                                    <span className={styles.step3PriceDesc}>{c.item}{c.quantidade > 1 ? ` ×${c.quantidade}` : ''}</span>
+                                    <span className={styles.step3PriceVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                            {pagamentos.length > 0 && (
+                              <>
+                                <div className={styles.ovPriceSection}>Pagamentos</div>
+                                {pagamentos.map((p, i) => (
+                                  <div key={i} className={styles.ovPricePagCard}>
+                                    <div className={styles.ovPricePagMain}>
+                                      <div className={styles.ovPagTitle}>{p.descricao}</div>
+                                      {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
+                                      <div className={styles.ovPagMeta}>
+                                        {p.data && <span>{p.data}</span>}
+                                        {(p.forma || p.formaPagamento) && <><span className={styles.ovPagDot}>·</span><span>{p.forma || p.formaPagamento}</span></>}
+                                        {p.registradoPor && <><span className={styles.ovPagDot}>·</span><span>registrado por {p.registradoPor}</span></>}
+                                      </div>
+                                    </div>
+                                    <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
+                                  </div>
+                                ))}
+                                <div className={styles.ovPriceSaldoRow}>
+                                  <span className={styles.step3PriceDesc}>Saldo pago</span>
+                                  <span className={[styles.step3PriceVal, styles.ovPricePago].join(' ')}>{fmtBRL(pagamentoTotal)}</span>
+                                </div>
+                              </>
+                            )}
+                            <div className={styles.ovPriceCardTotal}>
+                              <span>Total</span>
+                              <span>{fmtBRL(grandTotal)}</span>
+                            </div>
+                          </div>
+                        </>,
+                        document.body
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1451,36 +1532,6 @@ export default function OverviewManagement() {
                 </div>
 
               </div>
-            )}
-            {detailTab === 'pagamentos' && (
-              <div className={styles.ovBodyPad}>
-                <Button variant="primary" size="sm" onClick={() => openPayModal(async (pag) => {
-                  const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
-                  setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                  notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
-                }, sv.titularNome)}>
-                  <Plus size={14} /> Adicionar Pagamento
-                </Button>
-                {allPagamentos.length === 0 ? (
-                  <div className={styles.emptyList}><CreditCard size={20} color="var(--text-2)" /><span>Nenhum pagamento registrado.</span></div>
-                ) : (
-                  <div className={styles.itemList}>
-                    {allPagamentos.map((p, i) => (
-                      <div key={p.id || i} className={styles.listItem}>
-                        <div className={styles.listItemLeft}>
-                          <CreditCard size={14} className={styles.listItemIconGreen} />
-                          <div>
-                            <div className={styles.listItemName}>{p.descricao}</div>
-                            <div className={styles.listItemSub}>{p.forma || p.formaPagamento} · {p.data}</div>
-                          </div>
-                        </div>
-                        <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* ── Footer ── */}
@@ -1517,6 +1568,13 @@ export default function OverviewManagement() {
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openTrocarQuarto(); }}>
                           <ArrowLeftRight size={14} /> Trocar Quarto
+                        </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openPayModal(async (pag) => {
+                          const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+                          setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                          notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                        }, sv.titularNome); }}>
+                          <CreditCard size={14} /> Adicionar Pagamento
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
                           <ShoppingCart size={14} /> Adicionar Consumo
@@ -1933,6 +1991,15 @@ export default function OverviewManagement() {
     const guestCount  = sv?.hospedes?.length ?? 0;
     const hasDesconto = !!(sv?.desconto?.valor);
 
+    const bedTags = room.status === ROOM_STATUS.DISPONIVEL
+      ? [
+          { key: 'casal',    Icon: BedDouble },
+          { key: 'solteiro', Icon: BedSingle },
+          { key: 'beliche',  Icon: Layers    },
+          { key: 'rede',     Icon: Waves     },
+        ].filter(({ key }) => (room.camas?.[key] || 0) > 0)
+      : [];
+
     return (
       <div className={[styles.roomCard, styles[`roomCard_${sk}`]].join(' ')} onClick={() => openDetail(room)}>
         {/* Top row: number + status badge */}
@@ -1946,7 +2013,16 @@ export default function OverviewManagement() {
           {room.status === ROOM_STATUS.DISPONIVEL && (
             <>
               <span className={styles.roomCardTipo}>{room.tipoOcupacao}</span>
-              <BedsRow camas={room.camas} />
+              {bedTags.length > 0 && (
+                <div className={styles.roomCardBadges}>
+                  {bedTags.map(({ key, Icon }) => (
+                    <div key={key} className={styles.roomCardBedTag}>
+                      <Icon size={11} />
+                      <span>{room.camas[key]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

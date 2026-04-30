@@ -326,6 +326,25 @@
   gap: 2px;
 }
 
+.roomCardBedTag {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: #374151;
+  border: none;
+  border-radius: 5px;
+  color: rgba(255,255,255,.85);
+  cursor: default;
+}
+.roomCardBedTag span {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255,255,255,.85);
+}
+
 /* Meta row (period / timer) */
 .metaRow {
   display: flex;
@@ -1649,7 +1668,7 @@
   color: #dc2626;
   background: rgba(220, 38, 38, 0.08);
   border: 1px solid rgba(220, 38, 38, 0.2);
-  border-radius: 20px;
+  border-radius: 5px;
   padding: 1px 6px;
   flex-shrink: 0;
 }
@@ -1917,7 +1936,7 @@
   color: var(--violet);
   background: rgba(124, 58, 237, 0.08);
   border: 1px solid rgba(124, 58, 237, 0.2);
-  border-radius: 20px;
+  border-radius: 5px;
   padding: 1px 6px;
   flex-shrink: 0;
 }
@@ -2770,3 +2789,100 @@
   transition: color 0.1s;
 }
 .ovAcoesSubBack:hover { color: var(--text); }
+
+/* ── Price breakdown (pernoite detail) ──────────────────────────────────── */
+.ovFinValueRow { display: flex; align-items: center; gap: 6px; }
+
+.ovPriceToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.ovPriceToggle:hover { background: var(--surface); color: var(--text); }
+
+.priceCardChevronOpen { transform: rotate(180deg); transition: transform .15s; }
+
+.ovPriceBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+}
+.ovPriceCardFloat {
+  position: fixed;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ovPriceCardRow {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 5px 12px;
+}
+.ovPriceCardRow:not(:last-child) { border-bottom: 1px solid var(--border); }
+.step3PriceDesc { font-size: 12px; color: var(--text-2); }
+.step3PriceVal { font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.ovPriceSection {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-2); padding: 4px 12px 2px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ovPricePago { color: var(--emerald) !important; }
+
+/* ── Pagamentos tab cards ───────────────────────────────────────────────────── */
+/* Payment cards inside the floating price popup */
+.ovPricePagCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.ovPricePagCard:last-of-type { border-bottom: none; }
+.ovPricePagMain { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ovPriceSaldoRow {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 5px 12px;
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.ovPagList { display: flex; flex-direction: column; }
+.ovPagCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ovPagCard:last-child { border-bottom: none; }
+.ovPagMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ovPagTitle { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .03em; }
+.ovPagName  { font-size: 13px; font-weight: 500; color: var(--text); }
+.ovPagMeta  { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.ovPagDot   { color: var(--text-2); }
+.ovPagValor { font-size: 14px; font-weight: 700; color: var(--emerald); flex-shrink: 0; white-space: nowrap; padding-top: 2px; }
+.ovPriceCardTotal {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; font-weight: 700; color: var(--text);
+  background: var(--surface-2);
+}
