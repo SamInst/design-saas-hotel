@@ -543,17 +543,6 @@ export default function OverviewManagement() {
     servico:    quartos.filter((q) => [ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(q.status)).length,
   };
 
-  const hasActiveFilters = statusFilter !== 'todos' || !!filterTipoOcupacao || !!filterDateStart || !!search.trim();
-
-  const clearAllFilters = () => {
-    setStatusFilter('todos');
-    setFilterTipoOcupacao('');
-    setFilterDateStart(null);
-    setFilterDateEnd(null);
-    setDateGroupCollapsed({});
-    setSearch('');
-  };
-
   // ── Total hospedados across all occupied rooms ────────────────────────────────
   const totalHospedados = quartos.reduce((sum, q) => sum + (q.servico?.hospedes?.length || 0), 0);
   const quartosOcupados = quartos.filter((q) => [ROOM_STATUS.OCUPADO, ROOM_STATUS.RESERVADO].includes(q.status)).length;
@@ -2122,48 +2111,97 @@ export default function OverviewManagement() {
             <p className={styles.subtitle}><Building2 size={13} /> Visão geral de quartos, hóspedes e day use</p>
           </div>
           <div className={styles.tableHeaderActions}>
-            <div className={styles.searchWrap}>
+            <div className={[styles.searchWrap, styles.headerControl].join(' ')}>
               <Search size={13} className={styles.searchIcon} />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+              {search.trim() && (
+                <button
+                  type="button"
+                  className={styles.searchClearBtn}
+                  onClick={() => setSearch('')}
+                  aria-label="Limpar busca"
+                  title="Limpar busca"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
-            <Select value={filterTipoOcupacao} onChange={(e) => setFilterTipoOcupacao(e.target.value)} className={styles.tipoSelectBar}>
-              <option value="">Tipo de ocupação</option>
-              {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
-            </Select>
-            <div className={styles.dateRangeWrap}>
+            <div className={[styles.dateRangeWrap, styles.headerControl].join(' ')}>
               <DatePicker
-                mode="range"
-                startDate={filterDateStart}
-                endDate={filterDateEnd}
-                onRangeChange={({ start, end }) => { setFilterDateStart(start); setFilterDateEnd(end); setDateGroupCollapsed({}); }}
-                placeholder="Período de check-in..."
+                mode="single"
+                value={filterDateStart}
+                onChange={(date) => { setFilterDateStart(date); setFilterDateEnd(null); setDateGroupCollapsed({}); }}
+                placeholder="Data de check-in..."
+                className={styles.datePickerWrap}
+                triggerClassName={styles.headerControlField}
               />
             </div>
-            <Button
-              variant="secondary"
-              className={[styles.btnClearFilters, hasActiveFilters ? styles.btnClearFiltersActive : ''].join(' ')}
-              onClick={clearAllFilters}
-            >
-              <X size={12} /> Limpar
-            </Button>
-            <Button variant="primary" onClick={() => setShowAddQuarto(true)}>
+            <Button variant="primary" className={styles.headerControlBtn} onClick={() => setShowAddQuarto(true)}>
               <Plus size={14} /> Adicionar Quarto
             </Button>
           </div>
         </div>
 
-        {/* ── Filter tabs ── */}
+        {/* ── Filters row ── */}
         <div className={styles.filterTabs}>
-          {FILTER_OPTIONS.map((f) => (
-            <button
-              key={f.id}
-              className={[styles.filterTab, statusFilter === f.id ? styles.filterTabActive : ''].join(' ')}
-              onClick={() => setStatusFilter(f.id)}
-            >
-              {f.label}
-              {filterCounts[f.id] != null && <span className={styles.filterCount}>{filterCounts[f.id]}</span>}
-            </button>
-          ))}
+          <div className={styles.filterField}>
+            <div className={styles.filterSelectWrap}>
+              <Select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className={[
+                  styles.filterSelectBar,
+                  statusFilter !== 'todos' ? styles.filterSelectActive : '',
+                  statusFilter !== 'todos' ? styles.filterSelectWithClear : '',
+                ].join(' ')}
+              >
+                <option value="todos">Todos os quartos</option>
+                {FILTER_OPTIONS.filter((f) => f.id !== 'todos').map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}{filterCounts[f.id] != null ? ` (${filterCounts[f.id]})` : ''}
+                  </option>
+                ))}
+              </Select>
+              {statusFilter !== 'todos' && (
+                <button
+                  type="button"
+                  className={styles.filterClearBtn}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setStatusFilter('todos'); }}
+                  aria-label="Limpar filtro de status"
+                  title="Limpar filtro"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className={styles.filterField}>
+            <div className={styles.filterSelectWrap}>
+              <Select
+                value={filterTipoOcupacao}
+                onChange={(e) => setFilterTipoOcupacao(e.target.value)}
+                className={[
+                  styles.filterSelectBar,
+                  filterTipoOcupacao ? styles.filterSelectActive : '',
+                  filterTipoOcupacao ? styles.filterSelectWithClear : '',
+                ].join(' ')}
+              >
+                <option value="">Tipo de ocupação</option>
+                {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+              {filterTipoOcupacao && (
+                <button
+                  type="button"
+                  className={styles.filterClearBtn}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFilterTipoOcupacao(''); }}
+                  aria-label="Limpar filtro de tipo de ocupação"
+                  title="Limpar filtro"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Category / Date groups ── */}
@@ -2208,30 +2246,6 @@ export default function OverviewManagement() {
                     </div>
                   )}
                 </div>
-                {collapsed[cat.id] ? (
-                  <div className={styles.catStatsMini}>
-                    <span className={[styles.catStatMini, styles.catStatMiniGreen].join(' ')}>
-                      <BedDouble size={12} />{cat.disponiveis}
-                    </span>
-                    {cat.ocupados > 0 && (
-                      <span className={[styles.catStatMini, styles.catStatMiniAmber].join(' ')}>
-                        <Users size={12} />{cat.ocupados}
-                      </span>
-                    )}
-                    {cat.emServico > 0 && (
-                      <span className={[styles.catStatMini, styles.catStatMiniSlate].join(' ')}>
-                        <Wrench size={12} />{cat.emServico}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className={styles.catStats}>
-                    <span className={[styles.catStat, styles.catStatGreen].join(' ')}>{cat.disponiveis} disponíveis</span>
-                    <span className={[styles.catStat, styles.catStatAmber].join(' ')}>{cat.ocupados} ocupados/reservados</span>
-                    {cat.emServico > 0 && <span className={[styles.catStat, styles.catStatSlate].join(' ')}>{cat.emServico} em serviço</span>}
-                    <span className={styles.catTotal}>{cat.total} quartos</span>
-                  </div>
-                )}
               </div>
               {!collapsed[cat.id] && (
                 <div className={styles.catBody}>
@@ -2749,49 +2763,54 @@ export default function OverviewManagement() {
           title={<><Plus size={15} /> Adicionar Quarto</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowAddQuarto(false)}>Cancelar</Button>
-              <Button variant="primary" onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setShowAddQuarto(false); }}>Salvar</Button>
+              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={() => setShowAddQuarto(false)}>Cancelar</Button>
+              <Button variant="primary" className={styles.addRoomSaveBtn} onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setShowAddQuarto(false); }}>Salvar quarto</Button>
             </div>
           }
         >
-          <div className={styles.formStack}>
-            <FormField label="Número *">
-              <Input placeholder="Ex: 23" />
-            </FormField>
-            <FormField label="Descrição">
-              <Input placeholder="Descrição do quarto..." />
-            </FormField>
-            <FormField label="Categoria *">
-              <Select>
-                <option value="">Selecione...</option>
-                <option>Standard</option>
-                <option>Luxo</option>
-                <option>Suíte</option>
-              </Select>
-            </FormField>
-            <FormField label="Tipo de Ocupação *">
-              <Select>
-                <option value="">Selecione...</option>
-                {TIPOS_OCUPACAO.map((t) => <option key={t}>{t}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="Qtd. máx. de pessoas">
-              <Input type="number" min="1" max="10" placeholder="Ex: 2" />
-            </FormField>
+          <div className={styles.addRoomModal}>
             <div className={styles.grid2}>
-              <FormField label="Camas de casal">
-                <Input type="number" min="0" placeholder="0" />
+              <FormField label="Número *">
+                <Input className={styles.addRoomField} placeholder="Ex: 23" />
               </FormField>
-              <FormField label="Camas solteiro">
-                <Input type="number" min="0" placeholder="0" />
+              <FormField label="Categoria *">
+                <Select className={styles.addRoomField}>
+                  <option value="">Categoria do quarto</option>
+                  <option>Standard</option>
+                  <option>Luxo</option>
+                  <option>Suíte</option>
+                </Select>
               </FormField>
             </div>
+
+            <FormField label="Descrição">
+              <Input className={styles.addRoomField} placeholder="Descrição do quarto..." />
+            </FormField>
+
             <div className={styles.grid2}>
+              <FormField label="Tipo de Ocupação *">
+                <Select className={styles.addRoomField}>
+                  <option value="">Tipo de ocupação</option>
+                  {TIPOS_OCUPACAO.map((t) => <option key={t}>{t}</option>)}
+                </Select>
+              </FormField>
+              <FormField label="Qtd. máx. de pessoas">
+                <Input className={styles.addRoomField} type="number" min="1" max="10" placeholder="Ex: 2" />
+              </FormField>
+            </div>
+
+            <div className={styles.addRoomBedsGrid}>
+              <FormField label="Camas de casal">
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+              </FormField>
+              <FormField label="Camas solteiro">
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+              </FormField>
               <FormField label="Beliches">
-                <Input type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
               <FormField label="Redes">
-                <Input type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
             </div>
           </div>

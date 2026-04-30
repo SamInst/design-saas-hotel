@@ -6,10 +6,10 @@
   border-radius:10px; background:var(--surface); border:1.5px solid var(--card-border);
   color:var(--text); font-size:13px; font-family:inherit; cursor:pointer; text-align:left;
   transition:border-color .15s, box-shadow .15s;
-  box-shadow:0 1px 2px rgba(15,23,42,.05);
+  box-shadow:none;
 }
-.trigger:hover { border-color:var(--violet); }
-.open { border-color:var(--violet) !important; box-shadow:0 0 0 3px rgba(124,58,237,.14) !important; }
+.trigger:hover { border-color:rgba(124,58,237,.32); }
+.open { border-color:rgba(124,58,237,.42) !important; box-shadow:none !important; }
 .ico  { width:15px; height:15px; flex-shrink:0; color:var(--text-2); }
 .val  { flex:1; color:var(--text); }
 .ph   { flex:1; color:var(--text-2); opacity:.6; }
@@ -23,12 +23,12 @@
 .textInput::placeholder { color:var(--text-2); opacity:.6; }
 
 .clear {
-  width:18px; height:18px; border-radius:50%; border:none;
-  background:rgba(107,114,128,.15); color:var(--text-2); cursor:pointer;
+  width:16px; height:16px; border-radius:4px; border:none;
+  background:transparent; color:var(--text-2); cursor:pointer;
   font-size:14px; display:flex; align-items:center; justify-content:center;
-  flex-shrink:0; transition:background .12s, color .12s;
+  flex-shrink:0; transition:color .12s;
 }
-.clear:hover { background:#fca5a5; color:#dc2626; }
+.clear:hover { color:#dc2626; }
 
 .pop {
   /* position/top/left/z-index set via inline style (portal) */

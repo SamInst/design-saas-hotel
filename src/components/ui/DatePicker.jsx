@@ -46,6 +46,8 @@ export function DatePicker({
   placeholder = 'Selecione a data',
   label,
   error = false,
+  className = '',
+  triggerClassName = '',
 }) {
   const today = sod(new Date());
   const [open,         setOpen]         = useState(false);
@@ -188,6 +190,7 @@ export function DatePicker({
 
   const triggerCls = [
     styles.trigger,
+    triggerClassName,
     open   ? styles.open        : '',
     error  ? styles.triggerError : '',
   ].join(' ');
@@ -260,7 +263,7 @@ export function DatePicker({
   );
 
   return (
-    <div className={styles.wrap} ref={ref}>
+    <div className={[styles.wrap, className].join(' ')} ref={ref}>
       {label && <label className={styles.label}>{label}</label>}
 
       <div
