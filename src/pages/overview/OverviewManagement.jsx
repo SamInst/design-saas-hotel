@@ -56,6 +56,8 @@ const displayToDate = (s) => {
   const [dd, mm, yyyy] = s.split('/');
   return new Date(+yyyy, +mm - 1, +dd);
 };
+const isoToDate = (s) => s ? new Date(s.split('T')[0] + 'T12:00:00') : null;
+const dateToISO = (d) => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
 
 function calcElapsedSeconds(dataUso, horaEntrada, horaSaida = null) {
   if (!dataUso || !horaEntrada) return 0;
@@ -542,18 +544,14 @@ export default function OverviewManagement() {
   const [detailHospedeSelected, setDetailHospedeSelected]   = useState(null);
 
   // Detail — Add Consumo (pernoite/dayuse existing)
-  const [detailConsumoCat, setDetailConsumoCat]             = useState('');
-  const [detailConsumoProd, setDetailConsumoProd]           = useState('');
-  const [detailConsumoQty, setDetailConsumoQty]             = useState(1);
-  const [detailConsumoForma, setDetailConsumoForma]         = useState('');
+  const [detailConsumoCat, setDetailConsumoCat]                 = useState('');
+  const [showConsumoExternoModal, setShowConsumoExternoModal]   = useState(false);
+  const [externoCart, setExternoCart]                           = useState([]); // [{ key, catId, itemId, nome, categoria, preco, qtd }]
 
-  // Consumir item (pernoite)
-  const [consumoItemSel,  setConsumoItemSel]  = useState(null);
-  const [consumoQtd,      setConsumoQtd]      = useState('');
-  const [consumoDespesa,  setConsumoDespesa]  = useState(false);
-  const [consumoPagOv,    setConsumoPagOv]    = useState(null);
-  const [showConsumoItemPag, setShowConsumoItemPag] = useState(false);
-  const [consumoSavingItem, setConsumoSavingItem]   = useState(false);
+  // Consumo — carrinho unificado (interno + externo → único pagamento)
+  const [consumoCart,    setConsumoCart]    = useState([]); // [{ key, tipo, nome, categoria, preco, qtd, qtdMax?, itemId? }]
+  const [consumoCartPag, setConsumoCartPag] = useState(null);
+  const [showConsumoPag, setShowConsumoPag] = useState(false);
 
   // Detail — Add Pagamento (pernoite/dayuse existing)
   const [showDetailAddPag, setShowDetailAddPag]             = useState(false);
@@ -672,8 +670,7 @@ export default function OverviewManagement() {
   const nhPendente   = Math.max(0, nhTotalHosp - nhTotalPago);
 
   // ── Detail add consumo computed ───────────────────────────────────────────────
-  const detailConsumoCatSel  = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(detailConsumoCat));
-  const detailConsumoProdSel = detailConsumoCatSel?.produtos.find((p) => p.id === parseInt(detailConsumoProd));
+  const detailConsumoCatSel = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(detailConsumoCat));
   const detailHospResults    = useMemo(() =>
     HOSPEDES_CADASTRADOS.filter((h) => !detailHospedeSearch || h.nome.toLowerCase().includes(detailHospedeSearch.toLowerCase())),
     [detailHospedeSearch]
@@ -1060,24 +1057,62 @@ export default function OverviewManagement() {
     finally { setConsumoSaving(false); }
   };
 
-  // ── Consumo externo (form → consumo list) ─────────────────────────────────────
-  const handleConsumoExterno = async () => {
-    if (!selectedRoom || !detailConsumoProdSel) { notify('Selecione um produto.', 'error'); return; }
+  // ── Consumo — helpers do carrinho ─────────────────────────────────────────────
+  const updateInternQty = (item, newQty) => {
+    const capped = Math.min(Math.max(0, newQty), item.qtdAtual);
+    setConsumoCart((prev) => {
+      if (capped <= 0) return prev.filter((c) => !(c.tipo === 'interno' && c.itemId === item.id));
+      const ex = prev.find((c) => c.tipo === 'interno' && c.itemId === item.id);
+      if (ex) return prev.map((c) => c.tipo === 'interno' && c.itemId === item.id ? { ...c, qtd: capped } : c);
+      return [...prev, { key: `int-${item.id}`, tipo: 'interno', nome: item.nome, categoria: item.categoria, preco: item.preco, qtd: capped, qtdMax: item.qtdAtual, itemId: item.id }];
+    });
+  };
+
+  const updateExternoQty = (item, newQty) => {
+    const catId  = detailConsumoCat;
+    const catNome = detailConsumoCatSel?.nome ?? '';
+    setExternoCart((prev) => {
+      if (newQty <= 0) return prev.filter((c) => !(c.catId === catId && c.itemId === item.id));
+      const ex = prev.find((c) => c.catId === catId && c.itemId === item.id);
+      if (ex) return prev.map((c) => c.catId === catId && c.itemId === item.id ? { ...c, qtd: newQty } : c);
+      return [...prev, { key: `ext-${catId}-${item.id}`, catId, itemId: item.id, nome: item.nome, categoria: catNome, preco: item.preco, qtd: newQty }];
+    });
+  };
+
+  const removeFromExternoCart = (key) => setExternoCart((prev) => prev.filter((c) => c.key !== key));
+
+  const handleConfirmExterno = () => {
+    setConsumoCart((prev) => {
+      const updated = [...prev];
+      externoCart.forEach((ec) => {
+        const cartItem = { key: `ext-${ec.catId}-${ec.itemId}-${Date.now()}`, tipo: 'externo', nome: ec.nome, categoria: ec.categoria, preco: ec.preco, qtd: ec.qtd, itemId: ec.itemId };
+        const idx = updated.findIndex((c) => c.tipo === 'externo' && c.itemId === ec.itemId && c.categoria === ec.categoria);
+        if (idx >= 0) updated[idx] = { ...updated[idx], qtd: updated[idx].qtd + ec.qtd };
+        else updated.push(cartItem);
+      });
+      return updated;
+    });
+    setShowConsumoExternoModal(false);
+    setExternoCart([]);
+    setDetailConsumoCat('');
+  };
+
+  const removeFromCart = (key) => setConsumoCart((prev) => prev.filter((c) => c.key !== key));
+
+  const handleConfirmConsumoAll = async (pag) => {
+    if (!selectedRoom || consumoCart.length === 0) return;
+    setConsumoCartPag(pag);
+    setShowConsumoPag(false);
     setConsumoSaving(true);
     try {
-      const consumo = {
-        item: detailConsumoProdSel.nome,
-        categoria: detailConsumoCatSel?.nome || '',
-        quantidade: detailConsumoQty,
-        valorUnitario: detailConsumoProdSel.preco,
-        valorTotal: detailConsumoProdSel.preco * detailConsumoQty,
-        formaPagamento: detailConsumoForma,
-        tipo: 'externo',
-      };
-      const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
-      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`${consumo.item} adicionado ao consumo.`);
-      setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma('');
+      const formaPag = tiposPagamentoOv.find((t) => t.id === Number(pag?.tipo_pagamento?.id))?.descricao ?? '';
+      for (const item of consumoCart) {
+        const consumo = { item: item.nome, categoria: item.categoria, quantidade: item.qtd, valorUnitario: item.preco, valorTotal: item.preco * item.qtd, formaPagamento: formaPag, tipo: item.tipo };
+        await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
+      }
+      notify(`${consumoCart.length} item(s) adicionado(s) ao consumo.`);
+      setShowAddConsumoModal(false);
+      setConsumoCart([]); setConsumoCartPag(null); setDetailConsumoCat('');
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setConsumoSaving(false); }
   };
@@ -1742,7 +1777,7 @@ export default function OverviewManagement() {
                       <span>Sem consumo</span>
                     </div>
                   ) : (
-                    <>
+                    <div className={styles.ovConsumoBox}>
                       <div className={styles.ovConsumoSideHeader}>
                         <ShoppingCart size={12} /> Consumo
                       </div>
@@ -1761,7 +1796,7 @@ export default function OverviewManagement() {
                         <span>Total</span>
                         <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? c.valor ?? 0), 0))}</span>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
 
@@ -1810,7 +1845,7 @@ export default function OverviewManagement() {
                         }, sv.titularNome); }}>
                           <CreditCard size={14} /> Adicionar Pagamento
                         </button>
-                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); }}>
                           <ShoppingCart size={14} /> Adicionar Consumo
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx(sv.diariaAtual ?? 1); setApComboOpen(false); setShowAlterarPessoas(true); }}>
@@ -1995,7 +2030,7 @@ export default function OverviewManagement() {
             )}
             {detailTab === 'consumos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setDetailConsumoProd(''); setDetailConsumoQty(1); setDetailConsumoForma(''); setShowAddConsumoModal(true); }}>
+                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); }}>
                   <Plus size={13} /> Adicionar Consumo
                 </Button>
                 {(sv.consumos || []).length === 0
@@ -2517,10 +2552,10 @@ export default function OverviewManagement() {
           title={renderDetailTitle()}
           footer={selectedRoom?.servico?.tipo === 'pernoite' ? undefined : renderDetailFooter()}
           containerStyle={selectedRoom?.servico?.tipo === 'pernoite'
-            ? { height: 'clamp(480px, 74vh, 640px)', width: 'min(1060px, 96vw)', maxWidth: 'min(1060px, 96vw)' }
+            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(1060px, 96vw)', maxWidth: 'min(1060px, 96vw)' }
             : undefined}
           bodyStyle={selectedRoom?.servico?.tipo === 'pernoite'
-            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 0 }
+            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
             : undefined}
         >
           {renderDetailContent()}
@@ -2938,14 +2973,6 @@ export default function OverviewManagement() {
               <FormField label="Responsável">
                 <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
               </FormField>
-              <div className={styles.grid2}>
-                <FormField label="Data de início">
-                  <DatePicker className={styles.modalInput} value={svcForm.dataHoraInicio ? svcForm.dataHoraInicio.split('T')[0] : ''} onChange={(d) => setSvcForm((f) => ({ ...f, dataHoraInicio: d ? `${d}T${(f.dataHoraInicio || '').split('T')[1] || '09:00'}` : '' }))} />
-                </FormField>
-                <FormField label="Data de fim">
-                  <DatePicker className={styles.modalInput} value={svcForm.dataHoraFim ? svcForm.dataHoraFim.split('T')[0] : ''} onChange={(d) => setSvcForm((f) => ({ ...f, dataHoraFim: d ? `${d}T${(f.dataHoraFim || '').split('T')[1] || '18:00'}` : '' }))} />
-                </FormField>
-              </div>
               <FormField label="Descrição">
                 <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
               </FormField>
@@ -3071,204 +3098,218 @@ export default function OverviewManagement() {
       {showAddConsumoModal && selectedRoom && (
         <Modal
           open
-          onClose={() => setShowAddConsumoModal(false)}
+          onClose={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}
           size="md"
           title={<><ShoppingCart size={15} /> Adicionar Consumo</>}
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowAddConsumoModal(false)}>Fechar</Button>
-            </div>
-          }
-        >
-          <div className={styles.consumoModalBody}>
-            {/* ── Diária atual ── */}
-            {selectedRoom.servico?.tipo === 'pernoite' && (() => {
-              const _sv = selectedRoom.servico;
-              const _d  = (_sv.diarias || [])[(_sv.diariaAtual || 1) - 1];
-              return _d ? (
-                <div className={styles.diariaInfoStrip}>
-                  <span className={styles.diariaInfoLabel}>Diária {_sv.diariaAtual}</span>
-                  {_d.dataInicio && <span className={styles.diariaInfoDates}>{_d.dataInicio} → {_d.dataFim}</span>}
-                  <span className={styles.diariaAtualChip}>Atual</span>
-                </div>
-              ) : null;
-            })()}
-            {/* ── Itens do quarto ── */}
-            <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
-              <div className={styles.consumoItemList}>
-                {MOCK_ITENS_QUARTO.map((item) => {
-                  const esgotado = item.qtdAtual === 0;
-                  const ratio    = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
-                  const isLow    = ratio < 0.5;
-                  return (
-                    <div key={item.id} className={styles.consumoItemRow}>
-                      <div className={styles.consumoItemInfo}>
-                        <span className={styles.consumoItemNome}>{item.nome}</span>
-                        <span className={styles.consumoItemMeta}>{item.categoria} · {fmtBRL(item.preco)}/un.</span>
-                      </div>
-                      <span className={[styles.consumoItemQtd, isLow ? styles.consumoItemQtdLow : ''].join(' ')}>
-                        {item.qtdAtual}/{item.qtdBase} disp.
-                      </span>
-                      <button
-                        className={styles.consumoItemBtn}
-                        disabled={esgotado}
-                        onClick={() => { setConsumoItemSel(item); setConsumoQtd('1'); setConsumoDespesa(false); setConsumoPagOv(null); }}
-                      >
-                        {esgotado ? 'Esgotado' : <><Minus size={11} /> Consumir</>}
-                      </button>
-                    </div>
-                  );
-                })}
+          footer={(() => {
+            const cartTotal = consumoCart.reduce((s, c) => s + c.preco * c.qtd, 0);
+            return (
+              <div className={styles.footerRight}>
+                <Button variant="secondary" onClick={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}>Fechar</Button>
+                <Button
+                  variant="primary"
+                  disabled={consumoSaving || consumoCart.length === 0 || !consumoCartPag}
+                  onClick={() => handleConfirmConsumoAll(consumoCartPag)}
+                >
+                  {consumoSaving && <Loader2 size={13} className={styles.spin} />}
+                  <Plus size={13} /> Adicionar Consumo{cartTotal > 0 ? ` · ${fmtBRL(cartTotal)}` : ''}
+                </Button>
               </div>
-            </div>
-
-            <div className={styles.consumoModalDivider} />
-
-            {/* ── Consumo externo (dispensa) ── */}
-            <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo (dispensa)</div>
-              <div className={styles.formStack}>
-                <FormField label="Categoria">
-                  <Select value={detailConsumoCat} onChange={(e) => { setDetailConsumoCat(e.target.value); setDetailConsumoProd(''); }}>
-                    <option value="">Selecione...</option>
-                    {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                  </Select>
-                </FormField>
-                {detailConsumoCatSel && (
-                  <FormField label="Produto">
-                    <Select value={detailConsumoProd} onChange={(e) => setDetailConsumoProd(e.target.value)}>
-                      <option value="">Selecione...</option>
-                      {detailConsumoCatSel.produtos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {fmtBRL(p.preco)}</option>)}
-                    </Select>
-                  </FormField>
-                )}
-                {detailConsumoProdSel && (
-                  <>
-                    <FormField label="Quantidade">
-                      <Input type="number" min="1" value={detailConsumoQty} onChange={(e) => setDetailConsumoQty(Math.max(1, parseInt(e.target.value) || 1))} />
-                    </FormField>
-                    <FormField label="Forma de Pagamento">
-                      <Select value={detailConsumoForma} onChange={(e) => setDetailConsumoForma(e.target.value)}>
-                        <option value="">Selecione...</option>
-                        {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
-                      </Select>
-                    </FormField>
-                    <div className={styles.totalPreview}>
-                      <span className={styles.totalPreviewLabel}>{detailConsumoQty}× {detailConsumoProdSel.nome}</span>
-                      <span className={styles.totalPreviewValue}>{fmtBRL(detailConsumoProdSel.preco * detailConsumoQty)}</span>
+            );
+          })()}
+        >
+          {(() => {
+            const cartTotal = consumoCart.reduce((s, c) => s + c.preco * c.qtd, 0);
+            return (
+              <div className={styles.consumoModalBody}>
+                {/* ── Diária atual ── */}
+                {selectedRoom.servico?.tipo === 'pernoite' && (() => {
+                  const _sv = selectedRoom.servico;
+                  const _d  = (_sv.diarias || [])[(_sv.diariaAtual || 1) - 1];
+                  return _d ? (
+                    <div className={styles.diariaInfoStrip}>
+                      <span className={styles.diariaInfoLabel}>Diária {_sv.diariaAtual}</span>
+                      {_d.dataInicio && <span className={styles.diariaInfoDates}>{_d.dataInicio} → {_d.dataFim}</span>}
+                      <span className={styles.diariaAtualChip}>Atual</span>
                     </div>
-                    <Button variant="primary" disabled={consumoSaving} onClick={handleConsumoExterno}>
-                      {consumoSaving && <Loader2 size={13} className={styles.spin} />}
-                      <Plus size={13} /> Adicionar
-                    </Button>
+                  ) : null;
+                })()}
+
+                {/* ── Itens do quarto ── */}
+                <div className={styles.consumoModalSection}>
+                  <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
+                  <div className={styles.consumoItemList}>
+                    {MOCK_ITENS_QUARTO.map((item) => {
+                      const esgotado = item.qtdAtual === 0;
+                      const ratio    = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
+                      const isLow    = ratio < 0.5;
+                      const inCart   = consumoCart.find((c) => c.tipo === 'interno' && c.itemId === item.id);
+                      const cartQty  = inCart?.qtd ?? 0;
+                      return (
+                        <div key={item.id} className={styles.consumoItemRow}>
+                          <div className={styles.consumoItemInfo}>
+                            <span className={styles.consumoItemNome}>{item.nome}</span>
+                            <span className={styles.consumoItemMeta}>
+                              {item.categoria} · {fmtBRL(item.preco)}/un.
+                            </span>
+                          </div>
+                          <div className={[styles.cartQtdStepper, esgotado ? styles.cartQtdStepperDisabled : ''].join(' ')}>
+                            <button disabled={cartQty === 0} onClick={() => updateInternQty(item, cartQty - 1)}>−</button>
+                            <span className={[styles.cartStepperFrac, isLow && cartQty > 0 ? styles.cartStepperFracLow : ''].join(' ')}>
+                              {cartQty}/{item.qtdAtual}
+                            </span>
+                            <button disabled={esgotado || cartQty >= item.qtdAtual} onClick={() => updateInternQty(item, cartQty + 1)}>+</button>
+                          </div>
+                          <span className={cartQty > 0 ? styles.cartRowTotal : styles.cartRowTotalEmpty}>
+                            {cartQty > 0 ? fmtBRL(item.preco * cartQty) : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className={styles.consumoModalDivider} />
+
+                {/* ── Consumo externo (dispensa) ── */}
+                <div className={styles.consumoModalSection}>
+                  <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo (dispensa)</div>
+                  <button className={styles.consumoExtOpenBtn} onClick={() => setShowConsumoExternoModal(true)}>
+                    <Plus size={13} /> Selecionar itens da dispensa
+                  </button>
+                </div>
+
+                {/* ── Carrinho ── */}
+                {consumoCart.length > 0 && (
+                  <>
+                    <div className={styles.consumoModalDivider} />
+                    <div className={styles.consumoModalSection}>
+                      <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens selecionados</div>
+                      <div className={styles.cartTable}>
+                        {consumoCart.map((item) => (
+                          <div key={item.key} className={styles.cartRow}>
+                            <span className={styles.cartRowNome}>{item.nome}</span>
+                            <span className={styles.cartRowQty}>{item.qtd}×</span>
+                            <span className={styles.cartRowTotal}>{fmtBRL(item.preco * item.qtd)}</span>
+                            <button className={styles.cartRowRemove} onClick={() => removeFromCart(item.key)}>
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                        <div className={styles.cartTotalRow}>
+                          <span>Total</span>
+                          <span>{fmtBRL(cartTotal)}</span>
+                        </div>
+                      </div>
+
+                      {/* Pagamento */}
+                      {consumoCartPag ? (
+                        <div className={styles.pagamentoChipOv}>
+                          <CreditCard size={13} />
+                          <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoCartPag.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoCartPag.nome_pagador ?? '—'} · {fmtBRL(consumoCartPag.valor)}</span>
+                          <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoPag(true)}>Alterar</button>
+                        </div>
+                      ) : (
+                        <button className={styles.definePagamentoOv} onClick={() => setShowConsumoPag(true)}>
+                          <CreditCard size={13} /> Definir Pagamento *
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </Modal>
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          SUB-MODAL — Consumir Item do Quarto
+          MODAL — Consumo Externo (Dispensa)
       ═══════════════════════════════════════════════════════ */}
-      {consumoItemSel && (() => {
-        const item    = consumoItemSel;
-        const qty     = Number(consumoQtd) || 0;
-        const esperado = qty * item.preco;
-        const pago     = consumoPagOv?.valor ?? null;
-        const diverge  = pago !== null && Math.abs(esperado - pago) > 0.01;
-        return (
-          <>
-            <Modal
-              open
-              onClose={() => setConsumoItemSel(null)}
-              size="sm"
-              title={<><Minus size={15} /> Consumir Item</>}
-              footer={
-                <div className={styles.footerRight}>
-                  <Button variant="secondary" onClick={() => setConsumoItemSel(null)}>Cancelar</Button>
-                  <Button variant="primary" disabled={consumoSavingItem || (!consumoDespesa && !consumoPagOv) || qty <= 0}
-                    onClick={async () => {
-                      setConsumoSavingItem(true);
-                      try {
-                        const consumo = { item: item.nome, categoria: item.categoria, quantidade: qty, valorUnitario: item.preco, valorTotal: esperado, formaPagamento: tiposPagamentoOv.find((t) => t.id === Number(consumoPagOv?.tipo_pagamento?.id))?.descricao ?? '', tipo: 'externo' };
-                        const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
-                        setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                        notify(`${item.nome} consumido.`);
-                        setConsumoItemSel(null);
-                      } catch (e) { notify('Erro: ' + e.message, 'error'); }
-                      finally { setConsumoSavingItem(false); }
-                    }}>
-                    {consumoSavingItem && <Loader2 size={14} className={styles.spin} />}
-                    Confirmar
-                  </Button>
-                </div>
-              }
-            >
-              <div className={styles.formStack}>
-                <div className={styles.itemInfoBox}>
-                  <span className={styles.itemInfoLabel}>Item selecionado</span>
-                  <span className={styles.itemInfoName}>{item.nome}</span>
-                  <span className={styles.itemInfoSub}>
-                    Qtd disponível: <strong>{item.qtdAtual}</strong> · Valor un.: <strong>{fmtBRL(item.preco)}</strong>
-                  </span>
-                </div>
+      {showConsumoExternoModal && (
+        <Modal
+          open
+          onClose={() => { setShowConsumoExternoModal(false); setExternoCart([]); setDetailConsumoCat(''); }}
+          size="md"
+          title={<><ShoppingCart size={15} /> Consumo Externo (Dispensa)</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => { setShowConsumoExternoModal(false); setExternoCart([]); setDetailConsumoCat(''); }}>Cancelar</Button>
+              <Button variant="primary" disabled={externoCart.length === 0} onClick={handleConfirmExterno}>
+                <Plus size={13} /> Adicionar ao consumo
+              </Button>
+            </div>
+          }
+        >
+          <div className={styles.formStack}>
+            <FormField label="Categoria">
+              <Select value={detailConsumoCat} onChange={(e) => setDetailConsumoCat(e.target.value)}>
+                <option value="">Selecione uma categoria...</option>
+                {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+              </Select>
+            </FormField>
+          </div>
 
-                <FormField label="Quantidade a consumir *">
-                  <Input type="number" placeholder="0" min="1" value={consumoQtd} onChange={(e) => setConsumoQtd(e.target.value)} />
-                </FormField>
-
-                <label className={styles.consumoCheckRow}>
-                  <input type="checkbox" checked={consumoDespesa} onChange={(e) => setConsumoDespesa(e.target.checked)} />
-                  <span>Despesa pessoal</span>
-                </label>
-
-                {consumoPagOv ? (
-                  <div className={styles.pagamentoChipOv}>
-                    <CreditCard size={13} />
-                    <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoPagOv.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoPagOv.nome_pagador ?? '—'} · {fmtBRL(pago)}</span>
-                    <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoItemPag(true)}>Alterar</button>
-                  </div>
-                ) : (
-                  <button className={styles.definePagamentoOv} onClick={() => setShowConsumoItemPag(true)}>
-                    <CreditCard size={13} /> Definir Pagamento{consumoDespesa ? '' : ' *'}
-                  </button>
-                )}
-
-                {qty > 0 && (
-                  <div className={diverge ? styles.consumoAlertDivergOv : styles.consumoAlertOv}>
-                    <div className={styles.consumoAlertRowOv}>
-                      <span>Valor esperado</span>
-                      <strong>{fmtBRL(esperado)}</strong>
+          {detailConsumoCatSel && (
+            <div className={styles.consumoItemList}>
+              {detailConsumoCatSel.produtos.map((item) => {
+                const qty = externoCart.find((c) => c.catId === detailConsumoCat && c.itemId === item.id)?.qtd ?? 0;
+                return (
+                  <div key={item.id} className={styles.consumoItemRow}>
+                    <div className={styles.consumoItemInfo}>
+                      <span className={styles.consumoItemNome}>{item.nome}</span>
+                      <span className={styles.consumoItemMeta}>{fmtBRL(item.preco)}/un.</span>
                     </div>
-                    {pago !== null && (
-                      <div className={styles.consumoAlertRowOv}>
-                        <span>Valor informado</span>
-                        <strong style={{ color: diverge ? '#ef4444' : '#059669' }}>{fmtBRL(pago)}</strong>
-                      </div>
-                    )}
-                    {diverge && !consumoDespesa && (
-                      <p style={{ fontSize: 11, color: '#ef4444', margin: '2px 0 0', lineHeight: 1.4 }}>
-                        Os valores divergem. Corrija o pagamento ou marque como despesa pessoal.
-                      </p>
-                    )}
+                    <div className={styles.cartQtdStepper}>
+                      <button disabled={qty === 0} onClick={() => updateExternoQty(item, qty - 1)}>−</button>
+                      <span>{qty}</span>
+                      <button onClick={() => updateExternoQty(item, qty + 1)}>+</button>
+                    </div>
+                    <span className={qty > 0 ? styles.cartRowTotal : styles.cartRowTotalEmpty}>
+                      {qty > 0 ? fmtBRL(item.preco * qty) : '—'}
+                    </span>
                   </div>
-                )}
+                );
+              })}
+            </div>
+          )}
+
+          {externoCart.length > 0 && (
+            <>
+              <div className={styles.consumoModalDivider} />
+              <div className={styles.consumoModalSection}>
+                <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Selecionados</div>
+                <div className={styles.cartTable}>
+                  {externoCart.map((item) => (
+                    <div key={item.key} className={styles.cartRow}>
+                      <span className={styles.cartRowNome}>{item.nome}</span>
+                      <span className={styles.cartRowQty}>{item.qtd}×</span>
+                      <span className={styles.cartRowTotal}>{fmtBRL(item.preco * item.qtd)}</span>
+                      <button className={styles.cartRowRemove} onClick={() => removeFromExternoCart(item.key)}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  ))}
+                  <div className={styles.cartTotalRow}>
+                    <span>Total</span>
+                    <span>{fmtBRL(externoCart.reduce((s, c) => s + c.preco * c.qtd, 0))}</span>
+                  </div>
+                </div>
               </div>
-            </Modal>
-            <PaymentModal
-              open={showConsumoItemPag}
-              onClose={() => setShowConsumoItemPag(false)}
-              onConfirm={(pag) => { setConsumoPagOv(pag); setShowConsumoItemPag(false); }}
-              tiposPagamento={tiposPagamentoOv}
-              initialPayment={consumoPagOv ?? undefined}
-              canAplicarDesconto={false}
-            />
-          </>
-        );
-      })()}
+            </>
+          )}
+        </Modal>
+      )}
+
+      <PaymentModal
+        open={showConsumoPag}
+        onClose={() => setShowConsumoPag(false)}
+        onConfirm={(pag) => { setConsumoCartPag(pag); setShowConsumoPag(false); }}
+        tiposPagamento={tiposPagamentoOv}
+        initialPayment={consumoCartPag ?? undefined}
+        canAplicarDesconto={false}
+        valorTotal={consumoCart.reduce((s, c) => s + c.preco * c.qtd, 0)}
+      />
 
       {/* ═══════════════════════════════════════════════════════
           SUB-MODAL — Alterar Pessoas nas Diárias
@@ -3452,9 +3493,9 @@ export default function OverviewManagement() {
                       const canRemove = d.num >= atualNum;
                       return (
                         <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div className={styles.gdDiariaItemBody}>
+                            <div className={styles.gdDiariaTopRow}>
+                              <div className={styles.gdDiariaLeftGroup}>
                                 <span className={styles.gdDiariaNum}>Diária {d.num}</span>
                                 {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
                               </div>
@@ -3472,9 +3513,9 @@ export default function OverviewManagement() {
                     })}
                     {gdDiariaPendentes.map((d, idx) => (
                       <div key={`pending-${idx}`} className={styles.gdDiariaItem} style={{ opacity: 0.7, borderColor: 'var(--violet)' }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className={styles.gdDiariaItemBody}>
+                          <div className={styles.gdDiariaTopRow}>
+                            <div className={styles.gdDiariaLeftGroup}>
                               <span className={styles.gdDiariaNum} style={{ color: 'var(--violet)' }}>Diária {diarias.length + idx + 1}</span>
                               <span className={styles.gdCurrentTag} style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--violet)' }}>Pendente</span>
                             </div>
