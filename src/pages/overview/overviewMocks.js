@@ -184,12 +184,18 @@ let _quartos = [
       totalDiarias: 4, diariaAtual: 3,
       valorTotal: 640, totalPago: 320, pagamentoPendente: 320,
       hospedes: [
-        { id: 1, nome: 'João Silva',  cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com'  },
-        { id: 2, nome: 'Maria Silva', cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com' },
+        { id: 1, nome: 'João Silva',     cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com'     },
+        { id: 2, nome: 'Maria Silva',    cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com'    },
+        { id: 3, nome: 'Carlos Mendes', cpf: '345.678.901-22', telefone: '(98) 97777-7777', email: 'carlos.mendes@email.com'  },
+        { id: 4, nome: 'Ana Costa',     cpf: '234.567.890-11', telefone: '(98) 96666-6666', email: 'ana.costa@email.com'      },
+        { id: 5, nome: 'Roberto Lima',  cpf: '456.789.012-33', telefone: '(98) 95555-5555', email: 'roberto.lima@email.com'   },
       ],
       consumos: [
-        { id: 9001, categoria: 'Bebidas',     item: 'Cerveja Heineken', quantidade: 3, valorUnitario: 12, valorTotal: 36 },
-        { id: 9002, categoria: 'Alimentação', item: 'Hambúrguer',       quantidade: 2, valorUnitario: 35, valorTotal: 70 },
+        { id: 9001, categoria: 'Bebidas',     item: 'Cerveja Heineken', quantidade: 3, valorUnitario: 12, valorTotal: 36  },
+        { id: 9002, categoria: 'Alimentação', item: 'Hambúrguer',       quantidade: 2, valorUnitario: 35, valorTotal: 70  },
+        { id: 9003, categoria: 'Bebidas',     item: 'Água Mineral',     quantidade: 4, valorUnitario:  5, valorTotal: 20  },
+        { id: 9004, categoria: 'Alimentação', item: 'Café da Manhã',    quantidade: 2, valorUnitario: 28, valorTotal: 56  },
+        { id: 9005, categoria: 'Frigobar',    item: 'Chocolate Snickers',quantidade: 1, valorUnitario: 8, valorTotal:  8  },
       ],
       pagamentos: [
         { id: 8001, descricao: 'Entrada (50%)', formaPagamento: 'PIX', valor: 320, data: '24/02/2026 14:30' },
@@ -226,6 +232,11 @@ let _quartos = [
       titularNome: 'Carlos Mendes', tipoAcomodacao: 'Individual',
       chegadaPrevista: '28/02/2026 15:00', saidaPrevista: '01/03/2026 12:00',
       totalDiarias: 1,
+      hospedes: [
+        { id: 10, nome: 'Carlos Mendes', cpf: '345.678.901-22', telefone: '(98) 97777-7777', email: 'carlos.mendes@email.com' },
+      ],
+      valorTotal: 160, totalPago: 0, pagamentoPendente: 160,
+      pagamentos: [],
     },
   },
   {
@@ -459,6 +470,14 @@ let _quartos = [
       titularNome: 'Pedro Oliveira', tipoAcomodacao: 'Duplo',
       chegadaPrevista: '01/03/2026 14:00', saidaPrevista: '04/03/2026 12:00',
       totalDiarias: 3,
+      hospedes: [
+        { id: 20, nome: 'Pedro Oliveira',  cpf: '556.677.889-00', telefone: '(98) 94444-4444', email: 'pedro.oliveira@email.com' },
+        { id: 21, nome: 'Lucia Ferreira',  cpf: '667.788.990-11', telefone: '(98) 93333-3333', email: 'lucia.ferreira@email.com'  },
+      ],
+      valorTotal: 960, totalPago: 480, pagamentoPendente: 480,
+      pagamentos: [
+        { id: 7001, descricao: 'Sinal (50%)', formaPagamento: 'PIX', valor: 480, data: '20/02/2026 10:15' },
+      ],
     },
   },
 

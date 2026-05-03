@@ -2429,7 +2429,27 @@
   border-radius: 16px 16px 0 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 14px;
+}
+.ovHeaderDates {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.ovHeaderDates .ovDatesRow {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.10);
+}
+.ovHeaderDates .ovDateLabel { color: rgba(255,255,255,0.45); }
+.ovHeaderDates .ovDateValue { color: #fff; }
+.ovHeaderDates .ovDateTime  { color: rgba(255,255,255,0.5); }
+.ovHeaderDates .ovDateArrow { color: rgba(255,255,255,0.3); }
+.ovHeaderDates .ovNightsCell { border-color: rgba(255,255,255,0.12); }
+.ovHeaderDates .ovNightsNum  { color: #fff; }
+.ovHeaderDates .ovNightsLabel { color: rgba(255,255,255,0.45); }
+@media (max-width: 980px) {
+  .ovHeaderDates { width: 100%; margin-left: 0; }
+  .ovHeaderDates .ovDatesRow { width: 100%; box-sizing: border-box; }
 }
 
 .ovRoomBadge {
@@ -2674,7 +2694,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  margin: 12px 14px;
+  margin-top: 12px;
 }
 .ovConsumoTable {
   display: flex;
@@ -2774,53 +2794,65 @@
 /* Guest card */
 /* Two-column layout */
 .ovTwoCol {
-  display: flex;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: auto auto;
   gap: 0;
-  align-items: stretch;
   flex: 1;
   min-height: 0;
 }
 .ovLeft {
-  width: clamp(240px, 38vw, 324px);
-  flex-shrink: 0;
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: clamp(12px,2vw,16px) clamp(10px,1.5vw,14px) clamp(12px,2vw,16px) clamp(14px,2.5vw,18px);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
+  padding: 14px 6px 14px 12px;
   box-sizing: border-box;
 }
 .ovRight {
-  flex: 1;
+  grid-column: 2;
+  grid-row: 1 / 3;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 18px 16px 16px;
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
+  gap: 14px;
+  padding: 14px 14px 16px 8px;
 }
 
 /* ── Consumo side column ─────────────────────────────────────────────────── */
 .ovConsumoSide {
-  width: 253px;
-  flex-shrink: 0;
+  grid-column: 1;
+  grid-row: 2;
   display: flex;
   flex-direction: column;
   gap: 0;
-  overflow-y: auto;
+  padding: 0 6px 14px 12px;
   box-sizing: border-box;
 }
 
 /* ── Responsive: stack columns on narrow screens ─────────────────────────── */
 @media (max-width: 980px) {
   .ovTwoCol {
+    display: flex;
     flex-direction: column;
     flex: none;
     overflow-y: visible;
+    overflow: visible;
+  }
+  .ovRight {
+    grid-column: auto;
+    grid-row: auto;
+    order: 0;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    overflow-y: visible;
   }
   .ovLeft {
+    grid-column: auto;
+    grid-row: auto;
+    order: 1;
     width: 100%;
     height: auto;
     border-right: none;
@@ -2828,16 +2860,14 @@
     overflow-y: visible;
     padding-bottom: 12px;
   }
-  .ovRight {
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    overflow-y: visible;
-  }
   .ovConsumoSide {
+    grid-column: auto;
+    grid-row: auto;
+    order: 2;
     width: 100%;
     height: auto;
     overflow-y: visible;
+    border-right: none;
     border-bottom: 1px solid var(--border);
     padding-bottom: 12px;
   }
@@ -2952,8 +2982,6 @@
 
 /* Financial card */
 .ovFinCard {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   display: flex;
@@ -3132,35 +3160,47 @@
 
 .priceCardChevronOpen { transform: rotate(180deg); transition: transform .15s; }
 
-.ovPriceBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9998;
-}
-.ovPriceCardFloat {
-  position: fixed;
-  z-index: 9999;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.18);
-  overflow: hidden;
+.ovPriceInline {
   display: flex;
   flex-direction: column;
-  max-height: 60vh;
-  overflow-y: auto;
+  gap: 12px;
+  animation: fadeSlideDown 0.15s ease-out;
+}
+@keyframes fadeSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ovDiariasCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.ovDiariasCard .ovPriceConsumoTotal {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
 }
 .ovPriceCardRow {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 8px; padding: 5px 12px;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 8px; padding: 7px 12px;
 }
-.ovPriceCardRow:not(:last-child) { border-bottom: 1px solid var(--border); }
+.ovDiariasList .ovPriceCardRow:not(:last-child) { border-bottom: 1px solid var(--border); }
+.ovPriceRowNoBorder, .ovPriceRowNoBorder:not(:last-child) { border-bottom: none; padding-top: 3px; padding-bottom: 3px; }
+.ovPriceConsumoTotal {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; padding: 4px 12px 6px;
+  font-size: 12px; font-weight: 600; color: var(--text);
+}
+.ovDiariaDesc { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.ovDiariaNum  { font-size: 12px; font-weight: 600; color: var(--text); }
+.ovDiariaDate { font-size: 11px; color: var(--text-2); }
 .step3PriceDesc { font-size: 12px; color: var(--text-2); }
 .step3PriceVal { font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
 .ovPriceSection {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   color: var(--text-2); padding: 4px 12px 2px;
-  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 40%, var(--text));
   background: var(--surface-2);
 }
 .ovPricePago { color: var(--emerald) !important; }
@@ -3175,14 +3215,15 @@
   padding: 8px 12px;
   border-bottom: 1px solid var(--border);
 }
-.ovPricePagCard:last-of-type { border-bottom: none; }
+.ovPricePagCard:last-child { border-bottom: none; }
 .ovPricePagMain { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .ovPriceSaldoRow {
   display: flex; justify-content: space-between; align-items: center;
-  gap: 8px; padding: 5px 12px;
-  border-top: 1px solid var(--border);
+  gap: 8px; padding: 4px 12px;
   font-weight: 600;
 }
+.ovPricePendente { color: #d97706 !important; }
+:root[data-theme="dark"] .ovPricePendente { color: #fbbf24 !important; }
 
 .ovPagList { display: flex; flex-direction: column; }
 .ovPagCard {
@@ -3195,15 +3236,15 @@
 }
 .ovPagCard:last-child { border-bottom: none; }
 .ovPagMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ovPagTitle { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .03em; }
-.ovPagName  { font-size: 13px; font-weight: 500; color: var(--text); }
+.ovPagTitle { font-size: 11px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .03em; }
+.ovPagName  { font-size: 12px; font-weight: 500; color: var(--text); }
 .ovPagMeta  { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--text-2); margin-top: 1px; }
-.ovPagDot   { color: var(--text-2); }
-.ovPagValor { font-size: 14px; font-weight: 700; color: var(--emerald); flex-shrink: 0; white-space: nowrap; padding-top: 2px; }
+.ovPagDot        { color: var(--text-2); }
+.ovPagRegistrado { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.ovPagValor { font-size: 12px; font-weight: 700; color: var(--emerald); flex-shrink: 0; white-space: nowrap; padding-top: 2px; }
 .ovPriceCardTotal {
   display: flex; justify-content: space-between; align-items: center;
   padding: 6px 12px;
-  border-top: 1px solid var(--border);
   font-size: 12px; font-weight: 700; color: var(--text);
   background: var(--surface-2);
 }

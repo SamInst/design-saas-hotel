@@ -623,10 +623,7 @@ export default function OverviewManagement() {
   const [apComboOpen, setApComboOpen]               = useState(false);
   const [apSearch, setApSearch]                     = useState('');
 
-  // Price breakdown (pernoite detail)
-  const [ovPriceOpen, setOvPriceOpen] = useState(false);
-  const [ovPricePos,  setOvPricePos]  = useState({ top: 0, left: 0, width: 300 });
-  const ovFinCardRef = useRef(null);
+
 
   // Saving
   const [saving, setSaving] = useState(false);
@@ -800,7 +797,7 @@ export default function OverviewManagement() {
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
     setDiariaTab('hospedes');
-    setOvPriceOpen(false);
+
   };
 
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
@@ -1533,19 +1530,171 @@ export default function OverviewManagement() {
 
     // ── Reservado ─────────────────────────────────────────────────────────────
     if (s.status === ROOM_STATUS.RESERVADO && s.servico?.tipo === 'reserva') {
-      const r = s.servico;
+      const sv = s.servico;
+      const progressPercent = sv.valorTotal > 0 ? Math.min(100, ((sv.totalPago || 0) / sv.valorTotal) * 100) : 0;
+      const allPagamentos   = sv.pagamentos || [];
+      const pagamentoTotal  = allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
+      const [checkinDate, checkinHora]   = (sv.chegadaPrevista || '').split(' ');
+      const [checkoutDate, checkoutHora] = (sv.saidaPrevista   || '').split(' ');
+      const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
       return (
-        <div className={styles.tabContent}>
-          <div className={styles.infoGrid2}>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Hóspede</span><span className={styles.infoValue}>{r.titularNome}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Tipo de Quarto</span><span className={styles.infoValue}>{r.tipoAcomodacao || s.tipoOcupacao}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Chegada Prevista</span><span className={styles.infoValue}>{r.chegadaPrevista}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Saída Prevista</span><span className={styles.infoValue}>{r.saidaPrevista}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Diárias</span><span className={styles.infoValue}>{r.totalDiarias}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Categoria</span><span className={styles.infoValue}>{s.categoria}</span></div>
+        <>
+          {/* ── Header ── */}
+          <div className={styles.ovHeader}>
+            <div className={styles.ovRoomBadge}>{s.numero}</div>
+            <div className={styles.ovHeaderContent}>
+              <div className={styles.ovHeaderTopRow}>
+                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_reservado`]].join(' ')}>{s.status}</span>
+              </div>
+              <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
+              <div className={styles.ovHeaderSub}>
+                {s.categoria} · {s.tipoOcupacao} · {checkinDate} – {checkoutDate} · Reserva
+              </div>
+            </div>
+            <div className={styles.ovHeaderDates}>
+              <div className={styles.ovDatesRow}>
+                <div className={styles.ovDateCell}>
+                  <span className={styles.ovDateLabel}>CHECK-IN</span>
+                  <span className={styles.ovDateValue}>{checkinDate}</span>
+                  <span className={styles.ovDateTime}>{checkinHora}</span>
+                </div>
+                <span className={styles.ovDateArrow}>→</span>
+                <div className={styles.ovDateCell}>
+                  <span className={styles.ovDateLabel}>CHECK-OUT</span>
+                  <span className={styles.ovDateValue}>{checkoutDate}</span>
+                  <span className={styles.ovDateTime}>{checkoutHora}</span>
+                </div>
+                <div className={styles.ovNightsCell}>
+                  <span className={styles.ovNightsNum}>{sv.totalDiarias}</span>
+                  <span className={styles.ovNightsLabel}>DIÁRIAS</span>
+                </div>
+              </div>
+            </div>
+            <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={15} /></button>
           </div>
-          <BedsDetailGrid camas={s.camas} />
-        </div>
+
+          {/* ── Body ── */}
+          <div className={styles.ovBody}>
+            <div className={styles.ovTwoCol}>
+              {/* Left: guests */}
+              <div className={styles.ovLeft}>
+                {(sv.hospedes || []).length > 0 ? (() => {
+                  const hospedes = sv.hospedes || [];
+                  return (
+                    <div className={styles.ovGuestTable}>
+                      {hospedes.map((h) => (
+                        <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                          <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                          <div className={styles.ovGuestInfo}>
+                            <div className={styles.ovGuestName}>{h.nome}</div>
+                            {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                            {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                          </div>
+                          <div className={styles.contactActions}>
+                            {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
+                            {h.email    && <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer" className={styles.quickBtn} onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })() : (
+                  <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
+                )}
+              </div>
+
+              {/* Right: financial */}
+              <div className={styles.ovRight}>
+                <div>
+                  <div className={styles.ovFinCard}>
+                    <div className={styles.ovFinHeader}>
+                      <DollarSign size={13} className={styles.ovFinIcon} />
+                      <span className={styles.ovFinTitle}>Resumo Financeiro</span>
+                    </div>
+                    <div className={styles.ovFinRow}>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Valor Total</span>
+                        <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Total Pago</span>
+                        <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago || 0)}</span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Pendente</span>
+                        <span className={[styles.ovFinValue, (sv.pagamentoPendente || 0) > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                          {fmtBRL(sv.pagamentoPendente || 0)}
+                        </span>
+                      </div>
+                    </div>
+                    {sv.valorTotal > 0 && (
+                      <div className={styles.ovFinProgress}>
+                        <div className={styles.ovFinProgressMeta}>
+                          <span>Progresso de pagamento</span>
+                          <span>{progressPercent.toFixed(0)}%</span>
+                        </div>
+                        <div className={styles.ovFinBar}>
+                          <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+                    )}
+                    {allPagamentos.length > 0 && (
+                      <div className={styles.ovPriceInline}>
+                        <div className={styles.ovDiariasCard}>
+                          {allPagamentos.map((p, i) => (
+                            <div key={i} className={styles.ovPricePagCard}>
+                              <div className={styles.ovPricePagMain}>
+                                <div className={styles.ovPagTitle}>{p.descricao}</div>
+                                {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
+                                <div className={styles.ovPagMeta}>
+                                  {p.data && <span>{p.data}</span>}
+                                  {(p.forma || p.formaPagamento) && (
+                                    <>{p.data && <span className={styles.ovPagDot}>·</span>}<span>{p.forma || p.formaPagamento}</span></>
+                                  )}
+                                </div>
+                                {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
+                              </div>
+                              <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
+                            </div>
+                          ))}
+                          {allPagamentos.length > 1 && (
+                            <div className={styles.ovPriceConsumoTotal}>
+                              <span>Total pagamentos</span>
+                              <span>{fmtBRL(pagamentoTotal)}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Footer ── */}
+          <div className={styles.ovFooter}>
+            <div className={styles.ovAcoesWrap}>
+              {ovAcoesOpen && (
+                <>
+                  <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
+                  <div className={styles.ovAcoesMenu}>
+                    <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
+                      <XCircle size={14} /> Cancelar Reserva
+                    </button>
+                    <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); }} disabled={saving}>
+                      {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Hospedar
+                    </button>
+                  </div>
+                </>
+              )}
+              <button className={styles.ovAcoesBtn} onClick={() => { setOvAcoesOpen((v) => !v); setVoucherPicking(false); }}>
+                Ações
+                <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
+              </button>
+            </div>
+          </div>
+        </>
       );
     }
 
@@ -1570,6 +1719,29 @@ export default function OverviewManagement() {
                 {s.categoria} · {s.tipoOcupacao}{sv.periodo ? ` · ${sv.periodo}` : ''} · Pernoite
               </div>
             </div>
+            <div className={styles.ovHeaderDates}>
+              <div className={styles.ovDatesRow}>
+                <div className={styles.ovDateCell}>
+                  <div className={styles.ovDateLabel}>Check-in</div>
+                  <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
+                  <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
+                </div>
+                <div className={styles.ovDateArrow}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                </div>
+                <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                  <div className={styles.ovDateLabel}>Check-out</div>
+                  <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
+                  <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
+                </div>
+                <div className={styles.ovNightsCell}>
+                  <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
+                  <div className={styles.ovNightsLabel}>Diárias</div>
+                </div>
+              </div>
+            </div>
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
           </div>
 
@@ -1579,8 +1751,8 @@ export default function OverviewManagement() {
 
                 {/* ── Left: guests ── */}
                 <div className={styles.ovLeft}>
-                  {curDiaria && (curDiaria.hospedes || []).length > 0 ? (() => {
-                    const hospedes = curDiaria.hospedes || [];
+                  {(sv.hospedes || []).length > 0 ? (() => {
+                    const hospedes = sv.hospedes || [];
                     const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
                     return (
                       <div className={styles.ovGuestTable}>
@@ -1611,37 +1783,14 @@ export default function OverviewManagement() {
                       </div>
                     );
                   })() : (
-                    <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede na diária atual.</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
                   )}
                 </div>
 
-                {/* ── Middle: dates + financial ── */}
+                {/* ── Middle: financial ── */}
                 <div className={styles.ovRight}>
-                  {/* Dates row */}
-                  <div className={styles.ovDatesRow}>
-                    <div className={styles.ovDateCell}>
-                      <div className={styles.ovDateLabel}>Check-in</div>
-                      <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
-                      <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
-                    </div>
-                    <div className={styles.ovDateArrow}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                      </svg>
-                    </div>
-                    <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                      <div className={styles.ovDateLabel}>Check-out</div>
-                      <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
-                      <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
-                    </div>
-                    <div className={styles.ovNightsCell}>
-                      <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
-                      <div className={styles.ovNightsLabel}>Diárias</div>
-                    </div>
-                  </div>
-
                   {/* Financial card */}
-                  <div ref={ovFinCardRef} style={{ position: 'relative' }}>
+                  <div>
                     <div className={styles.ovFinCard}>
                       <div className={styles.ovFinHeader}>
                         <DollarSign size={13} className={styles.ovFinIcon} />
@@ -1674,69 +1823,42 @@ export default function OverviewManagement() {
                           </div>
                         </div>
                       )}
-                      {sv.diarias?.length > 0 && (
-                        <div className={styles.ovFinDiariaRow}>
-                          <span className={styles.ovFinLabel}>Valor da Diária</span>
-                          <span className={styles.ovFinValueRow}>
-                            <span className={styles.ovFinDiariaVal}>{fmtBRL(curDiaria?.valor ?? sv.diarias[0]?.valor)}</span>
-                            <button
-                              className={styles.ovPriceToggle}
-                              onClick={() => {
-                                if (!ovPriceOpen && ovFinCardRef.current) {
-                                  const r = ovFinCardRef.current.getBoundingClientRect();
-                                  setOvPricePos({ top: r.top, right: window.innerWidth - r.left + 6, width: r.width });
-                                }
-                                setOvPriceOpen((v) => !v);
-                              }}
-                              title="Ver detalhes do preço"
-                            >
-                              <ChevronDown size={12} className={ovPriceOpen ? styles.priceCardChevronOpen : ''} />
-                            </button>
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Floating price breakdown — rendered via portal to escape modal overflow */}
-                    {ovPriceOpen && (() => {
-                      const consumos      = sv.consumos || [];
-                      const pagamentos    = allPagamentos;
-                      const consumoTotal  = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
-                      const pagamentoTotal = pagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
-                      const grandTotal    = (sv.valorTotal || 0) + consumoTotal;
-                      return createPortal(
-                        <>
-                          <div className={styles.ovPriceBackdrop} onClick={() => setOvPriceOpen(false)} />
-                          <div
-                            className={styles.ovPriceCardFloat}
-                            style={{ top: ovPricePos.top, right: ovPricePos.right, width: ovPricePos.width }}
-                          >
-                            {sv.diarias.map((d) => {
-                              const dateFrom = d.dataInicio?.split(' ')[0] || '';
-                              const dateTo   = d.dataFim?.split(' ')[0] || '';
-                              const nHosp    = (d.hospedes || []).length || 1;
-                              const label    = `Diária ${d.num} - (${dateFrom} → ${dateTo}) ${nHosp} Adulto${nHosp !== 1 ? 's' : ''}`;
-                              return (
-                                <div key={d.num} className={styles.ovPriceCardRow}>
-                                  <span className={styles.step3PriceDesc}>{label}</span>
-                                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
+                      {sv.diarias?.length > 0 && (() => {
+                        const consumos       = sv.consumos || [];
+                        const pagamentos     = allPagamentos;
+                        const consumoTotal   = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
+                        const pagamentoTotal = pagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
+                        const grandTotal     = (sv.valorTotal || 0) + consumoTotal;
+                        return (
+                          <div className={styles.ovPriceInline}>
+                            <div className={styles.ovDiariasCard}>
+                              <div className={styles.ovDiariasList}>
+                                {sv.diarias.map((d) => {
+                                  const dateFrom = d.dataInicio?.split(' ')[0] || '';
+                                  const dateTo   = d.dataFim?.split(' ')[0] || '';
+                                  const nHosp    = (d.hospedes || []).length || 1;
+                                  return (
+                                    <div key={d.num} className={styles.ovPriceCardRow}>
+                                      <div className={styles.ovDiariaDesc}>
+                                        <span className={styles.ovDiariaNum}>Diária {d.num}</span>
+                                        {dateFrom && <span className={styles.ovDiariaDate}>{dateFrom}</span>}
+                                        {dateTo   && <span className={styles.ovDiariaDate}>{dateTo}</span>}
+                                        <span className={styles.ovDiariaDate}>{nHosp} Adulto{nHosp !== 1 ? 's' : ''}</span>
+                                      </div>
+                                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {sv.diarias.length > 1 && (
+                                <div className={styles.ovPriceConsumoTotal}>
+                                  <span>Total diárias</span>
+                                  <span>{fmtBRL(sv.diarias.reduce((s, d) => s + (d.valor ?? 0), 0))}</span>
                                 </div>
-                              );
-                            })}
-                            {consumos.length > 0 && (
-                              <>
-                                <div className={styles.ovPriceSection}>Consumo</div>
-                                {consumos.map((c, i) => (
-                                  <div key={c.id || i} className={styles.ovPriceCardRow}>
-                                    <span className={styles.step3PriceDesc}>{c.item}{c.quantidade > 1 ? ` ×${c.quantidade}` : ''}</span>
-                                    <span className={styles.step3PriceVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
-                                  </div>
-                                ))}
-                              </>
-                            )}
+                              )}
+                            </div>
                             {pagamentos.length > 0 && (
-                              <>
-                                <div className={styles.ovPriceSection}>Pagamentos</div>
+                              <div className={styles.ovDiariasCard}>
                                 {pagamentos.map((p, i) => (
                                   <div key={i} className={styles.ovPricePagCard}>
                                     <div className={styles.ovPricePagMain}>
@@ -1744,30 +1866,32 @@ export default function OverviewManagement() {
                                       {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
                                       <div className={styles.ovPagMeta}>
                                         {p.data && <span>{p.data}</span>}
-                                        {(p.forma || p.formaPagamento) && <><span className={styles.ovPagDot}>·</span><span>{p.forma || p.formaPagamento}</span></>}
-                                        {p.registradoPor && <><span className={styles.ovPagDot}>·</span><span>registrado por {p.registradoPor}</span></>}
+                                        {(p.forma || p.formaPagamento) && (
+                                          <>
+                                            {p.data && <span className={styles.ovPagDot}>·</span>}
+                                            <span>{p.forma || p.formaPagamento}</span>
+                                          </>
+                                        )}
                                       </div>
+                                      {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
                                     </div>
                                     <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
                                   </div>
                                 ))}
-                                <div className={styles.ovPriceSaldoRow}>
-                                  <span className={styles.step3PriceDesc}>Saldo pago</span>
-                                  <span className={[styles.step3PriceVal, styles.ovPricePago].join(' ')}>{fmtBRL(pagamentoTotal)}</span>
-                                </div>
-                              </>
+                                {pagamentos.length > 1 && (
+                                  <div className={styles.ovPriceConsumoTotal}>
+                                    <span>Total pagamentos</span>
+                                    <span>{fmtBRL(pagamentoTotal)}</span>
+                                  </div>
+                                )}
+                              </div>
                             )}
-                            <div className={styles.ovPriceCardTotal}>
-                              <span>Total</span>
-                              <span>{fmtBRL(grandTotal)}</span>
-                            </div>
                           </div>
-                        </>,
-                        document.body
-                      );
-                    })()}
-                  </div>
-                </div>
+                        );
+                      })()}
+                    </div>{/* ovFinCard */}
+                  </div>{/* ref wrapper */}
+                </div>{/* ovRight */}
 
                 {/* ── Right: consumo ── */}
                 <div className={styles.ovConsumoSide}>
@@ -1778,9 +1902,6 @@ export default function OverviewManagement() {
                     </div>
                   ) : (
                     <div className={styles.ovConsumoBox}>
-                      <div className={styles.ovConsumoSideHeader}>
-                        <ShoppingCart size={12} /> Consumo
-                      </div>
                       <div className={styles.ovConsumoTable}>
                         {(sv.consumos || []).map((c, i) => (
                           <div key={c.id || i} className={styles.ovConsumoRow}>
@@ -2548,13 +2669,13 @@ export default function OverviewManagement() {
           open={!!selectedRoom}
           onClose={closeDetail}
           size="lg"
-          hideHeader={selectedRoom?.servico?.tipo === 'pernoite'}
+          hideHeader={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)}
           title={renderDetailTitle()}
-          footer={selectedRoom?.servico?.tipo === 'pernoite' ? undefined : renderDetailFooter()}
-          containerStyle={selectedRoom?.servico?.tipo === 'pernoite'
-            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(1060px, 96vw)', maxWidth: 'min(1060px, 96vw)' }
+          footer={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo) ? undefined : renderDetailFooter()}
+          containerStyle={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)
+            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(636px, 96vw)', maxWidth: 'min(636px, 96vw)' }
             : undefined}
-          bodyStyle={selectedRoom?.servico?.tipo === 'pernoite'
+          bodyStyle={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)
             ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
             : undefined}
         >
