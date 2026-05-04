@@ -1,9 +1,9 @@
-// ── Simulated network delay ─────────────────────────────────────────────────
-const delay = (ms = 220) => new Promise((r) => setTimeout(r, ms));
+import { recepcaoApi } from '../../services/api';
 
-let _nextId = 900;
-const nextId = () => ++_nextId;
-const clone  = (v) => JSON.parse(JSON.stringify(v));
+// helpers for local (day-use / minibar) cache mutations
+const _clone  = (v) => JSON.parse(JSON.stringify(v));
+let   _nextId = 9000;
+const _genId  = () => ++_nextId;
 
 // ── Room status ───────────────────────────────────────────────────────────────
 export const ROOM_STATUS = {
@@ -111,729 +111,359 @@ export const OVERVIEW_ROOMS_CATS = [
   { nome: 'Suíte',    quartos: ['17','18','19','20','21','22'] },
 ];
 
-// ── 22 rooms ──────────────────────────────────────────────────────────────────
-let _quartos = [
-  // ── STANDARD (01–10) ────────────────────────────────────────────────────────
-  {
-    id: 1, numero: '01', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Triplo',
-    descricao: 'Quarto Standard com cama casal e solteiro, com frigobar e vista para o jardim. Aceita menores de idade com tarifas diferenciadas.',
-    camas: { casal: 1, solteiro: 1, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 32"', qtd: 1 },
-      { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 3 },
-      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 4 },
-      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 1 },
-    ],
-    // Tabela de preços multi-pessoa (exemplo com crianças)
-    pricingOverride: {
-      pernoite: {
-        modeloCobranca: 'Por ocupação',
-        tiers: [
-          { pessoas: 1, valor: 130, crianca: { tipo: 'fixo',       valor: 140,  label: 'R$ 140,00 (fixo)' } },
-          { pessoas: 2, valor: 190, crianca: { tipo: 'percentual', valor: 20,   label: '+20%'              } },
-          { pessoas: 3, valor: 250, crianca: { tipo: 'adicional',  valor: 50,   label: '+R$ 50,00'         } },
-        ],
-      },
-      dayuse: {
-        tiers: [
-          { pessoas: 1, horasBase: 1, precoBase: 30, precoAdicional: 10, crianca: { tipo: 'percentual', valor: 10, label: '+10%'    } },
-          { pessoas: 2, horasBase: 1, precoBase: 40, precoAdicional: 15, crianca: { tipo: 'adicional',  valor: 10, label: '+R$10,00' } },
-          { pessoas: 3, horasBase: 1, precoBase: 50, precoAdicional: 25, crianca: { tipo: 'adicional',  valor: 10, label: '+R$10,00' } },
-        ],
-      },
-    },
-  },
-  {
-    id: 2, numero: '02', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Duplo',
-    descricao: 'Quarto compartilhado com duas camas de solteiro.',
-    camas: { casal: 0, solteiro: 2, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Solteiro', qtd: 2 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 2, qtdAtual: 2 },
-      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 103, nome: 'Refrigerante',     qtdBase: 2, qtdAtual: 1 },
-    ],
-  },
-  {
-    id: 3, numero: '03', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Standard com cama de casal e TV a cabo.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'pernoite', id: 301,
-      titularNome: 'João Silva', tipoAcomodacao: 'Casal',
-      periodo: '24/02/2026 - 28/02/2026',
-      chegadaPrevista: '24/02/2026 14:00', saidaPrevista: '28/02/2026 12:00',
-      status: PERNOITE_STATUS.ATIVO,
-      totalDiarias: 4, diariaAtual: 3,
-      valorTotal: 640, totalPago: 320, pagamentoPendente: 320,
-      hospedes: [
-        { id: 1, nome: 'João Silva',     cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com'     },
-        { id: 2, nome: 'Maria Silva',    cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com'    },
-        { id: 3, nome: 'Carlos Mendes', cpf: '345.678.901-22', telefone: '(98) 97777-7777', email: 'carlos.mendes@email.com'  },
-        { id: 4, nome: 'Ana Costa',     cpf: '234.567.890-11', telefone: '(98) 96666-6666', email: 'ana.costa@email.com'      },
-        { id: 5, nome: 'Roberto Lima',  cpf: '456.789.012-33', telefone: '(98) 95555-5555', email: 'roberto.lima@email.com'   },
-      ],
-      consumos: [
-        { id: 9001, categoria: 'Bebidas',     item: 'Cerveja Heineken', quantidade: 3, valorUnitario: 12, valorTotal: 36  },
-        { id: 9002, categoria: 'Alimentação', item: 'Hambúrguer',       quantidade: 2, valorUnitario: 35, valorTotal: 70  },
-        { id: 9003, categoria: 'Bebidas',     item: 'Água Mineral',     quantidade: 4, valorUnitario:  5, valorTotal: 20  },
-        { id: 9004, categoria: 'Alimentação', item: 'Café da Manhã',    quantidade: 2, valorUnitario: 28, valorTotal: 56  },
-        { id: 9005, categoria: 'Frigobar',    item: 'Chocolate Snickers',quantidade: 1, valorUnitario: 8, valorTotal:  8  },
-      ],
-      pagamentos: [
-        { id: 8001, descricao: 'Entrada (50%)', formaPagamento: 'PIX', valor: 320, data: '24/02/2026 14:30' },
-      ],
-      diarias: [
-        { idx: 0, num: 1, dataInicio: '24/02/2026 14:00', dataFim: '25/02/2026 12:00', valor: 160,
-          hospedes: [{ nome: 'João Silva', cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com' }, { nome: 'Maria Silva', cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com' }],
-          consumos: [], pagamentos: [] },
-        { idx: 1, num: 2, dataInicio: '25/02/2026 12:00', dataFim: '26/02/2026 12:00', valor: 160,
-          hospedes: [{ nome: 'João Silva', cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com' }, { nome: 'Maria Silva', cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com' }],
-          consumos: [{ item: 'Cerveja Heineken', qtd: 3, valor: 36 }], pagamentos: [] },
-        { idx: 2, num: 3, dataInicio: '26/02/2026 12:00', dataFim: '27/02/2026 12:00', valor: 160,
-          hospedes: [{ nome: 'João Silva', cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com' }, { nome: 'Maria Silva', cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com' }],
-          consumos: [{ item: 'Hambúrguer', qtd: 2, valor: 70 }],
-          pagamentos: [{ descricao: 'Entrada (50%)', forma: 'PIX', valor: 320 }] },
-        { idx: 3, num: 4, dataInicio: '27/02/2026 12:00', dataFim: '28/02/2026 12:00', valor: 160,
-          hospedes: [{ nome: 'João Silva', cpf: '123.456.789-00', telefone: '(98) 99999-9999', email: 'joao.silva@email.com' }, { nome: 'Maria Silva', cpf: '987.654.321-00', telefone: '(98) 98888-8888', email: 'maria.silva@email.com' }],
-          consumos: [], pagamentos: [] },
-      ],
-    },
-  },
-  {
-    id: 4, numero: '04', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Individual',
-    descricao: 'Quarto Standard econômico com cama de solteiro.',
-    camas: { casal: 0, solteiro: 1, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.RESERVADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 28"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Banheiro Compartilhado', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'reserva', id: 302,
-      titularNome: 'Carlos Mendes', tipoAcomodacao: 'Individual',
-      chegadaPrevista: '28/02/2026 15:00', saidaPrevista: '01/03/2026 12:00',
-      totalDiarias: 1,
-      hospedes: [
-        { id: 10, nome: 'Carlos Mendes', cpf: '345.678.901-22', telefone: '(98) 97777-7777', email: 'carlos.mendes@email.com' },
-      ],
-      valorTotal: 160, totalPago: 0, pagamentoPendente: 160,
-      pagamentos: [],
-    },
-  },
-  {
-    id: 5, numero: '05', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Standard aguardando limpeza.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.LIMPEZA,
-    servico: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    limpeza: { responsavel: 'Ana Paula', inicio: '28/02/2026 12:30' },
-  },
-  {
-    id: 6, numero: '06', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Individual',
-    descricao: 'Quarto compacto e econômico, ideal para viajante solo.',
-    camas: { casal: 0, solteiro: 1, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 28"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',  qtdBase: 2, qtdAtual: 2 },
-      { produtoId: 103, nome: 'Refrigerante',  qtdBase: 2, qtdAtual: 2 },
-    ],
-  },
-  {
-    id: 7, numero: '07', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Standard espaçoso com ar-condicionado.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'dayuse', id: 701,
-      titularNome: null,
-      dataUso: '28/02/2026', horaEntrada: '09:00', horaSaida: null,
-      status: DAYUSE_STATUS.ATIVO,
-      horasBase: 2, precoBase: 90, precoAdicional: 15,
-      valorTotal: 0, totalPago: 0, pagamentoPendente: 0,
-      hospedes: [],
-      consumos: [
-        { id: 7001, categoria: 'Bebidas', item: 'Cerveja Heineken', quantidade: 2, valorUnitario: 12, valorTotal: 24 },
-      ],
-      pagamentos: [],
-    },
-  },
-  {
-    id: 8, numero: '08', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Triplo',
-    descricao: 'Quarto familiar com beliche e cama de casal.',
-    camas: { casal: 1, solteiro: 0, beliche: 1, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'Beliche', qtd: 1 }, { nome: 'TV 32"', qtd: 1 },
-      { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 3 },
-      { produtoId: 103, nome: 'Refrigerante',     qtdBase: 4, qtdAtual: 4 },
-    ],
-  },
-  {
-    id: 9, numero: '09', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto em manutenção do sistema elétrico.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.MANUTENCAO,
-    servico: null, limpeza: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 32"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    manutencao: { responsavel: 'Carlos Oliveira', descricao: 'Reparo no sistema elétrico e tomadas.', previsaoFim: '01/03/2026' },
-  },
-  {
-    id: 10, numero: '10', categoriaId: 1, categoria: 'Standard', tipoOcupacao: 'Casal',
-    descricao: 'Quarto recém reformado com decoração moderna.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Casal', qtd: 1 }, { nome: 'TV 40"', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',    qtdBase: 2, qtdAtual: 2 },
-      { produtoId: 102, nome: 'Cerveja Heineken', qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 104, nome: 'Suco Natural',     qtdBase: 2, qtdAtual: 2 },
-    ],
-  },
+// ── Normalizers ───────────────────────────────────────────────────────────────
+const _STATUS_MAP = {
+  DISPONIVEL:      ROOM_STATUS.DISPONIVEL,
+  OCUPADO:         ROOM_STATUS.OCUPADO,
+  EM_LIMPEZA:      ROOM_STATUS.LIMPEZA,
+  MANUTENCAO:      ROOM_STATUS.MANUTENCAO,
+  FORA_DE_SERVICO: ROOM_STATUS.FORA_DE_SERVICO,
+  RESERVADO:       ROOM_STATUS.RESERVADO,
+};
 
-  // ── LUXO (11–16) ─────────────────────────────────────────────────────────────
-  {
-    id: 11, numero: '11', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Luxo com varanda, vista panorâmica e cama king.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Banheiro Privativo', qtd: 1 }, { nome: 'Varanda', qtd: 1 },
-      { nome: 'Cofre', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 6 },
-      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 2 },
-      { produtoId: 104, nome: 'Suco Natural',      qtdBase: 2, qtdAtual: 2 },
-    ],
-  },
-  {
-    id: 12, numero: '12', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Luxo com hidromassagem e TV 4K.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 55" 4K', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Hidromassagem', qtd: 1 }, { nome: 'Frigobar', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
-      { nome: 'Varanda', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'pernoite', id: 1201,
-      titularNome: 'Ana Costa', tipoAcomodacao: 'Casal',
-      periodo: '26/02/2026 - 03/03/2026',
-      chegadaPrevista: '26/02/2026 15:00', saidaPrevista: '03/03/2026 12:00',
-      status: PERNOITE_STATUS.ATIVO,
-      totalDiarias: 5, diariaAtual: 3,
-      valorTotal: 1400, totalPago: 700, pagamentoPendente: 700,
-      hospedes: [
-        { id: 3, nome: 'Ana Costa', cpf: '111.222.333-44', telefone: '(98) 97777-7777' },
-      ],
-      consumos: [
-        { id: 12001, categoria: 'Serviços',    item: 'Frigobar',    quantidade: 1, valorUnitario: 15, valorTotal: 15 },
-        { id: 12002, categoria: 'Alimentação', item: 'Pizza média', quantidade: 1, valorUnitario: 45, valorTotal: 45 },
-      ],
-      pagamentos: [
-        { id: 11001, descricao: 'Entrada (50%)', formaPagamento: 'Cartão de Crédito', valor: 700, data: '26/02/2026 15:30' },
-      ],
-      diarias: [
-        { idx: 0, num: 1, dataInicio: '26/02/2026 15:00', dataFim: '27/02/2026 12:00', valor: 280,
-          hospedes: [{ nome: 'Ana Costa', cpf: '111.222.333-44' }], consumos: [],
-          pagamentos: [{ descricao: 'Entrada (50%)', forma: 'Cartão de Crédito', valor: 700 }] },
-        { idx: 1, num: 2, dataInicio: '27/02/2026 12:00', dataFim: '28/02/2026 12:00', valor: 280,
-          hospedes: [{ nome: 'Ana Costa', cpf: '111.222.333-44' }],
-          consumos: [{ item: 'Frigobar', qtd: 1, valor: 15 }], pagamentos: [] },
-        { idx: 2, num: 3, dataInicio: '28/02/2026 12:00', dataFim: '01/03/2026 12:00', valor: 280,
-          hospedes: [{ nome: 'Ana Costa', cpf: '111.222.333-44' }],
-          consumos: [{ item: 'Pizza média', qtd: 1, valor: 45 }], pagamentos: [] },
-        { idx: 3, num: 4, dataInicio: '01/03/2026 12:00', dataFim: '02/03/2026 12:00', valor: 280,
-          hospedes: [{ nome: 'Ana Costa', cpf: '111.222.333-44' }], consumos: [], pagamentos: [] },
-        { idx: 4, num: 5, dataInicio: '02/03/2026 12:00', dataFim: '03/03/2026 12:00', valor: 280,
-          hospedes: [{ nome: 'Ana Costa', cpf: '111.222.333-44' }], consumos: [], pagamentos: [] },
-      ],
-    },
-  },
-  {
-    id: 13, numero: '13', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Triplo',
-    descricao: 'Quarto Luxo espaçoso com hidromassagem e rede adicional.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 1 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'Rede', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 },
-      { nome: 'Ar-Condicionado', qtd: 1 }, { nome: 'Hidromassagem', qtd: 1 }, { nome: 'Frigobar', qtd: 1 },
-      { nome: 'Varanda', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 5 },
-      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 3, qtdAtual: 3 },
-    ],
-  },
-  {
-    id: 14, numero: '14', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Luxo com varanda exclusiva e minibar.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Minibar', qtd: 1 }, { nome: 'Varanda Privativa', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
-      { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'dayuse', id: 1401,
-      titularNome: 'Fernanda Souza',
-      dataUso: '28/02/2026', horaEntrada: '08:00', horaSaida: '11:30',
-      status: DAYUSE_STATUS.ENCERRADO,
-      horasBase: 2, precoBase: 150, precoAdicional: 25,
-      valorTotal: 175, totalPago: 0, pagamentoPendente: 175,
-      hospedes: [
-        { id: 5, nome: 'Fernanda Souza', cpf: '999.888.777-66', telefone: '(98) 95555-5555' },
-      ],
-      consumos: [],
-      pagamentos: [],
-    },
-  },
-  {
-    id: 15, numero: '15', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Casal',
-    descricao: 'Quarto Luxo em processo de limpeza pós-estadia.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.LIMPEZA,
-    servico: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 50" Smart', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Varanda', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    limpeza: { responsavel: 'Paulo Fonseca', inicio: '28/02/2026 11:45' },
-  },
-  {
-    id: 16, numero: '16', categoriaId: 2, categoria: 'Luxo', tipoOcupacao: 'Duplo',
-    descricao: 'Quarto Luxo duplo com duas camas de solteiro e varanda.',
-    camas: { casal: 0, solteiro: 2, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.RESERVADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama Solteiro', qtd: 2 }, { nome: 'TV 50" Smart', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 1 },
-      { nome: 'Frigobar', qtd: 1 }, { nome: 'Varanda', qtd: 1 }, { nome: 'Cofre', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'reserva', id: 1601,
-      titularNome: 'Pedro Oliveira', tipoAcomodacao: 'Duplo',
-      chegadaPrevista: '01/03/2026 14:00', saidaPrevista: '04/03/2026 12:00',
-      totalDiarias: 3,
-      hospedes: [
-        { id: 20, nome: 'Pedro Oliveira',  cpf: '556.677.889-00', telefone: '(98) 94444-4444', email: 'pedro.oliveira@email.com' },
-        { id: 21, nome: 'Lucia Ferreira',  cpf: '667.788.990-11', telefone: '(98) 93333-3333', email: 'lucia.ferreira@email.com'  },
-      ],
-      valorTotal: 960, totalPago: 480, pagamentoPendente: 480,
-      pagamentos: [
-        { id: 7001, descricao: 'Sinal (50%)', formaPagamento: 'PIX', valor: 480, data: '20/02/2026 10:15' },
-      ],
-    },
-  },
+function _normalizePessoa(p) {
+  return { id: p.id, nome: p.nome ?? '', cpf: p.cpf ?? '', telefone: p.telefone ?? '', email: p.email ?? '', titular: p.titular ?? false };
+}
 
-  // ── SUÍTE (17–22) ────────────────────────────────────────────────────────────
-  {
-    id: 17, numero: '17', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Quádruplo',
-    descricao: 'Suíte Master com sala de estar e vista para o mar.',
-    camas: { casal: 1, solteiro: 2, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'Cama Solteiro', qtd: 2 }, { nome: 'TV 65" 4K', qtd: 2 },
-      { nome: 'Ar-Condicionado', qtd: 2 }, { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Sala de Estar', qtd: 1 },
-      { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 }, { nome: 'Varanda Panorâmica', qtd: 1 },
-      { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 6, qtdAtual: 6 },
-      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 8, qtdAtual: 8 },
-      { produtoId: 103, nome: 'Refrigerante',      qtdBase: 6, qtdAtual: 6 },
-      { produtoId: 104, nome: 'Suco Natural',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 3, qtdAtual: 3 },
-    ],
-  },
-  {
-    id: 18, numero: '18', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Casal',
-    descricao: 'Suíte com banheira de imersão e serviço de mordomia.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 65" 4K', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 2 },
-      { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
-      { nome: 'Mordomia', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'pernoite', id: 1801,
-      titularNome: 'Roberto Lima', tipoAcomodacao: 'Casal',
-      periodo: '27/02/2026 - 02/03/2026',
-      chegadaPrevista: '27/02/2026 14:00', saidaPrevista: '02/03/2026 12:00',
-      status: PERNOITE_STATUS.DIARIA_ENCERRADA,
-      totalDiarias: 3, diariaAtual: 2,
-      valorTotal: 1350, totalPago: 1350, pagamentoPendente: 0,
-      hospedes: [
-        { id: 6, nome: 'Roberto Lima',   cpf: '444.333.222-11', telefone: '(98) 94444-4444' },
-        { id: 5, nome: 'Fernanda Souza', cpf: '999.888.777-66', telefone: '(98) 95555-5555' },
-      ],
-      consumos: [
-        { id: 18001, categoria: 'Bebidas', item: 'Vinho Tinto 375ml', quantidade: 1, valorUnitario: 80, valorTotal: 80 },
-      ],
-      pagamentos: [
-        { id: 17001, descricao: 'Pagamento integral', formaPagamento: 'Cartão de Crédito', valor: 1350, data: '27/02/2026 14:30' },
-      ],
-      diarias: [
-        { idx: 0, num: 1, dataInicio: '27/02/2026 14:00', dataFim: '28/02/2026 12:00', valor: 450,
-          hospedes: [{ nome: 'Roberto Lima', cpf: '444.333.222-11' }, { nome: 'Fernanda Souza', cpf: '999.888.777-66' }],
-          consumos: [], pagamentos: [{ descricao: 'Pagamento integral', forma: 'Cartão de Crédito', valor: 1350 }] },
-        { idx: 1, num: 2, dataInicio: '28/02/2026 12:00', dataFim: '01/03/2026 12:00', valor: 450,
-          hospedes: [{ nome: 'Roberto Lima', cpf: '444.333.222-11' }, { nome: 'Fernanda Souza', cpf: '999.888.777-66' }],
-          consumos: [{ item: 'Vinho Tinto 375ml', qtd: 1, valor: 80 }], pagamentos: [] },
-        { idx: 2, num: 3, dataInicio: '01/03/2026 12:00', dataFim: '02/03/2026 12:00', valor: 450,
-          hospedes: [{ nome: 'Roberto Lima', cpf: '444.333.222-11' }, { nome: 'Fernanda Souza', cpf: '999.888.777-66' }],
-          consumos: [], pagamentos: [] },
-      ],
-    },
-  },
-  {
-    id: 19, numero: '19', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Triplo',
-    descricao: 'Suíte em reforma completa do banheiro.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.FORA_DE_SERVICO,
-    servico: null, limpeza: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 65" 4K', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 2 },
-      { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    manutencao: { responsavel: 'Equipe Técnica', descricao: 'Reforma geral do banheiro e troca de azulejos.', previsaoFim: '15/03/2026' },
-  },
-  {
-    id: 20, numero: '20', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Casal',
-    descricao: 'Suíte executiva com banheira de imersão e varanda privativa.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.DISPONIVEL,
-    servico: null, limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 65" 4K', qtd: 1 }, { nome: 'Ar-Condicionado', qtd: 2 },
-      { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
-      { nome: 'Varanda Privativa', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    minibar: [
-      { produtoId: 101, nome: 'Água Mineral',      qtdBase: 4, qtdAtual: 4 },
-      { produtoId: 102, nome: 'Cerveja Heineken',  qtdBase: 6, qtdAtual: 6 },
-      { produtoId: 105, nome: 'Vinho Tinto 375ml', qtdBase: 2, qtdAtual: 2 },
-    ],
-  },
-  {
-    id: 21, numero: '21', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Casal',
-    descricao: 'Suíte presidencial com serviço de mordomia.',
-    camas: { casal: 1, solteiro: 0, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.OCUPADO,
-    limpeza: null, manutencao: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'TV 65" 4K', qtd: 2 }, { nome: 'Ar-Condicionado', qtd: 2 },
-      { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Frigobar Premium', qtd: 1 }, { nome: 'Cofre', qtd: 1 },
-      { nome: 'Mordomia', qtd: 1 }, { nome: 'Sala de Estar', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    servico: {
-      tipo: 'dayuse', id: 2101,
-      titularNome: 'Patrícia Gomes',
-      dataUso: '28/02/2026', horaEntrada: '10:00', horaSaida: null,
-      status: DAYUSE_STATUS.ATIVO,
-      horasBase: 2, precoBase: 200, precoAdicional: 40,
-      valorTotal: 0, totalPago: 0, pagamentoPendente: 0,
-      hospedes: [
-        { id: 7, nome: 'Patrícia Gomes', cpf: '777.888.999-00', telefone: '(98) 93333-3333' },
-      ],
-      consumos: [
-        { id: 21001, categoria: 'Serviços', item: 'Frigobar',     quantidade: 1, valorUnitario: 15, valorTotal: 15 },
-        { id: 21002, categoria: 'Bebidas',  item: 'Água Mineral', quantidade: 2, valorUnitario:  4, valorTotal:  8 },
-      ],
-      pagamentos: [],
-    },
-  },
-  {
-    id: 22, numero: '22', categoriaId: 3, categoria: 'Suíte', tipoOcupacao: 'Triplo',
-    descricao: 'Suíte em manutenção do sistema de climatização.',
-    camas: { casal: 1, solteiro: 1, beliche: 0, rede: 0 },
-    status: ROOM_STATUS.MANUTENCAO,
-    servico: null, limpeza: null,
-    itens: [
-      { nome: 'Cama King', qtd: 1 }, { nome: 'Cama Solteiro', qtd: 1 }, { nome: 'TV 65" 4K', qtd: 1 },
-      { nome: 'Ar-Condicionado', qtd: 2 }, { nome: 'Banheira de Imersão', qtd: 1 }, { nome: 'Wi-Fi', qtd: 1 },
-    ],
-    manutencao: { responsavel: 'João Técnico', descricao: 'Troca completa do sistema de ar-condicionado.', previsaoFim: '05/03/2026' },
-  },
-];
+function _normalizeConsumo(c) {
+  const qty  = c.quantidade ?? 1;
+  const unit = c.valor_unitario ?? c.valorUnitario ?? 0;
+  return {
+    id: c.id,
+    categoria: c.categoria ?? '',
+    item: c.descricao ?? c.item ?? '',
+    quantidade: qty,
+    valorUnitario: unit,
+    valorTotal: c.valor_total ?? (unit * qty),
+  };
+}
 
-// ── Mock API ──────────────────────────────────────────────────────────────────
+function _normalizePagamento(p) {
+  return {
+    id: p.uuid ?? p.id,
+    descricao: p.nome_pagador ?? p.descricao ?? '',
+    formaPagamento: p.tipo_pagamento?.descricao ?? p.formaPagamento ?? '',
+    valor: p.valor ?? 0,
+    data: p.data_hora_registro ?? p.data ?? '',
+    cancelado: p.cancelado ?? false,
+  };
+}
+
+function _normalizeDiaria(d) {
+  return {
+    id: d.id,
+    idx: (d.numero ?? 1) - 1,
+    num: d.numero ?? 1,
+    dataInicio: d.data_hora_inicio ?? '',
+    dataFim: d.data_hora_fim ?? '',
+    valor: d.valor ?? 0,
+    hospedes: (d.pessoas ?? []).map(_normalizePessoa),
+    consumos: (d.consumos ?? []).map(_normalizeConsumo),
+    pagamentos: [],
+  };
+}
+
+function _normalizeServico(svc, tipo) {
+  if (!svc) return null;
+  const diarias   = (svc.diarias   ?? []).map(_normalizeDiaria);
+  const pagamentos = (svc.pagamentos ?? []).map(_normalizePagamento);
+  const totalPago  = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
+  const valorTotal = svc.valor_total ?? 0;
+  const titular    = (svc.pessoas ?? []).find(p => p.titular) ?? svc.pessoas?.[0];
+  return {
+    tipo,
+    id: svc.id,
+    titularNome: titular?.nome ?? null,
+    tipoAcomodacao: svc.tipo_ocupacao ?? '',
+    periodo: `${svc.check_in ?? ''} - ${svc.check_out ?? ''}`,
+    chegadaPrevista: svc.check_in ?? '',
+    saidaPrevista:   svc.check_out ?? '',
+    status: svc.status ?? '',
+    totalDiarias: svc.quantidade_diarias ?? diarias.length,
+    diariaAtual:  svc.numero_diaria_atual ?? 0,
+    valorTotal,
+    totalPago,
+    pagamentoPendente: Math.max(0, valorTotal - totalPago),
+    hospedes: (svc.pessoas ?? []).map(_normalizePessoa),
+    consumos: diarias.flatMap(d => d.consumos),
+    pagamentos,
+    diarias,
+  };
+}
+
+// API shape: { data, categorias: [{ id, nome, descricao, hospedagens: [{ quarto, quarto_pernoite, quarto_dayuse }] }] }
+function _normalizeHospedagem(h, cat) {
+  const q = h.quarto;
+
+  let servico = null;
+  if (h.quarto_pernoite)     servico = _normalizeServico(h.quarto_pernoite, 'pernoite');
+  else if (h.quarto_dayuse)  servico = _normalizeServico(h.quarto_dayuse,  'dayuse');
+  else if (h.quarto_reserva) servico = _normalizeServico(h.quarto_reserva, 'reserva');
+
+  const lm = q.quarto_limpeza;
+  const limpeza = lm ? {
+    id: lm.id,
+    responsavel: lm.responsavel ?? lm.funcionario?.nome ?? '',
+    inicio: lm.data_hora_inicio ?? '',
+  } : null;
+
+  const mn = q.quarto_manutencao;
+  const manutencao = mn ? {
+    id: mn.id,
+    responsavel: mn.responsavel ?? '',
+    descricao: mn.descricao ?? '',
+    previsaoFim: mn.previsao_fim ?? '',
+  } : null;
+
+  return {
+    id: q.id,
+    numero: String(q.id).padStart(2, '0'),
+    categoriaId: cat.id,
+    categoria: cat.nome,
+    categoriaDescricao: cat.descricao ?? '',
+    tipoOcupacao: q.descricao ?? '',
+    descricao: q.descricao ?? '',
+    camas: {
+      casal:    q.quantidade_cama_casal     ?? 0,
+      solteiro: q.quantidade_cama_solteiro  ?? 0,
+      beliche:  q.quantidade_beliche        ?? 0,
+      rede:     q.quantidade_rede           ?? 0,
+    },
+    status: (() => {
+      if (h.quarto_pernoite || h.quarto_dayuse) return ROOM_STATUS.OCUPADO;
+      if (h.quarto_reserva)                     return ROOM_STATUS.RESERVADO;
+      if (q.quarto_limpeza)                     return ROOM_STATUS.LIMPEZA;
+      if (q.quarto_manutencao)                  return ROOM_STATUS.MANUTENCAO;
+      return _STATUS_MAP[q.status] ?? ROOM_STATUS.DISPONIVEL;
+    })(),
+    servico,
+    limpeza,
+    manutencao,
+    itens: (q.quarto_itens ?? []).map(i => ({ nome: i.item?.descricao ?? '', qtd: i.quantidade_atual ?? 0 })),
+    minibar: (q.quarto_itens ?? []).map(i => ({
+      produtoId:  i.item?.id,
+      nome:       i.item?.descricao ?? '',
+      qtdBase:    i.quantidade_padrao ?? 0,
+      qtdAtual:   i.quantidade_atual  ?? 0,
+    })),
+  };
+}
+
+// ── Cache ─────────────────────────────────────────────────────────────────────
+let _cache = [];
+
+async function _reload() {
+  const data = await recepcaoApi.listar();
+  const rooms = [];
+  for (const cat of (data?.categorias ?? [])) {
+    for (const h of (cat.hospedagens ?? [])) {
+      rooms.push(_normalizeHospedagem(h, cat));
+    }
+  }
+  _cache = rooms;
+  return _cache;
+}
+
+function _find(id) { return _cache.find(q => q.id === id) ?? null; }
+
+function _patchCache(id, updater) {
+  const idx = _cache.findIndex(q => q.id === id);
+  if (idx >= 0) _cache[idx] = updater(_clone(_cache[idx]));
+  return _find(id);
+}
+
+// ── Real API ──────────────────────────────────────────────────────────────────
 export const overviewApi = {
   async listar() {
-    await delay();
-    return clone(_quartos);
+    return _reload();
   },
 
   async marcarDisponivel(id) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.DISPONIVEL, servico: null, limpeza: null, manutencao: null }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+    const room = _find(id);
+    if (room?.limpeza?.id)       await recepcaoApi.finalizarLimpeza(room.limpeza.id);
+    else if (room?.manutencao?.id) await recepcaoApi.finalizarManutencao(room.manutencao.id);
+    else                           await recepcaoApi.alterarStatusQuarto(id, 'DISPONIVEL');
+    await _reload();
+    return _find(id);
   },
 
   async marcarLimpeza(id, data = {}) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : {
-        ...q, status: ROOM_STATUS.LIMPEZA,
-        limpeza: { responsavel: data.responsavel || '', inicio: data.inicio || '', dataHoraInicio: data.dataHoraInicio || '', dataHoraFim: data.dataHoraFim || '' },
-        manutencao: null,
-      }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+    await recepcaoApi.acionarLimpeza(id, {
+      responsavel:      data.responsavel,
+      data_hora_inicio: data.dataHoraInicio,
+      data_hora_fim:    data.dataHoraFim,
+    });
+    await _reload();
+    return _find(id);
   },
 
   async marcarManutencao(id, data = {}) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : {
-        ...q, status: ROOM_STATUS.MANUTENCAO,
-        manutencao: { responsavel: data.responsavel || '', descricao: data.descricao || '', previsaoFim: data.previsaoFim || '', dataHoraInicio: data.dataHoraInicio || '', dataHoraFim: data.dataHoraFim || '' },
-        limpeza: null,
-      }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+    await recepcaoApi.criarManutencao({
+      fk_quarto:   id,
+      responsavel: data.responsavel,
+      descricao:   data.descricao,
+      previsao_fim: data.previsaoFim,
+    });
+    await _reload();
+    return _find(id);
   },
 
-  async marcarForaDeServico(id, data = {}) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.FORA_DE_SERVICO, manutencao: { responsavel: data.responsavel || '', descricao: data.descricao || '', previsaoFim: data.previsaoFim || '' }, limpeza: null }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+  async marcarForaDeServico(id) {
+    await recepcaoApi.alterarStatusQuarto(id, 'FORA_DE_SERVICO');
+    await _reload();
+    return _find(id);
   },
 
   async criarPernoite(id, servicoData) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.OCUPADO, servico: { ...clone(servicoData), tipo: 'pernoite', id: nextId() } }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+    const checkIn  = (servicoData.chegadaPrevista ?? '').split(' ')[0];
+    const checkOut = (servicoData.saidaPrevista   ?? '').split(' ')[0];
+    const pessoas  = (servicoData.hospedes ?? []).map(h => h.id).filter(Boolean);
+    const pernoite = await recepcaoApi.criarPernoite({ quarto_id: id, data_entrada: checkIn, data_saida: checkOut, pessoas });
+    const pagamentos = (servicoData.pagamentos ?? []).map(p => ({
+      tipo_pagamento: { id: p.tipoPagamentoId },
+      nome_pagador:   p.nomePagador,
+      descricao:      p.descricao || undefined,
+      valor:          p.valor,
+    }));
+    if (pagamentos.length && pernoite?.id) {
+      await recepcaoApi.adicionarPagamentos(pernoite.id, pagamentos);
+    }
+    await _reload();
+    return _find(id);
   },
 
+  // Day use – not yet in documented API; mutate local cache only
   async criarDayUse(id, servicoData) {
-    await delay();
-    _quartos = _quartos.map((q) =>
-      q.id !== id ? q : { ...q, status: ROOM_STATUS.OCUPADO, servico: { ...clone(servicoData), tipo: 'dayuse', id: nextId() } }
-    );
-    return clone(_quartos.find((q) => q.id === id));
+    return _patchCache(id, (q) => ({
+      ...q,
+      status: ROOM_STATUS.OCUPADO,
+      servico: { ...servicoData, tipo: 'dayuse', id: _genId() },
+    }));
   },
 
   async encerrarDayUse(id, { horaSaida, valorTotal, pagamentoPendente }) {
-    await delay();
-    _quartos = _quartos.map((q) => {
-      if (q.id !== id || !q.servico) return q;
-      return { ...q, servico: { ...q.servico, horaSaida, valorTotal, pagamentoPendente, status: DAYUSE_STATUS.ENCERRADO } };
-    });
-    return clone(_quartos.find((q) => q.id === id));
+    return _patchCache(id, (q) => ({
+      ...q,
+      servico: q.servico ? { ...q.servico, horaSaida, valorTotal, pagamentoPendente, status: DAYUSE_STATUS.ENCERRADO } : q.servico,
+    }));
   },
 
   async finalizarServico(id) {
-    await delay();
-    const q = _quartos.find((r) => r.id === id);
-    if (!q || !q.servico) throw new Error('Serviço não encontrado');
-    const servico = clone(q.servico);
-    if (servico.tipo === 'pernoite') {
-      servico.status = servico.pagamentoPendente > 0 ? PERNOITE_STATUS.FINALIZADO_PENDENTE : PERNOITE_STATUS.FINALIZADO;
-    } else if (servico.tipo === 'dayuse') {
-      servico.status = servico.pagamentoPendente > 0 ? DAYUSE_STATUS.FINALIZADO_PENDENTE : DAYUSE_STATUS.FINALIZADO;
-    }
-    _quartos = _quartos.map((r) =>
-      r.id !== id ? r : { ...r, status: ROOM_STATUS.LIMPEZA, limpeza: { responsavel: '', inicio: '' }, servico }
-    );
-    return clone(_quartos.find((r) => r.id === id));
+    const pernoiteId = _find(id)?.servico?.id;
+    if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, 'FINALIZADO');
+    await _reload();
+    return _find(id);
   },
 
   async cancelarServico(id) {
-    await delay();
-    _quartos = _quartos.map((q) => {
-      if (q.id !== id || !q.servico) return q;
-      const servico = clone(q.servico);
-      if (servico.tipo === 'pernoite') servico.status = PERNOITE_STATUS.CANCELADO;
-      else if (servico.tipo === 'dayuse') servico.status = DAYUSE_STATUS.CANCELADO;
-      return { ...q, status: ROOM_STATUS.DISPONIVEL, servico };
-    });
-    return clone(_quartos.find((q) => q.id === id));
+    const pernoiteId = _find(id)?.servico?.id;
+    if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, 'CANCELADO');
+    await _reload();
+    return _find(id);
   },
 
-  async adicionarPagamento(id, pagamento) {
-    await delay();
-    const q = _quartos.find((r) => r.id === id);
-    if (!q?.servico) throw new Error('Serviço não encontrado');
-    const novoPago = q.servico.totalPago + pagamento.valor;
-    _quartos = _quartos.map((r) => {
-      if (r.id !== id) return r;
-      const servico = {
-        ...r.servico,
-        totalPago: novoPago,
-        pagamentoPendente: Math.max(0, r.servico.valorTotal - novoPago),
-        pagamentos: [...r.servico.pagamentos, { ...clone(pagamento), id: nextId() }],
-      };
-      return { ...r, servico };
-    });
-    return clone(_quartos.find((r) => r.id === id));
-  },
+  async adicionarPagamento(id, pag) {
+    const room = _find(id);
+    const pernoiteId = room?.servico?.id;
+    const isPernoite = room?.servico?.tipo === 'pernoite' || room?.servico?.tipo === 'reserva';
 
-  async adicionarDiaria(id, novaDiaria) {
-    await delay();
-    const q = _quartos.find((r) => r.id === id);
-    if (!q?.servico) throw new Error('Serviço não encontrado');
-    const diarias = clone(q.servico.diarias || []);
-    const idx = diarias.length;
-    diarias.push({ ...clone(novaDiaria), idx, num: idx + 1 });
-    _quartos = _quartos.map((r) => {
-      if (r.id !== id) return r;
-      const totalDiarias = diarias.length;
-      const valorTotal = diarias.reduce((sum, d) => sum + (d.valor || 0), 0);
-      return { ...r, servico: { ...r.servico, diarias, totalDiarias, valorTotal, pagamentoPendente: Math.max(0, valorTotal - r.servico.totalPago) } };
-    });
-    return clone(_quartos.find((r) => r.id === id));
-  },
+    if (pernoiteId && isPernoite) {
+      await recepcaoApi.adicionarPagamentos(pernoiteId, [{
+        tipo_pagamento: { id: pag.tipoPagamentoId },
+        nome_pagador:   pag.nomePagador || pag.descricao || '',
+        valor:          pag.valor,
+      }]);
+      await _reload();
+      return _find(id);
+    }
 
-  async removerDiaria(id, diariaIdx) {
-    await delay();
-    const q = _quartos.find((r) => r.id === id);
-    if (!q?.servico) throw new Error('Serviço não encontrado');
-    let diarias = clone(q.servico.diarias || []).filter((d) => d.idx !== diariaIdx);
-    diarias = diarias.map((d, i) => ({ ...d, idx: i, num: i + 1 }));
-    _quartos = _quartos.map((r) => {
-      if (r.id !== id) return r;
-      const totalDiarias = diarias.length;
-      const valorTotal = diarias.reduce((sum, d) => sum + (d.valor || 0), 0);
-      return { ...r, servico: { ...r.servico, diarias, totalDiarias, valorTotal, pagamentoPendente: Math.max(0, valorTotal - r.servico.totalPago) } };
-    });
-    return clone(_quartos.find((r) => r.id === id));
-  },
-
-  async trocarQuarto(id, novoQuartoId, diariasIdxs) {
-    await delay();
-    // In a real API this would reassign diárias to new room.
-    // Here we just update the room number/category on the servico for display.
-    const novoQuarto = _quartos.find((q) => q.id === novoQuartoId);
-    if (!novoQuarto) throw new Error('Quarto destino não encontrado');
-    _quartos = _quartos.map((r) => {
-      if (r.id !== id || !r.servico) return r;
-      return { ...r, servico: { ...r.servico, quartoDestino: novoQuarto.numero, quartoDestinoCat: novoQuarto.categoria } };
-    });
-    return clone(_quartos.find((r) => r.id === id));
-  },
-
-  async updateMinibarItem(id, produtoId, delta) {
-    await delay();
-    _quartos = _quartos.map((q) => {
-      if (q.id !== id || !q.minibar) return q;
+    // Day use – local cache
+    return _patchCache(id, (q) => {
+      if (!q.servico) return q;
+      const novoPago = (q.servico.totalPago ?? 0) + pag.valor;
       return {
         ...q,
-        minibar: q.minibar.map((item) =>
-          item.produtoId !== produtoId ? item : { ...item, qtdAtual: Math.max(0, item.qtdAtual + delta) }
-        ),
+        servico: {
+          ...q.servico,
+          totalPago: novoPago,
+          pagamentoPendente: Math.max(0, (q.servico.valorTotal ?? 0) - novoPago),
+          pagamentos: [...(q.servico.pagamentos ?? []), { ...pag, id: _genId() }],
+        },
       };
     });
-    return clone(_quartos.find((q) => q.id === id));
   },
 
-  async reporMinibar(id) {
-    await delay();
-    _quartos = _quartos.map((q) => {
-      if (q.id !== id || !q.minibar) return q;
-      return { ...q, minibar: q.minibar.map((item) => ({ ...item, qtdAtual: item.qtdBase })) };
-    });
-    return clone(_quartos.find((q) => q.id === id));
+  async adicionarDiaria(id) {
+    // Not yet implemented via dedicated endpoint; reload to refresh state
+    await _reload();
+    return _find(id);
+  },
+
+  async removerDiaria(id) {
+    await _reload();
+    return _find(id);
+  },
+
+  async trocarQuarto(id, novoQuartoId, diariasIdxs = []) {
+    const room    = _find(id);
+    const diarias = room?.servico?.diarias ?? [];
+    const targets = diariasIdxs.length
+      ? diarias.filter(d => diariasIdxs.includes(d.idx))
+      : diarias;
+    await Promise.all(targets.map(d => recepcaoApi.trocarQuartoDiaria(d.id, novoQuartoId)));
+    await _reload();
+    return _find(id);
   },
 
   async adicionarConsumo(id, consumo) {
-    await delay();
-    _quartos = _quartos.map((r) => {
-      if (r.id !== id || !r.servico) return r;
-      const novoConsumo = { ...clone(consumo), id: nextId() };
-      const servico = {
-        ...r.servico,
-        consumos: [...(r.servico.consumos || []), novoConsumo],
+    const room       = _find(id);
+    const diarias    = room?.servico?.diarias ?? [];
+    const diariaAtual = room?.servico?.diariaAtual ?? 0;
+    const diaria     = diarias.find(d => d.num === diariaAtual) ?? diarias[diarias.length - 1];
+
+    if (diaria?.id && consumo.produtoId) {
+      await recepcaoApi.adicionarConsumos(diaria.id, [{ fk_item: consumo.produtoId, quantidade: consumo.quantidade ?? 1 }]);
+      await _reload();
+      return _find(id);
+    }
+
+    // Local cache fallback (day use or items without API item ID)
+    return _patchCache(id, (q) => {
+      if (!q.servico) return q;
+      return {
+        ...q,
+        servico: {
+          ...q.servico,
+          consumos: [...(q.servico.consumos ?? []), { ...consumo, id: _genId() }],
+        },
       };
-      // Decrement minibar qty if internal consumo
-      const minibar = consumo.produtoId
-        ? (r.minibar || []).map((item) =>
-            item.produtoId !== consumo.produtoId ? item : { ...item, qtdAtual: Math.max(0, item.qtdAtual - 1) }
-          )
-        : r.minibar;
-      return { ...r, servico, minibar };
     });
-    return clone(_quartos.find((r) => r.id === id));
+  },
+
+  // Minibar – no dedicated API; local cache mutations
+  async updateMinibarItem(id, produtoId, delta) {
+    return _patchCache(id, (q) => ({
+      ...q,
+      minibar: (q.minibar ?? []).map(item =>
+        item.produtoId !== produtoId ? item : { ...item, qtdAtual: Math.max(0, item.qtdAtual + delta) }
+      ),
+    }));
+  },
+
+  async reporMinibar(id) {
+    return _patchCache(id, (q) => ({
+      ...q,
+      minibar: (q.minibar ?? []).map(item => ({ ...item, qtdAtual: item.qtdBase })),
+    }));
   },
 
   async adicionarMinibarItem(id, item) {
-    await delay();
-    _quartos = _quartos.map((q) => {
-      if (q.id !== id) return q;
-      const minibar = clone(q.minibar || []);
-      const existing = minibar.find((m) => m.produtoId === item.produtoId);
-      if (existing) {
-        existing.qtdAtual += item.quantidade;
-        existing.qtdBase  += item.quantidade;
-      } else {
-        minibar.push({ produtoId: item.produtoId, nome: item.nome, qtdBase: item.quantidade, qtdAtual: item.quantidade });
-      }
+    return _patchCache(id, (q) => {
+      const minibar = _clone(q.minibar ?? []);
+      const existing = minibar.find(m => m.produtoId === item.produtoId);
+      if (existing) { existing.qtdAtual += item.quantidade; existing.qtdBase += item.quantidade; }
+      else minibar.push({ produtoId: item.produtoId, nome: item.nome, qtdBase: item.quantidade, qtdAtual: item.quantidade });
       return { ...q, minibar };
     });
-    return clone(_quartos.find((q) => q.id === id));
   },
 };

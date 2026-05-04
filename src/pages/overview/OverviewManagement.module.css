@@ -1248,9 +1248,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border-bottom: 1px solid var(--border);
 }
-.nhSection:last-child { border-bottom: none; }
 .nhSectionTitle {
   font-size: 11px;
   font-weight: 700;
@@ -1320,6 +1318,180 @@
 
 /* ── Categoria stat red (ocupado) ────────────────────────────────────────────── */
 .catStatRed { color: #dc2626; background: rgba(220, 38, 38, 0.1); }
+
+/* ── Nova Hospedagem redesign ────────────────────────────────────────────────── */
+
+/* Section divider — blue (Hóspedes / Período) */
+.nhDividerBlue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.nhDividerBlue::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: #1d4ed8;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.nhDividerBlue::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(29, 78, 216, 0.2);
+}
+
+/* Section divider — orange (Pagamentos) */
+.nhDividerOrange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f97316;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.nhDividerOrange::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: #f97316;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.nhDividerOrange::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(249, 115, 22, 0.2);
+}
+
+/* "Adicionar pagamento" button */
+.nhAddPagBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid #f97316;
+  background: color-mix(in srgb, #f97316 10%, transparent);
+  color: #f97316;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.nhAddPagBtn:hover { background: color-mix(in srgb, #f97316 18%, transparent); }
+/* Price card — identical to BookingCalendar */
+.nhPriceCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.nhPriceCardHeader {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: none; border: none; cursor: pointer;
+  color: inherit; text-align: left;
+}
+.nhPriceCardHeader:hover { background: color-mix(in srgb, var(--border) 30%, transparent); }
+.nhFinStrip { flex: 1; display: flex; align-items: center; }
+.nhFinStripItem { flex: 1; text-align: center; font-size: 12px; color: var(--text-2); }
+.nhFinStripItem b { font-weight: 600; color: var(--text); margin-left: 4px; }
+.nhFinStripDivider { width: 1px; height: 12px; background: var(--border); flex-shrink: 0; }
+.nhChevron { color: var(--text-2); flex-shrink: 0; transition: transform .15s; }
+.nhChevronOpen { color: var(--text-2); flex-shrink: 0; transform: rotate(180deg); transition: transform .15s; }
+.nhPriceCardBody { border-top: 1px solid var(--border); padding: 0 12px; display: flex; flex-direction: column; }
+.nhPriceCardRoom {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 0;
+}
+.nhPriceDetailItem { display: flex; flex-direction: column; gap: 2px; }
+.nhPriceRow { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.nhPriceDesc { font-size: 12px; color: var(--text-2); }
+.nhPriceVal  { font-size: 12px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.nhPriceTotalRow {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--text);
+}
+.nhPriceDetailSub { display: flex; gap: 8px; flex-wrap: wrap; }
+.nhPriceDetailSub span { font-size: 11px; color: var(--text-2); }
+.nhSazChip {
+  font-size: 10px; font-weight: 600; color: var(--violet);
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+  border-radius: 4px;
+}
+.nhPagList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.nhPagItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.nhPagItemInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.nhPagItemNome {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nhPagItemSub {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.nhPagItemValor {
+  font-weight: 700;
+  color: var(--emerald);
+  white-space: nowrap;
+  font-size: 13px;
+}
+.nhPagForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.nhPagValorRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.nhPagAddWrap {
+  padding-bottom: 1px;
+}
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  margin-top: 4px;
+}
+.checkRow input { cursor: pointer; }
 
 /* ── Modal service inputs ──────────────────────────────────────────────────── */
 .modalInput {
@@ -2452,6 +2624,21 @@
   .ovHeaderDates .ovDatesRow { width: 100%; box-sizing: border-box; }
 }
 
+/* Standalone dark period block (above financial card) */
+.ovPeriodDark { background: #1e293b; border-radius: var(--radius); margin-bottom: 8px; }
+.ovPeriodDark .ovDatesRow {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+}
+.ovPeriodDark .ovDateLabel  { color: rgba(255,255,255,0.45); }
+.ovPeriodDark .ovDateValue  { color: #fff; }
+.ovPeriodDark .ovDateTime   { color: rgba(255,255,255,0.5); }
+.ovPeriodDark .ovDateArrow  { color: rgba(255,255,255,0.3); }
+.ovPeriodDark .ovNightsCell { border-color: rgba(255,255,255,0.12); }
+.ovPeriodDark .ovNightsNum  { color: #fff; }
+.ovPeriodDark .ovNightsLabel { color: rgba(255,255,255,0.45); }
+
 .ovRoomBadge {
   flex-shrink: 0;
   background: rgba(255,255,255,0.10);
@@ -2694,7 +2881,6 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  margin-top: 12px;
 }
 .ovConsumoTable {
   display: flex;
@@ -2822,13 +3008,9 @@
 
 /* ── Consumo side column ─────────────────────────────────────────────────── */
 .ovConsumoSide {
-  grid-column: 1;
-  grid-row: 2;
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 0 6px 14px 12px;
-  box-sizing: border-box;
 }
 
 /* ── Responsive: stack columns on narrow screens ─────────────────────────── */
@@ -2861,14 +3043,9 @@
     padding-bottom: 12px;
   }
   .ovConsumoSide {
-    grid-column: auto;
-    grid-row: auto;
-    order: 2;
     width: 100%;
     height: auto;
     overflow-y: visible;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
     padding-bottom: 12px;
   }
 }
@@ -2891,11 +3068,10 @@
 }
 .ovConsumoSideEmpty {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  flex: 1;
+  padding: 14px 12px;
   font-size: 12px;
   color: var(--text-2);
 }

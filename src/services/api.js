@@ -697,6 +697,28 @@ export const dashboardApi = {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  RECEPÇÃO  (quartos com status e serviços ativos)
+// ─────────────────────────────────────────────────────────────
+export const recepcaoApi = {
+  listar:                (params)              => request('/quarto/recepcao', { params }),
+  alterarStatusQuarto:   (id, status)          => request(`/quarto/${id}/status`, { method: 'PATCH', params: { status } }),
+  criarManutencao:       (body)                => request('/quarto/manutencao', { method: 'POST', body }),
+  finalizarManutencao:   (id)                  => request(`/quarto/manutencao/${id}/finalizar`, { method: 'PATCH' }),
+  acionarLimpeza:        (quartoId, body)       => request(`/quarto/${quartoId}/limpeza`, { method: 'POST', body }),
+  finalizarLimpeza:      (limpezaId)           => request(`/quarto/limpeza/${limpezaId}/finalizar`, { method: 'PATCH' }),
+  criarPernoite:         (body)                => request('/pernoites', { method: 'POST', body }),
+  alterarStatusPernoite: (id, status)          => request(`/pernoites/${id}/status`, { method: 'PUT', params: { status } }),
+  adicionarPagamentos:   (id, pags)            => request(`/pernoites/${id}/pagamentos`, { method: 'POST', body: pags }),
+  cancelarPagamento:     (uuid, motivo)        => request(`/pernoites/pagamentos/${uuid}`, { method: 'DELETE', body: { motivo_cancelamento: motivo } }),
+  adicionarPessoas:      (diariaId, ids)       => request(`/diarias/${diariaId}/pessoas`, { method: 'POST', body: { pessoa_ids: ids } }),
+  removerPessoa:         (diariaId, pessoaId)  => request(`/diarias/${diariaId}/pessoas/${pessoaId}`, { method: 'DELETE' }),
+  trocarQuartoDiaria:    (diariaId, quartoId)  => request(`/diarias/${diariaId}/quarto`, { method: 'PUT', body: { quarto_id: quartoId } }),
+  adicionarConsumos:     (diariaId, items)     => request(`/diarias/${diariaId}/consumos`, { method: 'POST', body: items }),
+  removerConsumo:        (diariaId, consumoId) => request(`/diarias/${diariaId}/consumos/${consumoId}`, { method: 'DELETE' }),
+  alterarStatusDiaria:   (id, status)          => request(`/diarias/${id}/status`, { method: 'PUT', params: { status } }),
+};
+
+// ─────────────────────────────────────────────────────────────
 //  EXPORT DEFAULT  (legado – mantém compatibilidade)
 // ─────────────────────────────────────────────────────────────
 export default {

@@ -18,9 +18,9 @@ import { Notification }             from '../../components/ui/Notification';
 import {
   overviewApi,
   ROOM_STATUS, PERNOITE_STATUS, DAYUSE_STATUS,
-  OVERVIEW_CATEGORIES, TIPOS_OCUPACAO, FORMAS_PAGAMENTO,
+  TIPOS_OCUPACAO, FORMAS_PAGAMENTO,
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
-  calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO, OVERVIEW_ROOMS_CATS,
+  calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './overviewMocks';
 import { cadastroApi, reservaApi, funcionarioApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
@@ -335,9 +335,11 @@ function NhHospedesPicker({ value = [], onChange }) {
           id: p.id,
           nome: p.nome,
           cpf: p.cpf ?? '',
+          dataNascimento: p.data_nascimento ?? '',
           bloqueado: p.status === 'BLOQUEADO',
           acompanhantes: (p.acompanhantes ?? []).map((a) => ({
             id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+            dataNascimento: a.data_nascimento ?? '',
             bloqueado: a.status === 'BLOQUEADO',
           })),
         })));
@@ -445,40 +447,22 @@ function NhHospedesPicker({ value = [], onChange }) {
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div ref={wrapRef} className={styles.nhPickerWrap}>
-        {searching
-          ? <Loader2 size={13} className={[styles.nhPickerIcon, styles.spin].join(' ')} />
-          : <Search size={13} className={styles.nhPickerIcon} />}
-        <div className={styles.nhPickerInner}>
-          {value.map((h) => (
-            <div key={h.id} className={styles.nhPickerChip}>
-              <span>{h.nome}</span>
-              <button type="button" className={styles.nhPickerChipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
-            </div>
-          ))}
-          <input ref={inputRef} className={styles.nhPickerInput} value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
-        </div>
+    <div ref={wrapRef} className={styles.nhPickerWrap}>
+      {searching
+        ? <Loader2 size={13} className={[styles.nhPickerIcon, styles.spin].join(' ')} />
+        : <Search size={13} className={styles.nhPickerIcon} />}
+      <div className={styles.nhPickerInner}>
+        {value.map((h) => (
+          <div key={h.id} className={styles.nhPickerChip}>
+            <span>{h.nome}</span>
+            <button type="button" className={styles.nhPickerChipRemove} onClick={() => rem(h.id)}><X size={10} /></button>
+          </div>
+        ))}
+        <input ref={inputRef} className={styles.nhPickerInput} value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
       </div>
       {dropdown}
-      {value.length > 0 && (
-        <div className={styles.nhPickerList}>
-          {value.map((h, i) => (
-            <div key={h.id} className={styles.nhPickerListItem}>
-              <div className={styles.nhPickerListLeft}>
-                <User size={14} className={i === 0 ? styles.listItemIconGreen : styles.listItemIcon} />
-                <div>
-                  <div className={styles.listItemName}>{h.nome}{i === 0 && <span className={styles.titularTag}>Titular</span>}</div>
-                  {h.cpf && <div className={styles.listItemSub}>{fmtCpf(h.cpf)}</div>}
-                </div>
-              </div>
-              <button className={styles.removeBtn} onClick={() => rem(h.id)}><Trash2 size={13} /></button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -524,19 +508,20 @@ export default function OverviewManagement() {
   const [npForm, setNpForm]             = useState(blankNpForm());
   const [nduForm, setNduForm]           = useState(blankNduForm());
 
-  // Nova Hospedagem (full 5-section pernoite create modal)
-  const [nhHospedes, setNhHospedes]         = useState([]);
-  const [nhCheckinDate, setNhCheckinDate]   = useState(null);
-  const [nhCheckinHora, setNhCheckinHora]   = useState('14:00');
-  const [nhCheckoutDate, setNhCheckoutDate] = useState(null);
-  const [nhCheckoutHora, setNhCheckoutHora] = useState('12:00');
-  const [nhPagamentos, setNhPagamentos]     = useState([]);
-  const [nhPagDesc, setNhPagDesc]           = useState('');
-  const [nhPagForma, setNhPagForma]         = useState('PIX');
-  const [nhPagValor, setNhPagValor]         = useState('');
-  const [savingNh, setSavingNh]             = useState(false);
-  // Nova Hospedagem step (0=hospedes, 1=periodo, 2=pagamentos)
-  const [nhStep, setNhStep]                 = useState(0);
+  // Nova Hospedagem (single-view create modal)
+  const [nhHospedes, setNhHospedes]             = useState([]);
+  const [nhCheckinDate, setNhCheckinDate]       = useState(null);
+  const [nhCheckoutDate, setNhCheckoutDate]     = useState(null);
+  const [nhPagamentos, setNhPagamentos]         = useState([]);
+  const [nhPagTipoId, setNhPagTipoId]           = useState('');
+  const [nhPagNomePagador, setNhPagNomePagador] = useState('');
+  const [nhPagDescricao, setNhPagDescricao]     = useState('');
+  const [nhPagValor, setNhPagValor]             = useState('');
+  const [nhCalc, setNhCalc]                         = useState(null);
+  const [nhCalcLoading, setNhCalcLoading]           = useState(false);
+  const [nhShowPriceDetail, setNhShowPriceDetail]   = useState(false);
+  const [nhShowPagForm, setNhShowPagForm]           = useState(false);
+  const [savingNh, setSavingNh]                     = useState(false);
 
   // Detail — Add Hóspede (pernoite/dayuse existing)
   const [showDetailAddHospede, setShowDetailAddHospede]     = useState(false);
@@ -662,9 +647,32 @@ export default function OverviewManagement() {
     diffDays(nhCheckinDate, nhCheckoutDate),
     [nhCheckinDate, nhCheckoutDate]
   );
-  const nhTotalHosp  = nhPrecoDiaria * nhTotalDias;
+  const nhTotalHosp  = nhCalc?.valor_total ?? (nhPrecoDiaria * nhTotalDias);
   const nhTotalPago  = nhPagamentos.reduce((s, p) => s + p.valor, 0);
   const nhPendente   = Math.max(0, nhTotalHosp - nhTotalPago);
+
+  // ── Calcula preço automaticamente ao selecionar período / hóspedes ───────────
+  useEffect(() => {
+    if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { setNhCalc(null); return; }
+    let cancelled = false;
+    setNhCalcLoading(true);
+    setNhCalc(null);
+    const isoToBr = (iso) => iso.split('-').reverse().join('/');
+    const datas_nascimento = nhHospedes
+      .map((h) => h.dataNascimento)
+      .filter(Boolean)
+      .map((dn) => /^\d{4}-\d{2}-\d{2}$/.test(dn) ? isoToBr(dn) : dn);
+    reservaApi.calcularPreco([{
+      fk_quarto:    novoRoom.id,
+      data_entrada: dateToDisplay(nhCheckinDate),
+      data_saida:   dateToDisplay(nhCheckoutDate),
+      datas_nascimento,
+    }])
+      .then((res) => { if (!cancelled) setNhCalc(Array.isArray(res) ? res[0] : res); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setNhCalcLoading(false); });
+    return () => { cancelled = true; };
+  }, [novoRoom?.id, nhCheckinDate, nhCheckoutDate, nhHospedes]); // eslint-disable-line
 
   // ── Detail add consumo computed ───────────────────────────────────────────────
   const detailConsumoCatSel = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(detailConsumoCat));
@@ -699,7 +707,17 @@ export default function OverviewManagement() {
     return matchFilter && matchSearch && matchTipo && matchPeriod;
   });
 
-  const byCategory = OVERVIEW_CATEGORIES.map((cat) => ({
+  // Derive categories from loaded rooms (API categories are dynamic)
+  const apiCategories = useMemo(() => {
+    const seen = new Map();
+    quartos.forEach((q) => {
+      if (!seen.has(q.categoriaId))
+        seen.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, descricao: q.categoriaDescricao ?? '' });
+    });
+    return [...seen.values()];
+  }, [quartos]);
+
+  const byCategory = apiCategories.map((cat) => ({
     ...cat,
     rooms:       filteredQuartos.filter((q) => q.categoriaId === cat.id),
     total:       quartos.filter((q) => q.categoriaId === cat.id).length,
@@ -806,12 +824,11 @@ export default function OverviewManagement() {
   const openNovoServico = (tipo, room) => {
     setNovoRoom(room);
     if (tipo === 'pernoite') {
-      // Full Nova Hospedagem modal
       setNhHospedes([]);
-      setNhCheckinDate(new Date()); setNhCheckinHora('14:00');
-      setNhCheckoutDate(null); setNhCheckoutHora('12:00');
-      setNhPagamentos([]); setNhPagDesc(''); setNhPagForma('PIX'); setNhPagValor('');
-      setNhStep(0);
+      setNhCheckinDate(new Date()); setNhCheckoutDate(null);
+      setNhPagamentos([]);
+      setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor('');
+      setNhCalc(null); setNhCalcLoading(false); setNhShowPriceDetail(false); setNhShowPagForm(false);
     } else {
       setNduForm(blankNduForm());
     }
@@ -870,11 +887,11 @@ export default function OverviewManagement() {
 
   // ── Criar Pernoite (Nova Hospedagem) ─────────────────────────────────────────
   const handleCriarPernoite = async () => {
-    if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify('Preencha as datas de chegada e saída.', 'error'); return; }
+    if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify('Preencha as data de chegada e saída.', 'error'); return; }
     setSavingNh(true);
     try {
-      const chegada  = `${dateToDisplay(nhCheckinDate)} ${nhCheckinHora}`;
-      const saida    = `${dateToDisplay(nhCheckoutDate)} ${nhCheckoutHora}`;
+      const chegada  = `${dateToDisplay(nhCheckinDate)} 14:00`;
+      const saida    = `${dateToDisplay(nhCheckoutDate)} 12:00`;
       const dias     = Math.max(1, diffDays(nhCheckinDate, nhCheckoutDate));
       const valorDiaria = calcPrecoDiaria(novoRoom.categoria, nhHospedes.length || 1);
       const valorTotal  = valorDiaria * dias;
@@ -1220,9 +1237,10 @@ export default function OverviewManagement() {
   // ── Adicionar Pagamento ───────────────────────────────────────────────────────
   const tiposPagamentoOv = FORMAS_PAGAMENTO.map((f, i) => ({ id: i + 1, descricao: f }));
   const pagamentoFromPaymentModal = (payment) => {
-    const forma = tiposPagamentoOv.find((t) => t.id === Number(payment.tipo_pagamento?.id))?.descricao ?? '';
-    const now = new Date();
-    return { descricao: payment.descricao ?? '', nomePagador: payment.nome_pagador ?? '', formaPagamento: forma, valor: payment.valor, data: `${dateToDisplay(now)} ${now.toTimeString().slice(0, 5)}` };
+    const tipoId = Number(payment.tipo_pagamento?.id);
+    const forma  = tiposPagamentoOv.find((t) => t.id === tipoId)?.descricao ?? '';
+    const now    = new Date();
+    return { descricao: payment.descricao ?? '', nomePagador: payment.nome_pagador ?? '', tipoPagamentoId: tipoId, formaPagamento: forma, valor: payment.valor, data: `${dateToDisplay(now)} ${now.toTimeString().slice(0, 5)}` };
   };
 
   const handleAddPagamento = async (payment) => {
@@ -1715,32 +1733,7 @@ export default function OverviewManagement() {
                 <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_${sk}`]].join(' ')}>{s.status}</span>
               </div>
               <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
-              <div className={styles.ovHeaderSub}>
-                {s.categoria} · {s.tipoOcupacao}{sv.periodo ? ` · ${sv.periodo}` : ''} · Pernoite
-              </div>
-            </div>
-            <div className={styles.ovHeaderDates}>
-              <div className={styles.ovDatesRow}>
-                <div className={styles.ovDateCell}>
-                  <div className={styles.ovDateLabel}>Check-in</div>
-                  <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
-                  <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
-                </div>
-                <div className={styles.ovDateArrow}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                  </svg>
-                </div>
-                <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                  <div className={styles.ovDateLabel}>Check-out</div>
-                  <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
-                  <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
-                  <div className={styles.ovNightsLabel}>Diárias</div>
-                </div>
-              </div>
+              <div className={styles.ovHeaderSub}>{s.categoria} · {s.tipoOcupacao} · Pernoite</div>
             </div>
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
           </div>
@@ -1789,6 +1782,30 @@ export default function OverviewManagement() {
 
                 {/* ── Middle: financial ── */}
                 <div className={styles.ovRight}>
+                  {/* Period block */}
+                  <div className={styles.ovPeriodDark}>
+                    <div className={styles.ovDatesRow}>
+                      <div className={styles.ovDateCell}>
+                        <div className={styles.ovDateLabel}>Check-in</div>
+                        <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
+                        <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
+                      </div>
+                      <div className={styles.ovDateArrow}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                      </div>
+                      <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                        <div className={styles.ovDateLabel}>Check-out</div>
+                        <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
+                        <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
+                      </div>
+                      <div className={styles.ovNightsCell}>
+                        <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
+                        <div className={styles.ovNightsLabel}>Diárias</div>
+                      </div>
+                    </div>
+                  </div>
                   {/* Financial card */}
                   <div>
                     <div className={styles.ovFinCard}>
@@ -1891,35 +1908,41 @@ export default function OverviewManagement() {
                       })()}
                     </div>{/* ovFinCard */}
                   </div>{/* ref wrapper */}
-                </div>{/* ovRight */}
 
-                {/* ── Right: consumo ── */}
-                <div className={styles.ovConsumoSide}>
-                  {(sv.consumos || []).length === 0 ? (
-                    <div className={styles.ovConsumoSideEmpty}>
-                      <ShoppingCart size={18} color="var(--text-2)" />
-                      <span>Sem consumo</span>
-                    </div>
-                  ) : (
+                  {/* Consumo */}
+                  <div className={styles.ovConsumoSide}>
                     <div className={styles.ovConsumoBox}>
-                      <div className={styles.ovConsumoTable}>
-                        {(sv.consumos || []).map((c, i) => (
-                          <div key={c.id || i} className={styles.ovConsumoRow}>
-                            <div className={styles.ovConsumoInfo}>
-                              <div className={styles.ovConsumoName}>{c.item}</div>
-                              <div className={styles.ovConsumoMeta}>{c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}</div>
-                            </div>
-                            <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
+                      <div className={styles.ovConsumoSideHeader}>
+                        <ShoppingCart size={11} />
+                        Consumo
+                      </div>
+                      {(sv.consumos || []).length === 0 ? (
+                        <div className={styles.ovConsumoSideEmpty}>
+                          <span>Sem consumo registrado</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className={styles.ovConsumoTable}>
+                            {(sv.consumos || []).map((c, i) => (
+                              <div key={c.id || i} className={styles.ovConsumoRow}>
+                                <div className={styles.ovConsumoInfo}>
+                                  <div className={styles.ovConsumoName}>{c.item}</div>
+                                  <div className={styles.ovConsumoMeta}>{c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}</div>
+                                </div>
+                                <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                      <div className={styles.ovConsumoSideTotal}>
-                        <span>Total</span>
-                        <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? c.valor ?? 0), 0))}</span>
-                      </div>
+                          <div className={styles.ovConsumoSideTotal}>
+                            <span>Total</span>
+                            <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? c.valor ?? 0), 0))}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </div>
+
+                </div>{/* ovRight */}
 
               </div>
           </div>
@@ -2693,168 +2716,168 @@ export default function OverviewManagement() {
           size="lg"
           title={<><BedDouble size={15} /> Nova Hospedagem — Apt. {novoRoom.numero} <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{novoRoom.categoria} · {novoRoom.tipoOcupacao}</span></>}
           footer={
-            <div className={styles.modalFooterRow}>
-              {nhStep > 0 && (
-                <Button variant="secondary" onClick={() => setNhStep((s) => s - 1)}>← Voltar</Button>
-              )}
-              <div style={{ flex: 1 }} />
+            <div className={styles.footerRight}>
               <Button variant="secondary" onClick={() => setNovoModal(null)}>Cancelar</Button>
-              {nhStep < 2 ? (
-                <Button variant="primary" onClick={() => setNhStep((s) => s + 1)}>
-                  Próximo →
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={handleCriarPernoite} disabled={savingNh || !nhCheckinDate || !nhCheckoutDate}>
-                  {savingNh && <Loader2 size={14} className={styles.spin} />}
-                  Criar Hospedagem
-                </Button>
-              )}
+              <Button variant="primary" onClick={handleCriarPernoite} disabled={savingNh || !nhCheckinDate || !nhCheckoutDate}>
+                {savingNh && <Loader2 size={14} className={styles.spin} />}
+                Criar Hospedagem
+              </Button>
             </div>
           }
-          bodyStyle={{ padding: 0, gap: 0 }}
         >
-          {/* ── Resumo financeiro fixo no topo ── */}
-          <div className={styles.nhFinancialFixed}>
-            <div className={styles.ovFinHeader}>
-              <DollarSign size={13} className={styles.ovFinIcon} />
-              <span className={styles.ovFinTitle}>Resumo Financeiro</span>
-            </div>
-            <div className={styles.ovFinRow}>
-              <div className={styles.ovFinItem}>
-                <span className={styles.ovFinLabel}>Total</span>
-                <span className={styles.ovFinValue}>{fmtBRL(nhTotalHosp)}</span>
-                {nhTotalDias > 0 && <span className={styles.nhFinSub}>{nhTotalDias}d × {fmtBRL(nhPrecoDiaria)}</span>}
-              </div>
-              <div className={styles.ovFinItem}>
-                <span className={styles.ovFinLabel}>Pago</span>
-                <span className={styles.ovFinValue}>{fmtBRL(nhTotalPago)}</span>
-              </div>
-              <div className={styles.ovFinItem}>
-                <span className={styles.ovFinLabel}>Pendente</span>
-                <span className={[styles.ovFinValue, nhPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>{fmtBRL(nhPendente)}</span>
-              </div>
-            </div>
-            {nhTotalHosp > 0 && (() => {
-              const pct = Math.min(100, Math.round(nhTotalPago / nhTotalHosp * 100));
-              return (
-                <div className={styles.ovFinProgress}>
-                  <div className={styles.ovFinProgressMeta}>
-                    <span>Progresso de pagamento</span>
-                    <span>{pct}%</span>
-                  </div>
-                  <div className={styles.ovFinBar}>
-                    <div className={styles.ovFinBarFill} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+          <div className={styles.formStack}>
 
-          {/* ── Step tabs ── */}
-          <div className={styles.nhStepTabs}>
-            {[
-              [0, 'Hóspedes'],
-              [1, 'Período'],
-              [2, 'Pagamentos'],
-            ].map(([idx, label]) => (
-              <button
-                key={idx}
-                className={[styles.nhStepTab, nhStep === idx ? styles.nhStepTabActive : ''].join(' ')}
-                onClick={() => setNhStep(idx)}
-              >
-                <span className={styles.nhStepNum}>{idx + 1}</span>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* ── Step 0: Hóspedes ── */}
-          {nhStep === 0 && (
-            <div className={styles.nhStepContent}>
+            {/* ── Hóspedes ── */}
+            <div className={styles.formStack} style={{ gap: 8 }}>
+              <div className={styles.nhDividerBlue}>Hóspedes</div>
               <NhHospedesPicker value={nhHospedes} onChange={setNhHospedes} />
             </div>
-          )}
 
-          {/* ── Step 1: Período ── */}
-          {nhStep === 1 && (
-            <div className={styles.nhStepContent}>
-              <div className={styles.grid2}>
-                <FormField label="Check-in *">
-                  <DatePicker mode="single" value={nhCheckinDate} onChange={setNhCheckinDate} />
-                </FormField>
-                <FormField label="Hora">
-                  <TimeInput value={nhCheckinHora} onChange={setNhCheckinHora} />
-                </FormField>
-              </div>
-              <div className={styles.grid2}>
-                <FormField label="Check-out *">
-                  <DatePicker mode="single" value={nhCheckoutDate} onChange={setNhCheckoutDate} minDate={nhCheckinDate} />
-                </FormField>
-                <FormField label="Hora">
-                  <TimeInput value={nhCheckoutHora} onChange={setNhCheckoutHora} />
-                </FormField>
-              </div>
+            {/* ── Período ── */}
+            <div className={styles.formStack} style={{ gap: 8 }}>
+              <div className={styles.nhDividerBlue}>Período</div>
+              <DatePicker
+                mode="range"
+                startDate={nhCheckinDate}
+                endDate={nhCheckoutDate}
+                onRangeChange={({ start, end }) => { setNhCheckinDate(start); setNhCheckoutDate(end); }}
+              />
               {nhCheckinDate && nhCheckoutDate && (
-                <div className={styles.totalPreview}>
-                  <span className={styles.totalPreviewLabel}>{nhTotalDias} diária{nhTotalDias !== 1 ? 's' : ''} × {fmtBRL(nhPrecoDiaria)}</span>
-                  <span className={styles.totalPreviewValue}>{fmtBRL(nhTotalHosp)}</span>
+                <div className={styles.nhPriceCard}>
+                  <button
+                    className={styles.nhPriceCardHeader}
+                    onClick={() => !nhCalcLoading && setNhShowPriceDetail((v) => !v)}
+                  >
+                    <span className={styles.nhFinStrip}>
+                      <span className={styles.nhFinStripItem}>
+                        Valor Total{' '}
+                        {nhCalcLoading
+                          ? <b><Loader2 size={11} className={styles.spin} /></b>
+                          : <b>{fmtBRL(nhTotalHosp)}</b>
+                        }
+                      </span>
+                      <span className={styles.nhFinStripDivider} />
+                      <span className={styles.nhFinStripItem}>
+                        Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(nhTotalPago)}</b>
+                      </span>
+                      <span className={styles.nhFinStripDivider} />
+                      <span className={styles.nhFinStripItem}>
+                        Pendente <b style={{ color: nhPendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(nhPendente)}</b>
+                      </span>
+                    </span>
+                    {!nhCalcLoading && nhCalc?.detalhes?.length > 0 && (
+                      <ChevronDown size={14} className={nhShowPriceDetail ? styles.nhChevronOpen : styles.nhChevron} />
+                    )}
+                  </button>
+
+                  {nhShowPriceDetail && !nhCalcLoading && nhCalc?.detalhes?.length > 0 && (
+                    <div className={styles.nhPriceCardBody}>
+                      <div className={styles.nhPriceCardRoom}>
+                        {nhCalc.detalhes.map((d, i) => (
+                          <div key={i} className={styles.nhPriceDetailItem}>
+                            <div className={styles.nhPriceRow}>
+                              <span className={styles.nhPriceDesc}>{d.descricao}</span>
+                              <span className={styles.nhPriceVal}>{fmtBRL(d.valor_final)}</span>
+                            </div>
+                            {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                              <div className={styles.nhPriceDetailSub}>
+                                <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                                {d.sazonalidade?.descricao && <span className={styles.nhSazChip}>{d.sazonalidade.descricao}</span>}
+                                {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        <div className={styles.nhPriceTotalRow}>
+                          <span>Total</span>
+                          <span>{fmtBRL(nhCalc.valor_total)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
 
-          {/* ── Step 2: Pagamentos ── */}
-          {nhStep === 2 && (
-            <div className={styles.nhStepContent}>
-              <div className={styles.pagamentoResume}>
-                <div className={styles.pagamentoResumeRow}><span>Total da hospedagem</span><span>{fmtBRL(nhTotalHosp)}</span></div>
-                <div className={[styles.pagamentoResumeRow, styles.pagamentoResumeTotal].join(' ')}>
-                  <span>Pendente</span>
-                  <span style={{ color: nhPendente > 0 ? '#d97706' : '#059669' }}>{fmtBRL(nhPendente)}</span>
-                </div>
-              </div>
+            {/* ── Pagamentos ── */}
+            <div className={styles.formStack} style={{ gap: 8 }}>
+              <div className={styles.nhDividerOrange}>Pagamentos</div>
+
+              {/* pagamentos já adicionados */}
               {nhPagamentos.map((p, i) => (
-                <div key={i} className={styles.listItem}>
-                  <div className={styles.listItemLeft}>
-                    <CreditCard size={14} className={styles.listItemIconGreen} />
-                    <div>
-                      <div className={styles.listItemName}>{p.descricao}</div>
-                      <div className={styles.listItemSub}>{p.forma}</div>
-                    </div>
+                <div key={i} className={styles.nhPagItem}>
+                  <CreditCard size={13} />
+                  <div className={styles.nhPagItemInfo}>
+                    <span className={styles.nhPagItemNome}>{p.nomePagador || '—'}</span>
+                    <span className={styles.nhPagItemSub}>
+                      {tiposPagamentoOv.find((t) => t.id === p.tipoPagamentoId)?.descricao ?? ''}
+                      {p.descricao ? ` · ${p.descricao}` : ''}
+                    </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
-                    <button className={styles.removeBtn} onClick={() => setNhPagamentos((prev) => prev.filter((_, j) => j !== i))}>
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
+                  <span className={styles.nhPagItemValor}>{fmtBRL(p.valor)}</span>
+                  <button className={styles.removeBtn} onClick={() => setNhPagamentos((prev) => prev.filter((_, j) => j !== i))}>
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               ))}
-              <div className={styles.grid2} style={{ marginTop: 8 }}>
-                <FormField label="Descrição">
-                  <Input value={nhPagDesc} onChange={(e) => setNhPagDesc(e.target.value)} placeholder="Ex: Entrada..." />
-                </FormField>
-                <FormField label="Forma">
-                  <Select value={nhPagForma} onChange={(e) => setNhPagForma(e.target.value)}>
-                    {FORMAS_PAGAMENTO.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </Select>
-                </FormField>
-              </div>
-              <div className={styles.grid2}>
-                <FormField label="Valor">
-                  <Input value={nhPagValor} onChange={(e) => setNhPagValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
-                </FormField>
-                <FormField label=" ">
-                  <Button variant="secondary" onClick={() => {
-                    const v = parseBRL(nhPagValor);
-                    if (!v || !nhPagDesc.trim()) return;
-                    setNhPagamentos((p) => [...p, { descricao: nhPagDesc, forma: nhPagForma, valor: v }]);
-                    setNhPagDesc(''); setNhPagValor('');
-                  }}>Adicionar</Button>
-                </FormField>
-              </div>
+
+              {/* botão + formulário colapsável */}
+              {nhShowPagForm ? (
+                <div className={styles.nhPagForm}>
+                  <FormField label="Tipo de Pagamento">
+                    <Select value={nhPagTipoId} onChange={(e) => setNhPagTipoId(e.target.value)}>
+                      <option value="">Selecione...</option>
+                      {tiposPagamentoOv.map((t) => <option key={t.id} value={t.id}>{t.descricao}</option>)}
+                    </Select>
+                  </FormField>
+                  <FormField label="Nome do Pagador">
+                    <Input placeholder="Nome completo"
+                      value={nhPagNomePagador} onChange={(e) => setNhPagNomePagador(e.target.value.toUpperCase())} />
+                    {nhHospedes[0]?.nome && (
+                      <label className={styles.checkRow}>
+                        <input type="checkbox"
+                          checked={nhPagNomePagador === nhHospedes[0].nome.toUpperCase()}
+                          onChange={(e) => setNhPagNomePagador(e.target.checked ? nhHospedes[0].nome.toUpperCase() : '')} />
+                        <span>Nome do titular</span>
+                      </label>
+                    )}
+                  </FormField>
+                  <FormField label="Descrição">
+                    <Input placeholder="Descrição do pagamento"
+                      value={nhPagDescricao} onChange={(e) => setNhPagDescricao(e.target.value.toUpperCase())} />
+                  </FormField>
+                  <div className={styles.nhPagValorRow}>
+                    <FormField label="Valor" style={{ flex: 1 }}>
+                      <Input value={nhPagValor} onChange={(e) => setNhPagValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
+                    </FormField>
+                    <div className={styles.nhPagAddWrap}>
+                      <Button variant="secondary" onClick={() => {
+                        const v = parseBRL(nhPagValor);
+                        if (!v || !nhPagTipoId || !nhPagNomePagador.trim()) return;
+                        setNhPagamentos((prev) => [...prev, {
+                          tipoPagamentoId: Number(nhPagTipoId),
+                          nomePagador: nhPagNomePagador.trim(),
+                          descricao: nhPagDescricao.trim(),
+                          valor: v,
+                        }]);
+                        setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor('');
+                        setNhShowPagForm(false);
+                      }}>Adicionar</Button>
+                    </div>
+                  </div>
+                  <button className={styles.nhAddPagBtn} style={{ alignSelf: 'flex-start', borderColor: 'var(--border)', background: 'none', color: 'var(--text-2)' }}
+                    onClick={() => { setNhShowPagForm(false); setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor(''); }}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button className={styles.nhAddPagBtn} onClick={() => setNhShowPagForm(true)}>
+                  <Plus size={11} /> Adicionar pagamento
+                </button>
+              )}
             </div>
-          )}
+
+          </div>
         </Modal>
       )}
 
@@ -3730,7 +3753,7 @@ export default function OverviewManagement() {
                   value={tqNovoQuartoId}
                   onChange={setTqNovoQuartoId}
                   quartos={quartos}
-                  categorias={OVERVIEW_ROOMS_CATS}
+                  categorias={apiCategories.map((c) => ({ nome: c.nome, quartos: quartos.filter((q) => q.categoriaId === c.id).map((q) => q.numero) }))}
                   currentNumero={selectedRoom.numero}
                 />
               </FormField>
