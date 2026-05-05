@@ -299,10 +299,11 @@ export const overviewApi = {
 
   async marcarManutencao(id, data = {}) {
     await recepcaoApi.criarManutencao({
-      fk_quarto:   id,
-      responsavel: data.responsavel,
-      descricao:   data.descricao,
-      previsao_fim: data.previsaoFim,
+      quarto:           { id },
+      nome_responsavel: data.responsavel || undefined,
+      descricao:        data.descricao   || undefined,
+      data_hora_inicio: data.dataHoraInicio || undefined,
+      data_hora_fim:    data.dataHoraFim    || undefined,
     });
     await _reload();
     return _find(id);

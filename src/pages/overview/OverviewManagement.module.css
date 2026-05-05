@@ -366,12 +366,12 @@
   box-shadow: 0 14px 30px rgba(2, 6, 23, 0.12), 0 2px 10px rgba(2, 6, 23, 0.08);
 }
 
-.roomCard_disponivel { background: linear-gradient(165deg, rgba(16,185,129,.13) 0%, rgba(16,185,129,.05) 42%, var(--surface) 100%); border-color: rgba(16,185,129,.30); }
+.roomCard_disponivel { background: linear-gradient(165deg, rgba(16,185,129,.42) 0%, rgba(16,185,129,.20) 42%, var(--surface) 100%); border-color: rgba(16,185,129,.65); }
 .roomCard_ocupado    { background: linear-gradient(165deg, rgba(220,38,38,.13) 0%, rgba(220,38,38,.05) 42%, var(--surface) 100%); border-color: rgba(220,38,38,.30);  }
 .roomCard_reservado  { background: linear-gradient(165deg, rgba(249,115,22,.13) 0%, rgba(249,115,22,.05) 42%, var(--surface) 100%); border-color: rgba(249,115,22,.30); }
 .roomCard_limpeza    { background: linear-gradient(165deg, rgba(37,99,235,.13) 0%, rgba(37,99,235,.05) 42%, var(--surface) 100%); border-color: rgba(37,99,235,.30);  }
-.roomCard_manutencao { background: linear-gradient(165deg, rgba(124,58,237,.13) 0%, rgba(124,58,237,.05) 42%, var(--surface) 100%); border-color: rgba(124,58,237,.30); }
-.roomCard_fora       { background: linear-gradient(165deg, rgba(100,116,139,.13) 0%, rgba(100,116,139,.05) 42%, var(--surface) 100%); border-color: rgba(100,116,139,.30);}
+.roomCard_manutencao { background: linear-gradient(160deg, #cbd5e1 0%, #b8c4d4 100%); border-color: rgba(124,58,237,.25); box-shadow: 0 6px 20px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5); }
+.roomCard_fora       { background: linear-gradient(165deg, rgba(100,116,139,.13) 0%, rgba(100,116,139,.05) 42%, var(--surface) 100%); border-color: rgba(100,116,139,.30); }
 
 .roomCardTop {
   display: flex;
@@ -392,13 +392,12 @@
 .roomCardNum_ocupado    { color: #dc2626; }
 .roomCardNum_reservado  { color: #ea580c; }
 .roomCardNum_limpeza    { color: #2563eb; }
-.roomCardNum_manutencao { color: #7c3aed; }
+.roomCardNum_manutencao { color: #a78bfa; } /* bright on dark bg */
 .roomCardNum_fora       { color: #64748b; }
 :root[data-theme="dark"] .roomCardNum_disponivel { color: #34d399; }
 :root[data-theme="dark"] .roomCardNum_ocupado    { color: #f87171; }
 :root[data-theme="dark"] .roomCardNum_reservado  { color: #fb923c; }
 :root[data-theme="dark"] .roomCardNum_limpeza    { color: #60a5fa; }
-:root[data-theme="dark"] .roomCardNum_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .roomCardNum_fora       { color: #94a3b8; }
 
 .roomCardBody {
@@ -465,6 +464,18 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ── Manutenção card: dark text on light gray bg ── */
+.roomCard_manutencao .roomCardLabel,
+.roomCard_manutencao .roomCardGuest { color: #1e293b; }
+.roomCard_manutencao .roomCardMeta,
+.roomCard_manutencao .roomCardDesc,
+.roomCard_manutencao .roomCardPeriod { color: #64748b; }
+.roomCard_manutencao .roomCardTipo {
+  color: #64748b;
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.08);
 }
 
 /* Badges row (pernoite / dayuse) */

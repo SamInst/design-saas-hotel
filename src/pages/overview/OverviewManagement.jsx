@@ -335,10 +335,14 @@ function NhHospedesPicker({ value = [], onChange }) {
           id: p.id,
           nome: p.nome,
           cpf: p.cpf ?? '',
+          telefone: p.telefone ?? '',
+          email: p.email ?? '',
           dataNascimento: p.data_nascimento ?? '',
           bloqueado: p.status === 'BLOQUEADO',
           acompanhantes: (p.acompanhantes ?? []).map((a) => ({
             id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+            telefone: a.telefone ?? '',
+            email: a.email ?? '',
             dataNascimento: a.data_nascimento ?? '',
             bloqueado: a.status === 'BLOQUEADO',
           })),
@@ -497,6 +501,7 @@ export default function OverviewManagement() {
   // Detail modal
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [detailTab, setDetailTab]       = useState('dados');
+  const [svGuests, setSvGuests]         = useState([]); // enriched with telefone/email
 
   // Pernoite detail — diária navigation
   const [detailDiariaIdx, setDetailDiariaIdx] = useState(0);
@@ -794,6 +799,29 @@ export default function OverviewManagement() {
     const fresh = quartos.find((q) => q.id === selectedRoom.id);
     if (fresh) setSelectedRoom(fresh);
   }, [quartos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Enrich guest contact info when room/servico changes ──────────────────────
+  useEffect(() => {
+    const hospedes = selectedRoom?.servico?.hospedes ?? [];
+    if (!hospedes.length) { setSvGuests([]); return; }
+    setSvGuests(hospedes); // show names immediately
+    let cancelled = false;
+    Promise.all(hospedes.map(async (h) => {
+      if (h.telefone || h.email) return h;
+      try {
+        // try by id first; fall back to cpf search if id param not supported
+        let res  = await cadastroApi.listarPessoas({ id: h.id, size: 1 });
+        let full = res?.content?.[0] ?? (Array.isArray(res) ? res[0] : res) ?? null;
+        if (!full?.id && h.cpf) {
+          res  = await cadastroApi.listarPessoas({ termo: h.cpf.replace(/\D/g, ''), size: 1 });
+          full = res?.content?.[0] ?? (Array.isArray(res) ? res[0] : res) ?? null;
+        }
+        if (!full?.id || full.id !== h.id) return h;
+        return { ...h, telefone: full.telefone ?? '', email: full.email ?? '' };
+      } catch { return h; }
+    })).then((enriched) => { if (!cancelled) setSvGuests(enriched); });
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (serviceModal?.type !== 'limpeza') return;
@@ -1296,6 +1324,7 @@ export default function OverviewManagement() {
     if (!selectedRoom) return null;
     const s = selectedRoom;
     const sk = roomStatusKey(s.status);
+    const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
     // ── Disponível ────────────────────────────────────────────────────────────
     if (s.status === ROOM_STATUS.DISPONIVEL) {
@@ -1554,7 +1583,6 @@ export default function OverviewManagement() {
       const pagamentoTotal  = allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
       const [checkinDate, checkinHora]   = (sv.chegadaPrevista || '').split(' ');
       const [checkoutDate, checkoutHora] = (sv.saidaPrevista   || '').split(' ');
-      const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
       return (
         <>
           {/* ── Header ── */}
@@ -1596,11 +1624,9 @@ export default function OverviewManagement() {
             <div className={styles.ovTwoCol}>
               {/* Left: guests */}
               <div className={styles.ovLeft}>
-                {(sv.hospedes || []).length > 0 ? (() => {
-                  const hospedes = sv.hospedes || [];
-                  return (
+                {svGuests.length > 0 ? (
                     <div className={styles.ovGuestTable}>
-                      {hospedes.map((h) => (
+                      {svGuests.map((h) => (
                         <div key={h.id || h.nome} className={styles.ovGuestRow}>
                           <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
                           <div className={styles.ovGuestInfo}>
@@ -1609,14 +1635,13 @@ export default function OverviewManagement() {
                             {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
                           </div>
                           <div className={styles.contactActions}>
-                            {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
-                            {h.email    && <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer" className={styles.quickBtn} onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
+                            {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
+                            {h.email    && <a href={`mailto:${h.email}`} className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
                           </div>
                         </div>
                       ))}
                     </div>
-                  );
-                })() : (
+                ) : (
                   <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
                 )}
               </div>
@@ -1744,12 +1769,9 @@ export default function OverviewManagement() {
 
                 {/* ── Left: guests ── */}
                 <div className={styles.ovLeft}>
-                  {(sv.hospedes || []).length > 0 ? (() => {
-                    const hospedes = sv.hospedes || [];
-                    const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-                    return (
+                  {svGuests.length > 0 ? (
                       <div className={styles.ovGuestTable}>
-                        {hospedes.map((h) => (
+                        {svGuests.map((h) => (
                           <div key={h.id || h.nome} className={styles.ovGuestRow}>
                             <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
                             <div className={styles.ovGuestInfo}>
@@ -1765,7 +1787,7 @@ export default function OverviewManagement() {
                                 </a>
                               )}
                               {h.email && (
-                                <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
+                                <a href={`mailto:${h.email}`}
                                   className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
                                   <Mail size={11} />
                                 </a>
@@ -1774,8 +1796,7 @@ export default function OverviewManagement() {
                           </div>
                         ))}
                       </div>
-                    );
-                  })() : (
+                  ) : (
                     <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
                   )}
                 </div>
@@ -2132,13 +2153,11 @@ export default function OverviewManagement() {
                 <Button variant="secondary" size="sm" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
                   <Plus size={13} /> Adicionar Hóspede
                 </Button>
-                {(sv.hospedes || []).length === 0
+                {svGuests.length === 0
                   ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
                   : (
                     <div className={styles.ovGuestTable}>
-                      {(sv.hospedes || []).map((h) => {
-                        const ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-                        return (
+                      {svGuests.map((h) => (
                           <div key={h.id} className={styles.ovGuestRow}>
                             <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
                             <div className={styles.ovGuestInfo}>
@@ -2154,7 +2173,7 @@ export default function OverviewManagement() {
                                 </a>
                               )}
                               {h.email && (
-                                <a href={`mailto:${h.email}`} target="_blank" rel="noreferrer"
+                                <a href={`mailto:${h.email}`}
                                   className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
                                   <Mail size={11} />
                                 </a>
@@ -2165,8 +2184,7 @@ export default function OverviewManagement() {
                               </button>
                             </div>
                           </div>
-                        );
-                      })}
+                      ))}
                     </div>
                   )
                 }
