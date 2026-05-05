@@ -122,7 +122,16 @@ const _STATUS_MAP = {
 };
 
 function _normalizePessoa(p) {
-  return { id: p.id, nome: p.nome ?? '', cpf: p.cpf ?? '', telefone: p.telefone ?? '', email: p.email ?? '', titular: p.titular ?? false };
+  // API may wrap person under p.pessoa (reserva shape) or be flat (pernoite shape)
+  const core = p.pessoa ?? p;
+  return {
+    id:       core.id,
+    nome:     core.nome      ?? '',
+    cpf:      core.cpf       ?? '',
+    telefone: core.telefone  ?? '',
+    email:    core.email     ?? '',
+    titular:  core.titular   ?? p.representante ?? false,
+  };
 }
 
 function _normalizeConsumo(c) {
@@ -165,26 +174,31 @@ function _normalizeDiaria(d) {
 
 function _normalizeServico(svc, tipo) {
   if (!svc) return null;
-  const diarias   = (svc.diarias   ?? []).map(_normalizeDiaria);
+  const diarias    = (svc.diarias    ?? []).map(_normalizeDiaria);
   const pagamentos = (svc.pagamentos ?? []).map(_normalizePagamento);
   const totalPago  = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
   const valorTotal = svc.valor_total ?? 0;
-  const titular    = (svc.pessoas ?? []).find(p => p.titular) ?? svc.pessoas?.[0];
+  // Unwrap nested pessoa shape (reserva) or flat shape (pernoite)
+  const hospedes   = (svc.pessoas ?? []).map(_normalizePessoa);
+  const titular    = hospedes.find(p => p.titular) ?? hospedes[0];
+  // Dates: reserva uses data_hora_entrada/saida; pernoite uses check_in/check_out
+  const checkin  = svc.data_hora_entrada ?? svc.check_in  ?? '';
+  const checkout = svc.data_hora_saida   ?? svc.check_out ?? '';
   return {
     tipo,
     id: svc.id,
     titularNome: titular?.nome ?? null,
     tipoAcomodacao: svc.tipo_ocupacao ?? '',
-    periodo: `${svc.check_in ?? ''} - ${svc.check_out ?? ''}`,
-    chegadaPrevista: svc.check_in ?? '',
-    saidaPrevista:   svc.check_out ?? '',
+    periodo: `${checkin} - ${checkout}`,
+    chegadaPrevista: checkin,
+    saidaPrevista:   checkout,
     status: svc.status ?? '',
     totalDiarias: svc.quantidade_diarias ?? diarias.length,
     diariaAtual:  svc.numero_diaria_atual ?? 0,
     valorTotal,
     totalPago,
     pagamentoPendente: Math.max(0, valorTotal - totalPago),
-    hospedes: (svc.pessoas ?? []).map(_normalizePessoa),
+    hospedes,
     consumos: diarias.flatMap(d => d.consumos),
     pagamentos,
     diarias,
@@ -278,6 +292,20 @@ export const overviewApi = {
     return _reload();
   },
 
+  async finalizarLimpeza(quartoId) {
+    const room = _find(quartoId);
+    if (room?.limpeza?.id) await recepcaoApi.finalizarLimpeza(room.limpeza.id);
+    await _reload();
+    return _find(quartoId);
+  },
+
+  async finalizarManutencao(quartoId) {
+    const room = _find(quartoId);
+    if (room?.manutencao?.id) await recepcaoApi.finalizarManutencao(room.manutencao.id);
+    await _reload();
+    return _find(quartoId);
+  },
+
   async marcarDisponivel(id) {
     const room = _find(id);
     if (room?.limpeza?.id)       await recepcaoApi.finalizarLimpeza(room.limpeza.id);
@@ -289,9 +317,9 @@ export const overviewApi = {
 
   async marcarLimpeza(id, data = {}) {
     await recepcaoApi.acionarLimpeza(id, {
-      responsavel:      data.responsavel,
-      data_hora_inicio: data.dataHoraInicio,
-      data_hora_fim:    data.dataHoraFim,
+      funcionario:      data.funcId ? { id: data.funcId } : undefined,
+      data_hora_inicio: data.dataHoraInicio || undefined,
+      data_hora_fim:    data.dataHoraFim    || undefined,
     });
     await _reload();
     return _find(id);

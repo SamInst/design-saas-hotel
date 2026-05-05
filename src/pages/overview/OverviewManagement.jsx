@@ -870,6 +870,28 @@ export default function OverviewManagement() {
     setFuncSelected(null);
   };
 
+  const handleFinalizarManutencao = async (room) => {
+    try {
+      setSaving(true);
+      const updated = await overviewApi.finalizarManutencao(room.id);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`Manutenção do Apt. ${room.numero} finalizada.`);
+      closeDetail();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleFinalizarLimpeza = async (room) => {
+    try {
+      setSaving(true);
+      const updated = await overviewApi.finalizarLimpeza(room.id);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`Limpeza do Apt. ${room.numero} finalizada.`);
+      closeDetail();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
   const handleMarcarDisponivel = async (room) => {
     try {
       setSaving(true);
@@ -1333,7 +1355,6 @@ export default function OverviewManagement() {
       const dispTabs  = [
         { id: 'dados',   label: 'Dados' },
         { id: 'consumo', label: 'Consumo' },
-        { id: 'itens',   label: 'Detalhes do Quarto' },
         { id: 'precos',  label: 'Preços' },
       ];
       return (
@@ -2282,16 +2303,26 @@ export default function OverviewManagement() {
     if (s.status === ROOM_STATUS.LIMPEZA) {
       return (
         <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={closeDetail}>Fechar</Button>
-          <Button variant="primary" className={styles.btnGreen} onClick={() => handleMarcarDisponivel(s)} disabled={saving}>
+          <Button variant="primary" className={styles.btnBlue} onClick={() => handleFinalizarLimpeza(s)} disabled={saving}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            <BedDouble size={14} /> Marcar Disponível
+            <Sparkles size={14} /> Finalizar Limpeza
           </Button>
         </div>
       );
     }
 
-    if (s.status === ROOM_STATUS.MANUTENCAO || s.status === ROOM_STATUS.FORA_DE_SERVICO) {
+    if (s.status === ROOM_STATUS.MANUTENCAO) {
+      return (
+        <div className={styles.footerRight}>
+          <Button variant="primary" className={styles.btnPurple} onClick={() => handleFinalizarManutencao(s)} disabled={saving}>
+            {saving && <Loader2 size={14} className={styles.spin} />}
+            <Wrench size={14} /> Finalizar Manutenção
+          </Button>
+        </div>
+      );
+    }
+
+    if (s.status === ROOM_STATUS.FORA_DE_SERVICO) {
       return (
         <div className={styles.footerRight}>
           <Button variant="secondary" onClick={closeDetail}>Fechar</Button>
@@ -2442,19 +2473,23 @@ export default function OverviewManagement() {
         {/* Content by status */}
         <div className={styles.roomCardBody}>
           {room.status === ROOM_STATUS.DISPONIVEL && (
-            <>
-              <span className={styles.roomCardTipo}>{room.tipoOcupacao}</span>
-              {bedTags.length > 0 && (
-                <div className={styles.roomCardBadges}>
-                  {bedTags.map(({ key, Icon }) => (
-                    <div key={key} className={styles.roomCardBedTag}>
-                      <Icon size={11} />
-                      <span>{room.camas[key]}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+            <div className={styles.bedGrid}>
+              {[
+                { key: 'casal',    Icon: BedDouble, label: 'Casal'    },
+                { key: 'solteiro', Icon: BedSingle, label: 'Solteiro' },
+                { key: 'beliche',  Icon: Layers,    label: 'Beliche'  },
+                { key: 'rede',     Icon: Waves,     label: 'Rede'     },
+              ].map(({ key, Icon, label }) => {
+                const qty = room.camas?.[key] || 0;
+                return (
+                  <div key={key} className={[styles.bedGridCell, qty > 0 ? styles.bedGridCellActive : ''].join(' ')}>
+                    <Icon size={12} />
+                    <span className={styles.bedGridQty}>{qty}</span>
+                    <span className={styles.bedGridLabel}>{label}</span>
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {room.status === ROOM_STATUS.LIMPEZA && (
@@ -2516,12 +2551,23 @@ export default function OverviewManagement() {
             </>
           )}
 
-          {sv?.tipo === 'reserva' && (
-            <>
-              <span className={styles.roomCardGuest}>{sv.titularNome || '—'}</span>
-              {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> {sv.chegadaPrevista}</span>}
-            </>
-          )}
+          {sv?.tipo === 'reserva' && (() => {
+            const parseBrDate = (s) => { const [d, t] = (s || '').split(' '); const [dd, mm, yyyy] = (d || '').split('/'); return yyyy ? new Date(`${yyyy}-${mm}-${dd}T${t || '00:00'}`) : null; };
+            const cin  = parseBrDate(sv.chegadaPrevista);
+            const cout = parseBrDate(sv.saidaPrevista);
+            const noites = cin && cout ? Math.round((cout - cin) / 86400000) : null;
+            const nPessoas = (sv.hospedes || []).length;
+            return (
+              <>
+                <span className={styles.roomCardGuest} style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'unset', lineHeight: 1.25 }}>{sv.titularNome || '—'}</span>
+                {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> Check-in: {sv.chegadaPrevista}</span>}
+                <div className={styles.roomCardBadges} style={{ marginTop: 2 }}>
+                  {nPessoas > 0 && <span className={styles.guestCountBadge}><Users size={10} /> {nPessoas}</span>}
+                  {noites > 0   && <span className={styles.guestCountBadge}><Calendar size={10} /> {noites}</span>}
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
     );
@@ -2705,24 +2751,28 @@ export default function OverviewManagement() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Detalhe do Quarto
       ═══════════════════════════════════════════════════════ */}
-      {selectedRoom && (
+      {selectedRoom && (() => {
+        const isServiceCard = [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(selectedRoom.status);
+        const isFullscreen  = ['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo);
+        return (
         <Modal
           open={!!selectedRoom}
           onClose={closeDetail}
           size="lg"
-          hideHeader={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)}
+          hideHeader={isFullscreen}
           title={renderDetailTitle()}
-          footer={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo) ? undefined : renderDetailFooter()}
-          containerStyle={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)
+          footer={isFullscreen ? undefined : renderDetailFooter()}
+          containerStyle={isFullscreen
             ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(636px, 96vw)', maxWidth: 'min(636px, 96vw)' }
             : undefined}
-          bodyStyle={['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo)
+          bodyStyle={isFullscreen
             ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
             : undefined}
         >
           {renderDetailContent()}
         </Modal>
-      )}
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Nova Hospedagem (Novo Pernoite)
@@ -3122,7 +3172,7 @@ export default function OverviewManagement() {
                         key={f.id}
                         type="button"
                         className={`${styles.funcListItem} ${funcSelected?.id === f.id ? styles.funcListItemActive : ''}`}
-                        onClick={() => { setFuncSelected(f); setSvcForm((fm) => ({ ...fm, responsavel: f.pessoa?.nome || f.nome })); }}
+                        onClick={() => { setFuncSelected(f); setSvcForm((fm) => ({ ...fm, responsavel: f.pessoa?.nome || f.nome, funcId: f.id })); }}
                       >
                         {f.pessoa?.nome || f.nome}
                         {funcSelected?.id === f.id && <Check size={14} style={{ marginLeft: 'auto' }} />}
