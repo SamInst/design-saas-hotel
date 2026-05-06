@@ -843,7 +843,8 @@ export default function OverviewManagement() {
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
     setDiariaTab('hospedes');
-
+    setConsumoCart([]);
+    setConsumoCartPag(null);
   };
 
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
@@ -1355,7 +1356,6 @@ export default function OverviewManagement() {
       const dispTabs  = [
         { id: 'dados',   label: 'Dados' },
         { id: 'consumo', label: 'Consumo' },
-        { id: 'precos',  label: 'Preços' },
       ];
       return (
         <>
@@ -1401,63 +1401,106 @@ export default function OverviewManagement() {
                 </div>
               </div>
             )}
-            {detailTab === 'consumo' && (
-              <div className={styles.tabContent}>
-                <div className={styles.minibarHeader}>
-                  <span className={styles.minibarHeaderTitle}><ShoppingCart size={13} /> Minibar / Consumo</span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={handleMinibarReporTudo}>
-                      <RotateCcw size={12} /> Repor Tudo
-                    </Button>
-                    <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setMinibarCat(''); setMinibarProd(''); setMinibarQtyAdd(1); setShowAddMinibar(true); }}>
-                      <Plus size={12} /> Adicionar Item
-                    </Button>
+            {detailTab === 'consumo' && (() => {
+              const minibarItems = (s.minibar || []).map((item) => {
+                let preco = item.preco ?? 0;
+                if (!preco) {
+                  for (const cat of CATEGORIAS_CONSUMO) {
+                    const p = cat.produtos?.find((p) => p.id === item.produtoId);
+                    if (p) { preco = p.preco; break; }
+                  }
+                }
+                return { id: item.produtoId, nome: item.nome, categoria: item.categoria || 'Minibar', preco, qtdAtual: item.qtdAtual };
+              });
+              const cartTotal = consumoCart.reduce((sum, c) => sum + c.preco * c.qtd, 0);
+              return (
+                <div className={styles.tabContent}>
+                  <div className={styles.consumoModalSection}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
+                      <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setMinibarCat(''); setMinibarProd(''); setMinibarQtyAdd(1); setShowAddMinibar(true); }}>
+                        <Plus size={12} /> Adicionar Item
+                      </Button>
+                    </div>
+                    {minibarItems.length === 0
+                      ? <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>Nenhum item no quarto</span></div>
+                      : (
+                        <div className={styles.consumoItemList}>
+                          {minibarItems.map((item) => {
+                            const esgotado = item.qtdAtual === 0;
+                            const inCart   = consumoCart.find((c) => c.tipo === 'interno' && c.itemId === item.id);
+                            const cartQty  = inCart?.qtd ?? 0;
+                            return (
+                              <div key={item.id} className={styles.consumoItemRow}>
+                                <div className={styles.consumoItemInfo}>
+                                  <span className={styles.consumoItemNome}>{item.nome}</span>
+                                  <span className={styles.consumoItemMeta}>{item.categoria} · {fmtBRL(item.preco)}/un.</span>
+                                </div>
+                                <div className={[styles.cartQtdStepper, esgotado ? styles.cartQtdStepperDisabled : ''].join(' ')}>
+                                  <button disabled={cartQty === 0} onClick={() => updateInternQty(item, cartQty - 1)}>−</button>
+                                  <span className={styles.cartStepperFrac}>{cartQty}/{item.qtdAtual}</span>
+                                  <button disabled={esgotado || cartQty >= item.qtdAtual} onClick={() => updateInternQty(item, cartQty + 1)}>+</button>
+                                </div>
+                                <span className={cartQty > 0 ? styles.cartRowTotal : styles.cartRowTotalEmpty}>
+                                  {cartQty > 0 ? fmtBRL(item.preco * cartQty) : '—'}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )
+                    }
                   </div>
-                </div>
-                {(!s.minibar || s.minibar.length === 0) ? (
-                  <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>Nenhum item no minibar</span></div>
-                ) : (
-                  <div className={styles.minibarList}>
-                    {s.minibar.map((item) => {
-                      const ratio = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
-                      const isLow = ratio < 0.5;
-                      return (
-                        <div key={item.produtoId} className={[styles.minibarCard, isLow ? styles.minibarCardLow : ''].join(' ')}>
-                          <div className={styles.minibarCardLeft}>
-                            <span className={styles.minibarCardName}>{item.nome}</span>
-                            <div className={styles.minibarQtyRow}>
-                              <span className={[styles.minibarQtyCurrent, isLow ? styles.minibarQtyLow : ''].join(' ')}>{item.qtdAtual}</span>
-                              <span className={styles.minibarQtySep}>/</span>
-                              <span className={styles.minibarQtyBase}>{item.qtdBase} base</span>
+
+                  {consumoCart.length > 0 && (
+                    <>
+                      <div className={styles.consumoModalDivider} />
+                      <div className={styles.consumoModalSection}>
+                        <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens selecionados</div>
+                        <div className={styles.cartTable}>
+                          {consumoCart.map((item) => (
+                            <div key={item.key} className={styles.cartRow}>
+                              <span className={styles.cartRowNome}>{item.nome}</span>
+                              <span className={styles.cartRowQty}>{item.qtd}×</span>
+                              <span className={styles.cartRowTotal}>{fmtBRL(item.preco * item.qtd)}</span>
+                              <button className={styles.cartRowRemove} onClick={() => removeFromCart(item.key)}>
+                                <Trash2 size={13} />
+                              </button>
                             </div>
-                          </div>
-                          <div className={styles.minibarProgressWrap}>
-                            <div className={styles.minibarProgressBar}>
-                              <div
-                                className={[styles.minibarProgressFill, isLow ? styles.minibarProgressFillLow : ''].join(' ')}
-                                style={{ width: `${Math.min(100, ratio * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          <div className={styles.minibarCardActions}>
-                            <button
-                              className={[styles.minibarIconBtn, styles.minibarIconBtnGreen].join(' ')}
-                              title="Repor item"
-                              onClick={() => handleMinibarRepor(item.produtoId)}
-                            ><RotateCcw size={13} /></button>
-                            <button
-                              className={[styles.minibarIconBtn, styles.minibarIconBtnRed].join(' ')}
-                              title="Consumir"
-                              onClick={() => handleMinibarConsumir(item.produtoId)}
-                            ><Minus size={13} /></button>
+                          ))}
+                          <div className={styles.cartTotalRow}>
+                            <span>Total</span>
+                            <span>{fmtBRL(cartTotal)}</span>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+
+                        {consumoCartPag ? (
+                          <div className={styles.pagamentoChipOv}>
+                            <CreditCard size={13} />
+                            <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoCartPag.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoCartPag.nome_pagador ?? '—'} · {fmtBRL(consumoCartPag.valor)}</span>
+                            <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoPag(true)}>Alterar</button>
+                          </div>
+                        ) : (
+                          <button className={styles.definePagamentoOv} onClick={() => setShowConsumoPag(true)}>
+                            <CreditCard size={13} /> Definir Pagamento *
+                          </button>
+                        )}
+
+                        <Button
+                          variant="primary"
+                          style={{ marginTop: 10, width: '100%' }}
+                          disabled={consumoSaving || !consumoCartPag}
+                          onClick={() => handleConfirmConsumoAll(consumoCartPag)}
+                        >
+                          {consumoSaving && <Loader2 size={13} className={styles.spin} />}
+                          <Plus size={13} /> Adicionar Consumo{cartTotal > 0 ? ` · ${fmtBRL(cartTotal)}` : ''}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
             {detailTab === 'itens' && (
               <div className={styles.tabContent}>
                 {(!s.itens || s.itens.length === 0)
@@ -1478,85 +1521,6 @@ export default function OverviewManagement() {
                 }
               </div>
             )}
-            {detailTab === 'precos' && (() => {
-              const po = s.pricingOverride;
-              return (
-                <div className={styles.pricingTabBlock}>
-                  {/* Pernoite pricing */}
-                  <div>
-                    <div className={styles.sectionTitle}><BedDouble size={13} /> Pernoite {po?.pernoite ? `— ${po.pernoite.modeloCobranca}` : `— ${stayPrice.modeloCobranca}`}</div>
-                    {po?.pernoite ? (
-                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                        <table className={styles.pricingTable}>
-                          <thead><tr><th>Ocupação</th><th>Valor / noite</th><th>Menor de Idade</th></tr></thead>
-                          <tbody>
-                            {po.pernoite.tiers.map((tier) => (
-                              <tr key={tier.pessoas}>
-                                <td>{tier.pessoas} {tier.pessoas === 1 ? 'pessoa' : 'pessoas'}</td>
-                                <td><strong>{fmtBRL(tier.valor)}</strong></td>
-                                <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{tier.crianca?.label || '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : stayPrice.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                        <table className={styles.pricingTable}>
-                          <thead><tr><th>Tipo</th><th>Valor / noite</th></tr></thead>
-                          <tbody><tr><td>Tarifa Fixa (qualquer ocupação)</td><td><strong>{fmtBRL(stayPrice.precoFixo)}</strong></td></tr></tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                        <table className={styles.pricingTable}>
-                          <thead><tr><th>Ocupação</th><th>Valor / noite</th></tr></thead>
-                          <tbody>
-                            {Object.entries(stayPrice.precosOcupacao || {}).map(([n, v]) => (
-                              <tr key={n}><td>{n} {n === '1' ? 'pessoa' : 'pessoas'}</td><td><strong>{fmtBRL(v)}</strong></td></tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                  {/* Day Use pricing */}
-                  <div>
-                    <div className={styles.sectionTitle}><Clock size={13} /> Day Use</div>
-                    {po?.dayuse ? (
-                      <div className={styles.pricingTableWrap} style={{ marginTop: 10 }}>
-                        <table className={styles.pricingTable}>
-                          <thead><tr><th>Ocupação</th><th>Base ({po.dayuse.tiers[0]?.horasBase}h)</th><th>+Hora extra</th><th>Menor de Idade</th></tr></thead>
-                          <tbody>
-                            {po.dayuse.tiers.map((tier) => (
-                              <tr key={tier.pessoas}>
-                                <td>{tier.pessoas} {tier.pessoas === 1 ? 'pessoa' : 'pessoas'}</td>
-                                <td><strong>{fmtBRL(tier.precoBase)}</strong></td>
-                                <td>{fmtBRL(tier.precoAdicional)}</td>
-                                <td style={{ color: 'var(--text-2)', fontSize: 12 }}>{tier.crianca?.label || '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    ) : (
-                      <div className={styles.pricingDayUseBlock} style={{ marginTop: 10 }}>
-                        <div className={styles.summaryCard}>
-                          <span className={styles.summaryLabel}>Preço Base</span>
-                          <span className={styles.summaryValue}>{fmtBRL(pricing.precoBase)}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{pricing.horasBase}h incluídas</span>
-                        </div>
-                        <div className={styles.summaryCard}>
-                          <span className={styles.summaryLabel}>Hora Adicional</span>
-                          <span className={styles.summaryValue}>{fmtBRL(pricing.precoAdicional)}</span>
-                          <span style={{ fontSize: 11, color: 'var(--text-2)' }}>por hora extra</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         </>
       );
@@ -1615,26 +1579,7 @@ export default function OverviewManagement() {
               </div>
               <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
               <div className={styles.ovHeaderSub}>
-                {s.categoria} · {s.tipoOcupacao} · {checkinDate} – {checkoutDate} · Reserva
-              </div>
-            </div>
-            <div className={styles.ovHeaderDates}>
-              <div className={styles.ovDatesRow}>
-                <div className={styles.ovDateCell}>
-                  <span className={styles.ovDateLabel}>CHECK-IN</span>
-                  <span className={styles.ovDateValue}>{checkinDate}</span>
-                  <span className={styles.ovDateTime}>{checkinHora}</span>
-                </div>
-                <span className={styles.ovDateArrow}>→</span>
-                <div className={styles.ovDateCell}>
-                  <span className={styles.ovDateLabel}>CHECK-OUT</span>
-                  <span className={styles.ovDateValue}>{checkoutDate}</span>
-                  <span className={styles.ovDateTime}>{checkoutHora}</span>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <span className={styles.ovNightsNum}>{sv.totalDiarias}</span>
-                  <span className={styles.ovNightsLabel}>DIÁRIAS</span>
-                </div>
+                {s.categoria} · {s.tipoOcupacao} · Reserva
               </div>
             </div>
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={15} /></button>
@@ -1667,8 +1612,33 @@ export default function OverviewManagement() {
                 )}
               </div>
 
-              {/* Right: financial */}
+              {/* Right: period + financial */}
               <div className={styles.ovRight}>
+                {/* Period block */}
+                <div className={styles.ovPeriodDark}>
+                  <div className={styles.ovDatesRow}>
+                    <div className={styles.ovDateCell}>
+                      <div className={styles.ovDateLabel}>Check-in</div>
+                      <div className={styles.ovDateValue}>{checkinDate}</div>
+                      <div className={styles.ovDateTime}>{checkinHora}</div>
+                    </div>
+                    <div className={styles.ovDateArrow}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </div>
+                    <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                      <div className={styles.ovDateLabel}>Check-out</div>
+                      <div className={styles.ovDateValue}>{checkoutDate}</div>
+                      <div className={styles.ovDateTime}>{checkoutHora}</div>
+                    </div>
+                    <div className={styles.ovNightsCell}>
+                      <div className={styles.ovNightsNum}>{sv.totalDiarias || '—'}</div>
+                      <div className={styles.ovNightsLabel}>Diárias</div>
+                    </div>
+                  </div>
+                </div>
+                {/* Financial card */}
                 <div>
                   <div className={styles.ovFinCard}>
                     <div className={styles.ovFinHeader}>
@@ -2283,19 +2253,31 @@ export default function OverviewManagement() {
 
     if (s.status === ROOM_STATUS.DISPONIVEL) {
       return (
-        <div className={styles.footerBetween}>
-          <div className={styles.footerLeft}>
-            <Button variant="secondary" onClick={() => openService('limpeza', s)}><Sparkles size={14} /> Limpeza</Button>
-            <Button variant="secondary" onClick={() => openService('manutencao', s)}><Wrench size={14} /> Manutenção</Button>
-          </div>
-          <div className={styles.footerRight}>
-            <Button variant="secondary" className={styles.btnOrange} onClick={() => openNovoServico('pernoite', s)}>
-              <BedDouble size={14} /> Novo Pernoite
-            </Button>
-            <Button variant="primary" onClick={() => openNovoServico('dayuse', s)}>
-              <Clock size={14} /> Novo Day Use
-            </Button>
-          </div>
+        <div className={styles.ovAcoesWrap}>
+          {ovAcoesOpen && (
+            <>
+              <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
+              <div className={styles.ovAcoesMenu}>
+                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
+                  <Sparkles size={14} /> Limpeza
+                </button>
+                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
+                  <Wrench size={14} /> Manutenção
+                </button>
+                <div className={styles.ovAcoesDiv} />
+                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
+                  <BedDouble size={14} /> Novo Pernoite
+                </button>
+                <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); openNovoServico('dayuse', s); }}>
+                  <Clock size={14} /> Novo Day Use
+                </button>
+              </div>
+            </>
+          )}
+          <button className={styles.ovAcoesBtn} onClick={() => setOvAcoesOpen((v) => !v)}>
+            Ações
+            <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
+          </button>
         </div>
       );
     }
