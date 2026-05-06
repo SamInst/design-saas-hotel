@@ -227,6 +227,22 @@ export function PaymentModal({
           </div>
         )}
 
+        {valorTotal !== null && valorPago === null && (
+          <div className={styles.pagSummaryStrip}>
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Total dos itens</span>
+              <span className={styles.pagSummaryVal}>{fmtBRL(valorTotal)}</span>
+            </div>
+            <div className={styles.pagSummaryDivider} />
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>A pagar</span>
+              <span className={[styles.pagSummaryVal, valorNum > 0 ? styles.pagSummaryPago : styles.pagSummaryPendente].join(' ')}>
+                {valorNum > 0 ? fmtBRL(valorNum) : '—'}
+              </span>
+            </div>
+          </div>
+        )}
+
         <FormField label="Tipo de Pagamento *">
           <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
             <option value="">Selecione...</option>

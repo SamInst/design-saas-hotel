@@ -1984,6 +1984,105 @@
 .totalPreviewValue { font-size: 15px; font-weight: 700; color: #059669; }
 :root[data-theme="dark"] .totalPreviewValue { color: #34d399; }
 
+/* ── Disponível consumo footer bar ──────────────────────────────────────────── */
+.disponConsumoFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 0 0 10px 10px;
+}
+.disponConsumoTotal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* ── Minibar stock info (badge + total) ─────────────────────────────────────── */
+.minibarStockInfo { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.minibarStockTotal { font-size: 10px; color: var(--text-2); white-space: nowrap; }
+
+/* ── Minibar stock badge ─────────────────────────────────────────────────────── */
+.minibarStockBadge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #059669;
+  background: color-mix(in srgb, #059669 12%, transparent);
+  border: 1px solid color-mix(in srgb, #059669 25%, transparent);
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.minibarStockBadgeEmpty {
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+:root[data-theme="dark"] .minibarStockBadge { color: #34d399; }
+
+/* ── Minibar stock bar (consume modal) ───────────────────────────────────────── */
+.minibarStockBar {
+  height: 6px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.minibarStockBarFill {
+  height: 100%;
+  background: #059669;
+  border-radius: 99px;
+  transition: width 0.3s;
+}
+:root[data-theme="dark"] .minibarStockBarFill { background: #34d399; }
+
+/* ── Consume qty stepper (consume modal) ─────────────────────────────────────── */
+.consumoQtdRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.consumoQtdBtn {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s;
+}
+.consumoQtdBtn:hover:not(:disabled) { background: var(--surface); }
+.consumoQtdBtn:disabled { opacity: 0.4; cursor: default; }
+.consumoQtdVal {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ── Estoque item info ───────────────────────────────────────────────────────── */
+.estoqueItemInfo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.estoqueItemPrice { margin-left: auto; font-size: 12px; font-weight: 700; color: #059669; }
+:root[data-theme="dark"] .estoqueItemPrice { color: #34d399; }
+
 /* ── Pagamento resume (add pagamento modal) ──────────────────────────────────── */
 .pagamentoResume {
   background: var(--surface-2);

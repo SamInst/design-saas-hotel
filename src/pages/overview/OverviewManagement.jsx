@@ -22,7 +22,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './overviewMocks';
-import { cadastroApi, reservaApi, funcionarioApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
@@ -576,6 +576,19 @@ export default function OverviewManagement() {
   const [minibarQtyAdd, setMinibarQtyAdd]         = useState(1);
   const [savingMinibar, setSavingMinibar]         = useState(false);
 
+  // Add item from estoque modal (quarto disponível — consumo tab)
+  const [showAddEstoque, setShowAddEstoque]         = useState(false);
+  const [estoqueCats, setEstoqueCats]               = useState([]);
+  const [estoqueLoading, setEstoqueLoading]         = useState(false);
+  const [estoqueSelCat, setEstoqueSelCat]           = useState('');
+  const [estoqueSelItem, setEstoqueSelItem]         = useState(null); // { id, descricao, quantidade, valor_venda }
+  const [estoqueQtdAtual, setEstoqueQtdAtual]       = useState(1);
+  const [estoqueQtdPadrao, setEstoqueQtdPadrao]     = useState(3);
+  const [savingEstoque, setSavingEstoque]           = useState(false);
+
+  // Disponível consumo — payment modal
+  const [showDisponPay, setShowDisponPay] = useState(false);
+
   // Unified add consumo modal (pernoite / dayuse)
   const [showAddConsumoModal, setShowAddConsumoModal] = useState(false);
   const [consumoSaving, setConsumoSaving]             = useState(false);
@@ -1099,6 +1112,39 @@ export default function OverviewManagement() {
     finally { setSavingMinibar(false); }
   };
 
+  // ── Adicionar item do estoque ao quarto ───────────────────────────────────────
+  const handleOpenAddEstoque = async () => {
+    setEstoqueSelCat('');
+    setEstoqueSelItem(null);
+    setEstoqueQtdAtual(1);
+    setEstoqueQtdPadrao(3);
+    setShowAddEstoque(true);
+    setEstoqueLoading(true);
+    try {
+      const res = await itemApi.estoque();
+      setEstoqueCats(res?.categorias ?? []);
+    } catch (e) { notify('Erro ao carregar estoque: ' + e.message, 'error'); }
+    finally { setEstoqueLoading(false); }
+  };
+
+  const handleConfirmAddEstoque = async () => {
+    if (!selectedRoom || !estoqueSelItem) return;
+    const jaExiste = (selectedRoom.minibar ?? []).some((m) => m.produtoId === estoqueSelItem.id);
+    if (jaExiste) { notify(`${estoqueSelItem.descricao} já está no quarto.`, 'error'); return; }
+    setSavingEstoque(true);
+    try {
+      await quartoApi.adicionarItem(selectedRoom.id, {
+        item: { id: estoqueSelItem.id },
+        quantidade_atual: estoqueQtdAtual,
+        quantidade_padrao: estoqueQtdPadrao,
+      });
+      notify(`${estoqueSelItem.descricao} adicionado ao quarto.`);
+      setShowAddEstoque(false);
+      await load();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSavingEstoque(false); }
+  };
+
   // ── Consumo interno (minibar item → consumo list) ─────────────────────────────
   const handleConsumoInterno = async (item) => {
     if (!selectedRoom) return;
@@ -1129,8 +1175,44 @@ export default function OverviewManagement() {
       if (capped <= 0) return prev.filter((c) => !(c.tipo === 'interno' && c.itemId === item.id));
       const ex = prev.find((c) => c.tipo === 'interno' && c.itemId === item.id);
       if (ex) return prev.map((c) => c.tipo === 'interno' && c.itemId === item.id ? { ...c, qtd: capped } : c);
-      return [...prev, { key: `int-${item.id}`, tipo: 'interno', nome: item.nome, categoria: item.categoria, preco: item.preco, qtd: capped, qtdMax: item.qtdAtual, itemId: item.id }];
+      return [...prev, { key: `int-${item.id}`, tipo: 'interno', nome: item.nome, categoria: item.categoria, preco: item.preco, qtd: capped, qtdMax: item.qtdAtual, itemId: item.id, quartoItemId: item.quartoItemId }];
     });
+  };
+
+  // ── Disponível — consumir via API ─────────────────────────────────────────────
+  const [reporLoading, setReporLoading] = useState(false);
+
+  const handleConfirmDisponConsumo = async (pag) => {
+    if (!selectedRoom) return;
+    const internCart = consumoCart.filter((c) => c.tipo === 'interno');
+    if (!internCart.length) return;
+    setConsumoSaving(true);
+    try {
+      await Promise.all(internCart.map((c) =>
+        quartoApi.consumirItem({ id: c.quartoItemId, quantidade: c.qtd })
+      ));
+      notify(`${internCart.length} item(s) consumido(s).`);
+      setConsumoCart([]); setConsumoCartPag(null);
+      await load();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setConsumoSaving(false); }
+  };
+
+  const handleReporTudo = async () => {
+    if (!selectedRoom) return;
+    const itensParaRepor = (selectedRoom.minibar ?? [])
+      .map((m) => ({ ...m, delta: m.qtdBase - m.qtdAtual }))
+      .filter((m) => m.delta > 0);
+    if (!itensParaRepor.length) { notify('Todos os itens já estão no máximo.', 'info'); return; }
+    setReporLoading(true);
+    try {
+      await Promise.all(itensParaRepor.map((m) =>
+        quartoApi.reporItem({ id: m.quartoItemId, quantidade: m.delta })
+      ));
+      notify('Itens repostos.');
+      await load();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setReporLoading(false); }
   };
 
   const updateExternoQty = (item, newQty) => {
@@ -1402,25 +1484,42 @@ export default function OverviewManagement() {
               </div>
             )}
             {detailTab === 'consumo' && (() => {
-              const minibarItems = (s.minibar || []).map((item) => {
-                let preco = item.preco ?? 0;
-                if (!preco) {
-                  for (const cat of CATEGORIAS_CONSUMO) {
-                    const p = cat.produtos?.find((p) => p.id === item.produtoId);
-                    if (p) { preco = p.preco; break; }
-                  }
-                }
-                return { id: item.produtoId, nome: item.nome, categoria: item.categoria || 'Minibar', preco, qtdAtual: item.qtdAtual };
-              });
-              const cartTotal = consumoCart.reduce((sum, c) => sum + c.preco * c.qtd, 0);
+              const minibarItems = (s.minibar || []).map((item) => ({
+                id: item.produtoId,
+                quartoItemId: item.quartoItemId,
+                nome: item.nome,
+                categoria: item.categoria || 'Minibar',
+                preco: item.preco ?? 0,
+                qtdAtual: item.qtdAtual ?? 0,
+                qtdBase: item.qtdBase ?? 0,
+                qtdTotal: item.qtdTotal ?? null,
+              }));
+              const temParaRepor = minibarItems.some((i) => i.qtdAtual < i.qtdBase);
+              const internCart  = consumoCart.filter((c) => c.tipo === 'interno');
+              const cartTotal   = internCart.reduce((sum, c) => sum + c.preco * c.qtd, 0);
+              const hasSelected = internCart.length > 0;
               return (
                 <div className={styles.tabContent}>
                   <div className={styles.consumoModalSection}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
-                      <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { setMinibarCat(''); setMinibarProd(''); setMinibarQtyAdd(1); setShowAddMinibar(true); }}>
-                        <Plus size={12} /> Adicionar Item
-                      </Button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {hasSelected && (
+                          <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={consumoSaving} onClick={() => setShowDisponPay(true)}>
+                            {consumoSaving && <Loader2 size={12} className={styles.spin} />}
+                            <ShoppingCart size={12} /> Consumir
+                          </Button>
+                        )}
+                        {temParaRepor && !hasSelected && (
+                          <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={reporLoading} onClick={handleReporTudo}>
+                            {reporLoading ? <Loader2 size={12} className={styles.spin} /> : <RotateCcw size={12} />}
+                            Repor
+                          </Button>
+                        )}
+                        <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={handleOpenAddEstoque}>
+                          <Plus size={12} /> Adicionar Item
+                        </Button>
+                      </div>
                     </div>
                     {minibarItems.length === 0
                       ? <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>Nenhum item no quarto</span></div>
@@ -1428,22 +1527,27 @@ export default function OverviewManagement() {
                         <div className={styles.consumoItemList}>
                           {minibarItems.map((item) => {
                             const esgotado = item.qtdAtual === 0;
-                            const inCart   = consumoCart.find((c) => c.tipo === 'interno' && c.itemId === item.id);
-                            const cartQty  = inCart?.qtd ?? 0;
+                            const cartEntry = internCart.find((c) => c.itemId === item.id);
+                            const cartQty   = cartEntry?.qtd ?? 0;
                             return (
                               <div key={item.id} className={styles.consumoItemRow}>
                                 <div className={styles.consumoItemInfo}>
                                   <span className={styles.consumoItemNome}>{item.nome}</span>
-                                  <span className={styles.consumoItemMeta}>{item.categoria} · {fmtBRL(item.preco)}/un.</span>
+                                  <span className={styles.consumoItemMeta}>{item.categoria}{item.preco > 0 ? ` · ${fmtBRL(item.preco)}/un.` : ''}</span>
+                                </div>
+                                <div className={styles.minibarStockInfo}>
+                                  <span className={[styles.minibarStockBadge, esgotado ? styles.minibarStockBadgeEmpty : ''].join(' ')}>
+                                    {item.qtdAtual}/{item.qtdBase}
+                                  </span>
+                                  {item.qtdTotal != null && (
+                                    <span className={styles.minibarStockTotal}>({item.qtdTotal} un. disp.)</span>
+                                  )}
                                 </div>
                                 <div className={[styles.cartQtdStepper, esgotado ? styles.cartQtdStepperDisabled : ''].join(' ')}>
                                   <button disabled={cartQty === 0} onClick={() => updateInternQty(item, cartQty - 1)}>−</button>
-                                  <span className={styles.cartStepperFrac}>{cartQty}/{item.qtdAtual}</span>
+                                  <span className={styles.cartStepperFrac}>{cartQty}</span>
                                   <button disabled={esgotado || cartQty >= item.qtdAtual} onClick={() => updateInternQty(item, cartQty + 1)}>+</button>
                                 </div>
-                                <span className={cartQty > 0 ? styles.cartRowTotal : styles.cartRowTotalEmpty}>
-                                  {cartQty > 0 ? fmtBRL(item.preco * cartQty) : '—'}
-                                </span>
                               </div>
                             );
                           })}
@@ -1452,52 +1556,6 @@ export default function OverviewManagement() {
                     }
                   </div>
 
-                  {consumoCart.length > 0 && (
-                    <>
-                      <div className={styles.consumoModalDivider} />
-                      <div className={styles.consumoModalSection}>
-                        <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens selecionados</div>
-                        <div className={styles.cartTable}>
-                          {consumoCart.map((item) => (
-                            <div key={item.key} className={styles.cartRow}>
-                              <span className={styles.cartRowNome}>{item.nome}</span>
-                              <span className={styles.cartRowQty}>{item.qtd}×</span>
-                              <span className={styles.cartRowTotal}>{fmtBRL(item.preco * item.qtd)}</span>
-                              <button className={styles.cartRowRemove} onClick={() => removeFromCart(item.key)}>
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          ))}
-                          <div className={styles.cartTotalRow}>
-                            <span>Total</span>
-                            <span>{fmtBRL(cartTotal)}</span>
-                          </div>
-                        </div>
-
-                        {consumoCartPag ? (
-                          <div className={styles.pagamentoChipOv}>
-                            <CreditCard size={13} />
-                            <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoCartPag.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoCartPag.nome_pagador ?? '—'} · {fmtBRL(consumoCartPag.valor)}</span>
-                            <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoPag(true)}>Alterar</button>
-                          </div>
-                        ) : (
-                          <button className={styles.definePagamentoOv} onClick={() => setShowConsumoPag(true)}>
-                            <CreditCard size={13} /> Definir Pagamento *
-                          </button>
-                        )}
-
-                        <Button
-                          variant="primary"
-                          style={{ marginTop: 10, width: '100%' }}
-                          disabled={consumoSaving || !consumoCartPag}
-                          onClick={() => handleConfirmConsumoAll(consumoCartPag)}
-                        >
-                          {consumoSaving && <Loader2 size={13} className={styles.spin} />}
-                          <Plus size={13} /> Adicionar Consumo{cartTotal > 0 ? ` · ${fmtBRL(cartTotal)}` : ''}
-                        </Button>
-                      </div>
-                    </>
-                  )}
                 </div>
               );
             })()}
@@ -2253,31 +2311,33 @@ export default function OverviewManagement() {
 
     if (s.status === ROOM_STATUS.DISPONIVEL) {
       return (
-        <div className={styles.ovAcoesWrap}>
-          {ovAcoesOpen && (
-            <>
-              <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
-              <div className={styles.ovAcoesMenu}>
-                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
-                  <Sparkles size={14} /> Limpeza
-                </button>
-                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
-                  <Wrench size={14} /> Manutenção
-                </button>
-                <div className={styles.ovAcoesDiv} />
-                <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
-                  <BedDouble size={14} /> Novo Pernoite
-                </button>
-                <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); openNovoServico('dayuse', s); }}>
-                  <Clock size={14} /> Novo Day Use
-                </button>
-              </div>
-            </>
-          )}
-          <button className={styles.ovAcoesBtn} onClick={() => setOvAcoesOpen((v) => !v)}>
-            Ações
-            <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
-          </button>
+        <div className={styles.footerRight}>
+          <div className={styles.ovAcoesWrap}>
+            {ovAcoesOpen && (
+              <>
+                <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
+                <div className={styles.ovAcoesMenu}>
+                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
+                    <Sparkles size={14} /> Limpeza
+                  </button>
+                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
+                    <Wrench size={14} /> Manutenção
+                  </button>
+                  <div className={styles.ovAcoesDiv} />
+                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
+                    <BedDouble size={14} /> Novo Pernoite
+                  </button>
+                  <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); openNovoServico('dayuse', s); }}>
+                    <Clock size={14} /> Novo Day Use
+                  </button>
+                </div>
+              </>
+            )}
+            <button className={styles.ovAcoesBtn} onClick={() => setOvAcoesOpen((v) => !v)}>
+              Ações
+              <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
+            </button>
+          </div>
         </div>
       );
     }
@@ -3031,57 +3091,107 @@ export default function OverviewManagement() {
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          MODAL — Minibar: Adicionar Item
+          MODAL — Adicionar Item do Estoque ao Quarto
       ═══════════════════════════════════════════════════════ */}
-      {showAddMinibar && selectedRoom && (() => {
-        const minibarCatSel  = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(minibarCat));
-        const minibarProdSel = minibarCatSel?.produtos.find((p) => p.id === parseInt(minibarProd));
+      {showAddEstoque && selectedRoom && (() => {
+        const minibarIds = new Set((selectedRoom.minibar ?? []).map((m) => m.produtoId));
+        const catSel     = estoqueCats.find((c) => String(c.id) === estoqueSelCat);
+        const catItems   = catSel?.itens ?? [];
         return (
           <Modal
             open
-            onClose={() => setShowAddMinibar(false)}
+            onClose={() => setShowAddEstoque(false)}
             size="sm"
-            title={<><Plus size={15} /> Adicionar ao Minibar — Apt. {selectedRoom.numero}</>}
+            title={<><Package size={15} /> Adicionar Item — Apt. {selectedRoom.numero}</>}
             footer={
               <div className={styles.footerRight}>
-                <Button variant="secondary" onClick={() => setShowAddMinibar(false)}>Cancelar</Button>
-                <Button variant="primary" onClick={handleAddMinibarItem} disabled={savingMinibar || !minibarProdSel}>
-                  {savingMinibar && <Loader2 size={14} className={styles.spin} />}
+                <Button variant="secondary" onClick={() => setShowAddEstoque(false)}>Cancelar</Button>
+                <Button variant="primary" onClick={handleConfirmAddEstoque} disabled={savingEstoque || !estoqueSelItem}>
+                  {savingEstoque && <Loader2 size={14} className={styles.spin} />}
                   Adicionar
                 </Button>
               </div>
             }
           >
             <div className={styles.formStack}>
-              <FormField label="Categoria *">
-                <Select value={minibarCat} onChange={(e) => { setMinibarCat(e.target.value); setMinibarProd(''); }}>
-                  <option value="">Selecione...</option>
-                  {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </Select>
-              </FormField>
-              {minibarCatSel && (
-                <FormField label="Produto *">
-                  <Select value={minibarProd} onChange={(e) => setMinibarProd(e.target.value)}>
-                    <option value="">Selecione...</option>
-                    {minibarCatSel.produtos.map((p) => <option key={p.id} value={p.id}>{p.nome} — {fmtBRL(p.preco)}</option>)}
-                  </Select>
-                </FormField>
-              )}
-              {minibarProdSel && (
+              {estoqueLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-2)', fontSize: 13 }}>
+                  <Loader2 size={14} className={styles.spin} /> Carregando estoque...
+                </div>
+              ) : (
                 <>
-                  <FormField label="Quantidade a adicionar *">
-                    <Input type="number" min="1" max="50" value={minibarQtyAdd} onChange={(e) => setMinibarQtyAdd(Math.max(1, parseInt(e.target.value) || 1))} />
+                  <FormField label="Categoria *">
+                    <Select value={estoqueSelCat} onChange={(e) => { setEstoqueSelCat(e.target.value); setEstoqueSelItem(null); }}>
+                      <option value="">Selecione...</option>
+                      {estoqueCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                    </Select>
                   </FormField>
-                  <div className={styles.totalPreview}>
-                    <span className={styles.totalPreviewLabel}>{minibarQtyAdd}× {minibarProdSel.nome}</span>
-                    <span className={styles.totalPreviewValue}>{fmtBRL(minibarProdSel.preco * minibarQtyAdd)}</span>
-                  </div>
+                  {catSel && (
+                    <FormField label="Item *">
+                      <Select value={estoqueSelItem?.id ?? ''} onChange={(e) => {
+                        const found = catItems.find((i) => String(i.id) === e.target.value);
+                        setEstoqueSelItem(found ?? null);
+                      }}>
+                        <option value="">Selecione...</option>
+                        {catItems.map((i) => {
+                          const jaNoQuarto = minibarIds.has(i.id);
+                          return (
+                            <option key={i.id} value={i.id} disabled={jaNoQuarto}>
+                              {i.descricao}{jaNoQuarto ? ' (já no quarto)' : ''}{i.valor_venda ? ` — ${fmtBRL(i.valor_venda)}` : ''}{i.quantidade != null ? ` (estoque: ${i.quantidade})` : ''}
+                            </option>
+                          );
+                        })}
+                      </Select>
+                    </FormField>
+                  )}
+                  {estoqueSelItem && (
+                    <>
+                      <div className={styles.estoqueItemInfo}>
+                        <Package size={13} />
+                        <span>{estoqueSelItem.descricao}</span>
+                        {estoqueSelItem.valor_venda != null && (
+                          <span className={styles.estoqueItemPrice}>{fmtBRL(estoqueSelItem.valor_venda)}/un.</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <FormField label="Qtd. atual *">
+                          <Input
+                            type="number" min="0"
+                            value={estoqueQtdAtual}
+                            onChange={(e) => setEstoqueQtdAtual(Math.max(0, parseInt(e.target.value) || 0))}
+                          />
+                        </FormField>
+                        <FormField label="Qtd. padrão *">
+                          <Input
+                            type="number" min="1"
+                            value={estoqueQtdPadrao}
+                            onChange={(e) => setEstoqueQtdPadrao(Math.max(1, parseInt(e.target.value) || 1))}
+                          />
+                        </FormField>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>
           </Modal>
         );
       })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Consumir (disponível) — pagamento direto
+      ═══════════════════════════════════════════════════════ */}
+      <PaymentModal
+        open={showDisponPay}
+        onClose={() => setShowDisponPay(false)}
+        onConfirm={(pag) => { setShowDisponPay(false); handleConfirmDisponConsumo(pag); }}
+        tiposPagamento={tiposPagamentoOv}
+        isSubmitting={consumoSaving}
+        titularNome={null}
+        valorTotal={consumoCart.filter((c) => c.tipo === 'interno').reduce((s, c) => s + c.preco * c.qtd, 0)}
+        valorPago={null}
+        canAplicarDesconto={false}
+      />
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Pagamento Unificado

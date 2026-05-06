@@ -306,6 +306,12 @@ export const quartoApi = {
   atualizar(id, body){ return request(`/quarto/${id}`, { method: 'PUT', body }); },
   // GET /quarto/{id}/itens → [{ id, item:{id,descricao}, quantidade_atual, quantidade_padrao }]
   itens(id)          { return request(`/quarto/${id}/itens`); },
+  // POST /quarto/{id}/itens — { item:{id}, quantidade_atual, quantidade_padrao }
+  adicionarItem(id, body) { return request(`/quarto/${id}/itens`, { method: 'POST', body }); },
+  // PATCH /quarto/itens/consumir — { id: quartoItemId, quantidade }
+  consumirItem(body) { return request('/quarto/itens/consumir', { method: 'PATCH', body }); },
+  // PATCH /quarto/itens/repor — { id: quartoItemId, quantidade }
+  reporItem(body)    { return request('/quarto/itens/repor',    { method: 'PATCH', body }); },
 };
 
 // ─────────────────────────────────────────────────────────────

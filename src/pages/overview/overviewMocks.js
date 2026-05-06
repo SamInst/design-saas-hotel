@@ -255,10 +255,13 @@ function _normalizeHospedagem(h, cat) {
     manutencao,
     itens: (q.quarto_itens ?? []).map(i => ({ nome: i.item?.descricao ?? '', qtd: i.quantidade_atual ?? 0 })),
     minibar: (q.quarto_itens ?? []).map(i => ({
-      produtoId:  i.item?.id,
-      nome:       i.item?.descricao ?? '',
-      qtdBase:    i.quantidade_padrao ?? 0,
-      qtdAtual:   i.quantidade_atual  ?? 0,
+      quartoItemId: i.id,
+      produtoId:    i.item?.id,
+      nome:         i.item?.descricao ?? '',
+      qtdBase:      i.quantidade_padrao    ?? 0,
+      qtdAtual:     i.quantidade_atual     ?? 0,
+      qtdTotal:     i.qtd_total_unidades   ?? null,
+      preco:        i.preco ?? 0,
     })),
   };
 }
