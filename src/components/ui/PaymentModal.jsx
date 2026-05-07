@@ -126,6 +126,7 @@ export function PaymentModal({
   loggedUser         = null,
   titularNome        = null,
   canAplicarDesconto = true,
+  canDespesaPessoal  = false,
   valorTotal         = null,
   valorPago          = null,
 }) {
@@ -133,16 +134,18 @@ export function PaymentModal({
   const [nomePagador, setNomePagador] = useState('');
   const [descricao,   setDescricao]   = useState('');
   const [valor,       setValor]       = useState('');
-  const [arquivo,       setArquivo]       = useState(null);   // novo arquivo
-  const [arquivoAtual,  setArquivoAtual]  = useState(null);   // path do arquivo existente
-  const [arquivoRemov,  setArquivoRemov]  = useState(false);  // usuario quer remover
+  const [arquivo,       setArquivo]       = useState(null);
+  const [arquivoAtual,  setArquivoAtual]  = useState(null);
+  const [arquivoRemov,  setArquivoRemov]  = useState(false);
   const [desconto,      setDesconto]      = useState(null);
   const [showDesc,      setShowDesc]      = useState(false);
   const [descontoOrigUuid, setDescontoOrigUuid] = useState(null);
+  const [despesaPessoal,   setDespesaPessoal]   = useState(false);
 
   // Inicializa ao abrir
   useEffect(() => {
     if (!open) return;
+    setDespesaPessoal(false);
     if (initialPayment) {
       setTipoPagId(String(initialPayment.tipo_pagamento?.id ?? ''));
       setNomePagador((initialPayment.nome_pagador ?? '').toUpperCase());
@@ -174,9 +177,13 @@ export function PaymentModal({
       : Math.max(0, valorNum - (desconto.valor ?? 0))
     : valorNum;
 
+  const canConfirm = despesaPessoal || (!!tipoPagId && !!nomePagador && !!valor);
+
   const handleConfirm = () => {
-    if (!tipoPagId || !nomePagador || !valor) {
-      return; // campos obrigatórios incompletos
+    if (!canConfirm) return;
+    if (despesaPessoal) {
+      onConfirm({ despesa_pessoal: true, descricao: descricao.trim() || undefined });
+      return;
     }
     const descontoFinal = desconto
       ? { ...desconto, ...(descontoOrigUuid ? { _uuid: descontoOrigUuid } : {}) }
@@ -201,7 +208,7 @@ export function PaymentModal({
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
             <Button variant="primary" onClick={handleConfirm}
-              disabled={isSubmitting || !tipoPagId || !nomePagador || !valor}
+              disabled={isSubmitting || !canConfirm}
               style={{ flex: 1 }}>
               {isSubmitting ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Confirmar'}
             </Button>
@@ -243,54 +250,69 @@ export function PaymentModal({
           </div>
         )}
 
-        <FormField label="Tipo de Pagamento *">
-          <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
-            <option value="">Selecione...</option>
-            {tiposPagamento.map(tp => (
-              <option key={tp.id} value={tp.id}>{tp.descricao}</option>
-            ))}
-          </Select>
-        </FormField>
+        {canDespesaPessoal && (
+          <label className={styles.despesaPessoalRow}>
+            <input type="checkbox" checked={despesaPessoal} onChange={e => setDespesaPessoal(e.target.checked)} />
+            <span>Despesa pessoal <span className={styles.despesaPessoalHint}>(sem cobrança)</span></span>
+          </label>
+        )}
 
-        <FormField label="Nome do Pagador *">
-          <Input placeholder="Nome completo"
-            value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
-          {titularNome && (
-            <label className={styles.checkRow}>
-              <input type="checkbox"
-                checked={nomePagador === titularNome.toUpperCase()}
-                onChange={e => setNomePagador(e.target.checked ? titularNome.toUpperCase() : '')} />
-              <span>Nome do titular</span>
-            </label>
-          )}
-          {loggedUser?.pessoa?.nome && (
-            <label className={styles.checkRow}>
-              <input type="checkbox"
-                checked={nomePagador === loggedUser.pessoa.nome.toUpperCase()}
-                onChange={e => setNomePagador(e.target.checked ? loggedUser.pessoa.nome.toUpperCase() : '')} />
-              <span>Nome do funcionário</span>
-            </label>
-          )}
-        </FormField>
+        {!despesaPessoal && (
+          <>
+            <FormField label="Nome do Pagador *">
+              <Input placeholder="Nome completo"
+                value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
+              {titularNome && (
+                <label className={styles.checkRow}>
+                  <input type="checkbox"
+                    checked={nomePagador === titularNome.toUpperCase()}
+                    onChange={e => setNomePagador(e.target.checked ? titularNome.toUpperCase() : '')} />
+                  <span>Nome do titular</span>
+                </label>
+              )}
+              {loggedUser?.pessoa?.nome && (
+                <label className={styles.checkRow}>
+                  <input type="checkbox"
+                    checked={nomePagador === loggedUser.pessoa.nome.toUpperCase()}
+                    onChange={e => setNomePagador(e.target.checked ? loggedUser.pessoa.nome.toUpperCase() : '')} />
+                  <span>Nome do funcionário</span>
+                </label>
+              )}
+            </FormField>
 
-        <FormField label="Descrição">
-          <Input placeholder="Descrição do pagamento"
-            value={descricao} onChange={e => setDescricao(e.target.value.toUpperCase())} />
-        </FormField>
+            <div className={styles.rowGrid}>
+              <FormField label="Tipo de Pagamento *">
+                <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
+                  <option value="">Selecione...</option>
+                  {tiposPagamento.map(tp => (
+                    <option key={tp.id} value={tp.id}>{tp.descricao}</option>
+                  ))}
+                </Select>
+              </FormField>
 
-        <FormField label="Valor *">
-          <Input type="text" placeholder="R$ 0,00"
-            value={valor} onChange={e => setValor(maskBRL(e.target.value))}
-            style={tipoRegistro === 'SAIDA'
-              ? { borderColor: '#f43f5e', color: '#f43f5e' }
-              : tipoRegistro === 'ENTRADA'
-                ? { borderColor: '#10b981', color: '#10b981' }
-                : undefined}
-          />
-        </FormField>
+              <FormField label="Valor *">
+                <Input type="text" placeholder="R$ 0,00"
+                  value={valor} onChange={e => setValor(maskBRL(e.target.value))}
+                  style={tipoRegistro === 'SAIDA'
+                    ? { borderColor: '#f43f5e', color: '#f43f5e' }
+                    : tipoRegistro === 'ENTRADA'
+                      ? { borderColor: '#10b981', color: '#10b981' }
+                      : undefined}
+                />
+              </FormField>
+            </div>
+          </>
+        )}
+
+        {!despesaPessoal && (
+          <FormField label="Descrição">
+            <Input placeholder="Descrição do pagamento"
+              value={descricao} onChange={e => setDescricao(e.target.value.toUpperCase())} />
+          </FormField>
+        )}
 
         {/* Desconto */}
-        {tipoRegistro !== 'SAIDA' && canAplicarDesconto && (desconto ? (
+        {!despesaPessoal && tipoRegistro !== 'SAIDA' && canAplicarDesconto && (desconto ? (
           <div className={styles.descontoApplied}>
             <Tag size={12} />
             <span>
@@ -311,7 +333,7 @@ export function PaymentModal({
         ))}
 
         {/* Comprovante */}
-        <FormField label="Comprovante (opcional)">
+        {!despesaPessoal && <FormField label="Comprovante (opcional)">
           {/* arquivo existente (edição) */}
           {arquivoAtual && !arquivoRemov && !arquivo && (
             <div className={styles.arquivoAtual}>
@@ -350,7 +372,7 @@ export function PaymentModal({
                 onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
             </label>
           )}
-        </FormField>
+        </FormField>}
       </Modal>
 
       <DiscountModal

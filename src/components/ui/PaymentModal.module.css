@@ -113,6 +113,22 @@
 }
 .addDesconto:hover { border-color: var(--violet); color: var(--violet); }
 
+/* ── Two-column row ────────────────────────────────────────── */
+.rowGrid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
+.rowGrid > :last-child { width: 110px; }
+
+/* ── Despesa pessoal ───────────────────────────────────────── */
+.despesaPessoalRow {
+  display: flex; align-items: center; gap: 8px; font-size: 13px;
+  font-weight: 600; color: var(--text); cursor: pointer; user-select: none;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--violet) 20%, transparent);
+  border-radius: 8px;
+}
+.despesaPessoalRow input { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; }
+.despesaPessoalHint { font-weight: 400; color: var(--text-2); font-size: 12px; }
+
 /* ── Usar meu nome ─────────────────────────────────────────── */
 .checkRow {
   display: flex; align-items: center; gap: 8px; font-size: 13px;

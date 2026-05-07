@@ -1180,7 +1180,8 @@ export default function OverviewManagement() {
   };
 
   // ── Disponível — consumir via API ─────────────────────────────────────────────
-  const [reporLoading, setReporLoading] = useState(false);
+  const [reporLoading, setReporLoading]           = useState(false);
+  const [reporItemLoading, setReporItemLoading]   = useState(new Set());
 
   const handleConfirmDisponConsumo = async (pag) => {
     if (!selectedRoom) return;
@@ -1213,6 +1214,18 @@ export default function OverviewManagement() {
       await load();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setReporLoading(false); }
+  };
+
+  const handleReporItem = async (item) => {
+    const delta = item.qtdBase - item.qtdAtual;
+    if (delta <= 0) return;
+    setReporItemLoading((prev) => new Set([...prev, item.quartoItemId]));
+    try {
+      await quartoApi.reporItem({ id: item.quartoItemId, quantidade: delta });
+      notify(`${item.nome} reposto.`);
+      await load();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setReporItemLoading((prev) => { const s = new Set(prev); s.delete(item.quartoItemId); return s; }); }
   };
 
   const updateExternoQty = (item, newQty) => {
@@ -1433,8 +1446,6 @@ export default function OverviewManagement() {
 
     // ── Disponível ────────────────────────────────────────────────────────────
     if (s.status === ROOM_STATUS.DISPONIVEL) {
-      const pricing   = DAY_USE_PRICING[s.categoria] || {};
-      const stayPrice = STAY_PRICING[s.categoria] || {};
       const dispTabs  = [
         { id: 'dados',   label: 'Dados' },
         { id: 'consumo', label: 'Consumo' },
@@ -1463,24 +1474,6 @@ export default function OverviewManagement() {
                     <p className={styles.descricaoText}>{s.descricao}</p>
                   </div>
                 )}
-                <div className={styles.pricingBlock}>
-                  <div className={styles.pricingBlockTitle}>Referência de Preços</div>
-                  <div className={styles.pricingCols}>
-                    <div className={styles.pricingCol}>
-                      <span className={styles.pricingColLabel}>Day Use</span>
-                      <span className={styles.pricingColVal}>{fmtBRL(pricing.precoBase)}</span>
-                      <span className={styles.pricingColSub}>{pricing.horasBase}h base + {fmtBRL(pricing.precoAdicional)}/h adicional</span>
-                    </div>
-                    <div className={styles.pricingColSep} />
-                    <div className={styles.pricingCol}>
-                      <span className={styles.pricingColLabel}>Pernoite</span>
-                      {stayPrice.modeloCobranca === 'Por quarto (tarifa fixa)'
-                        ? <span className={styles.pricingColVal}>{fmtBRL(stayPrice.precoFixo)}</span>
-                        : <span className={styles.pricingColVal}>A partir de {fmtBRL(stayPrice.precosOcupacao?.[1])}</span>}
-                      <span className={styles.pricingColSub}>{stayPrice.modeloCobranca}</span>
-                    </div>
-                  </div>
-                </div>
               </div>
             )}
             {detailTab === 'consumo' && (() => {
@@ -1513,7 +1506,7 @@ export default function OverviewManagement() {
                         {temParaRepor && !hasSelected && (
                           <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={reporLoading} onClick={handleReporTudo}>
                             {reporLoading ? <Loader2 size={12} className={styles.spin} /> : <RotateCcw size={12} />}
-                            Repor
+                            Repor tudo
                           </Button>
                         )}
                         <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={handleOpenAddEstoque}>
@@ -1548,6 +1541,18 @@ export default function OverviewManagement() {
                                   <span className={styles.cartStepperFrac}>{cartQty}</span>
                                   <button disabled={esgotado || cartQty >= item.qtdAtual} onClick={() => updateInternQty(item, cartQty + 1)}>+</button>
                                 </div>
+                                {item.qtdAtual < item.qtdBase && (
+                                  <button
+                                    className={styles.reporItemBtn}
+                                    disabled={reporItemLoading.has(item.quartoItemId)}
+                                    onClick={() => handleReporItem(item)}
+                                    title="Repor item"
+                                  >
+                                    {reporItemLoading.has(item.quartoItemId)
+                                      ? <Loader2 size={11} className={styles.spin} />
+                                      : <RotateCcw size={11} />}
+                                  </button>
+                                )}
                               </div>
                             );
                           })}
@@ -2524,10 +2529,9 @@ export default function OverviewManagement() {
               ].map(({ key, Icon, label }) => {
                 const qty = room.camas?.[key] || 0;
                 return (
-                  <div key={key} className={[styles.bedGridCell, qty > 0 ? styles.bedGridCellActive : ''].join(' ')}>
+                  <div key={key} title={label} className={[styles.bedGridCell, qty > 0 ? styles.bedGridCellActive : ''].join(' ')}>
                     <Icon size={12} />
                     <span className={styles.bedGridQty}>{qty}</span>
-                    <span className={styles.bedGridLabel}>{label}</span>
                   </div>
                 );
               })}
@@ -3191,6 +3195,7 @@ export default function OverviewManagement() {
         valorTotal={consumoCart.filter((c) => c.tipo === 'interno').reduce((s, c) => s + c.preco * c.qtd, 0)}
         valorPago={null}
         canAplicarDesconto={false}
+        canDespesaPessoal={true}
       />
 
       {/* ═══════════════════════════════════════════════════════
