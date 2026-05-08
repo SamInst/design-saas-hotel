@@ -136,14 +136,23 @@ function _normalizePessoa(p) {
 
 function _normalizeConsumo(c) {
   const qty  = c.quantidade ?? 1;
-  const unit = c.valor_unitario ?? c.valorUnitario ?? 0;
+  const unit = c.valor ?? c.valor_unitario ?? c.valorUnitario ?? 0;
+  const itemNome = typeof c.item === 'object' ? (c.item?.descricao ?? '') : (c.descricao ?? c.item ?? '');
+  const pag = c.pagamento ?? null;
   return {
     id: c.id,
     categoria: c.categoria ?? '',
-    item: c.descricao ?? c.item ?? '',
+    item: itemNome,
     quantidade: qty,
     valorUnitario: unit,
     valorTotal: c.valor_total ?? (unit * qty),
+    despesaPessoal: c.despesa_pessoal ?? false,
+    pagamento: pag ? {
+      nomePagador:   pag.nome_pagador ?? '',
+      formaPagamento: pag.tipo_pagamento?.descricao ?? '',
+      valor:         pag.valor ?? 0,
+      data:          pag.data_hora_registro ?? '',
+    } : null,
   };
 }
 
@@ -176,8 +185,9 @@ function _normalizeServico(svc, tipo) {
   if (!svc) return null;
   const diarias    = (svc.diarias    ?? []).map(_normalizeDiaria);
   const pagamentos = (svc.pagamentos ?? []).map(_normalizePagamento);
-  const totalPago  = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
-  const valorTotal = svc.valor_total ?? 0;
+  const totalPago   = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
+  const consumoSum  = diarias.flatMap(d => d.consumos).reduce((s, c) => s + (c.valorTotal ?? 0), 0);
+  const valorTotal  = (svc.valor_total ?? 0) + consumoSum;
   // Unwrap nested pessoa shape (reserva) or flat shape (pernoite)
   const hospedes   = (svc.pessoas ?? []).map(_normalizePessoa);
   const titular    = hospedes.find(p => p.titular) ?? hospedes[0];
@@ -380,9 +390,9 @@ export const overviewApi = {
     }));
   },
 
-  async finalizarServico(id) {
+  async finalizarServico(id, status = 'FINALIZADO') {
     const pernoiteId = _find(id)?.servico?.id;
-    if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, 'FINALIZADO');
+    if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, status);
     await _reload();
     return _find(id);
   },

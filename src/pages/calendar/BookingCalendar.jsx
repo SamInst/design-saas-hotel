@@ -12,7 +12,7 @@ import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva } from './gerarVoucherReserva';
-import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi } from '../../services/api';
+import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, recepcaoApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -3471,14 +3471,14 @@ export default function BookingCalendar() {
 
   const handleMoverPernoite = async (id) => {
     try {
-      await reservaApi.atualizarStatus([id], 'HOSPEDADO');
+      await recepcaoApi.criarPernoite({ reserva_id: id });
       const upd = await reservaApi.buscarPorId(id);
       const normalized = normalizeReserva(upd);
       setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
       setSelectedReserva(normalized);
-      notify('Reserva movida para pernoites!');
+      notify('Hospedagem iniciada!');
     } catch (e) {
-      notify(e?.message ?? 'Erro ao mover reserva.', 'error');
+      notify(e?.message ?? 'Erro ao hospedar.', 'error');
     }
   };
 

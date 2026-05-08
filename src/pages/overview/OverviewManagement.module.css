@@ -2799,7 +2799,7 @@
 }
 
 /* Standalone dark period block (above financial card) */
-.ovPeriodDark { background: #1e293b; border-radius: var(--radius); margin-bottom: 8px; }
+.ovPeriodDark { background: #1e293b; border-radius: var(--radius); }
 .ovPeriodDark .ovDatesRow {
   background: rgba(255,255,255,0.05);
   border-color: rgba(255,255,255,0.08);
@@ -3062,16 +3062,18 @@
 }
 .ovConsumoRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
 }
 .ovConsumoRow:last-child { border-bottom: none; }
 .ovConsumoInfo { flex: 1; min-width: 0; }
-.ovConsumoName { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ovConsumoName { font-size: 12px; font-weight: 600; color: var(--text); }
 .ovConsumoMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
-.ovConsumoVal  { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; flex-shrink: 0; }
+.ovConsumoVal  { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; flex-shrink: 0; align-self: flex-start; }
+.ovConsumoPagMeta { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-2); margin-top: 3px; flex-wrap: wrap; }
+.ovConsumoPagDot  { opacity: .5; }
 
 /* ── Diárias tab column variants ─────────────────────────────────────────── */
 .ovColWide {
@@ -3176,7 +3178,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
   padding: 14px 14px 16px 8px;
 }
 
@@ -3285,7 +3287,7 @@
 }
 .ovGuestRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
@@ -3307,13 +3309,14 @@
   text-transform: uppercase;
   letter-spacing: .04em;
 }
-.ovGuestInfo { flex: 1; min-width: 0; }
-.ovGuestName { font-size: 12px; font-weight: 600; color: var(--text); }
-.ovGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+.ovGuestInfo { flex: 1; min-width: 0; overflow: visible; }
+.ovGuestName { font-size: 12px; font-weight: 600; color: var(--text); word-break: break-word; }
+.ovGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; word-break: break-all; overflow-wrap: anywhere; }
 
 /* Guest card with buttons below email */
 .ovGuestContent { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .contactActionsCenter { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.ovGuestAvatarCol { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; }
 
 /* Diária info strip (consumo modal + alterar pessoas modal) */
 .diariaInfoStrip {
@@ -3332,25 +3335,26 @@
 
 /* Financial card */
 .ovFinCard {
-  border-radius: 12px;
-  padding: 14px 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 6px 0 0;
 }
 .ovFinHeader { display: flex; align-items: center; gap: 7px; }
 .ovFinIcon   { color: #d97706; flex-shrink: 0; }
 :root[data-theme="dark"] .ovFinIcon { color: #fbbf24; }
 .ovFinTitle  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
-.ovFinRow    { display: flex; flex-wrap: wrap; gap: 10px; }
-.ovFinItem   { display: flex; flex-direction: column; gap: 2px; flex: 1 1 90px; min-width: 0; }
+.ovFinRow    { display: flex; gap: 10px; justify-content: space-between; padding: 0 4px; }
+.ovFinItem   { display: flex; flex-direction: column; gap: 2px; }
+.ovFinItem:nth-child(2) { align-items: center; }
+.ovFinItem:last-child   { align-items: flex-end; }
 .ovFinLabel  { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
 .ovFinValue  { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
 .ovFinPending { color: #d97706; }
 .ovFinPaid    { color: #059669; }
 :root[data-theme="dark"] .ovFinPending { color: #fbbf24; }
 :root[data-theme="dark"] .ovFinPaid    { color: #34d399; }
-.ovFinProgress { display: flex; flex-direction: column; gap: 5px; }
+.ovFinProgress { display: flex; flex-direction: column; gap: 5px; padding: 0 4px; }
 .ovFinProgressMeta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
 .ovFinBar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
 .ovFinBarFill { height: 100%; background: #059669; border-radius: 3px; transition: width 0.3s ease; }
@@ -3592,6 +3596,31 @@
 .ovPagDot        { color: var(--text-2); }
 .ovPagRegistrado { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .ovPagValor { font-size: 12px; font-weight: 700; color: var(--emerald); flex-shrink: 0; white-space: nowrap; padding-top: 2px; }
+
+/* ── Pagamentos Realizados card (left column) ───────────────────────────────── */
+.ovPagamentosCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.ovPagamentosTitle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-2);
+  padding: 7px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ovPagamentosCard .ovDiariasCard { border: none; border-radius: 0; background: transparent; }
+
 .ovPriceCardTotal {
   display: flex; justify-content: space-between; align-items: center;
   padding: 6px 12px;

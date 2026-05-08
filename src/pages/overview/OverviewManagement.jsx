@@ -22,7 +22,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './overviewMocks';
-import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
@@ -580,6 +580,8 @@ export default function OverviewManagement() {
   const [showAddEstoque, setShowAddEstoque]         = useState(false);
   const [estoqueCats, setEstoqueCats]               = useState([]);
   const [estoqueLoading, setEstoqueLoading]         = useState(false);
+  const [consumoCats, setConsumoCats]               = useState([]);
+  const [consumoCatsLoading, setConsumoCatsLoading] = useState(false);
   const [estoqueSelCat, setEstoqueSelCat]           = useState('');
   const [estoqueSelItem, setEstoqueSelItem]         = useState(null); // { id, descricao, quantidade, valor_venda }
   const [estoqueQtdAtual, setEstoqueQtdAtual]       = useState(1);
@@ -613,7 +615,13 @@ export default function OverviewManagement() {
   const [encerrarModal, setEncerrarModal] = useState(false);
 
   // Confirm (finalizar / cancelar)
-  const [confirmModal, setConfirmModal] = useState(null); // { action: 'finalizar'|'cancelar' }
+  const [confirmModal, setConfirmModal] = useState(null); // { action: 'cancelar' }
+  const [pendingPayWarning, setPendingPayWarning] = useState(false);
+  // Atribuir limpeza ao finalizar
+  const [atribuirLimpezaModal, setAtribuirLimpezaModal] = useState(null); // { status: 'FINALIZADO'|'FINALIZADO_PAGAMENTO_PENDENTE' }
+  const [limpezaFuncs, setLimpezaFuncs]       = useState([]);
+  const [limpezaFuncsLoading, setLimpezaFuncsLoading] = useState(false);
+  const [limpezaFuncId, setLimpezaFuncId]     = useState('');
 
   // Ações dropdown (pernoite footer)
   const [ovAcoesOpen, setOvAcoesOpen]       = useState(false);
@@ -693,7 +701,7 @@ export default function OverviewManagement() {
   }, [novoRoom?.id, nhCheckinDate, nhCheckoutDate, nhHospedes]); // eslint-disable-line
 
   // ── Detail add consumo computed ───────────────────────────────────────────────
-  const detailConsumoCatSel = CATEGORIAS_CONSUMO.find((c) => c.id === parseInt(detailConsumoCat));
+  const detailConsumoCatSel = consumoCats.find((c) => String(c.id) === String(detailConsumoCat));
   const detailHospResults    = useMemo(() =>
     HOSPEDES_CADASTRADOS.filter((h) => !detailHospedeSearch || h.nome.toLowerCase().includes(detailHospedeSearch.toLowerCase())),
     [detailHospedeSearch]
@@ -1016,15 +1024,58 @@ export default function OverviewManagement() {
     finally { setSaving(false); }
   };
 
-  // ── Finalizar / Cancelar ──────────────────────────────────────────────────────
-  const handleFinalizar = async () => {
+  // ── Hospedar reserva → POST /pernoites { reserva_id } ───────────────────────
+  const handleHospedarReserva = async () => {
     if (!selectedRoom) return;
+    const reservaId = selectedRoom.servico?.id;
+    if (!reservaId) { notify('Reserva não identificada.', 'error'); return; }
     setSaving(true);
     try {
-      const updated = await overviewApi.finalizarServico(selectedRoom.id);
-      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Serviço finalizado — quarto encaminhado para limpeza.');
-      setConfirmModal(null);
+      await recepcaoApi.criarPernoite({ reserva_id: reservaId });
+      await load();
+      notify(`Hospedagem iniciada — Apt. ${selectedRoom.numero}.`);
+      closeDetail();
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  // ── Finalizar / Cancelar ──────────────────────────────────────────────────────
+  const openAtribuirLimpeza = (status) => {
+    setLimpezaFuncId('');
+    setAtribuirLimpezaModal({ status });
+    setLimpezaFuncsLoading(true);
+    funcionarioApi.listar({ size: 100 })
+      .then((res) => setLimpezaFuncs(res?.content ?? (Array.isArray(res) ? res : [])))
+      .catch(() => setLimpezaFuncs([]))
+      .finally(() => setLimpezaFuncsLoading(false));
+  };
+
+  const handleClickFinalizar = () => {
+    const pendente = selectedRoom?.servico?.pagamentoPendente ?? 0;
+    if (pendente > 0) {
+      setPendingPayWarning(true);
+    } else {
+      openAtribuirLimpeza('FINALIZADO');
+    }
+  };
+
+  const handleDoFinalizar = async (funcId) => {
+    if (!selectedRoom) return;
+    const status = atribuirLimpezaModal?.status ?? 'FINALIZADO';
+    const pernoiteId = selectedRoom.servico?.id;
+    setSaving(true);
+    try {
+      if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, status);
+      await recepcaoApi.acionarLimpeza(selectedRoom.id, {
+        funcionario: funcId ? { id: Number(funcId) } : undefined,
+      });
+      await load();
+      const msg = status === 'FINALIZADO_PAGAMENTO_PENDENTE'
+        ? 'Finalizado com pagamento pendente.'
+        : 'Serviço finalizado.';
+      notify(funcId ? `${msg} Limpeza atribuída.` : `${msg} Quarto encaminhado para limpeza.`);
+      setAtribuirLimpezaModal(null);
+      closeDetail();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSaving(false); }
   };
@@ -1190,7 +1241,7 @@ export default function OverviewManagement() {
     setConsumoSaving(true);
     try {
       await Promise.all(internCart.map((c) =>
-        quartoApi.consumirItem({ id: c.quartoItemId, quantidade: c.qtd })
+        quartoApi.consumirItem({ id: c.itemId, quantidade: c.qtd })
       ));
       notify(`${internCart.length} item(s) consumido(s).`);
       setConsumoCart([]); setConsumoCartPag(null);
@@ -1208,7 +1259,7 @@ export default function OverviewManagement() {
     setReporLoading(true);
     try {
       await Promise.all(itensParaRepor.map((m) =>
-        quartoApi.reporItem({ id: m.quartoItemId, quantidade: m.delta })
+        quartoApi.reporItem({ id: m.produtoId, quantidade: m.delta })
       ));
       notify('Itens repostos.');
       await load();
@@ -1219,13 +1270,13 @@ export default function OverviewManagement() {
   const handleReporItem = async (item) => {
     const delta = item.qtdBase - item.qtdAtual;
     if (delta <= 0) return;
-    setReporItemLoading((prev) => new Set([...prev, item.quartoItemId]));
+    setReporItemLoading((prev) => new Set([...prev, item.produtoId]));
     try {
-      await quartoApi.reporItem({ id: item.quartoItemId, quantidade: delta });
+      await quartoApi.reporItem({ id: item.produtoId, quantidade: delta });
       notify(`${item.nome} reposto.`);
       await load();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
-    finally { setReporItemLoading((prev) => { const s = new Set(prev); s.delete(item.quartoItemId); return s; }); }
+    finally { setReporItemLoading((prev) => { const s = new Set(prev); s.delete(item.produtoId); return s; }); }
   };
 
   const updateExternoQty = (item, newQty) => {
@@ -1265,14 +1316,32 @@ export default function OverviewManagement() {
     setShowConsumoPag(false);
     setConsumoSaving(true);
     try {
-      const formaPag = tiposPagamentoOv.find((t) => t.id === Number(pag?.tipo_pagamento?.id))?.descricao ?? '';
-      for (const item of consumoCart) {
-        const consumo = { item: item.nome, categoria: item.categoria, quantidade: item.qtd, valorUnitario: item.preco, valorTotal: item.preco * item.qtd, formaPagamento: formaPag, tipo: item.tipo };
-        await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
-      }
+      const diarias     = selectedRoom.servico?.diarias ?? [];
+      const diariaAtual = selectedRoom.servico?.diariaAtual ?? 0;
+      const diaria      = diarias.find((d) => d.num === diariaAtual) ?? diarias[diarias.length - 1];
+      if (!diaria?.id) throw new Error('Diária atual não encontrada.');
+
+      const isDespesa = !!pag?.despesa_pessoal;
+      const hasPag    = !isDespesa && pag?.tipo_pagamento?.id && pag?.nome_pagador;
+      const body = consumoCart.map((item) => ({
+        item:            { id: item.itemId },
+        quantidade:      item.qtd,
+        despesa_pessoal: isDespesa,
+        ...(hasPag && {
+          pagamento: {
+            tipo_pagamento: { id: Number(pag.tipo_pagamento?.id) },
+            valor:          item.preco * item.qtd,
+            nome_pagador:   pag.nome_pagador,
+            ...(pag.descricao ? { descricao: pag.descricao } : {}),
+          },
+        }),
+      }));
+
+      await recepcaoApi.adicionarConsumos(diaria.id, body);
       notify(`${consumoCart.length} item(s) adicionado(s) ao consumo.`);
       setShowAddConsumoModal(false);
       setConsumoCart([]); setConsumoCartPag(null); setDetailConsumoCat('');
+      await load();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setConsumoSaving(false); }
   };
@@ -1352,10 +1421,11 @@ export default function OverviewManagement() {
     if (!selectedRoom || !tqNovoQuartoId) { notify('Selecione o quarto destino.', 'error'); return; }
     setSavingTq(true);
     try {
-      const updated = await overviewApi.trocarQuarto(selectedRoom.id, tqNovoQuartoId, tqDiariasIdxs);
-      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      await overviewApi.trocarQuarto(selectedRoom.id, tqNovoQuartoId, tqDiariasIdxs);
       notify('Quarto alterado com sucesso.');
       setShowTrocarQuarto(false);
+      closeDetail();
+      await load();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSavingTq(false); }
   };
@@ -1544,11 +1614,11 @@ export default function OverviewManagement() {
                                 {item.qtdAtual < item.qtdBase && (
                                   <button
                                     className={styles.reporItemBtn}
-                                    disabled={reporItemLoading.has(item.quartoItemId)}
+                                    disabled={reporItemLoading.has(item.produtoId)}
                                     onClick={() => handleReporItem(item)}
                                     title="Repor item"
                                   >
-                                    {reporItemLoading.has(item.quartoItemId)
+                                    {reporItemLoading.has(item.produtoId)
                                       ? <Loader2 size={11} className={styles.spin} />
                                       : <RotateCcw size={11} />}
                                   </button>
@@ -1657,15 +1727,17 @@ export default function OverviewManagement() {
                     <div className={styles.ovGuestTable}>
                       {svGuests.map((h) => (
                         <div key={h.id || h.nome} className={styles.ovGuestRow}>
-                          <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                          <div className={styles.ovGuestAvatarCol}>
+                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                            <div className={styles.contactActions}>
+                              {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
+                              {h.email    && <a href={`mailto:${h.email}`} className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
+                            </div>
+                          </div>
                           <div className={styles.ovGuestInfo}>
                             <div className={styles.ovGuestName}>{h.nome}</div>
                             {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
                             {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
-                          </div>
-                          <div className={styles.contactActions}>
-                            {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
-                            {h.email    && <a href={`mailto:${h.email}`} className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
                           </div>
                         </div>
                       ))}
@@ -1779,7 +1851,7 @@ export default function OverviewManagement() {
                     <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
                       <XCircle size={14} /> Cancelar Reserva
                     </button>
-                    <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); }} disabled={saving}>
+                    <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); handleHospedarReserva(); }} disabled={saving}>
                       {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Hospedar
                     </button>
                   </div>
@@ -1821,37 +1893,76 @@ export default function OverviewManagement() {
           <div className={styles.ovBody}>
             <div className={styles.ovTwoCol}>
 
-                {/* ── Left: guests ── */}
+                {/* ── Left: guests + payments ── */}
                 <div className={styles.ovLeft}>
                   {svGuests.length > 0 ? (
                       <div className={styles.ovGuestTable}>
                         {svGuests.map((h) => (
                           <div key={h.id || h.nome} className={styles.ovGuestRow}>
-                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                            <div className={styles.ovGuestAvatarCol}>
+                              <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                              <div className={styles.contactActions}>
+                                {h.telefone && (
+                                  <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                    className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                    <Phone size={11} />
+                                  </a>
+                                )}
+                                {h.email && (
+                                  <a href={`mailto:${h.email}`}
+                                    className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                    <Mail size={11} />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                             <div className={styles.ovGuestInfo}>
                               <div className={styles.ovGuestName}>{h.nome}</div>
                               {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
                               {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
-                            </div>
-                            <div className={styles.contactActions}>
-                              {h.telefone && (
-                                <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                  className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
-                                  <Phone size={11} />
-                                </a>
-                              )}
-                              {h.email && (
-                                <a href={`mailto:${h.email}`}
-                                  className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
-                                  <Mail size={11} />
-                                </a>
-                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                   ) : (
                     <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
+                  )}
+
+                  {/* Pagamentos Realizados */}
+                  {allPagamentos.length > 0 && (
+                    <div className={styles.ovPagamentosCard}>
+                      <div className={styles.ovPagamentosTitle}>
+                        <CreditCard size={11} />
+                        Pagamentos Realizados
+                      </div>
+                      <div className={styles.ovDiariasCard}>
+                        {allPagamentos.map((p, i) => (
+                          <div key={i} className={styles.ovPricePagCard}>
+                            <div className={styles.ovPricePagMain}>
+                              <div className={styles.ovPagTitle}>{p.descricao}</div>
+                              {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
+                              <div className={styles.ovPagMeta}>
+                                {p.data && <span>{p.data}</span>}
+                                {(p.forma || p.formaPagamento) && (
+                                  <>
+                                    {p.data && <span className={styles.ovPagDot}>·</span>}
+                                    <span>{p.forma || p.formaPagamento}</span>
+                                  </>
+                                )}
+                              </div>
+                              {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
+                            </div>
+                            <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
+                          </div>
+                        ))}
+                        {allPagamentos.length > 1 && (
+                          <div className={styles.ovPriceConsumoTotal}>
+                            <span>Total pagamentos</span>
+                            <span>{fmtBRL(allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0))}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -1884,10 +1995,6 @@ export default function OverviewManagement() {
                   {/* Financial card */}
                   <div>
                     <div className={styles.ovFinCard}>
-                      <div className={styles.ovFinHeader}>
-                        <DollarSign size={13} className={styles.ovFinIcon} />
-                        <span className={styles.ovFinTitle}>Resumo Financeiro</span>
-                      </div>
                       <div className={styles.ovFinRow}>
                         <div className={styles.ovFinItem}>
                           <span className={styles.ovFinLabel}>Valor Total</span>
@@ -1916,11 +2023,9 @@ export default function OverviewManagement() {
                         </div>
                       )}
                       {sv.diarias?.length > 0 && (() => {
-                        const consumos       = sv.consumos || [];
-                        const pagamentos     = allPagamentos;
-                        const consumoTotal   = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
-                        const pagamentoTotal = pagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0);
-                        const grandTotal     = (sv.valorTotal || 0) + consumoTotal;
+                        const consumos     = sv.consumos || [];
+                        const consumoTotal = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
+                        const grandTotal   = (sv.valorTotal || 0) + consumoTotal;
                         return (
                           <div className={styles.ovPriceInline}>
                             <div className={styles.ovDiariasCard}>
@@ -1949,35 +2054,6 @@ export default function OverviewManagement() {
                                 </div>
                               )}
                             </div>
-                            {pagamentos.length > 0 && (
-                              <div className={styles.ovDiariasCard}>
-                                {pagamentos.map((p, i) => (
-                                  <div key={i} className={styles.ovPricePagCard}>
-                                    <div className={styles.ovPricePagMain}>
-                                      <div className={styles.ovPagTitle}>{p.descricao}</div>
-                                      {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
-                                      <div className={styles.ovPagMeta}>
-                                        {p.data && <span>{p.data}</span>}
-                                        {(p.forma || p.formaPagamento) && (
-                                          <>
-                                            {p.data && <span className={styles.ovPagDot}>·</span>}
-                                            <span>{p.forma || p.formaPagamento}</span>
-                                          </>
-                                        )}
-                                      </div>
-                                      {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
-                                    </div>
-                                    <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
-                                  </div>
-                                ))}
-                                {pagamentos.length > 1 && (
-                                  <div className={styles.ovPriceConsumoTotal}>
-                                    <span>Total pagamentos</span>
-                                    <span>{fmtBRL(pagamentoTotal)}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
                           </div>
                         );
                       })()}
@@ -2002,15 +2078,27 @@ export default function OverviewManagement() {
                               <div key={c.id || i} className={styles.ovConsumoRow}>
                                 <div className={styles.ovConsumoInfo}>
                                   <div className={styles.ovConsumoName}>{c.item}</div>
-                                  <div className={styles.ovConsumoMeta}>{c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}</div>
+                                  <div className={styles.ovConsumoMeta}>
+                                    {c.quantidade ? `×${c.quantidade}` : ''}
+                                    {c.valorUnitario > 0 ? ` · ${fmtBRL(c.valorUnitario)}/un.` : ''}
+                                  </div>
+                                  {c.despesaPessoal ? (
+                                    <div className={styles.ovConsumoPagMeta}>Despesa pessoal</div>
+                                  ) : c.pagamento && (
+                                    <div className={styles.ovConsumoPagMeta}>
+                                      {c.pagamento.nomePagador && <span>{c.pagamento.nomePagador}</span>}
+                                      {c.pagamento.formaPagamento && <span className={styles.ovConsumoPagDot}>·</span>}
+                                      {c.pagamento.formaPagamento && <span>{c.pagamento.formaPagamento}</span>}
+                                    </div>
+                                  )}
                                 </div>
-                                <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal ?? c.valor)}</span>
+                                <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal)}</span>
                               </div>
                             ))}
                           </div>
                           <div className={styles.ovConsumoSideTotal}>
                             <span>Total</span>
-                            <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? c.valor ?? 0), 0))}</span>
+                            <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? 0), 0))}</span>
                           </div>
                         </>
                       )}
@@ -2064,7 +2152,7 @@ export default function OverviewManagement() {
                         }, sv.titularNome); }}>
                           <CreditCard size={14} /> Adicionar Pagamento
                         </button>
-                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); }}>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); setConsumoCats([]); setConsumoCatsLoading(true); itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false)); }}>
                           <ShoppingCart size={14} /> Adicionar Consumo
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx(sv.diariaAtual ?? 1); setApComboOpen(false); setShowAlterarPessoas(true); }}>
@@ -2078,7 +2166,7 @@ export default function OverviewManagement() {
                         <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
                           <XCircle size={14} /> Cancelar Pernoite
                         </button>
-                        <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'finalizar' }); }} disabled={saving}>
+                        <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); handleClickFinalizar(); }} disabled={saving}>
                           {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Finalizar
                         </button>
                       </>
@@ -2213,30 +2301,32 @@ export default function OverviewManagement() {
                     <div className={styles.ovGuestTable}>
                       {svGuests.map((h) => (
                           <div key={h.id} className={styles.ovGuestRow}>
-                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                            <div className={styles.ovGuestAvatarCol}>
+                              <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                              <div className={styles.contactActions}>
+                                {h.telefone && (
+                                  <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                    className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                    <Phone size={11} />
+                                  </a>
+                                )}
+                                {h.email && (
+                                  <a href={`mailto:${h.email}`}
+                                    className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                    <Mail size={11} />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
                             <div className={styles.ovGuestInfo}>
                               <div className={styles.ovGuestName}>{h.nome}</div>
                               {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
                               {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
                             </div>
-                            <div className={styles.contactActions}>
-                              {h.telefone && (
-                                <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                  className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
-                                  <Phone size={11} />
-                                </a>
-                              )}
-                              {h.email && (
-                                <a href={`mailto:${h.email}`}
-                                  className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
-                                  <Mail size={11} />
-                                </a>
-                              )}
-                              <button type="button" className={styles.removeBtn}
-                                onClick={() => { if (window.confirm(`Remover ${h.nome}?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
-                                <Trash2 size={12} />
-                              </button>
-                            </div>
+                            <button type="button" className={styles.removeBtn}
+                              onClick={() => { if (window.confirm(`Remover ${h.nome}?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                              <Trash2 size={12} />
+                            </button>
                           </div>
                       ))}
                     </div>
@@ -2246,7 +2336,7 @@ export default function OverviewManagement() {
             )}
             {detailTab === 'consumos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); }}>
+                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); setConsumoCats([]); setConsumoCatsLoading(true); itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false)); }}>
                   <Plus size={13} /> Adicionar Consumo
                 </Button>
                 {(sv.consumos || []).length === 0
@@ -2387,8 +2477,9 @@ export default function OverviewManagement() {
           <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
             <XCircle size={14} /> Cancelar Reserva
           </Button>
-          <Button variant="primary" onClick={() => openNovoServico('pernoite', s)}>
-            <BedDouble size={14} /> Iniciar Pernoite
+          <Button variant="primary" onClick={handleHospedarReserva} disabled={saving}>
+            {saving && <Loader2 size={14} className={styles.spin} />}
+            <BedDouble size={14} /> Hospedar
           </Button>
         </div>
       );
@@ -2403,7 +2494,7 @@ export default function OverviewManagement() {
             </Button>
           </div>
           <div className={styles.footerRight}>
-            <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
+            <Button variant="primary" onClick={handleClickFinalizar} disabled={saving}>
               {saving && <Loader2 size={14} className={styles.spin} />}
               <CheckCircle size={14} /> Finalizar
             </Button>
@@ -2443,7 +2534,7 @@ export default function OverviewManagement() {
                 }}>
                   <Tag size={14} /> Desconto
                 </Button>
-                <Button variant="primary" onClick={() => setConfirmModal({ action: 'finalizar' })} disabled={saving}>
+                <Button variant="primary" onClick={handleClickFinalizar} disabled={saving}>
                   {saving && <Loader2 size={14} className={styles.spin} />}
                   <CheckCircle size={14} /> Finalizar
                 </Button>
@@ -3417,7 +3508,7 @@ export default function OverviewManagement() {
                 <Button variant="secondary" onClick={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}>Fechar</Button>
                 <Button
                   variant="primary"
-                  disabled={consumoSaving || consumoCart.length === 0 || !consumoCartPag}
+                  disabled={consumoSaving || consumoCart.length === 0}
                   onClick={() => handleConfirmConsumoAll(consumoCartPag)}
                 >
                   {consumoSaving && <Loader2 size={13} className={styles.spin} />}
@@ -3448,7 +3539,8 @@ export default function OverviewManagement() {
                 <div className={styles.consumoModalSection}>
                   <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
                   <div className={styles.consumoItemList}>
-                    {MOCK_ITENS_QUARTO.map((item) => {
+                    {(selectedRoom.minibar ?? []).map((m) => {
+                      const item     = { id: m.produtoId, quartoItemId: m.quartoItemId, nome: m.nome, categoria: m.categoria || 'Minibar', preco: m.preco ?? 0, qtdAtual: m.qtdAtual ?? 0, qtdBase: m.qtdBase ?? 0 };
                       const esgotado = item.qtdAtual === 0;
                       const ratio    = item.qtdBase > 0 ? item.qtdAtual / item.qtdBase : 1;
                       const isLow    = ratio < 0.5;
@@ -3459,7 +3551,7 @@ export default function OverviewManagement() {
                           <div className={styles.consumoItemInfo}>
                             <span className={styles.consumoItemNome}>{item.nome}</span>
                             <span className={styles.consumoItemMeta}>
-                              {item.categoria} · {fmtBRL(item.preco)}/un.
+                              {item.categoria}{item.preco > 0 ? ` · ${fmtBRL(item.preco)}/un.` : ''}
                             </span>
                           </div>
                           <div className={[styles.cartQtdStepper, esgotado ? styles.cartQtdStepperDisabled : ''].join(' ')}>
@@ -3520,7 +3612,7 @@ export default function OverviewManagement() {
                         </div>
                       ) : (
                         <button className={styles.definePagamentoOv} onClick={() => setShowConsumoPag(true)}>
-                          <CreditCard size={13} /> Definir Pagamento *
+                          <CreditCard size={13} /> Adicionar Pagamento (opcional)
                         </button>
                       )}
                     </div>
@@ -3554,28 +3646,31 @@ export default function OverviewManagement() {
             <FormField label="Categoria">
               <Select value={detailConsumoCat} onChange={(e) => setDetailConsumoCat(e.target.value)}>
                 <option value="">Selecione uma categoria...</option>
-                {CATEGORIAS_CONSUMO.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                {consumoCatsLoading
+                  ? <option disabled>Carregando...</option>
+                  : consumoCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </Select>
             </FormField>
           </div>
 
           {detailConsumoCatSel && (
             <div className={styles.consumoItemList}>
-              {detailConsumoCatSel.produtos.map((item) => {
-                const qty = externoCart.find((c) => c.catId === detailConsumoCat && c.itemId === item.id)?.qtd ?? 0;
+              {(detailConsumoCatSel.itens ?? []).map((item) => {
+                const qty   = externoCart.find((c) => c.catId === detailConsumoCat && c.itemId === item.id)?.qtd ?? 0;
+                const preco = item.valor_venda ?? 0;
                 return (
                   <div key={item.id} className={styles.consumoItemRow}>
                     <div className={styles.consumoItemInfo}>
-                      <span className={styles.consumoItemNome}>{item.nome}</span>
-                      <span className={styles.consumoItemMeta}>{fmtBRL(item.preco)}/un.</span>
+                      <span className={styles.consumoItemNome}>{item.descricao}</span>
+                      <span className={styles.consumoItemMeta}>{preco > 0 ? `${fmtBRL(preco)}/un.` : ''}</span>
                     </div>
                     <div className={styles.cartQtdStepper}>
-                      <button disabled={qty === 0} onClick={() => updateExternoQty(item, qty - 1)}>−</button>
+                      <button disabled={qty === 0} onClick={() => updateExternoQty({ ...item, nome: item.descricao, preco }, qty - 1)}>−</button>
                       <span>{qty}</span>
-                      <button onClick={() => updateExternoQty(item, qty + 1)}>+</button>
+                      <button onClick={() => updateExternoQty({ ...item, nome: item.descricao, preco }, qty + 1)}>+</button>
                     </div>
                     <span className={qty > 0 ? styles.cartRowTotal : styles.cartRowTotalEmpty}>
-                      {qty > 0 ? fmtBRL(item.preco * qty) : '—'}
+                      {qty > 0 ? fmtBRL(preco * qty) : '—'}
                     </span>
                   </div>
                 );
@@ -3999,34 +4094,102 @@ export default function OverviewManagement() {
       )}
 
       {/* ═══════════════════════════════════════════════════════
-          MODAL — Confirmar Finalizar / Cancelar
+          MODAL — Pagamento Pendente ao Finalizar
+      ═══════════════════════════════════════════════════════ */}
+      {pendingPayWarning && selectedRoom && (
+        <Modal
+          open
+          onClose={() => setPendingPayWarning(false)}
+          size="sm"
+          title={<><AlertTriangle size={15} /> Pagamento Pendente</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setPendingPayWarning(false)} disabled={saving}>Cancelar</Button>
+              <Button variant="danger" onClick={() => { setPendingPayWarning(false); openAtribuirLimpeza('FINALIZADO_PAGAMENTO_PENDENTE'); }} disabled={saving}>
+                Prosseguir mesmo assim
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
+              Ainda há <strong style={{ color: '#d97706' }}>{fmtBRL(selectedRoom.servico?.pagamentoPendente)}</strong> de pagamento pendente no <strong>Apt. {selectedRoom.numero}</strong>.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
+              Prosseguir com a finalização? O pernoite ficará com o status <strong>Finalizado com Pagamento Pendente</strong>.
+            </p>
+          </div>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Confirmar Cancelar Serviço
       ═══════════════════════════════════════════════════════ */}
       {confirmModal && selectedRoom && (
         <Modal
           open
           onClose={() => setConfirmModal(null)}
           size="sm"
-          title={confirmModal.action === 'finalizar' ? <><CheckCircle size={15} /> Finalizar Serviço</> : <><XCircle size={15} /> Cancelar Serviço</>}
+          title={<><XCircle size={15} /> Cancelar Serviço</>}
           footer={
             <div className={styles.footerRight}>
               <Button variant="secondary" onClick={() => setConfirmModal(null)}>Voltar</Button>
-              <Button
-                variant={confirmModal.action === 'finalizar' ? 'primary' : 'danger'}
-                onClick={confirmModal.action === 'finalizar' ? handleFinalizar : handleCancelar}
-                disabled={saving}
-              >
+              <Button variant="danger" onClick={handleCancelar} disabled={saving}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                {confirmModal.action === 'finalizar' ? 'Finalizar' : 'Cancelar Serviço'}
+                Cancelar Serviço
               </Button>
             </div>
           }
         >
           <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-            {confirmModal.action === 'finalizar'
-              ? <>Confirma a finalização do serviço no <strong>Apt. {selectedRoom.numero}</strong>? O quarto será encaminhado para limpeza.</>
-              : <>Confirma o cancelamento do serviço no <strong>Apt. {selectedRoom.numero}</strong>? O quarto ficará disponível.</>
-            }
+            Confirma o cancelamento do serviço no <strong>Apt. {selectedRoom.numero}</strong>? O quarto ficará disponível.
           </p>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Atribuir Limpeza ao Finalizar
+      ═══════════════════════════════════════════════════════ */}
+      {atribuirLimpezaModal && selectedRoom && (
+        <Modal
+          open
+          onClose={() => setAtribuirLimpezaModal(null)}
+          size="sm"
+          title={<><Sparkles size={15} /> Atribuir Limpeza</>}
+          footer={
+            <div className={styles.footerBetween}>
+              <Button variant="secondary" onClick={() => handleDoFinalizar(null)} disabled={saving}>
+                {saving && <Loader2 size={14} className={styles.spin} />}
+                Pular
+              </Button>
+              <Button variant="primary" onClick={() => handleDoFinalizar(limpezaFuncId || null)} disabled={saving || limpezaFuncsLoading || !limpezaFuncId}>
+                {saving && <Loader2 size={14} className={styles.spin} />}
+                <CheckCircle size={14} /> Atribuir e Finalizar
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
+              Selecione o funcionário responsável pela limpeza do <strong style={{ color: 'var(--text)' }}>Apt. {selectedRoom.numero}</strong>.
+            </p>
+            {limpezaFuncsLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)' }}>
+                <Loader2 size={14} className={styles.spin} /> Carregando funcionários...
+              </div>
+            ) : (
+              <Select
+                label="Funcionário"
+                value={limpezaFuncId}
+                onChange={(e) => setLimpezaFuncId(e.target.value)}
+              >
+                <option value="">Selecione...</option>
+                {limpezaFuncs.map((f) => (
+                  <option key={f.id} value={f.id}>{f.pessoa?.nome ?? f.nome ?? f.id}</option>
+                ))}
+              </Select>
+            )}
+          </div>
         </Modal>
       )}
     </div>
