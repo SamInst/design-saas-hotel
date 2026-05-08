@@ -617,6 +617,7 @@ export default function OverviewManagement() {
   // Confirm (finalizar / cancelar)
   const [confirmModal, setConfirmModal] = useState(null); // { action: 'cancelar' }
   const [pendingPayWarning, setPendingPayWarning] = useState(false);
+  const [checkoutAntecipado, setCheckoutAntecipado] = useState(false);
   // Atribuir limpeza ao finalizar
   const [atribuirLimpezaModal, setAtribuirLimpezaModal] = useState(null); // { status: 'FINALIZADO'|'FINALIZADO_PAGAMENTO_PENDENTE' }
   const [limpezaFuncs, setLimpezaFuncs]       = useState([]);
@@ -1050,13 +1051,23 @@ export default function OverviewManagement() {
       .finally(() => setLimpezaFuncsLoading(false));
   };
 
-  const handleClickFinalizar = () => {
+  const _prosseguirFinalizar = () => {
     const pendente = selectedRoom?.servico?.pagamentoPendente ?? 0;
     if (pendente > 0) {
       setPendingPayWarning(true);
     } else {
       openAtribuirLimpeza('FINALIZADO');
     }
+  };
+
+  const handleClickFinalizar = () => {
+    const saidaStr = selectedRoom?.servico?.saidaPrevista?.split(' ')[0]; // "dd/MM/yyyy"
+    const saidaISO = saidaStr ? saidaStr.split('/').reverse().join('-') : '';
+    if (saidaISO && saidaISO !== todayStr()) {
+      setCheckoutAntecipado(true);
+      return;
+    }
+    _prosseguirFinalizar();
   };
 
   const handleDoFinalizar = async (funcId) => {
@@ -1241,7 +1252,7 @@ export default function OverviewManagement() {
     setConsumoSaving(true);
     try {
       await Promise.all(internCart.map((c) =>
-        quartoApi.consumirItem({ id: c.itemId, quantidade: c.qtd })
+        quartoApi.consumirItem({ id: c.quartoItemId, quantidade: c.qtd })
       ));
       notify(`${internCart.length} item(s) consumido(s).`);
       setConsumoCart([]); setConsumoCartPag(null);
@@ -1259,7 +1270,7 @@ export default function OverviewManagement() {
     setReporLoading(true);
     try {
       await Promise.all(itensParaRepor.map((m) =>
-        quartoApi.reporItem({ id: m.produtoId, quantidade: m.delta })
+        quartoApi.reporItem({ id: m.quartoItemId, quantidade: m.delta })
       ));
       notify('Itens repostos.');
       await load();
@@ -1272,7 +1283,7 @@ export default function OverviewManagement() {
     if (delta <= 0) return;
     setReporItemLoading((prev) => new Set([...prev, item.produtoId]));
     try {
-      await quartoApi.reporItem({ id: item.produtoId, quantidade: delta });
+      await quartoApi.reporItem({ id: item.quartoItemId, quantidade: delta });
       notify(`${item.nome} reposto.`);
       await load();
     } catch (e) { notify('Erro: ' + e.message, 'error'); }
@@ -4089,6 +4100,37 @@ export default function OverviewManagement() {
                 </span>
               </div>
             )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Checkout Antecipado
+      ═══════════════════════════════════════════════════════ */}
+      {checkoutAntecipado && selectedRoom && (
+        <Modal
+          open
+          onClose={() => setCheckoutAntecipado(false)}
+          size="sm"
+          title={<><AlertTriangle size={15} /> Finalização Antecipada</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setCheckoutAntecipado(false)}>Cancelar</Button>
+              <Button variant="danger" onClick={() => { setCheckoutAntecipado(false); _prosseguirFinalizar(); }}>
+                Finalizar mesmo assim
+              </Button>
+            </div>
+          }
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
+              O checkout previsto do <strong>Apt. {selectedRoom.numero}</strong> é{' '}
+              <strong style={{ color: '#d97706' }}>{selectedRoom.servico?.saidaPrevista?.split(' ')[0] || '—'}</strong>,
+              diferente de hoje.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
+              Deseja finalizar o pernoite antes da data prevista?
+            </p>
           </div>
         </Modal>
       )}
