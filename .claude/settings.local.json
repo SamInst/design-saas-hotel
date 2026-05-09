@@ -10,7 +10,10 @@
       "Bash(git add src/pages/inventory/InventoryManagement.jsx)",
       "Bash(git push)",
       "Bash(git add src/app/App.jsx src/pages/pricing/)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\OverviewManagement.module.css\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\recepcao.module.css\")",
+      "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\overviewMocks.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\overviewApi.js\")",
+      "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\gerarVoucherHospedagem.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\gerarVoucherHospedagem.js\")"
     ]
   }
 }
