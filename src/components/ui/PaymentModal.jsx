@@ -141,10 +141,11 @@ export function PaymentModal({
   const [showDesc,      setShowDesc]      = useState(false);
   const [descontoOrigUuid, setDescontoOrigUuid] = useState(null);
   const [despesaPessoal,   setDespesaPessoal]   = useState(false);
+  const [localSubmitting,  setLocalSubmitting]  = useState(false);
 
   // Inicializa ao abrir
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setLocalSubmitting(false); return; }
     setDespesaPessoal(false);
     if (initialPayment) {
       setTipoPagId(String(initialPayment.tipo_pagamento?.id ?? ''));
@@ -180,7 +181,8 @@ export function PaymentModal({
   const canConfirm = despesaPessoal || (!!tipoPagId && !!nomePagador && !!valor);
 
   const handleConfirm = () => {
-    if (!canConfirm) return;
+    if (!canConfirm || localSubmitting || isSubmitting) return;
+    setLocalSubmitting(true);
     if (despesaPessoal) {
       onConfirm({ despesa_pessoal: true, descricao: descricao.trim() || undefined });
       return;
@@ -208,9 +210,9 @@ export function PaymentModal({
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
             <Button variant="primary" onClick={handleConfirm}
-              disabled={isSubmitting || !canConfirm}
+              disabled={localSubmitting || isSubmitting || !canConfirm}
               style={{ flex: 1 }}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Confirmar'}
+              {(localSubmitting || isSubmitting) ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Confirmar'}
             </Button>
           </div>
         }>

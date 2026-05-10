@@ -6,7 +6,7 @@ import {
   CheckCircle, XCircle, DollarSign, Calendar, Square, Loader2,
   AlertTriangle, ShoppingCart, Package, Trash2, Phone, Mail,
   RefreshCw, ArrowLeftRight, Minus, RotateCcw, Users, X,
-  Percent, Tag, ChevronRight, ChevronLeft, Check, FileText,
+  Percent, Tag, ChevronRight, ChevronLeft, Check, FileText, Pencil,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -640,6 +640,13 @@ export default function RecepcaoPage() {
   const [apDiariaIdx, setApDiariaIdx]               = useState(0);
   const [apComboOpen, setApComboOpen]               = useState(false);
   const [apSearch, setApSearch]                     = useState('');
+  const [apSearchResults, setApSearchResults]       = useState([]);
+  const [apSearchLoading, setApSearchLoading]       = useState(false);
+
+  // Gerenciar modals
+  const [showGerenciarPag, setShowGerenciarPag]         = useState(false);
+  const [showGerenciarConsumo, setShowGerenciarConsumo] = useState(false);
+  const [editingPag, setEditingPag]                     = useState(null);
 
 
 
@@ -661,6 +668,24 @@ export default function RecepcaoPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // ── Pessoa search for Gerenciar Pessoas modal ──────────────────────────────────
+  useEffect(() => {
+    if (!showAlterarPessoas || !apSearch || apSearch.length < 2) {
+      setApSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    setApSearchLoading(true);
+    const tid = setTimeout(async () => {
+      try {
+        const res = await cadastroApi.listarPessoas({ termo: apSearch.trim(), size: 8 });
+        if (!cancelled) setApSearchResults(res?.content ?? []);
+      } catch { if (!cancelled) setApSearchResults([]); }
+      finally  { if (!cancelled) setApSearchLoading(false); }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(tid); };
+  }, [apSearch, showAlterarPessoas]);
 
   // ── 1-second tick for active Day Uses ────────────────────────────────────────
   useEffect(() => {
@@ -1488,6 +1513,71 @@ export default function RecepcaoPage() {
     finally { setSaving(false); }
   };
 
+  const handleCancelarPagamento = async (pagUuid) => {
+    if (!selectedRoom) return;
+    setSaving(true);
+    try {
+      const updated = await overviewApi.cancelarPagamento(selectedRoom.id, pagUuid);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Pagamento cancelado.');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleEditarPagamento = async (oldUuid, payment) => {
+    if (!selectedRoom) return;
+    const pag = pagamentoFromPaymentModal(payment);
+    setSaving(true);
+    try {
+      await overviewApi.cancelarPagamento(selectedRoom.id, oldUuid);
+      const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Pagamento atualizado.');
+      setEditingPag(null);
+      setShowGerenciarPag(true);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleRemoverConsumo = async (consumoId) => {
+    if (!selectedRoom) return;
+    setSaving(true);
+    try {
+      const updated = await overviewApi.removerConsumo(selectedRoom.id, consumoId);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Consumo removido.');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleAdicionarPessoa = async (pessoaId) => {
+    if (!selectedRoom) return;
+    const diarias = selectedRoom.servico?.diarias ?? [];
+    const selDiaria = diarias[apDiariaIdx];
+    if (!selDiaria?.id) { notify('Selecione uma diária primeiro.', 'error'); return; }
+    setSaving(true);
+    try {
+      const updated = await overviewApi.adicionarPessoaDiaria(selectedRoom.id, selDiaria.id, pessoaId);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Pessoa adicionada.');
+      setApSearch('');
+      setApSearchResults([]);
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
+  const handleRemoverPessoa = async (diariaId, pessoaId, nome) => {
+    if (!selectedRoom) return;
+    if (!window.confirm(`Remover ${nome} desta diária?`)) return;
+    setSaving(true);
+    try {
+      const updated = await overviewApi.removerPessoaDiaria(selectedRoom.id, diariaId, pessoaId);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify('Pessoa removida.');
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    finally { setSaving(false); }
+  };
+
   const handlePayConfirmNew = async (payment) => {
     const pag = pagamentoFromPaymentModal(payment);
     if (payOnConfirm) await payOnConfirm(pag);
@@ -1890,7 +1980,7 @@ export default function RecepcaoPage() {
       const diarias = sv.diarias || [];
       const curDiaria = diarias[detailDiariaIdx];
       const progressPercent = sv.valorTotal > 0 ? Math.min(100, (sv.totalPago / sv.valorTotal) * 100) : 0;
-      const allPagamentos = diarias.flatMap((d) => d.pagamentos || []);
+      const allPagamentos = sv.pagamentos || [];
       return (
         <>
           {/* ── Custom header ── */}
@@ -2162,18 +2252,14 @@ export default function RecepcaoPage() {
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openTrocarQuarto(); }}>
                           <ArrowLeftRight size={14} /> Trocar Quarto
                         </button>
-                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openPayModal(async (pag) => {
-                          const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
-                          setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                          notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
-                        }, sv.titularNome); }}>
-                          <CreditCard size={14} /> Adicionar Pagamento
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPag(true); }}>
+                          <CreditCard size={14} /> Gerenciar Pagamentos
                         </button>
-                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); setConsumoCats([]); setConsumoCatsLoading(true); itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false)); }}>
-                          <ShoppingCart size={14} /> Adicionar Consumo
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarConsumo(true); }}>
+                          <ShoppingCart size={14} /> Gerenciar Consumos
                         </button>
-                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx(sv.diariaAtual ?? 1); setApComboOpen(false); setShowAlterarPessoas(true); }}>
-                          <Users size={14} /> Alterar Pessoas
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
+                          <Users size={14} /> Gerenciar Pessoas
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => setVoucherPicking(true)}>
                           <FileText size={14} /> Gerar Voucher
@@ -2309,8 +2395,8 @@ export default function RecepcaoPage() {
             )}
             {detailTab === 'hospedes' && (
               <div className={styles.ovBodyPad}>
-                <Button variant="secondary" size="sm" onClick={() => { setDetailHospedeSearch(''); setDetailHospedeSelected(null); setShowDetailAddHospede(true); }}>
-                  <Plus size={13} /> Adicionar Hóspede
+                <Button variant="secondary" size="sm" onClick={() => { setApDiariaIdx(0); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
+                  <Users size={13} /> Gerenciar Pessoas
                 </Button>
                 {svGuests.length === 0
                   ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
@@ -2353,8 +2439,8 @@ export default function RecepcaoPage() {
             )}
             {detailTab === 'consumos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => { setDetailConsumoCat(''); setExternoCart([]); setConsumoCart([]); setConsumoCartPag(null); setShowAddConsumoModal(true); setConsumoCats([]); setConsumoCatsLoading(true); itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false)); }}>
-                  <Plus size={13} /> Adicionar Consumo
+                <Button variant="primary" size="sm" onClick={() => setShowGerenciarConsumo(true)}>
+                  <ShoppingCart size={13} /> Gerenciar Consumos
                 </Button>
                 {(sv.consumos || []).length === 0
                   ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
@@ -2379,12 +2465,8 @@ export default function RecepcaoPage() {
             )}
             {detailTab === 'pagamentos' && (
               <div className={styles.subTabContent}>
-                <Button variant="primary" size="sm" onClick={() => openPayModal(async (pag) => {
-                  const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
-                  setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                  notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
-                }, s.servico?.titularNome)}>
-                  <Plus size={13} /> Adicionar Pagamento
+                <Button variant="primary" size="sm" onClick={() => setShowGerenciarPag(true)}>
+                  <CreditCard size={13} /> Gerenciar Pagamentos
                 </Button>
                 <div className={styles.itemList}>
                   {(sv.pagamentos || []).length === 0
@@ -3291,79 +3373,47 @@ export default function RecepcaoPage() {
       {showAlterarPessoas && selectedRoom && (() => {
         const _sv      = selectedRoom.servico;
         const _diarias = _sv?.diarias || [];
-        const _atual   = _sv?.diariaAtual || 1;
-        const _futureDiarias = _diarias.filter((_, i) => i >= _atual);
-        const _selDiaria = _diarias[apDiariaIdx];
+        const _selDiaria = _diarias[apDiariaIdx] ?? _diarias[0];
         const _hospedes  = _selDiaria?.hospedes || [];
         const _ini = (nome) => (nome || '?').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
-        const _searchResults = apSearch.length >= 2
-          ? HOSPEDES_CADASTRADOS.filter((h) => h.nome.toLowerCase().includes(apSearch.toLowerCase()))
-          : [];
+        const hospedesIds = new Set(_hospedes.map(h => h.id));
         return (
           <Modal
             open
-            onClose={() => { setShowAlterarPessoas(false); setApSearch(''); }}
+            onClose={() => { setShowAlterarPessoas(false); setApSearch(''); setApSearchResults([]); }}
             size="md"
             bodyStyle={{ padding: 0 }}
-            title={<><Users size={15} /> Alterar Pessoas</>}
+            title={<><Users size={15} /> Gerenciar Pessoas</>}
           >
-            {/* Diária selector (future only) */}
-            <div className={styles.diariaSelectBar}>
-              {apComboOpen && <div className={styles.diariaComboBackdrop} onClick={() => setApComboOpen(false)} />}
-              <div className={styles.diariaCombo}>
-                <button type="button" className={styles.diariaComboTrigger} onClick={() => setApComboOpen((v) => !v)}>
-                  <span className={styles.diariaComboLabel}>
-                    {_selDiaria
-                      ? `Diária ${_selDiaria.num ?? apDiariaIdx + 1}${_selDiaria.dataInicio ? ` — ${_selDiaria.dataInicio} → ${_selDiaria.dataFim}` : ''}`
-                      : 'Selecione uma diária'}
-                  </span>
-                  <ChevronDown size={13} className={apComboOpen ? styles.diariaComboChevronOpen : styles.diariaComboChevron} />
-                </button>
-                {apComboOpen && (
-                  <div className={styles.diariaComboDropdown}>
-                    {_futureDiarias.length === 0
-                      ? <div className={styles.diariaComboOption} style={{ color: 'var(--text-2)', pointerEvents: 'none' }}>Sem diárias futuras</div>
-                      : _futureDiarias.map((d, i) => {
-                          const absIdx = _atual + i;
-                          const isSel  = absIdx === apDiariaIdx;
-                          return (
-                            <div key={absIdx}
-                              className={[styles.diariaComboOption, isSel ? styles.diariaComboOptionActive : ''].join(' ')}
-                              onClick={() => { setApDiariaIdx(absIdx); setApComboOpen(false); }}>
-                              <span className={styles.diariaComboOptionLabel}>
-                                Diária {d.num ?? absIdx + 1}{d.dataInicio ? ` — ${d.dataInicio} → ${d.dataFim}` : ''}
-                              </span>
-                            </div>
-                          );
-                        })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Search */}
-            <div className={styles.apSearchWrap}>
-              <Input
-                value={apSearch}
-                onChange={(e) => setApSearch(e.target.value)}
-                placeholder="Buscar pessoa por nome..."
-              />
-              {_searchResults.length > 0 && (
-                <div className={styles.guestList}>
-                  {_searchResults.map((h) => (
-                    <button
-                      key={h.id}
-                      type="button"
-                      className={styles.guestItem}
-                      onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setApSearch(''); }}
-                    >
-                      <span className={styles.guestName}>{h.nome}</span>
-                      <span className={styles.guestSub}>{h.cpf} · {h.telefone}</span>
-                    </button>
-                  ))}
+            {/* Diária selector */}
+            {_diarias.length > 1 && (
+              <div className={styles.diariaSelectBar}>
+                {apComboOpen && <div className={styles.diariaComboBackdrop} onClick={() => setApComboOpen(false)} />}
+                <div className={styles.diariaCombo}>
+                  <button type="button" className={styles.diariaComboTrigger} onClick={() => setApComboOpen((v) => !v)}>
+                    <span className={styles.diariaComboLabel}>
+                      {_selDiaria
+                        ? `Diária ${_selDiaria.num ?? apDiariaIdx + 1}${_selDiaria.dataInicio ? ` — ${_selDiaria.dataInicio} → ${_selDiaria.dataFim}` : ''}`
+                        : 'Selecione uma diária'}
+                    </span>
+                    <ChevronDown size={13} className={apComboOpen ? styles.diariaComboChevronOpen : styles.diariaComboChevron} />
+                  </button>
+                  {apComboOpen && (
+                    <div className={styles.diariaComboDropdown}>
+                      {_diarias.map((d, i) => (
+                        <div key={i}
+                          className={[styles.diariaComboOption, i === apDiariaIdx ? styles.diariaComboOptionActive : ''].join(' ')}
+                          onClick={() => { setApDiariaIdx(i); setApComboOpen(false); }}>
+                          <span className={styles.diariaComboOptionLabel}>
+                            Diária {d.num ?? i + 1}{d.dataInicio ? ` — ${d.dataInicio} → ${d.dataFim}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Guests in selected diária */}
             <div className={styles.apHospedesBody}>
@@ -3377,23 +3427,53 @@ export default function RecepcaoPage() {
                       <div className={styles.ovGuestInfo}>
                         <div className={styles.ovGuestName}>
                           {h.nome}
-                          {idx === 0 && <span className={styles.titularTag}>Titular</span>}
+                          {(h.titular || idx === 0) && <span className={styles.titularTag}>Titular</span>}
                         </div>
                         {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
                       </div>
                       <div className={styles.contactActions}>
-                        {idx > 0 && (
+                        {!h.titular && idx !== 0 && (
                           <button type="button" className={styles.quickBtn} title="Tornar Titular"
-                            onClick={() => { if (window.confirm(`Tornar ${h.nome} o titular desta diária?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                            onClick={() => notify('Troca de titular indisponível pela API.', 'info')}>
                             <ArrowLeftRight size={11} />
                           </button>
                         )}
-                        <button type="button" className={styles.removeBtn}
-                          onClick={() => { if (window.confirm(`Remover ${h.nome} desta diária?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                        <button type="button" className={styles.removeBtn} disabled={saving}
+                          onClick={() => _selDiaria?.id && handleRemoverPessoa(_selDiaria.id, h.id, h.nome)}>
                           <Trash2 size={13} />
                         </button>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Search to add */}
+            <div className={styles.apSearchWrap}>
+              <Input
+                value={apSearch}
+                onChange={(e) => { setApSearch(e.target.value); }}
+                placeholder="Buscar pessoa para adicionar..."
+              />
+              {apSearchLoading && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', color: 'var(--text-2)', fontSize: 12 }}>
+                  <Loader2 size={12} className={styles.spin} /> Buscando...
+                </div>
+              )}
+              {!apSearchLoading && apSearchResults.length > 0 && (
+                <div className={styles.guestList}>
+                  {apSearchResults.filter(h => !hospedesIds.has(h.id)).map((h) => (
+                    <button
+                      key={h.id}
+                      type="button"
+                      className={styles.guestItem}
+                      disabled={saving || !_selDiaria?.id}
+                      onClick={() => handleAdicionarPessoa(h.id)}
+                    >
+                      <span className={styles.guestName}>{h.nome}</span>
+                      <span className={styles.guestSub}>{h.cpf}{h.telefone ? ` · ${h.telefone}` : ''}</span>
+                    </button>
                   ))}
                 </div>
               )}
@@ -3420,6 +3500,165 @@ export default function RecepcaoPage() {
         valorPago={selectedRoom?.servico?.totalPago ?? null}
         canAplicarDesconto={false}
       />
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Gerenciar Pagamentos
+      ═══════════════════════════════════════════════════════ */}
+      {showGerenciarPag && selectedRoom?.servico && (() => {
+        const sv = selectedRoom.servico;
+        const pags = (sv.pagamentos || []).filter(p => !p.cancelado);
+        const total = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
+        return (
+          <Modal
+            open
+            onClose={() => setShowGerenciarPag(false)}
+            size="sm"
+            title={<><CreditCard size={15} /> Gerenciar Pagamentos</>}
+            footer={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                {pags.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>}
+                <div style={{ marginLeft: 'auto' }}>
+                  <Button variant="primary" size="sm" onClick={() => {
+                    setShowGerenciarPag(false);
+                    openPayModal(async (pag) => {
+                      const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
+                      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+                      notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                      setShowGerenciarPag(true);
+                    }, sv.titularNome);
+                  }}>
+                    <Plus size={13} /> Adicionar
+                  </Button>
+                </div>
+              </div>
+            }
+          >
+            {pags.length === 0 ? (
+              <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+            ) : (
+              <div className={styles.itemList}>
+                {pags.map((p) => (
+                  <div key={p.id} className={styles.listItem}>
+                    <div className={styles.listItemLeft}>
+                      <CreditCard size={14} className={styles.listItemIconGreen} />
+                      <div>
+                        <div className={styles.listItemName}>{p.nomePagador || p.descricao}</div>
+                        <div className={styles.listItemSub}>{p.formaPagamento}{p.data ? ` · ${p.data}` : ''}{p.descricaoOrig ? ` · ${p.descricaoOrig}` : ''}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
+                      <button className={styles.quickBtn} title="Editar" disabled={saving}
+                        onClick={() => {
+                          setShowGerenciarPag(false);
+                          setEditingPag(p);
+                        }}>
+                        <Pencil size={12} />
+                      </button>
+                      <button className={styles.removeBtn} title="Cancelar pagamento" disabled={saving}
+                        onClick={async () => {
+                          if (!window.confirm('Cancelar este pagamento?')) return;
+                          await handleCancelarPagamento(p.id);
+                        }}>
+                        {saving ? <Loader2 size={12} className={styles.spin} /> : <Trash2 size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Modal>
+        );
+      })()}
+
+      {/* PaymentModal para edição de pagamento */}
+      <PaymentModal
+        open={!!editingPag && !!selectedRoom}
+        onClose={() => { setEditingPag(null); setShowGerenciarPag(true); }}
+        onConfirm={(payment) => handleEditarPagamento(editingPag?.id, payment)}
+        tiposPagamento={tiposPagamentoOv}
+        isSubmitting={saving}
+        initialPayment={editingPag ? {
+          tipo_pagamento: { id: tiposPagamentoOv.find(t => t.descricao === editingPag.formaPagamento)?.id ?? '' },
+          nome_pagador: editingPag.nomePagador,
+          descricao: editingPag.descricaoOrig,
+          valor: editingPag.valor,
+          uuid: editingPag.id,
+        } : null}
+        titularNome={selectedRoom?.servico?.titularNome ?? null}
+        valorTotal={selectedRoom?.servico?.valorTotal ?? null}
+        valorPago={selectedRoom?.servico?.totalPago ?? null}
+        canAplicarDesconto={false}
+      />
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Gerenciar Consumos
+      ═══════════════════════════════════════════════════════ */}
+      {showGerenciarConsumo && selectedRoom?.servico && (() => {
+        const sv = selectedRoom.servico;
+        const consumos = sv.consumos || [];
+        const total = consumos.reduce((s, c) => s + (c.valorTotal ?? 0), 0);
+        return (
+          <Modal
+            open
+            onClose={() => setShowGerenciarConsumo(false)}
+            size="sm"
+            title={<><ShoppingCart size={15} /> Gerenciar Consumos</>}
+            footer={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                {consumos.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>}
+                <div style={{ marginLeft: 'auto' }}>
+                  <Button variant="primary" size="sm" onClick={() => {
+                    setShowGerenciarConsumo(false);
+                    setDetailConsumoCat('');
+                    setExternoCart([]);
+                    setConsumoCart([]);
+                    setConsumoCartPag(null);
+                    setShowAddConsumoModal(true);
+                    setConsumoCats([]);
+                    setConsumoCatsLoading(true);
+                    itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false));
+                  }}>
+                    <Plus size={13} /> Adicionar
+                  </Button>
+                </div>
+              </div>
+            }
+          >
+            {consumos.length === 0 ? (
+              <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+            ) : (
+              <div className={styles.itemList}>
+                {consumos.map((c, i) => (
+                  <div key={c.id || i} className={styles.listItem}>
+                    <div className={styles.listItemLeft}>
+                      <ShoppingCart size={14} className={styles.listItemIcon} />
+                      <div>
+                        <div className={styles.listItemName}>{c.item}</div>
+                        <div className={styles.listItemSub}>
+                          {c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}
+                          {c.valorUnitario > 0 ? ` · ${fmtBRL(c.valorUnitario)}/un.` : ''}
+                          {c.despesaPessoal ? ' · Despesa pessoal' : ''}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
+                      <button className={styles.removeBtn} title="Remover consumo" disabled={saving}
+                        onClick={async () => {
+                          if (!window.confirm(`Remover "${c.item}"?`)) return;
+                          await handleRemoverConsumo(c.id);
+                        }}>
+                        {saving ? <Loader2 size={12} className={styles.spin} /> : <Trash2 size={12} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Modal>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Gerenciar Diárias

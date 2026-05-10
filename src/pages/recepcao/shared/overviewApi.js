@@ -158,12 +158,15 @@ function _normalizeConsumo(c) {
 
 function _normalizePagamento(p) {
   return {
-    id: p.uuid ?? p.id,
-    descricao: p.nome_pagador ?? p.descricao ?? '',
-    formaPagamento: p.tipo_pagamento?.descricao ?? p.formaPagamento ?? '',
-    valor: p.valor ?? 0,
-    data: p.data_hora_registro ?? p.data ?? '',
-    cancelado: p.cancelado ?? false,
+    id:              p.uuid ?? p.id,
+    nomePagador:     p.nome_pagador ?? '',
+    descricao:       p.nome_pagador ?? p.descricao ?? '', // kept for backward compat displays
+    descricaoOrig:   p.descricao ?? '',
+    formaPagamento:  p.tipo_pagamento?.descricao ?? p.formaPagamento ?? '',
+    tipoPagamentoId: p.tipo_pagamento?.id ?? null,
+    valor:           p.valor ?? 0,
+    data:            p.data_hora_registro ?? p.data ?? '',
+    cancelado:       p.cancelado ?? false,
   };
 }
 
@@ -176,7 +179,7 @@ function _normalizeDiaria(d) {
     dataFim: d.data_hora_fim ?? '',
     valor: d.valor ?? 0,
     hospedes: (d.pessoas ?? []).map(_normalizePessoa),
-    consumos: (d.consumos ?? []).map(_normalizeConsumo),
+    consumos: (d.consumos ?? []).map(c => ({ ..._normalizeConsumo(c), diariaId: d.id })),
     pagamentos: [],
   };
 }
@@ -497,6 +500,35 @@ export const overviewApi = {
       ...q,
       minibar: (q.minibar ?? []).map(item => ({ ...item, qtdAtual: item.qtdBase })),
     }));
+  },
+
+  async cancelarPagamento(quartoId, pagUuid) {
+    await recepcaoApi.cancelarPagamento(pagUuid, 'Cancelado pela recepção');
+    await _reload();
+    return _find(quartoId);
+  },
+
+  async removerConsumo(quartoId, consumoId) {
+    const room   = _find(quartoId);
+    const diarias = room?.servico?.diarias ?? [];
+    const diaria  = diarias.find(d => d.consumos.some(c => c.id === consumoId));
+    if (diaria?.id && consumoId) {
+      await recepcaoApi.removerConsumo(diaria.id, consumoId);
+    }
+    await _reload();
+    return _find(quartoId);
+  },
+
+  async adicionarPessoaDiaria(quartoId, diariaId, pessoaId) {
+    await recepcaoApi.adicionarPessoas(diariaId, [pessoaId]);
+    await _reload();
+    return _find(quartoId);
+  },
+
+  async removerPessoaDiaria(quartoId, diariaId, pessoaId) {
+    await recepcaoApi.removerPessoa(diariaId, pessoaId);
+    await _reload();
+    return _find(quartoId);
   },
 
   async adicionarMinibarItem(id, item) {
