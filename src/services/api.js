@@ -442,8 +442,62 @@ export const reservaApi = {
 };
 
 export const orcamentoApi = {
+  // ─── Buscar orçamentos (retorna array) ────────────────────────
+  // GET /orcamento/buscar?orcamentoId=X&nomeSolicitante=Y
+  buscar({ orcamentoId, nomeSolicitante } = {}) {
+    const qs = new URLSearchParams();
+    if (orcamentoId != null)  qs.append('orcamentoId',     orcamentoId);
+    if (nomeSolicitante)      qs.append('nomeSolicitante', nomeSolicitante);
+    return request(`/orcamento/buscar?${qs.toString()}`);
+  },
+
+  // Compat: busca por ID e extrai o primeiro elemento
   buscarPorId(orcamentoId) {
-    return request(`/reserva/orcamento/${orcamentoId}`);
+    return orcamentoApi.buscar({ orcamentoId })
+      .then((arr) => (Array.isArray(arr) ? arr[0] : arr) ?? null);
+  },
+
+  // ─── Criar orçamento ─────────────────────────────────────────
+  // POST /orcamento
+  // body: { nome_solicitante, hospedagens: [{ quarto_id, status, data_hora_checkin,
+  //         data_hora_checkout, pessoas_orcamento, observacao, valor_total }] }
+  criar(body) {
+    return request('/orcamento', { method: 'POST', body });
+  },
+
+  // ─── Cancelar orçamento (todas hospedagens → ORCAMENTO_CANCELADO) ─
+  // PUT /orcamento/{orcamentoId}/cancelar  { motivo_cancelamento }
+  cancelar(orcamentoId, motivo) {
+    return request(`/orcamento/${orcamentoId}/cancelar`, {
+      method: 'PUT',
+      body: { motivo_cancelamento: motivo },
+    });
+  },
+
+  // ─── Editar nome do solicitante ───────────────────────────────
+  // PUT /orcamento/editar  { id, nome_solicitante }
+  editar({ id, nome_solicitante }) {
+    return request('/orcamento/editar', { method: 'PUT', body: { id, nome_solicitante } });
+  },
+
+  // ─── Adicionar pessoas a uma hospedagem ─────────────────────
+  // POST /orcamento/{hospedagemId}/pessoas
+  // body: [{ nome, data_nascimento }]
+  adicionarPessoas(hospedagemId, pessoas) {
+    return request(`/orcamento/${hospedagemId}/pessoas`, { method: 'POST', body: pessoas });
+  },
+
+  // ─── Remover pessoas por ID ──────────────────────────────────
+  // DELETE /orcamento/pessoas  [id1, id2]
+  removerPessoas(pessoaIds) {
+    return request('/orcamento/pessoas', { method: 'DELETE', body: pessoaIds });
+  },
+
+  // ─── Calcular preço (endpoint exclusivo de orçamento) ────────
+  // POST /calcular-preco  (diferente de /reserva/calcular-preco)
+  calcularPreco(items) {
+    const body = Array.isArray(items) ? items : [items];
+    return request('/calcular-preco', { method: 'POST', body });
   },
 };
 

@@ -760,10 +760,15 @@
 }
 
 .detailTabBody {
-  min-height: 320px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
+.detailTabBody::-webkit-scrollbar       { width: 6px; }
+.detailTabBody::-webkit-scrollbar-track  { background: transparent; }
+.detailTabBody::-webkit-scrollbar-thumb  { background: rgba(107, 114, 128, 0.3); border-radius: 999px; }
 
 /* ── Tab content ────────────────────────────────────────────────────────────── */
 .tabContent {
@@ -3182,6 +3187,77 @@
   padding: 14px 14px 16px 8px;
 }
 
+/* ── Receipt (consumo tab) ───────────────────────────────────────────────── */
+.receiptCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+.receiptHead {
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border-bottom: 1px dashed var(--border);
+}
+.receiptTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.receiptSub {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.receiptRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  padding: 8px 14px;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.receiptRow:last-child { border-bottom: none; }
+.receiptItemName {
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.receiptItemSub {
+  font-size: 10px;
+  color: var(--text-2);
+  margin-top: 1px;
+}
+.receiptItemMeta {
+  color: var(--text-2);
+  font-size: 11px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+}
+.receiptItemVal {
+  color: var(--text);
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+.receiptFoot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px dashed var(--border);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+
 /* ── Consumo side column ─────────────────────────────────────────────────── */
 .ovConsumoSide {
   display: flex;
@@ -3590,8 +3666,8 @@
 }
 .ovPagCard:last-child { border-bottom: none; }
 .ovPagMain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ovPagTitle { font-size: 11px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .03em; }
-.ovPagName  { font-size: 12px; font-weight: 500; color: var(--text); }
+.ovPagTitle { font-size: 12px; font-weight: 600; color: var(--text); }
+.ovPagName  { font-size: 11px; font-weight: 400; color: var(--text-2); }
 .ovPagMeta  { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .ovPagDot        { color: var(--text-2); }
 .ovPagRegistrado { font-size: 11px; color: var(--text-2); margin-top: 1px; }

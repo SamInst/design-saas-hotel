@@ -674,6 +674,132 @@
 .orcHospedeList { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .orcHospedeRow  { display: flex; align-items: center; gap: 8px; }
 
+/* ── Orçamentos Modal — lista com expand ──────────────────────────────────── */
+.orcListRoot  { display: flex; flex-direction: column; }
+.orcListGroup { border-bottom: 1px solid var(--border); }
+.orcListGroup:last-child { border-bottom: none; }
+
+/* Orçamento cancelado — apagado */
+.orcListGroupCancelado {
+  opacity: 0.45;
+  filter: grayscale(1);
+  pointer-events: auto; /* mantém o expand funcionando */
+}
+.orcListGroupCancelado .orcListRow { cursor: default; }
+.orcListGroupCancelado .orcHospItem { cursor: default; }
+
+/* Row wrapper: expander + action buttons side by side */
+.orcListRowWrap {
+  display: flex; align-items: center;
+  border-bottom: none;
+}
+
+.orcListRow {
+  display: flex; align-items: center; gap: 12px;
+  flex: 1; min-width: 0; padding: 12px 16px;
+  background: none; border: none; cursor: pointer;
+  text-align: left; transition: background 0.13s;
+}
+.orcListRow:hover { background: var(--surface-2); }
+
+.orcListInfo  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.orcListName  { font-size: 13px; font-weight: 600; color: var(--text); }
+.orcListMeta  { font-size: 11px; color: var(--text-2); }
+
+/* Action buttons (edit + voucher) */
+.orcListActions {
+  display: flex; align-items: center; gap: 4px; padding: 0 10px 0 0; flex-shrink: 0;
+}
+.orcActionBtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); cursor: pointer; flex-shrink: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.orcActionBtn:hover { background: var(--surface-2); color: var(--violet); border-color: var(--violet); }
+.orcActionBtnDanger:hover { background: color-mix(in srgb, #ef4444 10%, var(--surface)); color: #ef4444; border-color: #ef4444; }
+
+/* Hospedagens expandidas */
+.orcHospList { display: flex; flex-direction: column; gap: 8px; padding: 4px 16px 12px; background: var(--surface-2); }
+
+.orcHospItem {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  cursor: pointer; transition: border-color 0.13s;
+}
+.orcHospItem:hover { border-color: var(--violet); }
+.orcHospItemCancelado { opacity: 0.65; }
+
+/* Dark period band header */
+.orcHospBand {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 12px;
+  background: #1e293b;
+  flex-shrink: 0;
+}
+.orcHospBandPeriod {
+  font-size: 13px; font-weight: 700;
+  color: rgba(255,255,255,0.92);
+  letter-spacing: 0.01em;
+}
+.orcHospBandDiarias {
+  font-size: 11px; font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+}
+
+/* Room label below the band */
+.orcHospRoomLabel {
+  padding: 7px 12px 0;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-2);
+}
+
+/* Pessoas — vertical list, no chips */
+.orcHospPessoasList {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 6px 12px 0;
+}
+.orcHospPessoaRow {
+  display: flex; align-items: baseline; gap: 6px;
+}
+.orcHospPessoaNome {
+  font-size: 13px; font-weight: 500; color: var(--text);
+}
+.orcHospPessoaAge { font-size: 11px; color: var(--text-2); }
+
+.orcHospFooter { display: flex; align-items: center; padding: 8px 12px 10px; }
+.orcHospValor  { font-size: 13px; font-weight: 700; color: var(--text); }
+.orcHospObs    { font-size: 11px; color: var(--text-2); font-style: italic; padding: 0 12px 8px; }
+.orcHospCancelReason {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: #f87171;
+  background: rgba(239,68,68,0.08);
+  padding: 4px 12px 8px;
+}
+
+/* Legacy — kept for compatibility if referenced elsewhere */
+.orcHospDates {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: var(--text);
+}
+.orcHospDiarias {
+  margin-left: 4px; font-size: 11px; font-weight: 400;
+  color: var(--text-2); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px;
+}
+.orcHospPessoas { display: flex; flex-wrap: wrap; gap: 5px; }
+.orcHospPessoaChip {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 2px 9px;
+}
+
 /* Orcamento detail room card (matches PDF aesthetic) */
 .orcRoomCard {
   border: 1px solid var(--border);

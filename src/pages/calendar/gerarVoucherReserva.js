@@ -10,7 +10,7 @@ const fmtCpf = (v) => {
   return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (v || '');
 };
 
-export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '', solicitante = null, pagamentos = [] }) => {
+export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '', solicitante = null, pagamentos = [], isOrcamento = false }) => {
   const brl  = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const dt   = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
   const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
@@ -86,9 +86,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 
       roomsHtml += `
         <div class="room-block">
-          <div class="room-card">
-            <div class="room-label">Apartamento ${desc || rm(quartoId)}</div>
-          </div>
+          ${isOrcamento ? '' : `<div class="room-card"><div class="room-label">Apartamento ${desc || rm(quartoId)}</div></div>`}
           ${hospedes.length > 0 ? `<div class="quarto-section">${hospedesHtml}</div>` : ''}
           ${obsHtml}
           ${detalhesHtml}
@@ -229,7 +227,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; Voucher de Reserva</div>
+    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; ${isOrcamento ? 'Orçamento' : 'Voucher de Reserva'}</div>
     <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
     <div class="info-grid">
       <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>

@@ -31,14 +31,31 @@ const toBrDate = (iso) => {
 // ─── Status mapping (backend enums → frontend keys) ───────────────────────────
 const mapStatus = (r) => {
   if (r.status) {
-    const s = (r.status + '').toLowerCase();
-    if (s === 'cancelado')  return 'cancelado';
-    if (s === 'hospedado')  return 'hospedado';
-    if (s === 'finalizado') return 'finalizado';
-    if (s === 'solicitada') return 'solicitada';
-    if (s === 'ativo')      return 'confirmada';
-    if (s === 'orcamento')  return 'orcamento';
-    return s;
+    const s = (r.status + '').toUpperCase();
+    // ── Novos status (enum atualizado) ──────────────────────────
+    if (s === 'ORCAMENTO')                              return 'orcamento';
+    if (s === 'ORCAMENTO_CANCELADO')                    return 'cancelado';
+    if (s === 'RESERVA_SOLICITADA')                     return 'solicitada';
+    if (s === 'RESERVA_ATIVA')                          return 'confirmada';
+    if (s === 'RESERVA_CANCELADA')                      return 'cancelado';
+    if (s === 'RESERVA_AUSENTE')                        return 'ausente';
+    if (s === 'PERNOITE_ATIVO')                         return 'hospedado';
+    if (s === 'PERNOITE_CANCELADO')                     return 'cancelado';
+    if (s === 'PERNOITE_FINALIZADO')                    return 'finalizado';
+    if (s === 'PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE') return 'finalizado';
+    if (s === 'DAY_USE_SOLICITADO')                     return 'solicitada';
+    if (s === 'DAY_USE_ATIVO')                          return 'hospedado';
+    if (s === 'DAY_USE_CANCELADO')                      return 'cancelado';
+    if (s === 'DAY_USE_FINALIZADO')                     return 'finalizado';
+    if (s === 'DAY_USE_FINALIZADO_PAGAMENTO_PENDENTE')  return 'finalizado';
+    if (s === 'DAY_USE_AUSENTE')                        return 'ausente';
+    // ── Legado (compatibilidade com versão anterior) ──────────
+    if (s === 'CANCELADO')  return 'cancelado';
+    if (s === 'HOSPEDADO')  return 'hospedado';
+    if (s === 'FINALIZADO') return 'finalizado';
+    if (s === 'SOLICITADA') return 'solicitada';
+    if (s === 'ATIVO')      return 'confirmada';
+    return s.toLowerCase();
   }
   if (r.cancelado)          return 'cancelado';
   if (r.hospedado)          return 'hospedado';
@@ -60,20 +77,27 @@ const normalizeReserva = (r) => {
   const pags      = pagsRaw.map((p) => p.pagamento ?? p);
   const totalPago = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
 
+  // Suporte a campos legados e novos nomes de data
+  const dataEntrada   = r.data_hora_entrada   ?? r.data_hora_checkin  ?? '';
+  const dataSaida     = r.data_hora_saida     ?? r.data_hora_checkout ?? '';
+  // Suporte a quarto_id (orçamento) além de fk_quarto e quarto embedded
+  const quartoId = r.quarto?.id ?? r.quarto_id ?? r.fk_quarto ?? (typeof r.quarto === 'number' ? r.quarto : null);
+
   return {
     id:                      r.id,
-    quarto:                  r.quarto?.id ?? r.fk_quarto ?? r.quarto,
+    quarto:                  quartoId,
+    quartoId:                quartoId, // cópia explícita para uso em display
     categoria:               r.categoria?.nome ?? '',
-    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.titular_nome ?? 'Hóspede',
+    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.nome_solicitante ?? r.titular_nome ?? 'Hóspede',
     empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
     observacao:              r.observacao ?? null,
     quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
-    dataInicio:              parseBrDate(r.data_hora_entrada),
-    dataFim:                 parseBrDate(r.data_hora_saida),
-    chegadaPrevista:         r.data_hora_entrada ?? '',
-    saidaPrevista:           r.data_hora_saida   ?? '',
+    dataInicio:              parseBrDate(dataEntrada),
+    dataFim:                 parseBrDate(dataSaida),
+    chegadaPrevista:         dataEntrada,
+    saidaPrevista:           dataSaida,
     status:                  mapStatus(r),
     hospedes: pessoas.map((p) => ({
       id:            p.id,
@@ -139,7 +163,7 @@ const formatDate = (d) => {
 const addDays   = (s, n) => addDaysStr(s, n);
 const diffDays  = (a, b) =>
   Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
-const fmtRoom   = (n) => String(n).padStart(2, '0');
+const fmtRoom   = (n) => n != null ? String(n).padStart(2, '0') : '—';
 const fmtDateBR = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
 const fmtCpf = (v) => { const d = (v || '').replace(/\D/g, ''); return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (v || ''); };
 const calcAge = (dob) => {
@@ -1184,7 +1208,13 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           <div style={{ display: 'flex', gap: 8 }}>
             <Button style={{ flex: 1 }} onClick={() => { setConfirmCancel2(false); setConfirmCancel(true); }}>Voltar</Button>
             <Button variant="danger" style={{ flex: 1 }}
-              onClick={() => { setConfirmCancel2(false); onCancel(reserva.id, cancelMotivRes.trim()); onClose(); }}>
+              onClick={() => {
+                setConfirmCancel2(false);
+                // Para orçamentos, passa o ID do orçamento (não da hospedagem) para o endpoint correto
+                const orcId = reserva.status === 'orcamento' ? (reserva.orcamentoInfo?.id ?? null) : null;
+                onCancel(reserva.id, cancelMotivRes.trim(), orcId);
+                onClose();
+              }}>
               Cancelar Definitivamente
             </Button>
           </div>
@@ -1468,7 +1498,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
   const [loading, setLoading] = useState(true);
   const [search,  setSearch]  = useState('');
 
-  const API_STATUS = { confirmada: 'ATIVO', hospedado: 'HOSPEDADO', finalizado: 'FINALIZADO', cancelado: 'CANCELADO', orcamento: 'ORCAMENTO', solicitada: 'SOLICITADA' };
+  const API_STATUS = { confirmada: 'RESERVA_ATIVA', hospedado: 'PERNOITE_ATIVO', finalizado: 'PERNOITE_FINALIZADO', cancelado: 'RESERVA_CANCELADA', orcamento: 'ORCAMENTO', solicitada: 'RESERVA_SOLICITADA' };
   useEffect(() => {
     setLoading(true);
     reservaApi.listarPorMesAno({ status: [API_STATUS[status] ?? status.toUpperCase()] })
@@ -1569,13 +1599,28 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
   const [priceOpen, setPriceOpen] = useState({});
 
   useEffect(() => {
-    orcamentoApi.buscarPorId(orcamentoId)
-      .then((data) => setOrc(data))
+    orcamentoApi.buscar({ orcamentoId })
+      .then((data) => {
+        // GET /orcamento/buscar retorna array
+        const item = Array.isArray(data) ? data[0] : data;
+        setOrc(item ?? null);
+      })
       .catch(() => setOrc(null))
       .finally(() => setLoading(false));
   }, [orcamentoId]);
 
-  const reservas   = useMemo(() => (orc?.reservas ?? []).map(normalizeReserva).filter((r) => r.dataInicio), [orc]);
+  // Suporte a `hospedagens` (novo) e `reservas` (legado)
+  const reservas = useMemo(() => {
+    const list = orc?.hospedagens ?? orc?.reservas ?? [];
+    return list.map((h) => normalizeReserva({
+      ...h,
+      orcamento_info: {
+        id:               orc?.id,
+        nome_solicitante: orc?.nome_solicitante,
+        data_hora_registro: orc?.data_hora_registro,
+      },
+    })).filter((r) => r.dataInicio);
+  }, [orc]);
   const grandTotal = reservas.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
   const totalPago  = reservas.reduce((s, r) => s + (r.totalPago  ?? 0), 0);
   const pendente   = Math.max(0, grandTotal - totalPago);
@@ -1759,59 +1804,383 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
   );
 }
 
-// ─── Orçamentos Modal (list grouped by orcamento) ─────────────────────────────
-function OrcamentosModal({ reservas, onClose, onSelectReserva, roomDescMap }) {
-  const [detailOrc, setDetailOrc] = useState(null); // { id, solicitante, dataRegistro }
+// ─── Orçamentos Modal ─────────────────────────────────────────────────────────
+function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reservas = [], roomDescMap = {}, onSave }) {
+  const [search,      setSearch]      = useState('');
+  const [orcamentos,  setOrcamentos]  = useState([]);
+  const [loading,     setLoading]     = useState(true);
+  const [expanded,    setExpanded]    = useState(new Set()); // Set de IDs expandidos
+  const [editOrc,     setEditOrc]     = useState(null);      // orçamento sendo editado
+  const [editNome,    setEditNome]    = useState('');
+  const [editSaving,  setEditSaving]  = useState(false);
+  const [editHosp,      setEditHosp]      = useState(null);  // { orc, hosp } → editar hospedagem
+  const [showCreate,    setShowCreate]    = useState(false); // abre CreateModal como Novo Orçamento
+  const [cancelOrc,     setCancelOrc]     = useState(null);  // orçamento a cancelar
+  const [cancelMotivo,  setCancelMotivo]  = useState('');
+  const [cancelSaving,  setCancelSaving]  = useState(false);
+  const timerRef = useRef(null);
 
-  // Group by orcamentoInfo.id
-  const groups = useMemo(() => {
-    const map = new Map();
-    reservas.filter((r) => r.status === 'orcamento').forEach((r) => {
-      const oid = r.orcamentoInfo?.id ?? r.id;
-      if (!map.has(oid)) map.set(oid, { id: oid, solicitante: r.orcamentoInfo?.nome_solicitante ?? r.titularNome, dataRegistro: r.orcamentoInfo?.data_hora_registro ?? '', reservas: [] });
-      map.get(oid).reservas.push(r);
+  const fetchOrcamentos = useCallback((nome = '') => {
+    setLoading(true);
+    const params = nome.trim() ? { nomeSolicitante: nome.trim() } : {};
+    orcamentoApi.buscar(params)
+      .then((data) => setOrcamentos(Array.isArray(data) ? data : []))
+      .catch(() => setOrcamentos([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Busca inicial
+  useEffect(() => { fetchOrcamentos(); }, []); // eslint-disable-line
+
+  const handleSearch = (val) => {
+    setSearch(val);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => fetchOrcamentos(val), 400);
+  };
+
+  const toggleExpand = (id) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
-    return [...map.values()];
-  }, [reservas]);
+  };
 
-  if (detailOrc) {
-    return (
-      <OrcamentoDetailModal
-        orcamentoId={detailOrc.id}
-        solicitante={detailOrc.solicitante}
-        dataRegistro={detailOrc.dataRegistro}
-        onClose={() => setDetailOrc(null)}
-        onSelectReserva={(r) => { setDetailOrc(null); onSelectReserva(r); }}
-        roomDescMap={roomDescMap}
-      />
-    );
-  }
+  // ── Editar nome do orçamento ───────────────────────────────────────────────
+  const openEditOrc = (e, orc) => {
+    e.stopPropagation();
+    setEditOrc(orc);
+    setEditNome(orc.nome_solicitante ?? '');
+  };
+
+  const handleSaveEditNome = async () => {
+    if (!editOrc || !editNome.trim()) return;
+    setEditSaving(true);
+    try {
+      await orcamentoApi.editar({ id: editOrc.id, nome_solicitante: editNome.trim() });
+      setOrcamentos((prev) => prev.map((o) =>
+        o.id === editOrc.id ? { ...o, nome_solicitante: editNome.trim() } : o
+      ));
+      setEditOrc(null);
+    } catch { /* silencia */ } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── Gerar voucher do orçamento ─────────────────────────────────────────────
+  const handleVoucher = (e, orc) => {
+    e.stopPropagation();
+    const _u = userStorage.get();
+    const hospedagens = orc.hospedagens ?? [];
+    const displayPeriodos = hospedagens.map((h) => {
+      const checkin  = parseBrDate(h.data_hora_checkin);
+      const checkout = parseBrDate(h.data_hora_checkout);
+      const roomId   = String(h.quarto_id ?? h.quarto?.id ?? '');
+      const pessoas  = (h.pessoas_orcamento ?? []).map((p) => ({ id: p.id, nome: p.nome }));
+      return { checkin, checkout, rooms: [roomId], roomHospedes: { [roomId]: pessoas } };
+    });
+    const precosCalc = {};
+    hospedagens.forEach((h, i) => {
+      const roomId = String(h.quarto_id ?? h.quarto?.id ?? '');
+      precosCalc[`${roomId}_${i}`] = { valor_total: h.valor_total ?? 0, detalhes: [], sazonalidades_aplicadas: [] };
+    });
+    gerarVoucherReserva({
+      tipo: 'individual', periodoMode: 'unico',
+      displayPeriodos, precosCalc, quartosObs: {}, roomDescMap: {},
+      userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
+      solicitante: { nome: orc.nome_solicitante ?? '', cpf: '' },
+      pagamentos: [],
+      isOrcamento: true,
+    });
+  };
+
+  // ── Cancelar orçamento ────────────────────────────────────────────────────
+  const openCancelOrc = (e, orc) => {
+    e.stopPropagation();
+    setCancelOrc(orc);
+    setCancelMotivo('');
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelOrc || !cancelMotivo.trim()) return;
+    setCancelSaving(true);
+    try {
+      await orcamentoApi.cancelar(cancelOrc.id, cancelMotivo.trim());
+      // Atualiza status localmente — o backend não deleta, só muda para ORCAMENTO_CANCELADO
+      setOrcamentos((prev) => prev.map((o) =>
+        o.id === cancelOrc.id ? { ...o, status: 'ORCAMENTO_CANCELADO' } : o
+      ));
+      setCancelOrc(null);
+      setCancelMotivo('');
+    } catch { /* silencia */ } finally {
+      setCancelSaving(false);
+    }
+  };
 
   return (
-    <Modal open onClose={onClose} size="md"
-      title={<><FileText size={15} /> Orçamentos ({groups.length})</>}
+    <>
+    {/* CreateModal como Novo Orçamento — renderizado sobre o modal de lista */}
+    {showCreate && (
+      <CreateModal
+        forceOrcamento
+        reservas={reservas}
+        categorias={categorias}
+        tiposPagamento={tiposPagamento}
+        roomDescMap={roomDescMap}
+        onClose={() => setShowCreate(false)}
+        onSave={async (result) => {
+          setShowCreate(false);
+          fetchOrcamentos(search); // atualiza a lista após criar
+          onSave?.(result);
+        }}
+        onNotify={() => {}}
+      />
+    )}
+
+    <Modal open={!showCreate} onClose={onClose} size="md"
+      title={<><FileText size={15} /> Orçamentos{!loading && ` (${orcamentos.length})`}</>}
+      footer={
+        <div className={styles.footerRight}>
+          <Button variant="primary" onClick={() => setShowCreate(true)}>
+            <Plus size={14} /> Novo Orçamento
+          </Button>
+        </div>
+      }
     >
-      {groups.length === 0 ? (
-        <div className={styles.emptyState}>Nenhum orçamento pendente.</div>
+      {/* Campo de busca por nome */}
+      <div className={styles.statusFilterSearch}>
+        <Search size={13} className={styles.statusFilterSearchIcon} />
+        <input
+          className={styles.statusFilterSearchInput}
+          placeholder="Buscar por nome do solicitante..."
+          value={search}
+          onChange={(e) => handleSearch(e.target.value)}
+          autoFocus
+        />
+        {search && (
+          <button className={styles.clearSearch} onClick={() => { setSearch(''); fetchOrcamentos(''); }}>
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Buscando...</div>
+      ) : orcamentos.length === 0 ? (
+        <div className={styles.emptyState}>
+          {search ? `Nenhum orçamento encontrado para "${search}".` : 'Nenhum orçamento cadastrado.'}
+        </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {groups.map((g) => {
-            const totalReservas = g.reservas.length;
-            const grandTotal    = g.reservas.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
+        <div className={styles.orcListRoot}>
+          {orcamentos.map((orc) => {
+            const isOpen      = expanded.has(orc.id);
+            const hospedagens = orc.hospedagens ?? [];
+            const grandTotal  = hospedagens.reduce((s, h) => s + (h.valor_total ?? 0), 0);
+
+            // Cancelado: status explícito no orçamento OU todas as hospedagens canceladas
+            const isCancelado = (orc.status != null
+              ? (orc.status + '').toUpperCase() === 'ORCAMENTO_CANCELADO'
+              : hospedagens.length > 0 && hospedagens.every((h) => mapStatus(h) === 'cancelado'));
+
             return (
-              <div key={g.id} className={styles.searchDropItem} style={{ cursor: 'pointer' }} onClick={() => setDetailOrc(g)}>
-                <div className={styles.searchDropInfo}>
-                  <div className={styles.searchDropName}>{g.solicitante}</div>
-                  <div className={styles.searchDropDates}>{g.dataRegistro}</div>
-                  <div className={styles.searchDropMeta}>{totalReservas} reserva{totalReservas !== 1 ? 's' : ''}{grandTotal > 0 ? ` · ${fmtBRL(grandTotal)}` : ''}</div>
+              <div key={orc.id} className={[styles.orcListGroup, isCancelado ? styles.orcListGroupCancelado : ''].join(' ')}>
+
+                {/* ── Linha cabeçalho ── */}
+                <div className={styles.orcListRowWrap}>
+                  <button className={styles.orcListRow} onClick={() => toggleExpand(orc.id)}>
+                    <div className={styles.orcListInfo}>
+                      <span className={styles.orcListName}>{orc.nome_solicitante}</span>
+                      <span className={styles.orcListMeta}>
+                        {orc.data_hora_registro}
+                        {hospedagens.length > 0 && (
+                          <> · <b>{hospedagens.length}</b> hospedagem{hospedagens.length !== 1 ? 's' : ''}</>
+                        )}
+                        {grandTotal > 0 && <> · {fmtBRL(grandTotal)}</>}
+                        {isCancelado && <> · <span style={{ color: '#ef4444', fontWeight: 600 }}>Cancelado</span></>}
+                      </span>
+                    </div>
+                    <ChevronDown size={14} style={{ flexShrink: 0, color: 'var(--text-2)', transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : '' }} />
+                  </button>
+
+                  {/* Botões de ação — ocultos quando cancelado */}
+                  {!isCancelado && (
+                    <div className={styles.orcListActions}>
+                      <button className={styles.orcActionBtn} title="Editar orçamento" onClick={(e) => openEditOrc(e, orc)}>
+                        <Pencil size={13} />
+                      </button>
+                      <button className={styles.orcActionBtn} title="Gerar voucher" onClick={(e) => handleVoucher(e, orc)}>
+                        <FileDown size={13} />
+                      </button>
+                      <button className={[styles.orcActionBtn, styles.orcActionBtnDanger].join(' ')} title="Cancelar orçamento" onClick={(e) => openCancelOrc(e, orc)}>
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <ChevronRight size={14} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+
+                {/* ── Hospedagens expandidas ── */}
+                {isOpen && (
+                  <div className={styles.orcHospList}>
+                    {hospedagens.map((h) => {
+                      const st       = mapStatus(h);
+                      const pessoas  = h.pessoas_orcamento ?? [];
+                      const checkin  = parseBrDate(h.data_hora_checkin);
+                      const checkout = parseBrDate(h.data_hora_checkout);
+                      const dias     = checkin && checkout ? diffDays(checkin, checkout) : 0;
+                      const motivo   = h.motivo_cancelamento?.motivo_cancelamento ?? null;
+                      const quartoId = h.quarto_id ?? h.quarto?.id ?? null;
+
+                      return (
+                        <div
+                          key={h.id}
+                          className={[styles.orcHospItem, st === 'cancelado' ? styles.orcHospItemCancelado : ''].join(' ')}
+                          onClick={() => setEditHosp({ orc, hosp: h })}
+                          title="Clique para editar"
+                        >
+                          {/* ── Banda de período escura ── */}
+                          <div className={styles.orcHospBand}>
+                            <span className={styles.orcHospBandPeriod}>
+                              {fmtDateBR(checkin)} → {fmtDateBR(checkout)}
+                            </span>
+                            <span className={styles.orcHospBandDiarias}>{diariasTxt(dias)}</span>
+                          </div>
+
+                          {/* Quarto */}
+                          {quartoId && (
+                            <div className={styles.orcHospRoomLabel}>
+                              Apartamento {fmtRoom(quartoId)}
+                            </div>
+                          )}
+
+                          {/* Pessoas — lista vertical sem chips */}
+                          {pessoas.length > 0 && (
+                            <div className={styles.orcHospPessoasList}>
+                              {pessoas.map((p) => {
+                                const age = calcAge(p.data_nascimento);
+                                return (
+                                  <div key={p.id} className={styles.orcHospPessoaRow}>
+                                    <span className={styles.orcHospPessoaNome}>{p.nome}</span>
+                                    {age !== null && <span className={styles.orcHospPessoaAge}>{age} anos</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Valor total */}
+                          {h.valor_total > 0 && (
+                            <div className={styles.orcHospFooter}>
+                              <span className={styles.orcHospValor}>Total: {fmtBRL(h.valor_total)}</span>
+                            </div>
+                          )}
+
+                          {/* Observação */}
+                          {h.observacao && (
+                            <div className={styles.orcHospObs}>{h.observacao}</div>
+                          )}
+
+                          {/* Motivo cancelamento */}
+                          {motivo && (
+                            <div className={styles.orcHospCancelReason}>
+                              <XCircle size={11} style={{ flexShrink: 0 }} />
+                              {motivo}
+                              {h.motivo_cancelamento?.data_hora_registro && (
+                                <span style={{ color: 'var(--text-2)', marginLeft: 4 }}>
+                                  · {h.motivo_cancelamento.data_hora_registro}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
     </Modal>
+
+    {/* ── Modal: editar nome do orçamento ── */}
+    <Modal open={!!editOrc} onClose={() => { setEditOrc(null); setEditNome(''); }} size="sm"
+      title={<><Pencil size={14} /> Editar Orçamento</>}
+      footer={
+        <div className={styles.footerRight}>
+          <Button variant="secondary" onClick={() => { setEditOrc(null); setEditNome(''); }}>Cancelar</Button>
+          <Button variant="primary" disabled={!editNome.trim() || editSaving} onClick={handleSaveEditNome}>
+            {editSaving && <Loader2 size={13} className={styles.spin} />} Salvar
+          </Button>
+        </div>
+      }
+    >
+      <div className={styles.formStack}>
+        <FormField label="Nome do Solicitante">
+          <input
+            className={styles.formInput}
+            value={editNome}
+            onChange={(e) => setEditNome(e.target.value.toUpperCase())}
+            placeholder="NOME DO SOLICITANTE"
+            style={{ textTransform: 'uppercase' }}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditNome(); }}
+          />
+        </FormField>
+      </div>
+    </Modal>
+
+    {/* ── Modal: editar hospedagem (placeholder — expande conforme necessidade) ── */}
+    {editHosp && (
+      <Modal open onClose={() => setEditHosp(null)} size="sm"
+        title={<><Pencil size={14} /> Editar Hospedagem</>}
+        footer={<div className={styles.footerRight}><Button onClick={() => setEditHosp(null)}>Fechar</Button></div>}
+      >
+        <div className={styles.formStack}>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
+            Orçamento: <b style={{ color: 'var(--text)' }}>{editHosp.orc.nome_solicitante}</b>
+          </p>
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
+            Período:{' '}
+            <b style={{ color: 'var(--text)' }}>
+              {fmtDateBR(parseBrDate(editHosp.hosp.data_hora_checkin))} → {fmtDateBR(parseBrDate(editHosp.hosp.data_hora_checkout))}
+            </b>
+          </p>
+          <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-2)' }}>
+            Edição de hospedagem em desenvolvimento.
+          </p>
+        </div>
+      </Modal>
+    )}
+
+    {/* ── Modal: cancelar orçamento ── */}
+    <Modal open={!!cancelOrc} onClose={() => { setCancelOrc(null); setCancelMotivo(''); }} size="sm"
+      title={<><Trash2 size={14} /> Cancelar Orçamento</>}
+      footer={
+        <div className={styles.footerRight}>
+          <Button variant="secondary" onClick={() => { setCancelOrc(null); setCancelMotivo(''); }}>Voltar</Button>
+          <Button variant="danger" disabled={!cancelMotivo.trim() || cancelSaving} onClick={handleConfirmCancel}>
+            {cancelSaving && <Loader2 size={13} className={styles.spin} />} Cancelar Definitivamente
+          </Button>
+        </div>
+      }
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
+          Informe o motivo do cancelamento do orçamento de{' '}
+          <b>{cancelOrc?.nome_solicitante}</b>:
+        </p>
+        <textarea
+          className={styles.motivoTextarea}
+          placeholder="Ex.: Solicitação do cliente"
+          rows={3}
+          value={cancelMotivo}
+          onChange={(e) => setCancelMotivo(e.target.value)}
+          autoFocus
+        />
+      </div>
+    </Modal>
+    </>
   );
 }
 
@@ -1988,12 +2357,21 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
 
 // ─── Sem Cadastro Hospedes Picker (orçamento sem cadastro) ───────────────────
 function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
-  const [nome,     setNome]     = useState('');
+  const autoNome = (len) => `ADULTO ${len + 1}`;
+  const isAutoNome = (s) => /^ADULTO \d+$/i.test(s.trim());
+
+  const [nome,     setNome]     = useState(() => autoNome(value.length));
   const [dob,      setDob]      = useState(null);
   const [isAdulto, setIsAdulto] = useState(true);
 
+  // Atualiza o campo automaticamente quando o tamanho da lista muda,
+  // mas só se o usuário ainda está com o nome automático (ou vazio)
+  useEffect(() => {
+    setNome((prev) => (prev === '' || isAutoNome(prev) ? autoNome(value.length) : prev));
+  }, [value.length]); // eslint-disable-line
+
   const canAdd   = nome.trim().length > 0 && (isAdulto || dob !== null);
-  const hasDraft = nome.trim().length > 0 || dob !== null;
+  const hasDraft = !isAutoNome(nome) || dob !== null; // draft real = nome customizado ou dob preenchido
 
   useEffect(() => { onDraftChange?.(hasDraft); }, [hasDraft]); // eslint-disable-line
 
@@ -2006,7 +2384,8 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
     if (!canAdd) return;
     const dataNascimento = isAdulto ? adulto18Date() : formatDate(dob);
     onChange([...value, { nome: nome.trim(), dataNascimento, _adulto: isAdulto }]);
-    setNome(''); setDob(null);
+    // próximo nome é atualizado pelo useEffect acima (value.length cresce)
+    setDob(null);
   };
 
   const rem = (i) => onChange(value.filter((_, j) => j !== i));
@@ -2301,13 +2680,13 @@ function RoomHospedesPicker({ value = [], onChange }) {
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {} }) {
+function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false }) {
   const STEPS = ['Tipo', 'Apartamento, Período & Hóspedes', 'Resumo & Pagamento'];
 
-  const [step,        setStep]        = useState(initialRoom ? 2 : 1);
-  const [tipo,        setTipo]        = useState('simples'); // 'simples' | 'grupo'
-  const [isOrcamento, setIsOrcamento] = useState(false);
-  const [orcMode,     setOrcMode]     = useState('cadastro'); // 'cadastro' | 'sem_cadastro'
+  const [step,             setStep]             = useState(initialRoom ? 2 : 1);
+  const [tipo,             setTipo]             = useState('simples'); // 'simples' | 'grupo'
+  const isOrcamento = forceOrcamento; // orçamento é sempre sem cadastro quando forceOrcamento
+  const [nomeSolicitante,  setNomeSolicitante]  = useState(''); // nome do solicitante para orçamentos
 
   // Step 2: período único
   const [quartos,        setQuartos]        = useState(initialRoom ? [String(initialRoom)] : []);
@@ -2425,8 +2804,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setShowPagModalRoom(null);
   };
 
-  // Derived orcamento flags
-  const isOrcSemCadastro = isOrcamento && orcMode === 'sem_cadastro';
+  // Orçamento é sempre sem cadastro (pessoas_orcamento com nome + data de nascimento)
+  const isOrcSemCadastro = isOrcamento;
 
   const resetMpForm = () => {
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
@@ -2519,7 +2898,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       });
 
       if (indexed.length === 0) return;
-      const resArray = await reservaApi.calcularPreco(indexed.map((x) => x.item));
+      // Orçamentos usam endpoint exclusivo /calcular-preco
+      const calcFn = isOrcamento ? orcamentoApi.calcularPreco : reservaApi.calcularPreco;
+      const resArray = await calcFn(indexed.map((x) => x.item));
       const results = {};
       (Array.isArray(resArray) ? resArray : []).forEach((r, i) => {
         if (indexed[i]) results[indexed[i].key] = r;
@@ -2538,47 +2919,64 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       const cleanPags = (pags) => pags.map(({ _localId, ...pg }) => pg);
 
       if (isOrcamento) {
-        // Orçamento: send minimal body with orcamento: true
+        // ── Novo endpoint POST /orcamento ─────────────────────────────────────
         const isoToBrLocal = (s) => (s && /^\d{4}-\d{2}-\d{2}$/.test(s) ? s.split('-').reverse().join('/') : s);
-        const buildOrcItem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
+
+        const buildHospedagem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
           const obs = quartosObs[quartoId]?.trim();
-          return {
-            fk_quarto:    parseInt(quartoId),
-            data_entrada: toBrDate(dataEntrada),
-            data_saida:   toBrDate(dataSaida),
-            orcamento:    true,
-            ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
-            ...(obs ? { observacao: obs } : {}),
-            // Sem cadastro: pessoas_orcamento com nome + data_nascimento
-            ...(isOrcSemCadastro && orcGuests.length > 0 ? {
-              pessoas_orcamento: orcGuests.map((h) => ({
+          // Pessoas para orçamento: sem cadastro usa orcGuests, com cadastro usa nomes dos hospedes registrados
+          const pessoasOrc = isOrcSemCadastro
+            ? orcGuests.map((h) => ({
                 nome: h.nome,
                 ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
-              })),
-            } : {}),
-            // Com cadastro: pessoas com IDs
-            ...(!isOrcSemCadastro && registeredGuests.length > 0 ? {
-              pessoas: registeredGuests.map((h) => ({ id: h.id })),
-            } : {}),
+              }))
+            : registeredGuests.map((h) => ({
+                nome: h.nome,
+                ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
+              }));
+          return {
+            quarto_id:         parseInt(quartoId),
+            status:            'ORCAMENTO',
+            data_hora_checkin:  `${toBrDate(dataEntrada)} 10:00`,
+            data_hora_checkout: `${toBrDate(dataSaida)} 12:00`,
+            pessoas_orcamento:  pessoasOrc,
+            ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
+            ...(obs ? { observacao: obs } : {}),
           };
         };
+
         const displayPeriodos = periodoMode === 'unico'
           ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes, roomHospedesOrc: quartoHospedesOrc }]
           : periodos.map((p) => ({ ...p, checkin: formatDate(p.checkin), checkout: formatDate(p.checkout) }));
-        let reservasBody;
+
+        let hospedagensBody;
         if (periodoMode === 'multiplos') {
-          reservasBody = periodos.flatMap((p, pi) =>
-            p.rooms.map((q) => buildOrcItem(q, formatDate(p.checkin), formatDate(p.checkout), pi, p.roomHospedes?.[q] || [], p.roomHospedesOrc?.[q] || []))
+          hospedagensBody = periodos.flatMap((p, pi) =>
+            p.rooms.map((q) => buildHospedagem(q, formatDate(p.checkin), formatDate(p.checkout), pi, p.roomHospedes?.[q] || [], p.roomHospedesOrc?.[q] || []))
           );
         } else {
-          reservasBody = quartos.map((q) => buildOrcItem(q, checkinStr, checkoutStr, 0, quartoHospedes[q] || [], quartoHospedesOrc[q] || []));
+          hospedagensBody = quartos.map((q) => buildHospedagem(q, checkinStr, checkoutStr, 0, quartoHospedes[q] || [], quartoHospedesOrc[q] || []));
         }
-        await onSave(reservasBody);
-        // Generate PDF after successful save
+
+        // Chama orcamentoApi.criar diretamente
+        const result = await orcamentoApi.criar({
+          nome_solicitante: nomeSolicitante.trim(),
+          hospedagens:      hospedagensBody,
+        });
+
+        // Gera PDF do orçamento
         const _user = userStorage.get();
         const _userName = _user?.pessoa?.nome ?? _user?.nome ?? '';
-        gerarVoucherReserva({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName: _userName });
+        gerarVoucherReserva({
+          tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap,
+          userName: _userName,
+          solicitante: { nome: nomeSolicitante.trim() },
+          isOrcamento: true,
+        });
+
+        // Notifica o componente pai para atualizar o estado com o resultado
+        await onSave({ _isOrcamento: true, orcamento: result });
         return;
       }
 
@@ -2624,18 +3022,22 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   return (
     <Modal open onClose={onClose} size="lg"
-      title={<><Plus size={15} /> Nova Reserva</>}
+      title={<><Plus size={15} /> {forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
       footer={
         <div className={styles.footerSpread}>
           <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); } }}>Voltar</Button>}</div>
           <div className={styles.footerRight}>
             <Button variant="secondary" onClick={onClose}>Cancelar</Button>
             {step < 3 ? (
-              <Button variant="primary" disabled={step === 2 && !canNext2} onClick={step === 2 ? handleGoToStep3 : () => setStep((s) => s + 1)}>Próximo</Button>
+              <Button variant="primary"
+                disabled={(step === 1 && forceOrcamento && !nomeSolicitante.trim()) || (step === 2 && !canNext2)}
+                onClick={step === 2 ? handleGoToStep3 : () => setStep((s) => s + 1)}>
+                Próximo
+              </Button>
             ) : (
               <Button variant="primary" disabled={!canNext2 || saving} onClick={handleSave}>
                 {saving && <Loader2 size={13} className={styles.spin} />}
-                {isOrcamento ? 'Gerar Orçamento' : 'Criar Reserva'}
+                {forceOrcamento ? 'Gerar Orçamento' : 'Criar Reserva'}
               </Button>
             )}
           </div>
@@ -2675,22 +3077,19 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   onClick={() => { setTipo(v); if (v !== 'grupo') setQuartos((q) => q.slice(0, 1)); }}
                 >{l}</button>
               ))}
-              <label className={styles.orcamentoToggle} style={{ marginLeft: 'auto' }}>
-                <input type="checkbox" checked={isOrcamento} onChange={(e) => setIsOrcamento(e.target.checked)} />
-                <span>Simular Orçamento</span>
-              </label>
             </div>
           </FormField>
-          {isOrcamento && (
-            <FormField label="">
-              <div style={{ display: 'flex', gap: 16 }}>
-                {[['cadastro', 'Com Cadastro'], ['sem_cadastro', 'Sem Cadastro']].map(([v, l]) => (
-                  <label key={v} className={styles.orcamentoToggle}>
-                    <input type="checkbox" checked={orcMode === v} onChange={() => setOrcMode(v)} />
-                    <span>{l}</span>
-                  </label>
-                ))}
-              </div>
+          {forceOrcamento && (
+            <FormField label="Nome do Solicitante">
+              <input
+                className={styles.formInput}
+                type="text"
+                placeholder="Ex: JOÃO SILVA"
+                value={nomeSolicitante}
+                onChange={(e) => setNomeSolicitante(e.target.value.toUpperCase())}
+                style={{ textTransform: 'uppercase' }}
+                autoFocus
+              />
             </FormField>
           )}
         </div>
@@ -2917,7 +3316,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
             {/* ── Tipo de reserva ── */}
             <div className={styles.kvList} style={{ padding: '0 0 14px' }}>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Vários Apartamentos' : 'Apartamento Único'}{isOrcamento ? ` · Orçamento ${orcMode === 'sem_cadastro' ? 'sem Cadastro' : 'com Cadastro'}` : ''}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Vários Apartamentos' : 'Apartamento Único'}{isOrcamento ? ' · Orçamento' : ''}</span></div>
               <div className={styles.kvRow}><span className={styles.kvLabel}>Modo</span><span className={styles.kvVal}>{periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos'}</span></div>
             </div>
 
@@ -3139,7 +3538,6 @@ export default function BookingCalendar() {
   const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
   const [showOrcamentos,     setShowOrcamentos]     = useState(false);
-  const [orcamentos,         setOrcamentos]         = useState([]);
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -3233,14 +3631,13 @@ export default function BookingCalendar() {
       .catch(() => {})
       .finally(() => setLoading(false));
 
-    // Orcamentos + Solicitações: single call, split in frontend
+    // Solicitações pendentes (RESERVA_SOLICITADA)
     Promise.all([
-      reservaApi.listarPorMesAno({ mes, ano, status: ['ORCAMENTO', 'SOLICITADA'] }),
-      reservaApi.listarPorMesAno({ mes: nextMes, ano: nextAno, status: ['ORCAMENTO', 'SOLICITADA'] }),
+      reservaApi.listarPorMesAno({ mes, ano, status: ['RESERVA_SOLICITADA'] }),
+      reservaApi.listarPorMesAno({ mes: nextMes, ano: nextAno, status: ['RESERVA_SOLICITADA'] }),
     ])
       .then(([curr, next]) => {
         const all = mergeFlat(flattenReservas(curr), flattenReservas(next));
-        setOrcamentos(all.filter((r) => r.status === 'orcamento'));
         setSolicitacoes(all.filter((r) => r.status === 'solicitada'));
       })
       .catch(() => {});
@@ -3320,7 +3717,7 @@ export default function BookingCalendar() {
     return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const allReservas = [...reservas, ...orcamentos, ...solicitacoes];
+  const allReservas = [...reservas, ...solicitacoes];
   const filteredReservas = allReservas;
 
   const searchResults = searchNorm.length >= 2
@@ -3348,7 +3745,6 @@ export default function BookingCalendar() {
   const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
 
   const solicitadasCount = solicitacoes.length;
-  const orcamentosCount  = new Set(orcamentos.map((r) => r.orcamentoInfo?.id ?? r.id)).size;
   const allRooms         = categorias.flatMap((c) => c.quartos);
 
   const handleApproveSolicitacao = async (id, quarto) => {
@@ -3449,24 +3845,37 @@ export default function BookingCalendar() {
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
 
-  const handleSaveNew = async (reservasBody) => {
+  const handleSaveNew = async (bodyOrFlag) => {
+    // ── Novo fluxo: orçamento criado via orcamentoApi.criar ───────────────────
+    if (bodyOrFlag?._isOrcamento) {
+      // Orçamentos não aparecem no calendário — apenas notifica e fecha
+      notify('Orçamento criado!');
+      setShowCreateModal(false);
+      return;
+    }
+
+    // ── Fluxo legado: reservas comuns via reservaApi.criar ────────────────────
+    const reservasBody = bodyOrFlag;
     const result = await reservaApi.criar({ reservas: reservasBody });
-    const novas  = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
-    const novasOrc = novas.filter((r) => r.status === 'orcamento');
+    const novas    = (Array.isArray(result) ? result : [result]).map(normalizeReserva).filter((r) => r.dataInicio);
     const novasSol = novas.filter((r) => r.status === 'solicitada');
-    const novasReg = novas.filter((r) => r.status !== 'orcamento' && r.status !== 'solicitada');
+    const novasReg = novas.filter((r) => r.status !== 'solicitada');
     if (novasReg.length)  setReservas((rs) => [...rs, ...novasReg]);
-    if (novasOrc.length)  setOrcamentos((rs) => [...rs, ...novasOrc]);
     if (novasSol.length)  setSolicitacoes((rs) => [...rs, ...novasSol]);
     notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
     setShowCreateModal(false);
   };
-  const handleCancelReserva = async (id, motivo) => {
-    await reservaApi.cancelar(id, motivo);
+  // orcamentoId: ID do orçamento (não da hospedagem) — passado quando status === 'orcamento'
+  const handleCancelReserva = async (id, motivo, orcamentoId = null) => {
+    if (orcamentoId) {
+      // PUT /orcamento/{orcamentoId}/cancelar — cancela todas as hospedagens do orçamento
+      await orcamentoApi.cancelar(orcamentoId, motivo);
+    } else {
+      await reservaApi.cancelar(id, motivo);
+    }
     setReservas((rs) => rs.filter((r) => r.id !== id));
-    setOrcamentos((rs) => rs.filter((r) => r.id !== id));
     setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
-    notify('Reserva cancelada.');
+    notify(orcamentoId ? 'Orçamento cancelado.' : 'Reserva cancelada.');
   };
 
   const handleMoverPernoite = async (id) => {
@@ -3484,11 +3893,9 @@ export default function BookingCalendar() {
 
   const handleActivateReserva = async (id) => {
     try {
-      await reservaApi.atualizarStatus([id], 'ATIVO');
+      await reservaApi.atualizarStatus([id], 'RESERVA_ATIVA');
       const upd = await reservaApi.buscarPorId(id);
       const normalized = normalizeReserva(upd);
-      // Move from orcamentos to reservas
-      setOrcamentos((rs) => rs.filter((r) => r.id !== id));
       setReservas((rs) => [...rs.filter((r) => r.id !== id), normalized]);
       setSelectedReserva(normalized);
       notify('Reserva ativada!');
@@ -3841,9 +4248,14 @@ export default function BookingCalendar() {
         />
       )}
       {showOrcamentos && (
-        <OrcamentosModal reservas={orcamentos} onClose={() => setShowOrcamentos(false)}
+        <OrcamentosModal
+          onClose={() => setShowOrcamentos(false)}
+          categorias={categorias}
+          tiposPagamento={tiposPagamento}
+          reservas={allReservas}
           roomDescMap={roomDescMap}
-          onSelectReserva={(r) => setSelectedReserva(r)} />
+          onSave={handleSaveNew}
+        />
       )}
       {showSolicitacoes && (
         <SolicitacoesModal reservas={solicitacoes} onClose={() => setShowSolicitacoes(false)}
@@ -3898,7 +4310,6 @@ export default function BookingCalendar() {
             <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>
               <FileText size={15} />
               <span>Orçamentos</span>
-              {orcamentosCount > 0 && <span className={styles.floatBadge}>{orcamentosCount}</span>}
             </button>
           </div>
 

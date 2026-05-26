@@ -415,7 +415,8 @@ export const overviewApi = {
     if (pernoiteId && isPernoite) {
       await recepcaoApi.adicionarPagamentos(pernoiteId, [{
         tipo_pagamento: { id: pag.tipoPagamentoId },
-        nome_pagador:   pag.nomePagador || pag.descricao || '',
+        nome_pagador:   pag.nomePagador || '',
+        descricao:      pag.descricao   || undefined,
         valor:          pag.valor,
       }]);
       await _reload();

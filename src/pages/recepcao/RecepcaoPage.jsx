@@ -895,7 +895,7 @@ export default function RecepcaoPage() {
     setSelectedRoom(room);
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
-    setDiariaTab('hospedes');
+    setDiariaTab('detalhes');
     setConsumoCart([]);
     setConsumoCartPag(null);
   };
@@ -1825,38 +1825,23 @@ export default function RecepcaoPage() {
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={15} /></button>
           </div>
 
-          {/* ── Body ── */}
-          <div className={styles.ovBody}>
-            <div className={styles.ovTwoCol}>
-              {/* Left: guests */}
-              <div className={styles.ovLeft}>
-                {svGuests.length > 0 ? (
-                    <div className={styles.ovGuestTable}>
-                      {svGuests.map((h) => (
-                        <div key={h.id || h.nome} className={styles.ovGuestRow}>
-                          <div className={styles.ovGuestAvatarCol}>
-                            <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
-                            <div className={styles.contactActions}>
-                              {h.telefone && <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}><Phone size={11} /></a>}
-                              {h.email    && <a href={`mailto:${h.email}`} className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}><Mail size={11} /></a>}
-                            </div>
-                          </div>
-                          <div className={styles.ovGuestInfo}>
-                            <div className={styles.ovGuestName}>{h.nome}</div>
-                            {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
-                            {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
-                )}
-              </div>
+          {/* ── Tab bar ── */}
+          <div className={styles.detailTabs}>
+            {[
+              ['detalhes',   'Detalhes'],
+              ['pessoas',    `Pessoas (${svGuests.length})`],
+              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
+            ].map(([t, label]) => (
+              <button key={t} className={[styles.detailTab, diariaTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
+                {label}
+              </button>
+            ))}
+          </div>
 
-              {/* Right: period + financial */}
-              <div className={styles.ovRight}>
-                {/* Period block */}
+          {/* ── Tab body ── */}
+          <div className={styles.detailTabBody}>
+            {diariaTab === 'detalhes' && (
+              <div className={styles.ovBodyPad}>
                 <div className={styles.ovPeriodDark}>
                   <div className={styles.ovDatesRow}>
                     <div className={styles.ovDateCell}>
@@ -1880,72 +1865,109 @@ export default function RecepcaoPage() {
                     </div>
                   </div>
                 </div>
-                {/* Financial card */}
-                <div>
-                  <div className={styles.ovFinCard}>
-                    <div className={styles.ovFinHeader}>
-                      <DollarSign size={13} className={styles.ovFinIcon} />
-                      <span className={styles.ovFinTitle}>Resumo Financeiro</span>
-                    </div>
-                    <div className={styles.ovFinRow}>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Valor Total</span>
-                        <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
-                      </div>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Total Pago</span>
-                        <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago || 0)}</span>
-                      </div>
-                      <div className={styles.ovFinItem}>
-                        <span className={styles.ovFinLabel}>Pendente</span>
-                        <span className={[styles.ovFinValue, (sv.pagamentoPendente || 0) > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
-                          {fmtBRL(sv.pagamentoPendente || 0)}
-                        </span>
-                      </div>
-                    </div>
-                    {sv.valorTotal > 0 && (
-                      <div className={styles.ovFinProgress}>
-                        <div className={styles.ovFinProgressMeta}>
-                          <span>Progresso de pagamento</span>
-                          <span>{progressPercent.toFixed(0)}%</span>
-                        </div>
-                        <div className={styles.ovFinBar}>
-                          <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
-                        </div>
-                      </div>
-                    )}
-                    {allPagamentos.length > 0 && (
-                      <div className={styles.ovPriceInline}>
-                        <div className={styles.ovDiariasCard}>
-                          {allPagamentos.map((p, i) => (
-                            <div key={i} className={styles.ovPricePagCard}>
-                              <div className={styles.ovPricePagMain}>
-                                <div className={styles.ovPagTitle}>{p.descricao}</div>
-                                {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
-                                <div className={styles.ovPagMeta}>
-                                  {p.data && <span>{p.data}</span>}
-                                  {(p.forma || p.formaPagamento) && (
-                                    <>{p.data && <span className={styles.ovPagDot}>·</span>}<span>{p.forma || p.formaPagamento}</span></>
-                                  )}
-                                </div>
-                                {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
-                              </div>
-                              <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
-                            </div>
-                          ))}
-                          {allPagamentos.length > 1 && (
-                            <div className={styles.ovPriceConsumoTotal}>
-                              <span>Total pagamentos</span>
-                              <span>{fmtBRL(pagamentoTotal)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                <div className={styles.ovFinCard}>
+                  <div className={styles.ovFinHeader}>
+                    <DollarSign size={13} className={styles.ovFinIcon} />
+                    <span className={styles.ovFinTitle}>Resumo Financeiro</span>
                   </div>
+                  <div className={styles.ovFinRow}>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago || 0)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={[styles.ovFinValue, (sv.pagamentoPendente || 0) > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                        {fmtBRL(sv.pagamentoPendente || 0)}
+                      </span>
+                    </div>
+                  </div>
+                  {sv.valorTotal > 0 && (
+                    <div className={styles.ovFinProgress}>
+                      <div className={styles.ovFinProgressMeta}>
+                        <span>Progresso de pagamento</span>
+                        <span>{progressPercent.toFixed(0)}%</span>
+                      </div>
+                      <div className={styles.ovFinBar}>
+                        <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
+            )}
+            {diariaTab === 'pessoas' && (
+              <div className={styles.ovBodyPad}>
+                {svGuests.length === 0
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  : (
+                    <div className={styles.ovGuestTable}>
+                      {svGuests.map((h) => (
+                        <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                          <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                          <div className={styles.ovGuestInfo}>
+                            <div className={styles.ovGuestName}>{h.nome}</div>
+                            {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                            {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                          </div>
+                          <div className={styles.contactActions}>
+                            {h.telefone && (
+                              <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                              </a>
+                            )}
+                            {h.email && (
+                              <a href={`mailto:${h.email}`}
+                                className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                <Mail size={11} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+              </div>
+            )}
+            {diariaTab === 'pagamentos' && (
+              <div className={styles.subTabContent} style={{ padding: 16 }}>
+                {allPagamentos.length === 0
+                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+                  : (
+                    <div className={styles.ovDiariasCard}>
+                      {allPagamentos.map((p, i) => (
+                        <div key={i} className={styles.ovPricePagCard}>
+                          <div className={styles.ovPricePagMain}>
+                            <div className={styles.ovPagTitle}>{p.descricao}</div>
+                            {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
+                            <div className={styles.ovPagMeta}>
+                              {p.data && <span>{p.data}</span>}
+                              {(p.forma || p.formaPagamento) && (
+                                <>{p.data && <span className={styles.ovPagDot}>·</span>}<span>{p.forma || p.formaPagamento}</span></>
+                              )}
+                            </div>
+                            {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
+                          </div>
+                          <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
+                        </div>
+                      ))}
+                      {allPagamentos.length > 1 && (
+                        <div className={styles.ovPriceConsumoTotal}>
+                          <span>Total pagamentos</span>
+                          <span>{fmtBRL(pagamentoTotal)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+              </div>
+            )}
           </div>
 
           {/* ── Footer ── */}
@@ -1996,225 +2018,250 @@ export default function RecepcaoPage() {
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
           </div>
 
-          {/* ── Scrollable body ── */}
-          <div className={styles.ovBody}>
-            <div className={styles.ovTwoCol}>
+          {/* ── Tab bar ── */}
+          <div className={styles.detailTabs}>
+            {[
+              ['detalhes',   'Detalhes'],
+              ['pessoas',    `Pessoas (${svGuests.length})`],
+              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
+              ['consumos',   `Consumos (${(sv.consumos || []).length})`],
+            ].map(([t, label]) => (
+              <button key={t} className={[styles.detailTab, diariaTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
+                {label}
+              </button>
+            ))}
+          </div>
 
-                {/* ── Left: guests + payments ── */}
-                <div className={styles.ovLeft}>
-                  {svGuests.length > 0 ? (
-                      <div className={styles.ovGuestTable}>
-                        {svGuests.map((h) => (
-                          <div key={h.id || h.nome} className={styles.ovGuestRow}>
-                            <div className={styles.ovGuestAvatarCol}>
-                              <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
-                              <div className={styles.contactActions}>
-                                {h.telefone && (
-                                  <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                    className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
-                                    <Phone size={11} />
-                                  </a>
-                                )}
-                                {h.email && (
-                                  <a href={`mailto:${h.email}`}
-                                    className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
-                                    <Mail size={11} />
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                            <div className={styles.ovGuestInfo}>
-                              <div className={styles.ovGuestName}>{h.nome}</div>
-                              {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
-                              {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
-                            </div>
-                          </div>
-                        ))}
+          {/* ── Tab body ── */}
+          <div className={styles.detailTabBody}>
+            {diariaTab === 'detalhes' && (
+              <div className={styles.ovBodyPad}>
+                <div className={styles.ovPeriodDark}>
+                  <div className={styles.ovDatesRow}>
+                    <div className={styles.ovDateCell}>
+                      <div className={styles.ovDateLabel}>Check-in</div>
+                      <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
+                      <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
+                    </div>
+                    <div className={styles.ovDateArrow}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                    </div>
+                    <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                      <div className={styles.ovDateLabel}>Check-out</div>
+                      <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
+                      <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
+                    </div>
+                    <div className={styles.ovNightsCell}>
+                      <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
+                      <div className={styles.ovNightsLabel}>Diárias</div>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.ovFinCard}>
+                  <div className={styles.ovFinRow}>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                        {fmtBRL(sv.pagamentoPendente)}
+                      </span>
+                    </div>
+                  </div>
+                  {sv.valorTotal > 0 && (
+                    <div className={styles.ovFinProgress}>
+                      <div className={styles.ovFinProgressMeta}>
+                        <span>Progresso de pagamento</span>
+                        <span>{progressPercent.toFixed(0)}%</span>
                       </div>
-                  ) : (
-                    <div style={{ fontSize: 12, color: 'var(--text-2)', paddingTop: 4 }}>Nenhum hóspede registrado.</div>
+                      <div className={styles.ovFinBar}>
+                        <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                      </div>
+                    </div>
                   )}
-
-                  {/* Pagamentos Realizados */}
-                  {allPagamentos.length > 0 && (
-                    <div className={styles.ovPagamentosCard}>
-                      <div className={styles.ovPagamentosTitle}>
-                        <CreditCard size={11} />
-                        Pagamentos Realizados
-                      </div>
+                  {sv.diarias?.length > 0 && (
+                    <div className={styles.ovPriceInline}>
                       <div className={styles.ovDiariasCard}>
-                        {allPagamentos.map((p, i) => (
-                          <div key={i} className={styles.ovPricePagCard}>
-                            <div className={styles.ovPricePagMain}>
-                              <div className={styles.ovPagTitle}>{p.descricao}</div>
-                              {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
-                              <div className={styles.ovPagMeta}>
-                                {p.data && <span>{p.data}</span>}
-                                {(p.forma || p.formaPagamento) && (
-                                  <>
-                                    {p.data && <span className={styles.ovPagDot}>·</span>}
-                                    <span>{p.forma || p.formaPagamento}</span>
-                                  </>
-                                )}
+                        <div className={styles.ovDiariasList}>
+                          {sv.diarias.map((d) => {
+                            const dateFrom = d.dataInicio?.split(' ')[0] || '';
+                            const dateTo   = d.dataFim?.split(' ')[0] || '';
+                            const nHosp    = (d.hospedes || []).length || 1;
+                            return (
+                              <div key={d.num} className={styles.ovPriceCardRow}>
+                                <div className={styles.ovDiariaDesc}>
+                                  <span className={styles.ovDiariaNum}>Diária {d.num}</span>
+                                  {dateFrom && <span className={styles.ovDiariaDate}>{dateFrom}</span>}
+                                  {dateTo   && <span className={styles.ovDiariaDate}>{dateTo}</span>}
+                                  <span className={styles.ovDiariaDate}>{nHosp} Adulto{nHosp !== 1 ? 's' : ''}</span>
+                                </div>
+                                <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
                               </div>
-                              {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
-                            </div>
-                            <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
-                          </div>
-                        ))}
-                        {allPagamentos.length > 1 && (
+                            );
+                          })}
+                        </div>
+                        {sv.diarias.length > 1 && (
                           <div className={styles.ovPriceConsumoTotal}>
-                            <span>Total pagamentos</span>
-                            <span>{fmtBRL(allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0))}</span>
+                            <span>Total diárias</span>
+                            <span>{fmtBRL(sv.diarias.reduce((s, d) => s + (d.valor ?? 0), 0))}</span>
                           </div>
                         )}
                       </div>
                     </div>
                   )}
                 </div>
-
-                {/* ── Middle: financial ── */}
-                <div className={styles.ovRight}>
-                  {/* Period block */}
-                  <div className={styles.ovPeriodDark}>
-                    <div className={styles.ovDatesRow}>
-                      <div className={styles.ovDateCell}>
-                        <div className={styles.ovDateLabel}>Check-in</div>
-                        <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
-                        <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
-                      </div>
-                      <div className={styles.ovDateArrow}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                        </svg>
-                      </div>
-                      <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                        <div className={styles.ovDateLabel}>Check-out</div>
-                        <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
-                        <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
-                      </div>
-                      <div className={styles.ovNightsCell}>
-                        <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
-                        <div className={styles.ovNightsLabel}>Diárias</div>
-                      </div>
+              </div>
+            )}
+            {diariaTab === 'pessoas' && (
+              <div className={styles.ovBodyPad}>
+                {svGuests.length === 0
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  : (
+                    <div className={styles.ovGuestTable}>
+                      {svGuests.map((h) => (
+                        <div key={h.id || h.nome} className={styles.ovGuestRow}>
+                          <div className={styles.ovGuestAvatar}>{ini(h.nome)}</div>
+                          <div className={styles.ovGuestInfo}>
+                            <div className={styles.ovGuestName}>{h.nome}</div>
+                            {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
+                            {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
+                          </div>
+                          <div className={styles.contactActions}>
+                            {h.telefone && (
+                              <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
+                                className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                              </a>
+                            )}
+                            {h.email && (
+                              <a href={`mailto:${h.email}`}
+                                className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                <Mail size={11} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+              </div>
+            )}
+            {diariaTab === 'pagamentos' && (
+              <div className={styles.ovBodyPad}>
+                <div className={styles.ovFinCard}>
+                  <div className={styles.ovFinRow}>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                        {fmtBRL(sv.pagamentoPendente)}
+                      </span>
                     </div>
                   </div>
-                  {/* Financial card */}
-                  <div>
-                    <div className={styles.ovFinCard}>
-                      <div className={styles.ovFinRow}>
-                        <div className={styles.ovFinItem}>
-                          <span className={styles.ovFinLabel}>Valor Total</span>
-                          <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
-                        </div>
-                        <div className={styles.ovFinItem}>
-                          <span className={styles.ovFinLabel}>Total Pago</span>
-                          <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
-                        </div>
-                        <div className={styles.ovFinItem}>
-                          <span className={styles.ovFinLabel}>Pendente</span>
-                          <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
-                            {fmtBRL(sv.pagamentoPendente)}
-                          </span>
-                        </div>
+                  {sv.valorTotal > 0 && (
+                    <div className={styles.ovFinProgress}>
+                      <div className={styles.ovFinProgressMeta}>
+                        <span>Progresso de pagamento</span>
+                        <span>{progressPercent.toFixed(0)}%</span>
                       </div>
-                      {sv.valorTotal > 0 && (
-                        <div className={styles.ovFinProgress}>
-                          <div className={styles.ovFinProgressMeta}>
-                            <span>Progresso de pagamento</span>
-                            <span>{progressPercent.toFixed(0)}%</span>
-                          </div>
-                          <div className={styles.ovFinBar}>
-                            <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
-                          </div>
-                        </div>
-                      )}
-                      {sv.diarias?.length > 0 && (() => {
-                        const consumos     = sv.consumos || [];
-                        const consumoTotal = consumos.reduce((acc, c) => acc + (c.valorTotal ?? c.valor ?? 0), 0);
-                        const grandTotal   = (sv.valorTotal || 0) + consumoTotal;
-                        return (
-                          <div className={styles.ovPriceInline}>
-                            <div className={styles.ovDiariasCard}>
-                              <div className={styles.ovDiariasList}>
-                                {sv.diarias.map((d) => {
-                                  const dateFrom = d.dataInicio?.split(' ')[0] || '';
-                                  const dateTo   = d.dataFim?.split(' ')[0] || '';
-                                  const nHosp    = (d.hospedes || []).length || 1;
-                                  return (
-                                    <div key={d.num} className={styles.ovPriceCardRow}>
-                                      <div className={styles.ovDiariaDesc}>
-                                        <span className={styles.ovDiariaNum}>Diária {d.num}</span>
-                                        {dateFrom && <span className={styles.ovDiariaDate}>{dateFrom}</span>}
-                                        {dateTo   && <span className={styles.ovDiariaDate}>{dateTo}</span>}
-                                        <span className={styles.ovDiariaDate}>{nHosp} Adulto{nHosp !== 1 ? 's' : ''}</span>
-                                      </div>
-                                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                              {sv.diarias.length > 1 && (
-                                <div className={styles.ovPriceConsumoTotal}>
-                                  <span>Total diárias</span>
-                                  <span>{fmtBRL(sv.diarias.reduce((s, d) => s + (d.valor ?? 0), 0))}</span>
-                                </div>
+                      <div className={styles.ovFinBar}>
+                        <div className={styles.ovFinBarFill} style={{ width: `${progressPercent}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {allPagamentos.length === 0
+                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+                  : (
+                    <div className={styles.ovDiariasCard}>
+                      {allPagamentos.map((p, i) => (
+                        <div key={i} className={styles.ovPricePagCard}>
+                          <div className={styles.ovPricePagMain}>
+                            <div className={styles.ovPagTitle}>{p.descricao}</div>
+                            {(p.nomePagador || sv.titularNome) && <div className={styles.ovPagName}>{p.nomePagador || sv.titularNome}</div>}
+                            <div className={styles.ovPagMeta}>
+                              {p.data && <span>{p.data}</span>}
+                              {(p.forma || p.formaPagamento) && (
+                                <>
+                                  {p.data && <span className={styles.ovPagDot}>·</span>}
+                                  <span>{p.forma || p.formaPagamento}</span>
+                                </>
                               )}
                             </div>
+                            {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
                           </div>
-                        );
-                      })()}
-                    </div>{/* ovFinCard */}
-                  </div>{/* ref wrapper */}
-
-                  {/* Consumo */}
-                  <div className={styles.ovConsumoSide}>
-                    <div className={styles.ovConsumoBox}>
-                      <div className={styles.ovConsumoSideHeader}>
-                        <ShoppingCart size={11} />
-                        Consumo
-                      </div>
-                      {(sv.consumos || []).length === 0 ? (
-                        <div className={styles.ovConsumoSideEmpty}>
-                          <span>Sem consumo registrado</span>
+                          <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
                         </div>
-                      ) : (
-                        <>
-                          <div className={styles.ovConsumoTable}>
-                            {(sv.consumos || []).map((c, i) => (
-                              <div key={c.id || i} className={styles.ovConsumoRow}>
-                                <div className={styles.ovConsumoInfo}>
-                                  <div className={styles.ovConsumoName}>{c.item}</div>
-                                  <div className={styles.ovConsumoMeta}>
-                                    {c.quantidade ? `×${c.quantidade}` : ''}
-                                    {c.valorUnitario > 0 ? ` · ${fmtBRL(c.valorUnitario)}/un.` : ''}
-                                  </div>
-                                  {c.despesaPessoal ? (
-                                    <div className={styles.ovConsumoPagMeta}>Despesa pessoal</div>
-                                  ) : c.pagamento && (
-                                    <div className={styles.ovConsumoPagMeta}>
-                                      {c.pagamento.nomePagador && <span>{c.pagamento.nomePagador}</span>}
-                                      {c.pagamento.formaPagamento && <span className={styles.ovConsumoPagDot}>·</span>}
-                                      {c.pagamento.formaPagamento && <span>{c.pagamento.formaPagamento}</span>}
-                                    </div>
-                                  )}
-                                </div>
-                                <span className={styles.ovConsumoVal}>{fmtBRL(c.valorTotal)}</span>
-                              </div>
-                            ))}
-                          </div>
-                          <div className={styles.ovConsumoSideTotal}>
-                            <span>Total</span>
-                            <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? 0), 0))}</span>
-                          </div>
-                        </>
+                      ))}
+                      {allPagamentos.length > 1 && (
+                        <div className={styles.ovPriceConsumoTotal}>
+                          <span>Total pagamentos</span>
+                          <span>{fmtBRL(allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0))}</span>
+                        </div>
                       )}
                     </div>
-                  </div>
-
-                </div>{/* ovRight */}
-
+                  )
+                }
               </div>
+            )}
+            {diariaTab === 'consumos' && (
+              <div className={styles.ovBodyPad}>
+                {(sv.consumos || []).length === 0
+                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+                  : (
+                    <div className={styles.receiptCard}>
+                      <div className={styles.receiptHead}>
+                        <div className={styles.receiptTitle}>Consumos — Quarto {s.numero}</div>
+                        <div className={styles.receiptSub}>
+                          {sv.chegadaPrevista?.split(' ')[0]}
+                          {sv.saidaPrevista ? ` → ${sv.saidaPrevista.split(' ')[0]}` : ''}
+                        </div>
+                      </div>
+                      {(sv.consumos || []).map((c, i) => (
+                        <div key={c.id || i} className={styles.receiptRow}>
+                          <div>
+                            <div className={styles.receiptItemName}>{c.item}</div>
+                            {(c.categoria || c.despesaPessoal || c.pagamento?.formaPagamento) && (
+                              <div className={styles.receiptItemSub}>
+                                {c.despesaPessoal
+                                  ? 'Despesa pessoal'
+                                  : [c.categoria, c.pagamento?.nomePagador, c.pagamento?.formaPagamento].filter(Boolean).join(' · ')
+                                }
+                              </div>
+                            )}
+                          </div>
+                          <span className={styles.receiptItemMeta}>
+                            {c.quantidade > 1 ? `×${c.quantidade}` : ''}
+                            {c.valorUnitario > 0 ? `  ${fmtBRL(c.valorUnitario)}` : ''}
+                          </span>
+                          <span className={styles.receiptItemVal}>{fmtBRL(c.valorTotal)}</span>
+                        </div>
+                      ))}
+                      <div className={styles.receiptFoot}>
+                        <span>Total</span>
+                        <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? 0), 0))}</span>
+                      </div>
+                    </div>
+                  )
+                }
+              </div>
+            )}
           </div>
 
           {/* ── Footer ── */}
@@ -2999,7 +3046,7 @@ export default function RecepcaoPage() {
           title={renderDetailTitle()}
           footer={isFullscreen ? undefined : renderDetailFooter()}
           containerStyle={isFullscreen
-            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(636px, 96vw)', maxWidth: 'min(636px, 96vw)' }
+            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(520px, 96vw)', maxWidth: 'min(520px, 96vw)' }
             : undefined}
           bodyStyle={isFullscreen
             ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
@@ -3542,8 +3589,9 @@ export default function RecepcaoPage() {
                     <div className={styles.listItemLeft}>
                       <CreditCard size={14} className={styles.listItemIconGreen} />
                       <div>
-                        <div className={styles.listItemName}>{p.nomePagador || p.descricao}</div>
-                        <div className={styles.listItemSub}>{p.formaPagamento}{p.data ? ` · ${p.data}` : ''}{p.descricaoOrig ? ` · ${p.descricaoOrig}` : ''}</div>
+                        <div className={styles.listItemName}>{p.descricao || p.nomePagador}</div>
+                        {p.nomePagador && <div className={styles.listItemSub}>{p.nomePagador}</div>}
+                        <div className={styles.listItemSub}>{p.formaPagamento}{p.data ? ` · ${p.data}` : ''}</div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
