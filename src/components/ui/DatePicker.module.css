@@ -94,6 +94,20 @@
 .dis { opacity:.3; cursor:not-allowed; }
 .hint { margin:8px 0 0; font-size:11px; color:var(--text-2); text-align:center; }
 
+/* Marked reference date (e.g. check-in shown in checkout calendar) */
+.mkd::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f59e0b;
+  pointer-events: none;
+}
+
 /* ── Month / Year grids ── */
 .smGrid {
   display:grid; grid-template-columns:repeat(3,1fr); gap:4px;

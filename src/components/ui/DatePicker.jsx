@@ -43,6 +43,7 @@ export function DatePicker({
   onRangeChange,
   minDate = null,
   maxDate = null,
+  markedDate = null,
   placeholder = 'Selecione a data',
   label,
   error = false,
@@ -222,9 +223,10 @@ export function DatePicker({
               const iE   = mode==='range' && sameDay(d,rangeEnd);
               const inR  = mode==='range' && startDate && rangeEnd && between(sod(d),sod(startDate),sod(rangeEnd));
               const hovE = mode==='range' && !endDate && sameDay(d,hoverDate);
+              const mkd  = markedDate && !sel && sameDay(d, markedDate);
               return (
                 <button key={d.toISOString()} type="button" disabled={dis}
-                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', dis?styles.dis:''].join(' ')}
+                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', dis?styles.dis:'', mkd?styles.mkd:''].join(' ')}
                   onClick={() => handleDayClick(sod(d))}
                   onMouseEnter={() => { if (mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
                   {d.getDate()}

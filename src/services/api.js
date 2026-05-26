@@ -401,6 +401,11 @@ export const reservaApi = {
     return request('/reserva', { method: 'PUT', body });
   },
 
+  /** POST /reserva/solicitar — cria uma reserva solicitada (sem quarto, sem pessoas cadastradas) */
+  solicitar(body) {
+    return request('/reserva/solicitar', { method: 'POST', body });
+  },
+
   /** Cancela uma reserva informando o motivo. */
   cancelar(id, motivoCancelamento) {
     return request(`/reserva/${id}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
@@ -414,6 +419,16 @@ export const reservaApi = {
   /** Ativa um orçamento transformando-o em reserva confirmada. */
   ativar(id) {
     return request(`/reserva/${id}/ativar`, { method: 'PUT' });
+  },
+
+  /**
+   * PUT /reserva/ativar — cria reserva ativa ou converte solicitação.
+   * @param {object} body    – { quarto_id, status, data_hora_checkin, data_hora_checkout, pessoas, pagamentos, observacao, valor_total }
+   * @param {number} [hospedagemId] – se informado, converte solicitação existente em reserva ativa
+   */
+  criarAtiva(body, hospedagemId) {
+    const qs = hospedagemId != null ? `?hospedagemId=${hospedagemId}` : '';
+    return request(`/reserva/ativar${qs}`, { method: 'PUT', body });
   },
 
   /** Adiciona ou remove uma pessoa de uma reserva. vincular=true adiciona, false remove. */
@@ -433,11 +448,19 @@ export const reservaApi = {
 
   calcularPreco(items) {
     const body = Array.isArray(items) ? items : [items];
-    return request('/reserva/calcular-preco', { method: 'POST', body });
+    return request('/calcular-preco', { method: 'POST', body });
   },
 
   verificarDisponibilidade({ fk_quartos, data_entrada, data_saida }) {
     return request(`/reserva/disponibilidade?fk_quartos=${fk_quartos.join(',')}&data_entrada=${data_entrada}&data_saida=${data_saida}`);
+  },
+
+  /**
+   * PUT /reserva/{id}/editar — atualiza dados da reserva (quarto, período, obs, valor_total).
+   * Pessoas e pagamentos vão em endpoints separados (/hospedagem).
+   */
+  editar(id, body) {
+    return request(`/reserva/${id}/editar`, { method: 'PUT', body });
   },
 };
 
@@ -493,11 +516,52 @@ export const orcamentoApi = {
     return request('/orcamento/pessoas', { method: 'DELETE', body: pessoaIds });
   },
 
+  // ─── Aprovar orçamento → converte em reserva ─────────────────
+  // PUT /orcamento/{orcamentoId}/aprovar
+  aprovar(orcamentoId) {
+    return request(`/orcamento/${orcamentoId}/aprovar`, { method: 'PUT' });
+  },
+
   // ─── Calcular preço (endpoint exclusivo de orçamento) ────────
   // POST /calcular-preco  (diferente de /reserva/calcular-preco)
   calcularPreco(items) {
     const body = Array.isArray(items) ? items : [items];
     return request('/calcular-preco', { method: 'POST', body });
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+//  HOSPEDAGEM
+// ─────────────────────────────────────────────────────────────
+export const hospedagemApi = {
+  /**
+   * Busca hospedagens/reservas com filtros flexíveis.
+   * GET /hospedagem/buscar?status=X&quarto_id=Y&mes=M&ano=A&nomeTitular=N&data=dd/MM/yyyy
+   */
+  buscar({ status, quarto_id, mes, ano, nomeTitular, data } = {}) {
+    const qs = new URLSearchParams();
+    if (status      != null) qs.append('status',      status);
+    if (quarto_id   != null) qs.append('quarto_id',   quarto_id);
+    if (mes         != null) qs.append('mes',          mes);
+    if (ano         != null) qs.append('ano',          ano);
+    if (nomeTitular)         qs.append('nomeTitular',  nomeTitular);
+    if (data)                qs.append('data',         data);
+    return request(`/hospedagem/buscar?${qs.toString()}`);
+  },
+
+  /** POST /hospedagem/{hospedagemId}/pessoas — adiciona lista de pessoas por ID */
+  adicionarPessoas(hospedagemId, pessoasIds) {
+    return request(`/hospedagem/${hospedagemId}/pessoas`, { method: 'POST', body: pessoasIds });
+  },
+
+  /** DELETE /hospedagem/{hospedagemId}/pessoas — remove lista de pessoas por ID */
+  removerPessoas(hospedagemId, pessoasIds) {
+    return request(`/hospedagem/${hospedagemId}/pessoas`, { method: 'DELETE', body: pessoasIds });
+  },
+
+  /** POST /hospedagem/{hospedagemId}/pagamentos — adiciona pagamentos à hospedagem */
+  adicionarPagamentos(hospedagemId, body) {
+    return request(`/hospedagem/${hospedagemId}/pagamentos`, { method: 'POST', body });
   },
 };
 
@@ -790,6 +854,7 @@ export default {
   pernoite:    pernoiteApi,
   dayUse:      dayUseApi,
   reserva:     reservaApi,
+  hospedagem:  hospedagemApi,
   item:        itemApi,
   categoria:   categoriaApi,
   cadastro:    cadastroApi,

@@ -14,7 +14,8 @@
       "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\OverviewManagement.module.css\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\recepcao.module.css\")",
       "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\overviewMocks.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\overviewApi.js\")",
       "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\gerarVoucherHospedagem.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\gerarVoucherHospedagem.js\")",
-      "PowerShell(\\(Get-Content \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\RecepcaoPage.jsx\" | Measure-Object -Line\\).Lines)"
+      "PowerShell(\\(Get-Content \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\RecepcaoPage.jsx\" | Measure-Object -Line\\).Lines)",
+      "Bash(node --input-type=module)"
     ]
   }
 }

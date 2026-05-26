@@ -440,12 +440,15 @@
 /* ── Status badges ─────────────────────────────────────────────────────────── */
 .statusBadge   { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #fff; width: fit-content; }
 .statusBadgeSm { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; color: #fff; white-space: nowrap; }
-.status_confirmada { background: #10b981; }
-.status_solicitada { background: #f59e0b; }
-.status_hospedado  { background: #374151; }
-.status_finalizado { background: #9ca3af; }
-.status_cancelado  { background: #ef4444; }
-.status_orcamento  { background: #6366f1; }
+.status_confirmada         { background: #10b981; }
+.status_solicitada         { background: #f59e0b; }
+.status_hospedado          { background: #374151; }
+.status_finalizado         { background: #9ca3af; }
+.status_cancelado          { background: #ef4444; }
+.status_orcamento          { background: #6366f1; }
+.status_ausente            { background: #f97316; }
+.status_pernoite_cancelado { background: #dc2626; }
+.status_pagamento_pendente { background: #eab308; }
 
 /* ── Hóspede list ──────────────────────────────────────────────────────────── */
 .hospedeList { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
@@ -706,17 +709,63 @@
 .orcListName  { font-size: 13px; font-weight: 600; color: var(--text); }
 .orcListMeta  { font-size: 11px; color: var(--text-2); }
 
-/* Action buttons (edit + voucher) */
-.orcListActions {
-  display: flex; align-items: center; gap: 4px; padding: 0 10px 0 0; flex-shrink: 0;
+/* FAB trigger per orçamento row */
+.orcMenuWrap {
+  position: relative; flex-shrink: 0; padding: 0 10px 0 0;
 }
-.orcActionBtn {
+.orcMenuTrigger {
   display: flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 6px;
   border: 1px solid var(--border); background: var(--surface);
-  color: var(--text-2); cursor: pointer; flex-shrink: 0;
+  color: var(--text-2); cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
+.orcMenuTrigger:hover { background: var(--surface-2); color: var(--text); border-color: var(--violet); }
+.orcMenuTriggerActive { color: var(--violet) !important; border-color: var(--violet) !important; background: color-mix(in srgb, var(--violet) 8%, var(--surface)) !important; }
+
+/* Dropdown — expands upward */
+.orcMenuDrop {
+  position: absolute;
+  right: 10px;
+  bottom: calc(100% + 6px);
+  min-width: 172px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08);
+  padding: 4px;
+  z-index: 300;
+  display: flex; flex-direction: column;
+  animation: orcMenuIn 0.12s ease;
+}
+@keyframes orcMenuIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+
+.orcMenuItem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border: none; background: none; border-radius: 7px;
+  font-size: 12px; font-weight: 500; color: var(--text);
+  cursor: pointer; text-align: left; width: 100%;
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s;
+}
+.orcMenuItem:hover { background: var(--surface-2); }
+.orcMenuItem:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.orcMenuItemApprove { color: #10b981; }
+.orcMenuItemApprove:hover { background: color-mix(in srgb, #10b981 8%, transparent); }
+
+.orcMenuItemDanger { color: #ef4444; }
+.orcMenuItemDanger:hover { background: color-mix(in srgb, #ef4444 8%, transparent); }
+
+.orcMenuDivider { height: 1px; background: var(--border); margin: 3px 0; }
+
+/* Legacy action btn classes — kept for safety */
+.orcListActions { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 0; flex-shrink: 0; }
+.orcActionBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.12s, color 0.12s, border-color 0.12s; }
 .orcActionBtn:hover { background: var(--surface-2); color: var(--violet); border-color: var(--violet); }
 .orcActionBtnDanger:hover { background: color-mix(in srgb, #ef4444 10%, var(--surface)); color: #ef4444; border-color: #ef4444; }
 
@@ -818,6 +867,8 @@
 /* ── Create Modal — step bar ───────────────────────────────────────────────── */
 .stepBar { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); flex-shrink: 0; }
 .stepItem { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 9px 12px; font-size: 12px; font-weight: 500; color: var(--text-2); border-right: 1px solid var(--border); transition: background 0.15s, color 0.15s; }
+.stepItem:first-child { flex: 0.9; }
+.stepItem:nth-child(2) { flex: 2; }
 .stepItem:last-child { border-right: none; }
 .stepActive { background: color-mix(in srgb, var(--violet) 10%, transparent); color: var(--violet); font-weight: 700; }
 .stepDone   { color: var(--emerald); }
@@ -1260,6 +1311,16 @@
 .editCompareDiffUp { color: #f43f5e; }
 .editCompareDiffDown { color: #10b981; }
 .editCompareLoading { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 4px; padding: 4px 0; }
+
+/* ── Edit price card top (above tabs in edit modal) ─────────────────────────── */
+.editPriceTop {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-shrink: 0;
+}
+.editPriceTop .priceCard { margin-bottom: 0; }
+.editPriceTop .editCompareGrid { margin-bottom: 0; }
 
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {
