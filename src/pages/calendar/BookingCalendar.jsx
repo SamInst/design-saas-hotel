@@ -180,16 +180,20 @@ const calcAge = (dob) => {
 };
 const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
 
-/** Converts a guest list to { quantidade_adultos, idades_criancas? } for /calcular-preco */
+/** Converts a guest list to { datas_nascimento } for /calcular-preco.
+ *  One birth date per guest in dd/MM/yyyy — guests without a stored date get a default adult date (18 years ago). */
 const buildGuestCalcParams = (guests) => {
-  const childAges = guests
-    .map((h) => calcAge(h.dataNascimento))
-    .filter((a) => a !== null && a >= 0 && a < 18);
-  const adultCount = Math.max(0, guests.length - childAges.length);
-  return {
-    quantidade_adultos: adultCount,
-    ...(childAges.length ? { idades_criancas: childAges } : {}),
-  };
+  if (!guests.length) return {};
+  const today = new Date();
+  const defaultAdult = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear() - 18}`;
+  const datas_nascimento = guests.map((h) => {
+    if (!h.dataNascimento) return defaultAdult;
+    // ISO yyyy-MM-dd → dd/MM/yyyy
+    return /^\d{4}-\d{2}-\d{2}$/.test(h.dataNascimento)
+      ? h.dataNascimento.split('-').reverse().join('/')
+      : h.dataNascimento; // already dd/MM/yyyy
+  });
+  return { datas_nascimento };
 };
 
 const initials = (nome) => {
