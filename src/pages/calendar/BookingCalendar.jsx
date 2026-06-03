@@ -488,6 +488,41 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const [origCalc,        setOrigCalc]        = useState(null);
   const [origCalcLoading, setOrigCalcLoading] = useState(false);
 
+  // ── Room availability for the edit dates ─────────────────────────────────────
+  const [editAvailability, setEditAvailability] = useState(null); // Set<roomId> | null
+  const [editAvailLoading, setEditAvailLoading] = useState(false);
+
+  // Re-check availability via /disponibilidade/quartos whenever the edit dates change
+  useEffect(() => {
+    if (!editing || !editCheckin || !editCheckout) { setEditAvailability(null); setEditAvailLoading(false); return; }
+    let cancelled = false;
+    setEditAvailLoading(true);
+    setEditAvailability(null);
+    const brDate = (d) => toBrDate(formatDate(d));
+    reservaApi.verificarDisponibilidade({
+      data_entrada: brDate(editCheckin),
+      data_saida:   brDate(editCheckout),
+    }).then((results) => {
+      if (cancelled) return;
+      const avail = new Set(
+        (Array.isArray(results) ? results : [])
+          .filter((r) => r.disponivel)
+          .map((r) => r.quarto_id ?? r.fk_quarto)
+      );
+      // This reservation occupies its own room for these dates, so the API reports it as
+      // unavailable — keep it selectable so the user isn't blocked from their current room.
+      avail.add(reserva.quarto);
+      setEditAvailability(avail);
+    }).catch(() => { if (!cancelled) setEditAvailability(null); })
+      .finally(() => { if (!cancelled) setEditAvailLoading(false); });
+    return () => { cancelled = true; };
+  }, [editing, editCheckin, editCheckout]); // eslint-disable-line
+
+  const editAvailableRooms = useMemo(() => {
+    if (!editAvailability) return allRoomIds;
+    return allRoomIds.filter((r) => editAvailability.has(r));
+  }, [editAvailability, allRoomIds]);
+
   // Fetch original price once when editing starts
   useEffect(() => {
     if (!editing) return;
@@ -725,7 +760,8 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           <FormField label="Apartamento">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
-              availableRooms={allRoomIds} categorias={categorias} roomDescMap={roomDescMap} singleSelect
+              availableRooms={editAvailableRooms} categorias={categorias} roomDescMap={roomDescMap} singleSelect
+              loading={editAvailLoading}
             />
           </FormField>
           <FormField label="Período de estadia">
@@ -2075,21 +2111,35 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
               ? (orc.status + '').toUpperCase() === 'ORCAMENTO_CANCELADO'
               : hospedagens.length > 0 && hospedagens.every((h) => mapStatus(h) === 'cancelado'));
 
+            // Vencido: alguma hospedagem com checkout anterior a hoje — não pode ser aprovado
+            const todayISO = formatDate(new Date());
+            const isExpired = !isCancelado && hospedagens.length > 0 && hospedagens.some((h) => {
+              const co = parseBrDate(h.data_hora_checkout);
+              return co && co < todayISO;
+            });
+
             return (
-              <div key={orc.id} className={[styles.orcListGroup, isCancelado ? styles.orcListGroupCancelado : ''].join(' ')}>
+              <div key={orc.id} className={[
+                styles.orcListGroup,
+                isCancelado ? styles.orcListGroupCancelado : '',
+                isExpired ? styles.orcListGroupExpired : '',
+              ].join(' ')}>
 
                 {/* ── Linha cabeçalho ── */}
                 <div className={styles.orcListRowWrap}>
                   <button className={styles.orcListRow} onClick={() => toggleExpand(orc.id)}>
                     <div className={styles.orcListInfo}>
-                      <span className={styles.orcListName}>{orc.nome_solicitante}</span>
+                      <span className={styles.orcListNameRow}>
+                        <span className={styles.orcListName}>{orc.nome_solicitante}</span>
+                        {isCancelado && <span className={[styles.orcStatusPill, styles.orcStatusPillCancelado].join(' ')}>Cancelado</span>}
+                        {isExpired && <span className={[styles.orcStatusPill, styles.orcStatusPillVencido].join(' ')}>Vencido</span>}
+                      </span>
                       <span className={styles.orcListMeta}>
                         {orc.data_hora_registro}
                         {hospedagens.length > 0 && (
                           <> · <b>{hospedagens.length}</b> hospedagem{hospedagens.length !== 1 ? 's' : ''}</>
                         )}
                         {grandTotal > 0 && <> · {fmtBRL(grandTotal)}</>}
-                        {isCancelado && <> · <span style={{ color: '#ef4444', fontWeight: 600 }}>Cancelado</span></>}
                       </span>
                     </div>
                     <ChevronDown size={14} style={{ flexShrink: 0, color: 'var(--text-2)', transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : '' }} />
@@ -2117,8 +2167,12 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                           <button className={styles.orcMenuItem} onClick={(e) => { setOpenMenuId(null); handleVoucher(e, orc); }}>
                             <FileDown size={12} /> Gerar PDF
                           </button>
-                          <button className={[styles.orcMenuItem, styles.orcMenuItemApprove].join(' ')} disabled={approveSaving} onClick={() => handleApprove(orc)}>
-                            <Check size={12} /> Aprovar Orçamento
+                          <button
+                            className={[styles.orcMenuItem, styles.orcMenuItemApprove].join(' ')}
+                            disabled={approveSaving || isExpired}
+                            title={isExpired ? 'Orçamento vencido: o check-out já passou e não pode ser aprovado.' : undefined}
+                            onClick={() => handleApprove(orc)}>
+                            <Check size={12} /> {isExpired ? 'Vencido — não aprovável' : 'Aprovar Orçamento'}
                           </button>
                           <div className={styles.orcMenuDivider} />
                           <button className={[styles.orcMenuItem, styles.orcMenuItemDanger].join(' ')} onClick={(e) => { setOpenMenuId(null); openCancelOrc(e, orc); }}>
@@ -3105,12 +3159,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             const ci = formatDate(p.checkin);
             const co = formatDate(p.checkout);
             for (const q of p.rooms) {
-              await reservaApi.solicitar(buildSolBody(q, ci, co, p.roomHospedesOrc?.[q] || [], quartosObs[q], pi));
+              await reservaApi.solicitar(buildSolBody(q, ci, co, p.roomHospedesOrc?.[q] || [], quartosObs[`${q}_${pi}`], pi));
             }
           }
         } else {
           for (const q of quartos) {
-            await reservaApi.solicitar(buildSolBody(q, checkinStr, checkoutStr, quartoHospedesOrc[q] || [], quartosObs[q], 0));
+            await reservaApi.solicitar(buildSolBody(q, checkinStr, checkoutStr, quartoHospedesOrc[q] || [], quartosObs[`${q}_0`], 0));
           }
         }
         await onSave?.({ _isSolicitacao: true });
@@ -3123,7 +3177,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
         const buildHospedagem = (quartoId, dataEntrada, dataSaida, periodoIdx, registeredGuests = [], orcGuests = []) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
-          const obs = quartosObs[quartoId]?.trim();
+          const obs = quartosObs[`${quartoId}_${periodoIdx}`]?.trim();
           // Pessoas para orçamento: sem cadastro usa orcGuests, com cadastro usa nomes dos hospedes registrados
           const pessoasOrc = isOrcSemCadastro
             ? orcGuests.map((h) => ({
@@ -3183,10 +3237,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       // includePagamentos=false when pagModo==='unico' and this is not the first body;
       // the backend links the first body's payment to all others via pagamentoUnico.
       const buildReservaBody = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx, includePagamentos = true) => {
+        const rKey = `${quartoId}_${periodoIdx}`;
         const roomPags = includePagamentos
-          ? (pagModo === 'unico' ? cleanPags(pagUnico) : cleanPags(quartosPag[quartoId] || []))
+          ? (pagModo === 'unico' ? cleanPags(pagUnico) : cleanPags(quartosPag[rKey] || []))
           : [];
-        const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
+        const valorTotal = precosCalc[rKey]?.valor_total ?? undefined;
         const pessoasIds = (hospedes || [])
           .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
           .map((h) => parseInt(h.id));
@@ -3198,7 +3253,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
           ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
           ...(roomPags.length   ? { pagamentos: roomPags } : {}),
-          ...(quartosObs[quartoId]?.trim() ? { observacao: quartosObs[quartoId].trim() } : {}),
+          ...(quartosObs[rKey]?.trim() ? { observacao: quartosObs[rKey].trim() } : {}),
         };
       };
 
@@ -3828,13 +3883,13 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                             <div className={styles.step3PagLabel}>Pagamentos</div>
                             <div className={styles.step3PayHeader}>
                               <button className={styles.step3AddPagBtn}
-                                onClick={() => { setShowPagModalRoom(q); setShowPagModal(true); }}>
+                                onClick={() => { setShowPagModalRoom(rKey); setShowPagModal(true); }}>
                                 <Plus size={11} /> Adicionar pagamento
                               </button>
                             </div>
-                            {(quartosPag[q] || []).length === 0
+                            {(quartosPag[rKey] || []).length === 0
                               ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
-                              : (quartosPag[q] || []).map((p) => {
+                              : (quartosPag[rKey] || []).map((p) => {
                                   const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
                                   return (
                                     <div key={p._localId} className={styles.step3PagRow}>
@@ -3843,7 +3898,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                                           <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
                                           <button type="button" className={styles.removeIconBtn}
-                                            onClick={() => setQuartosPag((prev) => ({ ...prev, [q]: (prev[q] || []).filter((x) => x._localId !== p._localId) }))}>
+                                            onClick={() => setQuartosPag((prev) => ({ ...prev, [rKey]: (prev[rKey] || []).filter((x) => x._localId !== p._localId) }))}>
                                             <Trash2 size={11} />
                                           </button>
                                         </div>
@@ -3861,8 +3916,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         <div className={styles.step3RoomSection}>
                           <textarea className={styles.obsTextarea} rows={2}
                             placeholder="Observação para este apartamento (opcional)..."
-                            value={quartosObs[q] || ''}
-                            onChange={(e) => setQuartosObs((prev) => ({ ...prev, [q]: e.target.value }))} />
+                            value={quartosObs[rKey] || ''}
+                            onChange={(e) => setQuartosObs((prev) => ({ ...prev, [rKey]: e.target.value }))} />
                         </div>
                       </div>
                     );
@@ -3916,14 +3971,15 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {/* Payment modal */}
       {(() => {
         const grandTotalModal = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
+        // showPagModalRoom holds the composite rKey `${roomId}_${periodoIdx}` (per-room mode)
+        const [roomId, roomPi] = showPagModalRoom != null ? showPagModalRoom.split('_') : [null, null];
         let pagVTotal, pagVPago;
         if (pagModo === 'unico') {
           pagVTotal = grandTotalModal || null;
           pagVPago  = pagUnico.reduce((s, p) => s + (p.valor ?? 0), 0);
         } else {
-          const rKey = showPagModalRoom !== null ? `${showPagModalRoom}_0` : null;
-          pagVTotal = rKey ? (precosCalc[rKey]?.valor_total ?? null) : null;
-          pagVPago  = showPagModalRoom !== null
+          pagVTotal = showPagModalRoom != null ? (precosCalc[showPagModalRoom]?.valor_total ?? null) : null;
+          pagVPago  = showPagModalRoom != null
             ? (quartosPag[showPagModalRoom] || []).reduce((s, p) => s + (p.valor ?? 0), 0)
             : null;
         }
@@ -3933,17 +3989,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             onClose={() => { setShowPagModal(false); setShowPagModalRoom(null); }}
             onConfirm={addPagamento}
             tiposPagamento={tiposPagamento}
-            titularNome={
-              showPagModalRoom !== null
-                ? ((quartoHospedes[showPagModalRoom] || [])[0]?.nome || allHospedes[0]?.nome || null)
-                : (allHospedes[0]?.nome || null)
-            }
+            titularNome={(() => {
+              if (roomId === null) return allHospedes[0]?.nome || null;
+              if (periodoMode === 'multiplos') {
+                return periodos[Number(roomPi)]?.roomHospedes?.[roomId]?.[0]?.nome || allHospedes[0]?.nome || null;
+              }
+              return (quartoHospedes[roomId] || [])[0]?.nome || allHospedes[0]?.nome || null;
+            })()}
             lastPayerName={(() => {
               const pool = pagModo === 'unico'
                 ? pagUnico
                 : (quartosPag[showPagModalRoom] || []);
               return pool.at(-1)?.nome_pagador ?? null;
             })()}
+            quartoNumero={roomId !== null ? fmtRoom(parseInt(roomId)) : null}
             canAplicarDesconto={false}
             valorTotal={pagVTotal}
             valorPago={pagVPago}
@@ -4383,6 +4442,39 @@ export default function BookingCalendar() {
     notify(orcamentoId ? 'Orçamento cancelado.' : 'Reserva cancelada.');
   };
 
+  // Gera um voucher PDF completo com todas as reservas do grupo
+  const handleGroupVoucher = (members) => {
+    const _u = userStorage.get();
+    const displayPeriodos = members.map((r) => ({
+      checkin: r.dataInicio,
+      checkout: r.dataFim,
+      rooms: [String(r.quarto)],
+      roomHospedes: { [String(r.quarto)]: r.hospedes ?? [] },
+    }));
+    const precosCalc = {};
+    const quartosObs = {};
+    members.forEach((r, i) => {
+      precosCalc[`${r.quarto}_${i}`] = { valor_total: r.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] };
+      if (r.observacao) quartosObs[`${r.quarto}_${i}`] = r.observacao;
+    });
+    // Pagamentos do grupo deduplicados por UUID (um pagamento único pode estar em várias reservas)
+    const seen = new Map();
+    members.forEach((r) => (r.pagamentos ?? []).forEach((p) => {
+      if (!p.cancelado && !seen.has(p.id)) seen.set(p.id, p);
+    }));
+    gerarVoucherReserva({
+      tipo: 'grupo',
+      periodoMode: 'multiplos',
+      displayPeriodos,
+      precosCalc,
+      quartosObs,
+      roomDescMap,
+      userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
+      solicitante: { nome: members[0]?.titularNome ?? '', cpf: members[0]?.hospedes?.[0]?.cpf ?? '' },
+      pagamentos: Array.from(seen.values()),
+    });
+  };
+
   const handleMoverPernoite = async (id) => {
     try {
       await recepcaoApi.criarPernoite({ reserva_id: id });
@@ -4443,15 +4535,40 @@ export default function BookingCalendar() {
     groupPanelTimeout.current = setTimeout(() => setGroupPanel(null), 200);
   }, []);
 
+  // Close group panel when clicking/touching anywhere outside it
+  useEffect(() => {
+    if (!groupPanel) return;
+    const close = () => setGroupPanel(null);
+    window.addEventListener('mousedown', close);
+    window.addEventListener('touchstart', close);
+    return () => {
+      window.removeEventListener('mousedown', close);
+      window.removeEventListener('touchstart', close);
+    };
+  }, [groupPanel != null]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handlePagamentoMultiplo = async (payment) => {
     setPagMultiploSaving(true);
     try {
-      const ids = Array.from(reservasSelecionadas);
-      await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
-      // Re-fetch each affected reservation so pagamentos + totalPago refresh in state
-      const fetched = await Promise.all(ids.map((id) => reservaApi.buscarPorId(id)));
-      const updatedMap = new Map(fetched.map((r) => [r.id, normalizeReserva(r)]));
-      setReservas((rs) => rs.map((r) => updatedMap.has(r.id) ? updatedMap.get(r.id) : r));
+      const selecionadas = allReservas.filter((r) => reservasSelecionadas.has(r.id));
+      const ids = selecionadas.map((r) => r.id);
+
+      // All selected reservations share the same (non-null) group → single group endpoint.
+      // Otherwise (any null group, or mixed groups) → normal multi-reservation payment.
+      const grupos = new Set(selecionadas.map((r) => r.grupo_id).filter((g) => g != null));
+      const grupoUnico = grupos.size === 1 && selecionadas.every((r) => r.grupo_id != null)
+        ? [...grupos][0]
+        : null;
+
+      if (grupoUnico != null) {
+        await hospedagemApi.adicionarPagamentoGrupo(grupoUnico, payment);
+      } else {
+        await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
+      }
+
+      // Single reload — the group endpoint pays every member of the group (not just the
+      // selected ones), so a full refresh is both simpler and more correct than N refetches.
+      await loadReservas();
       notify(`Pagamento adicionado a ${ids.length} reserva${ids.length !== 1 ? 's' : ''}!`);
       exitSelectionMode();
     } catch (e) {
@@ -4580,7 +4697,7 @@ export default function BookingCalendar() {
             className={startInView ? styles.barStatusTag : styles.barStatusTagInline}
             style={gColor ? { background: `color-mix(in srgb, ${gColor} 70%, #000)` } : undefined}
           >
-            {orig.status === 'confirmada' && <><Check size={9} strokeWidth={3} /> Reserva confirmada</>}
+            {orig.status === 'confirmada' && (gColor ? <>Reserva em grupo #{orig.grupo_id}</> : <><Check size={9} strokeWidth={3} /> Reserva confirmada</>)}
             {orig.status === 'solicitada' && <>Reserva solicitada</>}
             {orig.status === 'hospedado'  && <><Check size={9} strokeWidth={3} /> Hospedado</>}
             {orig.status === 'finalizado' && <>Finalizado</>}
@@ -4898,35 +5015,109 @@ export default function BookingCalendar() {
         if (members.length === 0) return null;
         const color  = grupoColor(groupPanel.grupoId);
         const { rect } = groupPanel;
-        const PANEL_W   = 260;
-        const estHeight = members.length * 58 + 44;
+        const PANEL_W   = 300;
+        const estHeight = members.length * 120 + 44;
         let left = rect.left - PANEL_W - 10;
         if (left < 8) left = Math.min(rect.right + 10, window.innerWidth - PANEL_W - 8);
         const top = Math.max(8, Math.min(window.innerHeight - estHeight - 8, rect.top - 8));
         return createPortal(
-          <>
-            {/* Backdrop — closes on outside tap (touch) or click (desktop) */}
-            <div
-              style={{ position: 'fixed', inset: 0, zIndex: 499 }}
-              onClick={() => setGroupPanel(null)}
-              onTouchStart={() => setGroupPanel(null)}
-            />
-            <div
+          <div
               onMouseEnter={() => clearTimeout(groupPanelTimeout.current)}
               onMouseLeave={handleBarGroupLeave}
+              onMouseDown={e => e.stopPropagation()}
+              onTouchStart={e => { clearTimeout(groupPanelTimeout.current); e.stopPropagation(); }}
               style={{
                 position: 'fixed', top, left, width: PANEL_W, zIndex: 500,
                 background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-                overflow: 'hidden',
+                overflow: 'hidden', maxHeight: window.innerHeight - 24, overflowY: 'auto',
               }}
             >
-              <div style={{ background: color, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Header */}
+              <div style={{ background: color, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, position: 'sticky', top: 0 }}>
                 <Users size={13} style={{ color: '#fff', flexShrink: 0 }} />
                 <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
-                  Grupo · {members.length} reserva{members.length !== 1 ? 's' : ''}
+                  Grupo #{groupPanel.grupoId} · {members.length} reserva{members.length !== 1 ? 's' : ''}
                 </span>
+                <button
+                  onClick={() => handleGroupVoucher(members)}
+                  title="Gerar voucher completo do grupo em PDF"
+                  style={{
+                    marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
+                    background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)',
+                    color: '#fff', fontSize: 11, fontWeight: 600, padding: '3px 8px',
+                    borderRadius: 6, cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  <FileDown size={12} /> Voucher
+                </button>
               </div>
+
+              {/* ── Combined price card ── */}
+              {(() => {
+                const seenPags = new Map();
+                members.forEach((r) =>
+                  (r.pagamentos ?? []).forEach((p) => {
+                    if (!p.cancelado && !seenPags.has(p.id)) seenPags.set(p.id, p);
+                  })
+                );
+                const uniquePags  = Array.from(seenPags.values());
+                const totalGrupo  = members.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
+                const pagoGrupo   = uniquePags.reduce((s, p) => s + (p.valor ?? 0), 0);
+                const pendente    = Math.max(0, totalGrupo - pagoGrupo);
+                return (
+                  <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                    {/* Totals row */}
+                    <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
+                      {[
+                        { label: 'Total',    val: totalGrupo, color: 'var(--text)' },
+                        { label: 'Pago',     val: pagoGrupo,  color: '#10b981' },
+                        { label: 'Pendente', val: pendente,   color: pendente > 0 ? '#f97316' : '#10b981' },
+                      ].map(({ label, val, color: c }, idx, arr) => (
+                        <div key={label} style={{
+                          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                          padding: '6px 4px',
+                          borderRight: idx < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                          background: 'var(--surface-2)', borderRadius: idx === 0 ? '6px 0 0 6px' : idx === arr.length - 1 ? '0 6px 6px 0' : 0,
+                        }}>
+                          <span style={{ fontSize: 10, color: 'var(--text-2)', marginBottom: 2 }}>{label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: c }}>{fmtBRL(val)}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Payments list */}
+                    {uniquePags.length === 0
+                      ? <span style={{ fontSize: 11, color: 'var(--text-2)' }}>Nenhum pagamento registrado.</span>
+                      : <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                          {uniquePags.map((p) => (
+                            <div key={p.id} style={{
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              fontSize: 11, padding: '3px 7px',
+                              background: 'var(--surface-2)', borderRadius: 4,
+                            }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {p.descricao || p.formaPagamento || 'Pagamento'}
+                                </span>
+                                {p.nomePagador && (
+                                  <span style={{ color: 'var(--text-2)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {p.nomePagador}
+                                  </span>
+                                )}
+                              </div>
+                              <span style={{ fontWeight: 700, color: 'var(--text)', flexShrink: 0, marginLeft: 8 }}>
+                                {fmtBRL(p.valor)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                    }
+                  </div>
+                );
+              })()}
+
+              {/* ── Member rows ── */}
               <div>
                 {members.map((r, i) => (
                   <button key={r.id}
@@ -4953,8 +5144,7 @@ export default function BookingCalendar() {
                   </button>
                 ))}
               </div>
-            </div>
-          </>,
+            </div>,
           document.body
         );
       })()}

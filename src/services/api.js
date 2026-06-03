@@ -578,6 +578,16 @@ export const hospedagemApi = {
       body: { hospedagem_ids: hospedagemIds, pagamento },
     });
   },
+
+  /**
+   * POST /pagamento/grupo/{grupoId} — cria um único pagamento e vincula a todas as
+   * reservas do grupo, gravando o grupo no vínculo (hospedagem_pagamento.fk_grupo).
+   * @param {number} grupoId
+   * @param {{ tipo_pagamento: { id: number }, nome_pagador: string, descricao?: string, valor: number }} pagamento
+   */
+  adicionarPagamentoGrupo(grupoId, pagamento) {
+    return request(`/pagamento/grupo/${grupoId}`, { method: 'POST', body: pagamento });
+  },
 };
 
 // ─────────────────────────────────────────────────────────────

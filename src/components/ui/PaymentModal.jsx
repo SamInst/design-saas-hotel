@@ -126,6 +126,7 @@ export function PaymentModal({
   loggedUser         = null,
   titularNome        = null,
   lastPayerName      = null,
+  quartoNumero       = null,
   canAplicarDesconto = true,
   canDespesaPessoal  = false,
   valorTotal         = null,
@@ -173,6 +174,21 @@ export function PaymentModal({
   }, [open]);
 
   const valorNum   = parseBRL(valor);
+
+  // ── 50% quick-fill ───────────────────────────────────────────
+  const metade = valorTotal != null && valorTotal > 0 ? Math.round(valorTotal * 0.5 * 100) / 100 : null;
+  const is50   = metade != null && valorNum > 0 && Math.abs(valorNum - metade) < 0.005;
+  const aplicar50 = (checked) => {
+    if (checked && metade != null) {
+      setValor(maskBRL(String(Math.round(metade * 100))));
+      setDescricao(quartoNumero ? `PAGAMENTO DE 50% PARA O QUARTO ${quartoNumero}` : 'PAGAMENTO DE 50%');
+      if (titularNome) setNomePagador(titularNome.toUpperCase());
+    } else {
+      setValor('');
+      setDescricao('');
+    }
+  };
+
   const valorFinal = desconto
     ? desconto.porcentagem !== undefined
       ? Math.max(0, valorNum * (1 - desconto.porcentagem / 100))
@@ -294,6 +310,13 @@ export function PaymentModal({
                 </label>
               )}
             </FormField>
+
+            {metade != null && (
+              <label className={styles.checkRow}>
+                <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
+                <span>Pagamento de 50% <b>({fmtBRL(metade)})</b></span>
+              </label>
+            )}
 
             <div className={styles.rowGrid}>
               <FormField label="Tipo de Pagamento *">
