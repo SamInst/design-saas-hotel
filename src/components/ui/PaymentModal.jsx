@@ -125,6 +125,7 @@ export function PaymentModal({
   tipoRegistro       = '',
   loggedUser         = null,
   titularNome        = null,
+  lastPayerName      = null,
   canAplicarDesconto = true,
   canDespesaPessoal  = false,
   valorTotal         = null,
@@ -262,6 +263,18 @@ export function PaymentModal({
         {!despesaPessoal && (
           <>
             <FormField label="Nome do Pagador *">
+              {(() => {
+                const up = lastPayerName?.toUpperCase();
+                const isDup = !up || up === titularNome?.toUpperCase() || up === loggedUser?.pessoa?.nome?.toUpperCase();
+                return !isDup ? (
+                  <label className={styles.checkRow}>
+                    <input type="checkbox"
+                      checked={nomePagador === up}
+                      onChange={e => setNomePagador(e.target.checked ? up : '')} />
+                    <span>Último pagador: <b>{lastPayerName}</b></span>
+                  </label>
+                ) : null;
+              })()}
               <Input placeholder="Nome completo"
                 value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
               {titularNome && (

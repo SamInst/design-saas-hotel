@@ -128,6 +128,7 @@ const normalizeReserva = (r) => {
     motivoCancelamento: r.motivo_cancelamento?.motivo_cancelamento ?? null,
     dataMotivo:         r.motivo_cancelamento?.data_hora_registro   ?? null,
     funcMotivo:         r.motivo_cancelamento?.funcionario?.nome    ?? null,
+    grupo_id: r.grupo_id ?? null,
     orcamentoInfo: r.orcamento_info ?? null,
     pessoasOrcamento: (r.pessoas_orcamento ?? []).map((p) => ({
       id:             p.id,
@@ -208,6 +209,12 @@ const STATUS_LABEL = {
   solicitada: 'Solicitada', finalizado: 'Finalizado', cancelado: 'Cancelado',
   orcamento: 'Orçamento',
 };
+
+const GRUPO_PALETTE = [
+  '#b45309', '#1d4ed8', '#be185d', '#047857',
+  '#6d28d9', '#c2410c', '#0e7490', '#4d7c0f',
+];
+const grupoColor = (grupoId) => GRUPO_PALETTE[Number(grupoId) % GRUPO_PALETTE.length];
 
 
 // ─── Confirm Modal ────────────────────────────────────────────────────────────
@@ -458,13 +465,12 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
       setPendingOps([]);
       setHasChanges(false);
-      // Re-fetch so parent bar updates (titular name, guest count, etc.)
-      if (hasPessoaOps && onSync) {
+      // Always re-fetch so the calendar bar reflects latest pagamentos/pessoas
+      if (onSync) {
         try {
           const fresh = await reservaApi.buscarPorId(reserva.id);
           const normalized = normalizeReserva(fresh);
           onSync(normalized);
-          // Update local pessoas so editCalc useEffect re-runs with fresh birth dates
           setPessoas(normalized.hospedes ?? []);
         } catch { /* ignore sync failure */ }
       }
@@ -852,7 +858,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
         footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>Remover</Button></div>}
       ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?</p></Modal>
 
-      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
+      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
 
       <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title="Cancelar Pagamento"
         footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>Confirmar</Button></div>}
@@ -1260,6 +1266,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
         tiposPagamento={tiposPagamento}
         isSubmitting={false}
         titularNome={reserva.titularNome}
+        lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null}
         canAplicarDesconto={false}
         valorTotal={reserva.valorTotal}
         valorPago={totalPago}
@@ -2865,6 +2872,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   // Step 3: Pagamentos
 
   const [quartosPag,     setQuartosPag]     = useState({});         // { [quartoId]: [payment] } individual
+  const [pagModo,        setPagModo]        = useState('por_quarto'); // 'por_quarto' | 'unico'
+  const [pagUnico,       setPagUnico]       = useState([]);           // payments for pagamento único mode
   const [showPagModal,   setShowPagModal]   = useState(false);
   const [showPagModalRoom, setShowPagModalRoom] = useState(null);   // quartoId for individual mode
   const [quartosObs,     setQuartosObs]     = useState({}); // { [quartoId]: string }
@@ -2892,13 +2901,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setAvailLoading(true);
     setApiAvailability(null);
     reservaApi.verificarDisponibilidade({
-      fk_quartos: allRoomIds,
       data_entrada: toBrDate(checkinStr),
       data_saida: toBrDate(checkoutStr),
     }).then((results) => {
       if (cancelled) return;
       const avail = new Set(
-        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.fk_quarto)
+        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.quarto_id ?? r.fk_quarto)
       );
       setApiAvailability(avail);
     }).catch(() => { if (!cancelled) setApiAvailability(null); })
@@ -2913,13 +2921,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setMpAvailLoading(true);
     setMpApiAvailability(null);
     reservaApi.verificarDisponibilidade({
-      fk_quartos: allRoomIds,
       data_entrada: toBrDate(formatDate(mpCheckin)),
       data_saida: toBrDate(formatDate(mpCheckout)),
     }).then((results) => {
       if (cancelled) return;
       const avail = new Set(
-        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.fk_quarto)
+        (Array.isArray(results) ? results : []).filter((r) => r.disponivel).map((r) => r.quarto_id ?? r.fk_quarto)
       );
       setMpApiAvailability(avail);
     }).catch(() => { if (!cancelled) setMpApiAvailability(null); })
@@ -2954,7 +2961,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   const addPagamento = (payment) => {
     const entry = { _localId: Date.now(), _criadoEm: new Date().toLocaleString('pt-BR'), ...payment };
-    if (showPagModalRoom !== null) {
+    if (pagModo === 'unico') {
+      setPagUnico((prev) => [...prev, entry]);
+    } else if (showPagModalRoom !== null) {
       setQuartosPag((prev) => ({ ...prev, [showPagModalRoom]: [...(prev[showPagModalRoom] || []), entry] }));
     }
     setShowPagModal(false);
@@ -3171,8 +3180,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       }
 
       // ── PUT /reserva/ativar — nova reserva ativa ─────────────────────────────
-      const buildReservaBody = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx) => {
-        const roomPags   = cleanPags(quartosPag[quartoId] || []);
+      // includePagamentos=false when pagModo==='unico' and this is not the first body;
+      // the backend links the first body's payment to all others via pagamentoUnico.
+      const buildReservaBody = (quartoId, dataEntrada, dataSaida, hospedes, periodoIdx, includePagamentos = true) => {
+        const roomPags = includePagamentos
+          ? (pagModo === 'unico' ? cleanPags(pagUnico) : cleanPags(quartosPag[quartoId] || []))
+          : [];
         const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total ?? undefined;
         const pessoasIds = (hospedes || [])
           .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
@@ -3189,23 +3202,24 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         };
       };
 
-      const allResults = [];
+      const allBodies = [];
       if (periodoMode === 'multiplos') {
         for (const [pi, p] of periodos.entries()) {
           const ci = formatDate(p.checkin);
           const co = formatDate(p.checkout);
           for (const q of p.rooms) {
-            const res = await reservaApi.criarAtiva(buildReservaBody(q, ci, co, p.roomHospedes?.[q] || [], pi));
-            allResults.push(...(Array.isArray(res) ? res : [res]));
+            // pagamentoUnico: only the very first body globally carries pagamentos
+            allBodies.push(buildReservaBody(q, ci, co, p.roomHospedes?.[q] || [], pi, pagModo !== 'unico' || allBodies.length === 0));
           }
         }
       } else {
-        for (const q of quartos) {
-          const res = await reservaApi.criarAtiva(buildReservaBody(q, checkinStr, checkoutStr, quartoHospedes[q] || [], 0));
-          allResults.push(...(Array.isArray(res) ? res : [res]));
+        for (const [qi, q] of quartos.entries()) {
+          allBodies.push(buildReservaBody(q, checkinStr, checkoutStr, quartoHospedes[q] || [], 0, pagModo !== 'unico' || qi === 0));
         }
       }
-      await onSave({ _isReserva: true, results: allResults });
+      const res = await reservaApi.criarAtiva(allBodies, pagModo === 'unico' ? true : null);
+      const allResults = Array.isArray(res) ? res : (res ? [res] : []);
+      await onSave({ _isReserva: true, results: allResults.filter(Boolean) });
     } catch (e) {
       onNotify?.(e?.message || 'Erro ao salvar reserva.', 'error');
     } finally { setSaving(false); }
@@ -3604,7 +3618,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
         // Financial totals
         const grandTotal   = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
-        const totalPago    = Object.values(quartosPag).flat().reduce((s, p) => s + (p.valor ?? 0), 0);
+        const isMultiRoom  = tipo === 'grupo' || quartos.length > 1;
+        const totalPago    = pagModo === 'unico'
+          ? pagUnico.reduce((s, p) => s + (p.valor ?? 0), 0)
+          : Object.values(quartosPag).flat().reduce((s, p) => s + (p.valor ?? 0), 0);
         const pendente     = Math.max(0, grandTotal - totalPago);
 
         return (
@@ -3677,6 +3694,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Vários Apartamentos' : 'Apartamento Único'}{isSolicitacao ? ' · Solicitação' : isOrcamento ? ' · Orçamento' : ''}</span></div>
               <div className={styles.kvRow}><span className={styles.kvLabel}>Modo</span><span className={styles.kvVal}>{periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos'}</span></div>
             </div>
+
+            {/* ── Payment mode toggle (multi-room only) ── */}
+            {isMultiRoom && !isSolicitacao && !isOrcamento && (
+              <div className={styles.pagModoToggle}>
+                <label className={`${styles.pagModoOption} ${pagModo === 'por_quarto' ? styles.pagModoOptionActive : ''}`}>
+                  <input type="radio" name="pagModo" value="por_quarto" checked={pagModo === 'por_quarto'} onChange={() => setPagModo('por_quarto')} />
+                  Pagamento por quarto
+                </label>
+                <label className={`${styles.pagModoOption} ${pagModo === 'unico' ? styles.pagModoOptionActive : ''}`}>
+                  <input type="radio" name="pagModo" value="unico" checked={pagModo === 'unico'} onChange={() => setPagModo('unico')} />
+                  Pagamento único
+                </label>
+              </div>
+            )}
 
             {/* ── Períodos + quartos + hóspedes ── */}
             {displayPeriodos.map((p, pi) => {
@@ -3792,7 +3823,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         </div>
 
                         {/* Pagamento */}
-                        {!isOrcamento && !isSolicitacao && (
+                        {!isOrcamento && !isSolicitacao && pagModo === 'por_quarto' && (
                           <div className={styles.step3PayArea}>
                             <div className={styles.step3PagLabel}>Pagamentos</div>
                             <div className={styles.step3PayHeader}>
@@ -3841,7 +3872,39 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               );
             })}
 
-
+            {/* ── Pagamento único section ── */}
+            {!isOrcamento && !isSolicitacao && isMultiRoom && pagModo === 'unico' && (
+              <div className={styles.step3PayArea} style={{ marginTop: 8 }}>
+                <div className={styles.step3PagLabel}>Pagamento</div>
+                <div className={styles.step3PayHeader}>
+                  <button className={styles.step3AddPagBtn} onClick={() => setShowPagModal(true)}>
+                    <Plus size={11} /> Adicionar pagamento
+                  </button>
+                </div>
+                {pagUnico.length === 0
+                  ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
+                  : pagUnico.map((p) => {
+                      const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
+                      return (
+                        <div key={p._localId} className={styles.step3PagRow}>
+                          <div className={styles.step3PagRowTop}>
+                            <span className={styles.step3PagDesc}>{p.descricao || tipDesc}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                              <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
+                              <button type="button" className={styles.removeIconBtn}
+                                onClick={() => setPagUnico((prev) => prev.filter((x) => x._localId !== p._localId))}>
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className={styles.step3PagMeta}>{p._criadoEm} · {tipDesc}</div>
+                          {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
+                        </div>
+                      );
+                    })
+                }
+              </div>
+            )}
 
           </div>
         );
@@ -3852,11 +3915,18 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
       {/* Payment modal */}
       {(() => {
-        const rKey = showPagModalRoom !== null ? `${showPagModalRoom}_0` : null;
-        const pagVTotal = rKey ? (precosCalc[rKey]?.valor_total ?? null) : null;
-        const pagVPago  = showPagModalRoom !== null
-          ? (quartosPag[showPagModalRoom] || []).reduce((s, p) => s + (p.valor ?? 0), 0)
-          : null;
+        const grandTotalModal = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
+        let pagVTotal, pagVPago;
+        if (pagModo === 'unico') {
+          pagVTotal = grandTotalModal || null;
+          pagVPago  = pagUnico.reduce((s, p) => s + (p.valor ?? 0), 0);
+        } else {
+          const rKey = showPagModalRoom !== null ? `${showPagModalRoom}_0` : null;
+          pagVTotal = rKey ? (precosCalc[rKey]?.valor_total ?? null) : null;
+          pagVPago  = showPagModalRoom !== null
+            ? (quartosPag[showPagModalRoom] || []).reduce((s, p) => s + (p.valor ?? 0), 0)
+            : null;
+        }
         return (
           <PaymentModal
             open={showPagModal}
@@ -3868,6 +3938,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 ? ((quartoHospedes[showPagModalRoom] || [])[0]?.nome || allHospedes[0]?.nome || null)
                 : (allHospedes[0]?.nome || null)
             }
+            lastPayerName={(() => {
+              const pool = pagModo === 'unico'
+                ? pagUnico
+                : (quartosPag[showPagModalRoom] || []);
+              return pool.at(-1)?.nome_pagador ?? null;
+            })()}
             canAplicarDesconto={false}
             valorTotal={pagVTotal}
             valorPago={pagVPago}
@@ -3899,6 +3975,11 @@ export default function BookingCalendar() {
   const [remoteSearchLoading, setRemoteSearchLoading] = useState(false);
   const [showSolicitacoes,   setShowSolicitacoes]   = useState(false);
   const [showOrcamentos,     setShowOrcamentos]     = useState(false);
+  const [pagamentoModoAtivo,   setPagamentoModoAtivo]   = useState(false);
+  const [reservasSelecionadas, setReservasSelecionadas] = useState(new Set());
+  const [showPagMultiploModal, setShowPagMultiploModal] = useState(false);
+  const [pagMultiploSaving,    setPagMultiploSaving]    = useState(false);
+  const [groupPanel,           setGroupPanel]           = useState(null);
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
@@ -3915,6 +3996,8 @@ export default function BookingCalendar() {
   const searchRef           = useRef(null);
   const monthPickerRef      = useRef(null);
   const dragJustHappenedRef = useRef(false);
+  const groupPanelTimeout   = useRef(null);
+  const longPressRef        = useRef(null); // { timeout, startX, startY }
   const [dragEditValues,   setDragEditValues]   = useState(null); // { quarto, checkin, checkout }
 
   const notify = useCallback((msg, type = 'success') => {
@@ -3967,6 +4050,55 @@ export default function BookingCalendar() {
     return flat.map(normalizeReserva).filter((r) => r.dataInicio);
   };
 
+  const mergeFlat = (a, b) => {
+    const seen = new Set(a.map((r) => r.id));
+    return [...a, ...b.filter((r) => !seen.has(r.id))];
+  };
+
+  const flatAndNorm = (arr) => {
+    const items = Array.isArray(arr) ? arr : [];
+    const seen = new Set();
+    const out = [];
+    for (const r of items) {
+      if (!seen.has(r.id)) { seen.add(r.id); out.push(normalizeReserva(r)); }
+    }
+    return out.filter((r) => r.dataInicio);
+  };
+
+  const loadReservas = async () => {
+    const mes = viewDate.getMonth() + 1;
+    const ano = viewDate.getFullYear();
+    const nextMonthDate = new Date(ano, mes, 1);
+    const nextMes = nextMonthDate.getMonth() + 1;
+    const nextAno = nextMonthDate.getFullYear();
+
+    setLoading(true);
+    try {
+      const [curr, next] = await Promise.all([
+        hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes, ano }),
+        hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes: nextMes, ano: nextAno }),
+      ]);
+      setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
+    } catch (_) {
+      // ignore load failures here
+    } finally {
+      setLoading(false);
+    }
+
+    try {
+      const data = await hospedagemApi.buscar({ status: 'RESERVA_SOLICITADA' });
+      const flat = Array.isArray(data) ? data : [];
+      const seen = new Set();
+      const deduped = [];
+      for (const r of flat) {
+        if (!seen.has(r.id)) { seen.add(r.id); deduped.push(normalizeReserva(r)); }
+      }
+      setSolicitacoes(deduped.filter((r) => r.dataInicio));
+    } catch (_) {
+      // ignore solicitacoes load failures here
+    }
+  };
+
   // ── Reload reservations when month/year changes ───────────────────────────
   useEffect(() => {
     const mes = viewDate.getMonth() + 1;
@@ -3977,44 +4109,8 @@ export default function BookingCalendar() {
     const nextMes = nextMonthDate.getMonth() + 1;
     const nextAno = nextMonthDate.getFullYear();
 
-    const mergeFlat = (a, b) => {
-      const seen = new Set(a.map((r) => r.id));
-      return [...a, ...b.filter((r) => !seen.has(r.id))];
-    };
-
-    // Helper: normalise a flat hospedagem array (new endpoint returns flat, not grouped)
-    const flatAndNorm = (arr) => {
-      const items = Array.isArray(arr) ? arr : [];
-      const seen = new Set();
-      const out = [];
-      for (const r of items) {
-        if (!seen.has(r.id)) { seen.add(r.id); out.push(normalizeReserva(r)); }
-      }
-      return out.filter((r) => r.dataInicio);
-    };
-
     // Main calendar: RESERVA_ATIVA por mês/ano
-    setLoading(true);
-    Promise.all([
-      hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes, ano }),
-      hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes: nextMes, ano: nextAno }),
-    ])
-      .then(([curr, next]) => setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next))))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-
-    // Solicitações pendentes (RESERVA_SOLICITADA)
-    hospedagemApi.buscar({ status: 'RESERVA_SOLICITADA' })
-      .then((data) => {
-        const flat = Array.isArray(data) ? data : [];
-        const seen = new Set();
-        const deduped = [];
-        for (const r of flat) {
-          if (!seen.has(r.id)) { seen.add(r.id); deduped.push(normalizeReserva(r)); }
-        }
-        setSolicitacoes(deduped.filter((r) => r.dataInicio));
-      })
-      .catch(() => {});
+    loadReservas();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate.getMonth(), viewDate.getFullYear()]);
 
@@ -4119,6 +4215,25 @@ export default function BookingCalendar() {
   const solicitadasCount = solicitacoes.length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
 
+  const { pagMultiploValorTotal, pagMultiploValorPago, pagMultiploLastPayer } = useMemo(() => {
+    if (reservasSelecionadas.size === 0) return { pagMultiploValorTotal: 0, pagMultiploValorPago: 0, pagMultiploLastPayer: null };
+    const selecionadas = allReservas.filter((r) => reservasSelecionadas.has(r.id));
+    // Deduplicate payments by UUID — the same payment can be linked to multiple reservations
+    const seen = new Map(); // id → { valor, nomePagador, dataRegistro }
+    for (const r of selecionadas) {
+      for (const p of (r.pagamentos ?? [])) {
+        if (!p.cancelado && !seen.has(p.id)) seen.set(p.id, p);
+      }
+    }
+    const uniquePags = Array.from(seen.values());
+    uniquePags.sort((a, b) => (b.dataRegistro ?? '').localeCompare(a.dataRegistro ?? ''));
+    return {
+      pagMultiploValorTotal: selecionadas.reduce((s, r) => s + (r.valorTotal ?? 0), 0),
+      pagMultiploValorPago:  uniquePags.reduce((s, p) => s + (p.valor ?? 0), 0),
+      pagMultiploLastPayer:  uniquePags[0]?.nomePagador ?? null,
+    };
+  }, [reservasSelecionadas, allReservas]);
+
   const handleApproveSolicitacao = async (id, quarto) => {
     const upd = await reservaApi.atualizar({ id, fk_quarto: quarto });
     const normalized = normalizeReserva(upd);
@@ -4133,6 +4248,7 @@ export default function BookingCalendar() {
   };
 
   const handleCellClick = (room, dateStr) => {
+    if (pagamentoModoAtivo) return;
     if (dragState) return;
     if (selRoom === room && selStart !== null) {
       if (dateStr === selStart) { setSelRoom(null); setSelStart(null); setSelHover(null); return; }
@@ -4213,7 +4329,13 @@ export default function BookingCalendar() {
 
   useEffect(() => { window.addEventListener('mouseup', handleGlobalMouseUp); return () => window.removeEventListener('mouseup', handleGlobalMouseUp); }, [handleGlobalMouseUp]);
   useEffect(() => {
-    const h = (e) => { if (e.key === 'Escape') { setDragState(null); setGhostDrag(null); lastHoverRef.current = null; setSelRoom(null); setSelStart(null); setSelHover(null); } };
+    const h = (e) => {
+      if (e.key === 'Escape') {
+        setDragState(null); setGhostDrag(null); lastHoverRef.current = null;
+        setSelRoom(null); setSelStart(null); setSelHover(null);
+        setPagamentoModoAtivo(false); setReservasSelecionadas(new Set()); setShowPagMultiploModal(false);
+      }
+    };
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
 
@@ -4235,9 +4357,14 @@ export default function BookingCalendar() {
     // ── Reserva ativa criada via reservaApi.criarAtiva ────────────────────────
     if (bodyOrFlag?._isReserva) {
       const novas = (bodyOrFlag.results ?? [])
+        .filter(Boolean)
         .map(normalizeReserva)
         .filter((r) => r.dataInicio);
-      setReservas((rs) => [...rs, ...novas]);
+      if (novas.length > 0) {
+        setReservas((rs) => [...rs, ...novas]);
+      } else {
+        await loadReservas();
+      }
       notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
       setShowCreateModal(false);
       return;
@@ -4301,6 +4428,39 @@ export default function BookingCalendar() {
     setSelectedReserva((prev) => prev?.id === normalized.id ? normalized : prev);
   };
 
+  const exitSelectionMode = useCallback(() => {
+    setPagamentoModoAtivo(false);
+    setReservasSelecionadas(new Set());
+    setShowPagMultiploModal(false);
+  }, []);
+
+  const handleBarGroupEnter = useCallback((grupoId, e) => {
+    clearTimeout(groupPanelTimeout.current);
+    setGroupPanel({ grupoId, rect: e.currentTarget.getBoundingClientRect() });
+  }, []);
+
+  const handleBarGroupLeave = useCallback(() => {
+    groupPanelTimeout.current = setTimeout(() => setGroupPanel(null), 200);
+  }, []);
+
+  const handlePagamentoMultiplo = async (payment) => {
+    setPagMultiploSaving(true);
+    try {
+      const ids = Array.from(reservasSelecionadas);
+      await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
+      // Re-fetch each affected reservation so pagamentos + totalPago refresh in state
+      const fetched = await Promise.all(ids.map((id) => reservaApi.buscarPorId(id)));
+      const updatedMap = new Map(fetched.map((r) => [r.id, normalizeReserva(r)]));
+      setReservas((rs) => rs.map((r) => updatedMap.has(r.id) ? updatedMap.get(r.id) : r));
+      notify(`Pagamento adicionado a ${ids.length} reserva${ids.length !== 1 ? 's' : ''}!`);
+      exitSelectionMode();
+    } catch (e) {
+      notify(e?.message ?? 'Erro ao adicionar pagamento.', 'error');
+    } finally {
+      setPagMultiploSaving(false);
+    }
+  };
+
   // ── Render bars ────────────────────────────────────────────────────────────
   const renderBars = (room) => {
     const toRender = filteredReservas.filter((r) => r.quarto === room);
@@ -4353,19 +4513,73 @@ export default function BookingCalendar() {
     const currentDiaria = orig.status === 'hospedado'
       ? Math.min(dias, Math.max(1, diffDays(orig.dataInicio, todayStr) + 1)) : null;
 
-    const isCancelado = orig.status === 'cancelado';
+    const isCancelado   = orig.status === 'cancelado';
+    const isSelSelected = pagamentoModoAtivo && reservasSelecionadas.has(orig.id);
+    const isSelDimmed   = pagamentoModoAtivo && !isSelSelected;
+    const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4) : isCancelado ? Math.min(opacity, 0.55) : opacity;
+    const gColor        = !isGhost && orig.grupo_id != null ? grupoColor(orig.grupo_id) : null;
 
     return (
       <div key={key}
         className={[styles.bar, styles[`bar_${orig.status}`], isGhost ? styles.barGhost : '', isDragging ? styles.barDragging : ''].join(' ')}
-        style={{ left, width, borderRadius, opacity: isCancelado ? Math.min(opacity, 0.55) : opacity }}
-        onMouseDown={isGhost ? undefined : (e) => handleBarMouseDown(e, orig)}
-        onClick={(e) => { e.stopPropagation(); if (!dragState && !dragJustHappenedRef.current) setSelectedReserva(orig); }}
-        title={`${orig.titularNome} — ${diariasTxt(dias)}`}
+        style={{
+          left, width, borderRadius,
+          opacity: barOpacity,
+          cursor: pagamentoModoAtivo ? 'pointer' : undefined,
+          ...(gColor ? { background: gColor } : {}),
+          ...(isSelSelected ? { outline: '2px solid #fff', outlineOffset: '1px', filter: 'brightness(1.15)' } : {}),
+        }}
+        onMouseDown={isGhost || pagamentoModoAtivo ? undefined : (e) => handleBarMouseDown(e, orig)}
+        onMouseEnter={gColor ? (e) => handleBarGroupEnter(orig.grupo_id, e) : undefined}
+        onMouseLeave={gColor ? handleBarGroupLeave : undefined}
+        onContextMenu={gColor ? (e) => e.preventDefault() : undefined}
+        onTouchStart={gColor ? (e) => {
+          const t = e.touches[0];
+          const rect = e.currentTarget.getBoundingClientRect();
+          longPressRef.current = {
+            timeout: setTimeout(() => {
+              setGroupPanel({ grupoId: orig.grupo_id, rect });
+              longPressRef.current = null;
+            }, 500),
+            startX: t.clientX,
+            startY: t.clientY,
+          };
+        } : undefined}
+        onTouchMove={gColor ? (e) => {
+          if (!longPressRef.current) return;
+          const t = e.touches[0];
+          if (Math.abs(t.clientX - longPressRef.current.startX) > 10 ||
+              Math.abs(t.clientY - longPressRef.current.startY) > 10) {
+            clearTimeout(longPressRef.current.timeout);
+            longPressRef.current = null;
+          }
+        } : undefined}
+        onTouchEnd={gColor ? () => {
+          if (longPressRef.current) {
+            clearTimeout(longPressRef.current.timeout);
+            longPressRef.current = null;
+          }
+        } : undefined}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (pagamentoModoAtivo) {
+            setReservasSelecionadas((prev) => {
+              const next = new Set(prev);
+              next.has(orig.id) ? next.delete(orig.id) : next.add(orig.id);
+              return next;
+            });
+            return;
+          }
+          if (!dragState && !dragJustHappenedRef.current) setSelectedReserva(orig);
+        }}
+        title={pagamentoModoAtivo ? `${isSelSelected ? '✓ ' : ''}${orig.titularNome}` : `${orig.titularNome} — ${diariasTxt(dias)}`}
       >
         {/* Floating status label — always above the bar */}
         {!isGhost && (
-          <div className={startInView ? styles.barStatusTag : styles.barStatusTagInline}>
+          <div
+            className={startInView ? styles.barStatusTag : styles.barStatusTagInline}
+            style={gColor ? { background: `color-mix(in srgb, ${gColor} 70%, #000)` } : undefined}
+          >
             {orig.status === 'confirmada' && <><Check size={9} strokeWidth={3} /> Reserva confirmada</>}
             {orig.status === 'solicitada' && <>Reserva solicitada</>}
             {orig.status === 'hospedado'  && <><Check size={9} strokeWidth={3} /> Hospedado</>}
@@ -4375,7 +4589,7 @@ export default function BookingCalendar() {
           </div>
         )}
 
-        {startInView && !isGhost && (
+        {startInView && !isGhost && !pagamentoModoAtivo && (
           <div className={styles.resizeHandle} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-l')} />
         )}
         <div className={styles.barContent}>
@@ -4392,7 +4606,7 @@ export default function BookingCalendar() {
             </div>
           )}
         </div>
-        {endInView && !isGhost && (
+        {endInView && !isGhost && !pagamentoModoAtivo && (
           <div className={[styles.resizeHandle, styles.resizeHandleRight].join(' ')} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-r')} />
         )}
       </div>
@@ -4641,8 +4855,112 @@ export default function BookingCalendar() {
       )}
       {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} />}
 
+      {/* ── Multi-payment selection panel ── */}
+      {pagamentoModoAtivo && (
+        <div className={styles.selectionPanel}>
+          <span className={styles.selectionCount}>
+            <b>{reservasSelecionadas.size}</b>
+            <span className={styles.selectionCountSub}>
+              {' '}reserva{reservasSelecionadas.size !== 1 ? 's' : ''} selecionada{reservasSelecionadas.size !== 1 ? 's' : ''}
+            </span>
+          </span>
+          <button
+            className={styles.selectionBtnPrimary}
+            disabled={reservasSelecionadas.size === 0 || pagMultiploSaving}
+            onClick={() => setShowPagMultiploModal(true)}
+          >
+            <DollarSign size={13} />
+            Adicionar Pagamento
+          </button>
+          <button className={styles.selectionBtnCancel} onClick={exitSelectionMode}>
+            <X size={13} />
+            Cancelar
+          </button>
+        </div>
+      )}
+
+      <PaymentModal
+        open={showPagMultiploModal}
+        onClose={() => setShowPagMultiploModal(false)}
+        onConfirm={handlePagamentoMultiplo}
+        tiposPagamento={tiposPagamento}
+        isSubmitting={pagMultiploSaving}
+        canAplicarDesconto={false}
+        canDespesaPessoal={false}
+        lastPayerName={pagMultiploLastPayer}
+        valorTotal={pagMultiploValorTotal}
+        valorPago={pagMultiploValorPago}
+      />
+
+      {/* ── Group hover panel ── */}
+      {groupPanel && !selectedReserva && !pagamentoModoAtivo && (() => {
+        const members = allReservas.filter((r) => r.grupo_id === groupPanel.grupoId);
+        if (members.length === 0) return null;
+        const color  = grupoColor(groupPanel.grupoId);
+        const { rect } = groupPanel;
+        const PANEL_W   = 260;
+        const estHeight = members.length * 58 + 44;
+        let left = rect.left - PANEL_W - 10;
+        if (left < 8) left = Math.min(rect.right + 10, window.innerWidth - PANEL_W - 8);
+        const top = Math.max(8, Math.min(window.innerHeight - estHeight - 8, rect.top - 8));
+        return createPortal(
+          <>
+            {/* Backdrop — closes on outside tap (touch) or click (desktop) */}
+            <div
+              style={{ position: 'fixed', inset: 0, zIndex: 499 }}
+              onClick={() => setGroupPanel(null)}
+              onTouchStart={() => setGroupPanel(null)}
+            />
+            <div
+              onMouseEnter={() => clearTimeout(groupPanelTimeout.current)}
+              onMouseLeave={handleBarGroupLeave}
+              style={{
+                position: 'fixed', top, left, width: PANEL_W, zIndex: 500,
+                background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+                overflow: 'hidden',
+              }}
+            >
+              <div style={{ background: color, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Users size={13} style={{ color: '#fff', flexShrink: 0 }} />
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
+                  Grupo · {members.length} reserva{members.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div>
+                {members.map((r, i) => (
+                  <button key={r.id}
+                    onClick={() => { setSelectedReserva(r); setGroupPanel(null); }}
+                    style={{
+                      display: 'flex', flexDirection: 'column', width: '100%', gap: 3,
+                      padding: '8px 12px', border: 'none', background: 'none',
+                      textAlign: 'left', cursor: 'pointer',
+                      borderLeft: `3px solid ${color}`,
+                      borderBottom: i < members.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ background: color, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                        Ap. {fmtRoom(r.quarto)}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {r.titularNome}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--text-2)' }}>
+                      {fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>,
+          document.body
+        );
+      })()}
+
       {/* ── Floating action panel ── */}
-      {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !dayModal && !showMonthPicker && !roomModal && <div className={styles.floatPanel}>
+      {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !dayModal && !showMonthPicker && !roomModal && !pagamentoModoAtivo && <div className={styles.floatPanel}>
         <button className={[styles.floatBtn, styles.floatBtnPrimary].join(' ')} onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
           <Plus size={15} />
           <span>Nova Reserva</span>
@@ -4683,6 +5001,13 @@ export default function BookingCalendar() {
           </div>
 
           <div className={styles.floatDivider} />
+
+          <div className={styles.floatBtnWrap}>
+            <button className={styles.floatBtn} onClick={() => setPagamentoModoAtivo(true)}>
+              <DollarSign size={15} />
+              <span>Adicionar Pagamento</span>
+            </button>
+          </div>
 
           <div className={styles.floatBtnWrap}>
             <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>

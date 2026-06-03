@@ -422,13 +422,13 @@ export const reservaApi = {
   },
 
   /**
-   * PUT /reserva/ativar — cria reserva ativa ou converte solicitação.
-   * @param {object} body    – { quarto_id, status, data_hora_checkin, data_hora_checkout, pessoas, pagamentos, observacao, valor_total }
-   * @param {number} [hospedagemId] – se informado, converte solicitação existente em reserva ativa
+   * PUT /reserva/ativar — cria uma ou mais reservas ativas em uma única chamada.
+   * @param {object|object[]} bodies        – um ou mais Hospedagem.Request
+   * @param {boolean}         [pagamentoUnico] – quando true, o pagamento do primeiro item é vinculado aos demais
    */
-  criarAtiva(body, hospedagemId) {
-    const qs = hospedagemId != null ? `?hospedagemId=${hospedagemId}` : '';
-    return request(`/reserva/ativar${qs}`, { method: 'PUT', body });
+  criarAtiva(bodies, pagamentoUnico) {
+    const params = pagamentoUnico != null ? { pagamentoUnico } : undefined;
+    return request('/reserva/ativar', { method: 'PUT', body: Array.isArray(bodies) ? bodies : [bodies], params });
   },
 
   /** Adiciona ou remove uma pessoa de uma reserva. vincular=true adiciona, false remove. */
@@ -451,8 +451,8 @@ export const reservaApi = {
     return request('/calcular-preco', { method: 'POST', body });
   },
 
-  verificarDisponibilidade({ fk_quartos, data_entrada, data_saida }) {
-    return request(`/reserva/disponibilidade?fk_quartos=${fk_quartos.join(',')}&data_entrada=${data_entrada}&data_saida=${data_saida}`);
+  verificarDisponibilidade({data_entrada, data_saida }) {
+    return request(`/disponibilidade/quartos?data_entrada=${data_entrada}&data_saida=${data_saida}`);
   },
 
   /**
@@ -562,6 +562,18 @@ export const hospedagemApi = {
   /** POST /hospedagem/{hospedagemId}/pagamentos — adiciona pagamentos à hospedagem */
   adicionarPagamentos(hospedagemId, body) {
     return request(`/hospedagem/${hospedagemId}/pagamentos`, { method: 'POST', body });
+  },
+
+  /**
+   * POST /hospedagem/pagamento-multiplo — cria um único pagamento e vincula a várias hospedagens.
+   * @param {number[]} hospedagemIds
+   * @param {{ tipo_pagamento: { id: number }, nome_pagador: string, descricao?: string, valor: number }} pagamento
+   */
+  adicionarPagamentoMultiplo(hospedagemIds, pagamento) {
+    return request('/hospedagem/pagamento-multiplo', {
+      method: 'POST',
+      body: { hospedagem_ids: hospedagemIds, pagamento },
+    });
   },
 };
 

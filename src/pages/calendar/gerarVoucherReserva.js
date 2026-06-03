@@ -158,8 +158,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
   const summaryHtml = `
     ${pagsHtml}
     <div class="price-strip" ${pagamentos.length === 0 ? 'style="margin-top:20px;border-radius:0 0 8px 8px;border-top:1px solid #e2e8f0"' : ''}>
-      <div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(pendente)}</b></div>
-      <div class="price-strip-divider"></div>
+      ${pendente > 0 ? `<div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(pendente)}</b></div><div class="price-strip-divider"></div>` : ''}
       <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
       <div class="price-strip-divider"></div>
       <div class="price-strip-item">Valor Total &nbsp;<b>${brl(grandTotal)}</b></div>

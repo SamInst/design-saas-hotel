@@ -1184,6 +1184,27 @@
 .step3PagVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
 .step3PagMeta { font-size: 11px; color: var(--text-2); }
 
+/* Payment mode toggle */
+.pagModoToggle {
+  display: flex; gap: 8px; margin-bottom: 14px;
+}
+.pagModoOption {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px; cursor: pointer;
+  font-size: 12px; font-weight: 500; color: var(--text-2);
+  border: 1px solid var(--border);
+  background: transparent;
+  transition: all .15s;
+  user-select: none;
+}
+.pagModoOption input[type="radio"] { display: none; }
+.pagModoOption:hover { border-color: #f97316; color: #f97316; }
+.pagModoOptionActive {
+  border-color: #f97316; color: #f97316;
+  background: color-mix(in srgb, #f97316 10%, transparent);
+  font-weight: 600;
+}
+
 /* Payment label inside step 3 */
 .step3PagLabel {
   font-size: 11px; font-weight: 700; color: #f97316;
@@ -1487,6 +1508,40 @@
   font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center;
 }
 .floatDivider { height: 1px; background: var(--border); margin: 2px 0; }
+
+/* ── Multi-payment selection panel ──────────────────────────── */
+.selectionPanel {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22);
+  padding: 10px 18px;
+  white-space: nowrap;
+}
+.selectionCount { font-size: 13px; color: var(--text); }
+.selectionCountSub { font-size: 12px; color: var(--text-2); font-weight: 400; }
+.selectionBtnPrimary {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border: none; border-radius: 9px;
+  background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.selectionBtnPrimary:not(:disabled):hover { background: color-mix(in srgb, var(--violet) 85%, #000); }
+.selectionBtnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+.selectionBtnCancel {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 11px; border: none; border-radius: 9px;
+  background: none; color: var(--text-2); font-size: 12px; font-weight: 500; cursor: pointer;
+}
+.selectionBtnCancel:hover { background: var(--surface-2); color: var(--text); }
+
 .floatToggleMobile { display: none; }
 .floatSecondary { display: contents; }
 .floatSecondaryOpen { display: contents; }
