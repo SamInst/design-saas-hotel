@@ -367,7 +367,8 @@ export const reservaApi = {
     if (nome  != null) qs.append('nome', nome);
     const statuses = Array.isArray(status) ? status : (status ? [status] : []);
     statuses.forEach((s) => qs.append('status', s));
-    return request(`/reserva?${qs.toString()}`);
+    const qsStr = qs.toString();
+    return request(`/reserva${qsStr ? `?${qsStr}` : ''}`);
   },
 
   /** Lista reservas de uma data específica (dd/MM/yyyy). Parâmetros opcionais: id, nome. */
@@ -471,7 +472,8 @@ export const orcamentoApi = {
     const qs = new URLSearchParams();
     if (orcamentoId != null)  qs.append('orcamentoId',     orcamentoId);
     if (nomeSolicitante)      qs.append('nomeSolicitante', nomeSolicitante);
-    return request(`/orcamento/buscar?${qs.toString()}`);
+    const qsStr = qs.toString();
+    return request(`/orcamento/buscar${qsStr ? `?${qsStr}` : ''}`);
   },
 
   // Compat: busca por ID e extrai o primeiro elemento
@@ -546,7 +548,8 @@ export const hospedagemApi = {
     if (ano         != null) qs.append('ano',          ano);
     if (nomeTitular)         qs.append('nomeTitular',  nomeTitular);
     if (data)                qs.append('data',         data);
-    return request(`/hospedagem/buscar?${qs.toString()}`);
+    const qsStr = qs.toString();
+    return request(`/hospedagem/buscar${qsStr ? `?${qsStr}` : ''}`);
   },
 
   /** POST /hospedagem/{hospedagemId}/pessoas — adiciona lista de pessoas por ID */
