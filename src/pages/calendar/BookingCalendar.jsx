@@ -12,7 +12,7 @@ import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva } from './gerarVoucherReserva';
-import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, recepcaoApi, hospedagemApi } from '../../services/api';
+import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -135,6 +135,17 @@ const normalizeReserva = (r) => {
       nome:           p.nome,
       dataNascimento: p.data_nascimento ?? '',
     })),
+    consumos: (r.consumos ?? [])
+      .filter((c) => c && !c.cancelado)
+      .map((c) => ({
+        id:             c.id,
+        descricao:      c.item?.descricao ?? 'Item',
+        quantidade:     c.quantidade ?? 1,
+        valorUnitario:  c.valor ?? 0,
+        valorTotal:     (c.valor ?? 0) * (c.quantidade ?? 1),
+        despesaPessoal: c.despesa_pessoal ?? false,
+        data:           c.data_hora_registro ?? '',
+      })),
   };
 };
 
@@ -287,6 +298,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const [confirmCancel2,     setConfirmCancel2]     = useState(false);
   const [cancelMotivRes,     setCancelMotivRes]     = useState('');
   const [confirmRemovePessoa, setConfirmRemovePessoa] = useState(null); // { id, nome }
+  const [showVoucherChoice,  setShowVoucherChoice]  = useState(false);
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPago  = pagamentos.filter((p) => !p.cancelado).reduce((s, p) => s + (p.valor ?? 0), 0);
@@ -296,7 +308,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const allRoomIds = categorias.flatMap((c) => c.quartos);
 
   // ── Voucher download ───────────────────────────────────────────────────────
-  const handleDownloadVoucher = () => {
+  const handleDownloadVoucher = (incluirConsumos = false) => {
     const _u = userStorage.get();
     const displayPeriodos = [{
       checkin: reserva.dataInicio,
@@ -307,8 +319,6 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     const precosCalc = {
       [`${reserva.quarto}_0`]: { valor_total: reserva.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] },
     };
-    const quartosObs = {};
-    if (reserva.observacao) quartosObs[`${reserva.quarto}_0`] = reserva.observacao;
     const solicitanteData = { nome: reserva.titularNome ?? '', cpf: pessoas[0]?.cpf ?? '' };
     const pagsAtivos = pagamentos.filter((p) => !p.cancelado);
     gerarVoucherReserva({
@@ -316,12 +326,21 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
       periodoMode: 'unico',
       displayPeriodos,
       precosCalc,
-      quartosObs,
+      quartosObs: {},
       roomDescMap,
       userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
       solicitante: solicitanteData,
       pagamentos: pagsAtivos,
+      titulo: reserva.status === 'hospedado' ? 'Voucher de Hospedagem' : 'Voucher de Reserva',
+      consumos: incluirConsumos ? (reserva.consumos ?? []) : [],
     });
+  };
+
+  // Se houver consumos cobráveis, pergunta se devem entrar no voucher; senão gera direto.
+  const temConsumos = (reserva.consumos ?? []).some((c) => !c.despesaPessoal);
+  const requestVoucher = () => {
+    if (temConsumos) setShowVoucherChoice(true);
+    else handleDownloadVoucher(false);
   };
 
   // ── Phone display mask ─────────────────────────────────────────────────────
@@ -1196,11 +1215,29 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
               </button>
             </>
           ) : (
-            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={handleDownloadVoucher}>
+            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={requestVoucher}>
               <FileDown size={14}/> Voucher
             </button>
           )}
         </div>
+      </Modal>
+
+      <Modal open={showVoucherChoice} onClose={() => setShowVoucherChoice(false)} size="sm"
+        title={<><FileDown size={14} /> Gerar Voucher</>}
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => { setShowVoucherChoice(false); handleDownloadVoucher(false); }}>
+              Sem consumos
+            </Button>
+            <Button variant="primary" style={{ flex: 1 }} onClick={() => { setShowVoucherChoice(false); handleDownloadVoucher(true); }}>
+              Com consumos
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+          Esta hospedagem possui consumos registrados. Deseja incluí-los no voucher?
+        </p>
       </Modal>
 
       <Modal open={confirmPernoite} onClose={() => setConfirmPernoite(false)} size="sm"
@@ -4134,7 +4171,7 @@ export default function BookingCalendar() {
     setLoading(true);
     try {
       const [curr, next] = await Promise.all([
-        hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes, ano }),
+        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO'], mes, ano }),
         hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes: nextMes, ano: nextAno }),
       ]);
       setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
@@ -4477,11 +4514,10 @@ export default function BookingCalendar() {
 
   const handleMoverPernoite = async (id) => {
     try {
-      await recepcaoApi.criarPernoite({ reserva_id: id });
-      const upd = await reservaApi.buscarPorId(id);
-      const normalized = normalizeReserva(upd);
-      setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
-      setSelectedReserva(normalized);
+      // Apenas altera o status da hospedagem para PERNOITE_ATIVO — atualiza o estado localmente
+      await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO');
+      setReservas((rs) => rs.map((r) => r.id === id ? { ...r, status: 'hospedado' } : r));
+      setSelectedReserva((prev) => prev && prev.id === id ? { ...prev, status: 'hospedado' } : prev);
       notify('Hospedagem iniciada!');
     } catch (e) {
       notify(e?.message ?? 'Erro ao hospedar.', 'error');
@@ -4634,7 +4670,8 @@ export default function BookingCalendar() {
     const isSelSelected = pagamentoModoAtivo && reservasSelecionadas.has(orig.id);
     const isSelDimmed   = pagamentoModoAtivo && !isSelSelected;
     const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4) : isCancelado ? Math.min(opacity, 0.55) : opacity;
-    const gColor        = !isGhost && orig.grupo_id != null ? grupoColor(orig.grupo_id) : null;
+    // Hospedado (PERNOITE_ATIVO) sempre cinza escuro, mesmo em grupo
+    const gColor        = !isGhost && orig.grupo_id != null && orig.status !== 'hospedado' ? grupoColor(orig.grupo_id) : null;
 
     return (
       <div key={key}

@@ -29,7 +29,7 @@ export default function Sidebar({
   isDark,
   onToggleTheme,
   onLogout,
-  appName = 'Hotel System',
+  appName = 'Isto é Pousada',
   collapsed = false,
   onToggleCollapse,
 }) {
@@ -55,11 +55,7 @@ export default function Sidebar({
       {/* ── BRAND ── */}
       <div className={styles.brand}>
         <div className={styles.logoWrap}>
-          <img
-            src="/images/hotel-system-logo.svg"
-            alt="Hotel System"
-            className={styles.logoImg}
-          />
+          <span className={styles.monogram}>ip</span>
         </div>
 
         {!collapsed && (

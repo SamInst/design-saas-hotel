@@ -10,7 +10,7 @@ const fmtCpf = (v) => {
   return d.length === 11 ? `${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}` : (v || '');
 };
 
-export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '', solicitante = null, pagamentos = [], isOrcamento = false }) => {
+export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precosCalc, quartosObs, roomDescMap, userName = '', solicitante = null, pagamentos = [], isOrcamento = false, titulo = null, consumos = [] }) => {
   const brl  = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const dt   = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
   const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
@@ -42,7 +42,6 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     p.rooms.forEach((quartoId) => {
       const calc = precosCalc[`${quartoId}_${pi}`] ?? { valor_total: 0, detalhes: [], sazonalidades_aplicadas: [] };
       const hospedes = p.roomHospedes?.[quartoId] || [];
-      const obs      = quartosObs[`${quartoId}_${pi}`] ?? quartosObs[quartoId] ?? '';
       const desc     = roomDescMap[quartoId] || '';
 
       let detalhesHtml = '';
@@ -80,15 +79,10 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
           </div>
         </div>`).join('');
 
-      const obsHtml = obs.trim()
-        ? `<label class="obs-label">Observação</label><div class="obs-box">${obs.trim()}</div>`
-        : '';
-
       roomsHtml += `
         <div class="room-block">
           ${isOrcamento ? '' : `<div class="room-card"><div class="room-label">Apartamento ${desc || rm(quartoId)}</div></div>`}
           ${hospedes.length > 0 ? `<div class="quarto-section">${hospedesHtml}</div>` : ''}
-          ${obsHtml}
           ${detalhesHtml}
           ${sazHtml}
           <div class="total-row">
@@ -127,10 +121,33 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     const pad = (v) => String(v).padStart(2, '0');
     return `${pad(n.getDate())}-${pad(n.getMonth()+1)}-${n.getFullYear()} ${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
   })();
-  const docTitle = `${nowFmt} VOUCHER DE RESERVA${titularNome ? ` | ${titularNome}` : ''}`;
+  // Título do documento: orçamento, ou personalizado (ex.: "Voucher de Hospedagem"), ou padrão
+  const headerTitle = isOrcamento ? 'Orçamento' : (titulo || 'Voucher de Reserva');
+  const docTitle = `${nowFmt} ${headerTitle.toUpperCase()}${titularNome ? ` | ${titularNome}` : ''}`;
 
+  // ── Consumos (opcional) ─────────────────────────────────────
+  const consumosList  = (consumos || []).filter((c) => !c.despesaPessoal);
+  const consumosTotal = consumosList.reduce((s, c) => s + (c.valorTotal ?? 0), 0);
+  const consumosHtml = consumosList.length > 0 ? `
+    <div class="pags-section" style="margin-top:20px">
+      <div class="pags-title">Consumos</div>
+      ${consumosList.map((c) => `
+        <div class="pag-row">
+          <div class="pag-left">
+            <span class="pag-forma">${c.quantidade}× ${c.descricao}</span>
+            ${c.valorUnitario ? `<span class="pag-data">${brl(c.valorUnitario)} / un.</span>` : ''}
+          </div>
+          <span class="pag-val" style="color:#0f172a">${brl(c.valorTotal)}</span>
+        </div>`).join('')}
+      <div class="pag-row" style="background:#f8fafc">
+        <div class="pag-left"><span class="pag-forma">Total de consumos</span></div>
+        <span class="pag-val" style="color:#0f172a">${brl(consumosTotal)}</span>
+      </div>
+    </div>` : '';
+
+  const totalGeral = grandTotal + consumosTotal;
   const totalPago = pagamentos.reduce((s, p) => s + (p.valor ?? 0), 0);
-  const pendente  = grandTotal - totalPago;
+  const pendente  = totalGeral - totalPago;
 
   const pagsHtml = pagamentos.length > 0 ? `
     <div class="pags-section" style="margin-top:20px">
@@ -156,12 +173,13 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     </div>` : '';
 
   const summaryHtml = `
+    ${consumosHtml}
     ${pagsHtml}
-    <div class="price-strip" ${pagamentos.length === 0 ? 'style="margin-top:20px;border-radius:0 0 8px 8px;border-top:1px solid #e2e8f0"' : ''}>
+    <div class="price-strip" ${pagamentos.length === 0 && !consumosHtml ? 'style="margin-top:20px;border-radius:0 0 8px 8px;border-top:1px solid #e2e8f0"' : ''}>
       ${pendente > 0 ? `<div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(pendente)}</b></div><div class="price-strip-divider"></div>` : ''}
       <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
       <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(grandTotal)}</b></div>
+      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(totalGeral)}</b></div>
     </div>`;
 
 
@@ -226,7 +244,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; ${isOrcamento ? 'Orçamento' : 'Voucher de Reserva'}</div>
+    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; ${headerTitle}</div>
     <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
     <div class="info-grid">
       <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>

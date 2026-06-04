@@ -66,6 +66,31 @@
 .sub      { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .mono     { font-size: 12px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; }
 .dateCell { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+
+/* Meta empilhada sob o nome — só aparece quando colunas são ocultadas no mobile */
+.cellMetaMobile { display: none; }
+.metaReg { display: inline-flex; align-items: center; gap: 3px; color: var(--text-2); }
+
+/* WhatsApp na célula de telefone (desktop) */
+.phoneCell { display: inline-flex; align-items: center; gap: 7px; }
+.waBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 7px; flex-shrink: 0;
+  border: 1px solid rgba(37,211,102,.3);
+  background: rgba(37,211,102,.1); color: #1da851;
+  cursor: pointer; transition: background .12s, color .12s, border-color .12s;
+}
+.waBtn:hover { background: #25d366; color: #fff; border-color: #25d366; }
+
+/* WhatsApp na meta empilhada (mobile) */
+.waMeta {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(37,211,102,.1); border: 1px solid rgba(37,211,102,.28);
+  color: #1da851; font-size: 11px; font-weight: 400;
+  font-family: var(--font-mono); text-decoration: none;
+}
+.waMeta:hover { background: #25d366; color: #fff; border-color: #25d366; }
 .btnEye   {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border);
@@ -91,6 +116,7 @@
 .pageBtn:hover:not(:disabled) { border-color:var(--violet); color:var(--violet); }
 .pageBtn:disabled              { opacity:.4; cursor:not-allowed; }
 .pageBtnActive { background:var(--violet); color:#fff; border-color:var(--violet); }
+.pageCurrent   { font-size:12px; font-weight:600; color:var(--text); padding:0 6px; white-space:nowrap; }
 .pageInfo      { margin-left:8px; font-size:12px; color:var(--text-2); }
 
 /* ── Empty / loading ── */
@@ -104,9 +130,12 @@
 .avatarEmpresa { background:rgba(14,165,233,.15); color:#0ea5e9; }
 
 /* ── Modal title block (detail modals) ── */
-.modalTitleBlock { display:flex; flex-direction:row; align-items:center; gap:10px; min-width:0; }
-.modalTitleName  { font-size:15px; font-weight:700; color:var(--text); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.modalTitleMeta  { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.modalTitleBlock { display:flex; flex-direction:row; align-items:center; gap:13px; min-width:0; }
+.modalTitleBlock .avatar {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--violet) 12%, transparent), 0 6px 16px -6px rgba(0,0,0,.3);
+}
+.modalTitleName  { font-size:17px; font-weight:700; letter-spacing:-.01em; color:var(--text); line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.modalTitleMeta  { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; }
 
 /* ── Detail modal actions ── */
 .detailActions { display:flex; gap:8px; justify-content:flex-end; }
@@ -122,8 +151,8 @@
   display:flex; align-items:center; justify-content:center;
   font-size:11px; font-weight:700; flex-shrink:0;
 }
-.detailId   { font-size:11px; font-family:var(--font-mono); font-weight:400; color:var(--text-2); background:var(--surface-2); border:1px solid var(--border); padding:1px 7px; border-radius:6px; }
-.depTag     { font-size:11px; color:#0ea5e9; background:rgba(14,165,233,.1); padding:2px 8px; border-radius:5px; }
+.detailId   { font-size:11px; font-family:var(--font-mono); font-weight:500; color:var(--text-2); background:var(--surface-2); border:1px solid var(--border); padding:2px 8px; border-radius:999px; }
+.depTag     { font-size:11px; font-weight:500; color:#0ea5e9; background:rgba(14,165,233,.1); padding:2px 9px; border-radius:999px; }
 
 /* ── Blocked notice ── */
 .blockedNotice {
@@ -133,39 +162,72 @@
   color:#ef4444; font-size:12px; font-weight:500;
 }
 
-/* ── Tabs ── */
-.tabs { display:flex; border-bottom:1px solid var(--border); margin:0 -16px; padding:0 16px; }
-.tab {
-  padding:10px 16px; font-size:13px; font-weight:500;
-  color:var(--text-2); background:none; border:none;
-  border-bottom:2px solid transparent; cursor:pointer;
-  transition:all .12s; margin-bottom:-1px;
+/* ── Tabs (pill track) ── */
+.tabs {
+  display:flex; gap:4px; padding:4px;
+  background:var(--surface-2); border:1px solid var(--border);
+  border-radius:12px; margin:0 0 4px;
+  /* permite o scroll horizontal funcionar mesmo dentro de um container flex */
+  min-width:0; max-width:100%;
+  overflow-x:auto; overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
 }
-.tab:hover   { color:var(--violet); }
-.tabActive   { color:var(--violet); border-bottom-color:var(--violet); font-weight:600; }
-.tabBody     { padding-top:14px; min-height:420px; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab {
+  padding:8px 15px; font-size:12.5px; font-weight:600;
+  color:var(--text-2); background:none; border:none; border-radius:9px;
+  cursor:pointer; white-space:nowrap; flex:0 0 auto;
+  transition:background .15s, color .15s;
+}
+.tab:hover   { color:var(--text); background:var(--surface); }
+.tabActive   { color:#fff; background:var(--violet); }
+.tabActive:hover { color:#fff; background:var(--violet); }
+.tabBody     { padding-top:16px; min-height:340px; }
 
-/* ── Detail KV grid ── */
-.detailGrid  { display:flex; flex-direction:column; gap:14px; }
+@media (max-width: 600px) {
+  .tab { padding:8px 13px; font-size:12px; }
+  .tabBody { min-height:0; }
+}
+
+/* ── Detail info cards ── */
+.detailGrid  { display:flex; flex-direction:column; gap:12px; }
+.infoCard {
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:15px 16px 13px;
+}
+.infoCardTitle {
+  display:flex; align-items:center; gap:8px;
+  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--violet); margin-bottom:13px;
+}
+.infoCardTitle::before {
+  content:''; width:7px; height:7px; border-radius:50%; flex-shrink:0;
+  background:var(--violet); box-shadow:0 0 0 3px color-mix(in srgb, var(--violet) 16%, transparent);
+}
 
 .sectionLabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:7px; }
-.kvList  { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; }
-.kvRow   { display:flex; flex-direction:column; gap:1px; }
-.kvLabel { font-size:10px; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; }
-.kvVal   { font-size:13px; color:var(--text); font-weight:500; }
+.kvList  { display:grid; grid-template-columns:1fr 1fr; gap:13px 16px; }
+.kvRow   { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.kvLabel { font-size:10px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.05em; }
+.kvVal   { font-size:13.5px; color:var(--text); font-weight:600; line-height:1.35; word-break:break-word; }
 
 /* ── Quick action buttons (WhatsApp/Email) ── */
 .quickBtn {
   display:inline-flex; align-items:center; justify-content:center;
-  width:20px; height:20px; border-radius:5px;
+  width:22px; height:22px; border-radius:7px;
   background:rgba(124,58,237,.10); color:var(--violet);
-  text-decoration:none; flex-shrink:0; transition:background .12s;
+  text-decoration:none; flex-shrink:0; transition:background .12s, color .12s;
 }
 .quickBtn:hover { background:var(--violet); color:#fff; }
+.quickBtnWa     { background:rgba(37,211,102,.12); color:#1da851; }
+.quickBtnWa:hover { background:#25d366; color:#fff; }
 
 /* ── Veículo card (detail) ── */
 .veiculoCard {
-  padding:12px 14px; border-radius:10px;
+  padding:13px 15px; border-radius:14px;
   border:1px solid var(--border); background:var(--surface-2);
 }
 .veiculoCardHead {
@@ -251,9 +313,13 @@
   flex:1; display:flex; flex-direction:column; gap:10px; min-width:0;
 }
 .photoFields {
-  display:grid; grid-template-columns:1fr 1.8fr 0.7fr;
+  display:grid; grid-template-columns:1fr 1fr;
   gap:10px; align-items:start;
 }
+/* CPF + Nascimento na linha de cima, Nome isolado embaixo (todas as larguras) */
+.photoFields > *:nth-child(1) { grid-column:1; grid-row:1; }                       /* CPF */
+.photoFields > *:nth-child(3) { grid-column:2; grid-row:1; width:auto !important; } /* Nascimento */
+.photoFields > *:nth-child(2) { grid-column:1 / -1; grid-row:2; }                  /* Nome (isolado) */
 .photoBig {
   position:relative; width:88px; height:88px; border-radius:50%;
   border:2px dashed var(--border); background:var(--surface-2);
@@ -581,6 +647,34 @@
 }
 
 /* ── Responsive ── */
+/* ── Responsivo: header + tabela ── */
+@media (max-width: 860px) {
+  .tableHeader { padding: 12px 12px 10px; }
+  .tableTools  { width: 100%; }
+  .searchWrap  { flex: 1 1 100%; min-width: 0; order: -1; }
+  .filterRow   { padding: 10px 12px; gap: 5px; }
+  /* rolagem horizontal das abas de filtro em telas estreitas */
+  .filterRow   { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .filterRow::-webkit-scrollbar { display: none; }
+  .filterTab   { flex-shrink: 0; }
+  .sortGroup   { margin-left: auto; flex-shrink: 0; }
+
+  /* colapsa colunas secundárias para a meta empilhada */
+  .colDoc, .colPhone, .colDate { display: none; }
+  .cellMetaMobile {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
+    margin-top: 3px; font-size: 11px;
+  }
+  .cellMetaMobile .mono { font-size: 11px; }
+  .table th, .table td { padding-left: 12px; padding-right: 12px; }
+}
+
+@media (max-width: 420px) {
+  .tableTools button { flex: 1 1 auto; justify-content: center; }
+  .pagination { flex-wrap: wrap; }
+  .pageInfo { width: 100%; margin: 4px 0 0; text-align: center; }
+}
+
 @media (max-width:700px) {
   .grid2, .grid3 { grid-template-columns:1fr; }
   .spanTwo { grid-column:auto; }
@@ -588,7 +682,7 @@
   .kvList  { grid-template-columns:1fr; }
   .photoHeaderRow { flex-direction:column; align-items:center; }
   .photoRightCol { width:100%; }
-  .photoFields { grid-template-columns:1fr; }
+  /* layout de campos (CPF+Nascimento / Nome) já é o padrão em .photoFields */
   .modalTwoCol { flex-direction:column; }
   .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--border); }
 

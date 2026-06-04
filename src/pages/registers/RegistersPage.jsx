@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, Calendar, Shield, UserCheck, UserX,
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
-  Edit2, X, Phone, Mail,
+  Edit2, X, Mail, MessageCircle,
 } from 'lucide-react';
 
 import { Button }                   from '../../components/ui/Button';
@@ -303,8 +303,8 @@ function AvatarCircle({ name, size = 40, className = '' }) {
 
 function Section({ title, children }) {
   return (
-    <div className={styles.section}>
-      <div className={styles.sectionDivider}>{title}</div>
+    <div className={styles.infoCard}>
+      <div className={styles.infoCardTitle}>{title}</div>
       <div className={styles.kvList}>{children}</div>
     </div>
   );
@@ -1449,8 +1449,9 @@ export default function RegistersPage() {
                 <thead><tr>
                   <th style={{ width: 44 }}></th>
                   <th>Nome / Razão Social</th>
-                  <th style={{ width: 148 }}>CPF / CNPJ</th>
-                  <th style={{ width: 148 }}>Telefone</th>
+                  <th className={styles.colDoc} style={{ width: 148 }}>CPF / CNPJ</th>
+                  <th className={styles.colPhone} style={{ width: 148 }}>Telefone</th>
+                  <th className={styles.colDate} style={{ width: 124 }}>Cadastrado em</th>
                   <th style={{ width: 100 }}>Status</th>
                 </tr></thead>
                 <tbody>
@@ -1463,10 +1464,24 @@ export default function RegistersPage() {
                       if (/^\d{2}\/\d{2}\/\d{4}/.test(reg)) { const [d,m,y] = reg.slice(0,10).split('/'); return `${y}-${m}-${d}`; }
                       return '';
                     };
+                    const fmtReg = reg => {
+                      const iso = toISO(reg);
+                      if (!iso) return '—';
+                      const [y, m, d] = iso.split('-');
+                      return `${d}/${m}/${y}`;
+                    };
+                    const waLink = tel => {
+                      const d = unmask(tel);
+                      if (!d) return null;
+                      return `https://wa.me/${d.length <= 11 ? '55' + d : d}`;
+                    };
                     return items.map(item => {
                     const name = nomeListing(item);
                     const { bg, fg } = avatarColor(name);
                     const isNew = toISO(item.data_hora_registro) === todayISO;
+                    const docFmt = item._type === 'empresa' ? maskCNPJ(item.cnpj ?? '') : maskCPF(item.cpf ?? '');
+                    const telFmt = item.telefone ? maskPhone(item.telefone) : '';
+                    const regFmt = fmtReg(item.data_hora_registro);
                     return (
                       <tr key={`${item._type}-${item.id}`} className={styles.row} onClick={() => openDetail(item)}>
                         <td>
@@ -1499,11 +1514,30 @@ export default function RegistersPage() {
                               <Building2 size={10} /> {empresaNome(item.empresas_vinculadas[0])}
                             </div>
                           )}
+                          {/* Meta empilhada — telefone (WhatsApp) + data; só no mobile */}
+                          <div className={styles.cellMetaMobile}>
+                            {telFmt && (
+                              <a className={styles.waMeta} href={waLink(item.telefone)} target="_blank" rel="noreferrer"
+                                onClick={e => e.stopPropagation()} title="Abrir no WhatsApp">
+                                <MessageCircle size={11} /> {telFmt}
+                              </a>
+                            )}
+                            <span className={styles.metaReg}><Calendar size={9} /> {regFmt}</span>
+                          </div>
                         </td>
-                        <td className={styles.mono}>
-                          {item._type === 'empresa' ? maskCNPJ(item.cnpj ?? '') : maskCPF(item.cpf ?? '')}
+                        <td className={[styles.mono, styles.colDoc].join(' ')}>{docFmt}</td>
+                        <td className={styles.colPhone}>
+                          {telFmt ? (
+                            <span className={styles.phoneCell}>
+                              <span className={styles.mono}>{telFmt}</span>
+                              <a className={styles.waBtn} href={waLink(item.telefone)} target="_blank" rel="noreferrer"
+                                onClick={e => e.stopPropagation()} title="Abrir no WhatsApp" aria-label="Abrir no WhatsApp">
+                                <MessageCircle size={13} />
+                              </a>
+                            </span>
+                          ) : <span className={styles.mono}>—</span>}
                         </td>
-                        <td className={styles.mono}>{item.telefone ? maskPhone(item.telefone) : '—'}</td>
+                        <td className={[styles.dateCell, styles.colDate].join(' ')}>{regFmt}</td>
                         <td><StatusBadge status={item.status} /></td>
                       </tr>
                     );
@@ -1520,11 +1554,7 @@ export default function RegistersPage() {
               <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}>
                 <ChevronLeft size={14} />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button key={i}
-                  className={[styles.pageBtn, page === i ? styles.pageBtnActive : ''].join(' ')}
-                  onClick={() => goToPage(i)}>{i + 1}</button>
-              ))}
+              <span className={styles.pageCurrent}>Página {page + 1} de {totalPages}</span>
               <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}>
                 <ChevRight size={14} />
               </button>
@@ -1552,7 +1582,7 @@ export default function RegistersPage() {
               ['dependentes', 'Dependentes',               true],
             ].filter(([,, visible]) => visible).map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
-                onClick={() => setDetailTab(id)}>{label}</button>
+                onClick={(e) => { setDetailTab(id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }}>{label}</button>
             ))}
           </div>
 
@@ -1570,8 +1600,8 @@ export default function RegistersPage() {
                       <span>{maskPhone(detailItem.telefone ?? '') || '—'}</span>
                       {detailItem.telefone && (
                         <a href={`https://wa.me/55${unmask(detailItem.telefone)}`} target="_blank"
-                          rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={e => e.stopPropagation()}>
-                          <Phone size={11} />
+                          rel="noreferrer" className={[styles.quickBtn, styles.quickBtnWa].join(' ')} title="WhatsApp" onClick={e => e.stopPropagation()}>
+                          <MessageCircle size={11} />
                         </a>
                       )}
                     </div>
@@ -1774,7 +1804,7 @@ export default function RegistersPage() {
             {[['informacoes','Informações',true],['vinculados','Vinculados',true],['historico','Histórico de Hospedagens',canHistorico]]
               .filter(([,,v]) => v).map(([id, label]) => (
               <button key={id} className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
-                onClick={() => setDetailTab(id)}>{label}</button>
+                onClick={(e) => { setDetailTab(id); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }}>{label}</button>
             ))}
           </div>
 
@@ -1791,8 +1821,8 @@ export default function RegistersPage() {
                       <span>{detailItem.telefone || '—'}</span>
                       {detailItem.telefone && (
                         <a href={`https://wa.me/55${unmask(detailItem.telefone)}`} target="_blank"
-                          rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={e => e.stopPropagation()}>
-                          <Phone size={11} />
+                          rel="noreferrer" className={[styles.quickBtn, styles.quickBtnWa].join(' ')} title="WhatsApp" onClick={e => e.stopPropagation()}>
+                          <MessageCircle size={11} />
                         </a>
                       )}
                     </div>

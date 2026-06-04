@@ -542,7 +542,7 @@ export const hospedagemApi = {
    */
   buscar({ status, quarto_id, mes, ano, nomeTitular, data } = {}) {
     const qs = new URLSearchParams();
-    if (status      != null) qs.append('status',      status);
+    if (status      != null) (Array.isArray(status) ? status : [status]).forEach((s) => qs.append('status', s));
     if (quarto_id   != null) qs.append('quarto_id',   quarto_id);
     if (mes         != null) qs.append('mes',          mes);
     if (ano         != null) qs.append('ano',          ano);
@@ -565,6 +565,11 @@ export const hospedagemApi = {
   /** POST /hospedagem/{hospedagemId}/pagamentos — adiciona pagamentos à hospedagem */
   adicionarPagamentos(hospedagemId, body) {
     return request(`/hospedagem/${hospedagemId}/pagamentos`, { method: 'POST', body });
+  },
+
+  /** PUT /hospedagem/{hospedagemId}/status?status=X — altera apenas o status (valida a transição) */
+  alterarStatus(hospedagemId, status) {
+    return request(`/hospedagem/${hospedagemId}/status`, { method: 'PUT', params: { status } });
   },
 
   /**

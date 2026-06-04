@@ -1,9 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 
-/* ──────────────────────────────────────
-   SIDEBAR SHELL
-────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────
+   SIDEBAR — Isto é Pousada
+   Permanent pine-ocean rail, mirroring the login stage.
+   Gold + terracotta accents · Fraunces brand · sand text.
+   ───────────────────────────────────────────────────────────── */
 .sidebar {
+  --pine:    #0c322b;
+  --pine-2:  #124237;
+  --pine-3:  #0a2620;
+  --cream:   #f6efe2;
+  --gold:    #e3ac6b;
+  --terra:   #d97a4e;
+
   width: 220px;
   height: 100vh;
   display: flex;
@@ -11,11 +20,11 @@
   overflow: hidden;
   overscroll-behavior: none;
 
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
 
-  background: #0e0e16;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset -1px 0 0 rgba(124, 58, 237, 0.08);
+  background: linear-gradient(185deg, var(--pine-2) 0%, var(--pine) 46%, var(--pine-3) 100%);
+  border-right: 1px solid rgba(244, 236, 224, 0.08);
+  box-shadow: inset -1px 0 0 rgba(227, 172, 107, 0.10);
 
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -28,8 +37,8 @@
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 14px 12px 12px;
+  gap: 10px;
+  padding: 15px 12px 13px;
   position: relative;
   flex-shrink: 0;
   min-height: 68px;
@@ -44,10 +53,20 @@
   justify-content: center;
 }
 
-.logoImg {
+.monogram {
+  display: grid;
+  place-items: center;
   width: 36px;
   height: 36px;
-  object-fit: contain;
+  border-radius: 10px;
+  background: linear-gradient(150deg, rgba(227,172,107,0.18), rgba(217,122,78,0.14));
+  border: 1px solid rgba(227, 172, 107, 0.32);
+  color: var(--gold);
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .brandText {
@@ -58,9 +77,10 @@
 
 .appName {
   display: block;
-  font-size: 13px;
-  font-weight: 700;
-  color: #f0eeff;
+  font-family: 'Fraunces', serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cream);
   white-space: nowrap;
   letter-spacing: -0.01em;
 }
@@ -68,11 +88,11 @@
 .appTagline {
   display: block;
   font-size: 9px;
-  font-weight: 400;
-  color: rgba(156, 163, 175, 0.55);
+  font-weight: 600;
+  color: rgba(227, 172, 107, 0.75);
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  margin-top: 2px;
+  letter-spacing: 0.14em;
+  margin-top: 3px;
 }
 
 .collapseBtn {
@@ -85,9 +105,9 @@
   height: 22px;
   border-radius: 7px;
 
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(156, 163, 175, 0.6);
+  border: 1px solid rgba(244, 236, 224, 0.10);
+  background: rgba(244, 236, 224, 0.05);
+  color: rgba(244, 236, 224, 0.55);
 
   display: flex;
   align-items: center;
@@ -98,9 +118,9 @@
 }
 
 .collapseBtn:hover {
-  background: rgba(124, 58, 237, 0.18);
-  border-color: rgba(124, 58, 237, 0.35);
-  color: #a78bfa;
+  background: rgba(227, 172, 107, 0.16);
+  border-color: rgba(227, 172, 107, 0.40);
+  color: var(--gold);
 }
 
 /* ──────────────────────────────────────
@@ -113,8 +133,8 @@
   background: linear-gradient(
     to right,
     transparent,
-    rgba(124, 58, 237, 0.25) 40%,
-    rgba(6, 182, 212, 0.15) 70%,
+    rgba(227, 172, 107, 0.32) 40%,
+    rgba(217, 122, 78, 0.18) 70%,
     transparent
   );
 }
@@ -123,7 +143,7 @@
   height: 1px;
   flex-shrink: 0;
   margin: 3px 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(244, 236, 224, 0.07);
 }
 
 /* ──────────────────────────────────────
@@ -139,12 +159,12 @@
   gap: 1px;
 
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+  scrollbar-color: rgba(244, 236, 224, 0.10) transparent;
 }
 
 .nav::-webkit-scrollbar       { width: 3px; }
 .nav::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(244, 236, 224, 0.10);
   border-radius: 999px;
 }
 
@@ -152,9 +172,9 @@
   display: block;
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(156, 163, 175, 0.40);
+  color: rgba(227, 172, 107, 0.50);
   padding: 4px 8px 7px;
   flex-shrink: 0;
 }
@@ -175,10 +195,10 @@
 
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(209, 213, 219, 0.72);
+  color: rgba(244, 236, 224, 0.70);
 
   cursor: pointer;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -194,27 +214,27 @@
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #f0eeff;
-  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(244, 236, 224, 0.06);
+  color: var(--cream);
+  border-color: rgba(244, 236, 224, 0.07);
 }
 
 .itemActive {
-  background: rgba(124, 58, 237, 0.18) !important;
-  border-color: rgba(124, 58, 237, 0.28) !important;
-  color: #c4b5fd !important;
+  background: rgba(227, 172, 107, 0.15) !important;
+  border-color: rgba(227, 172, 107, 0.30) !important;
+  color: #f3dcb6 !important;
   font-weight: 600;
 }
 
-.itemActive .iconWrap { color: #a78bfa; }
+.itemActive .iconWrap { color: var(--gold); }
 
 .activePip {
   margin-left: auto;
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #7c3aed;
-  box-shadow: 0 0 7px rgba(124, 58, 237, 0.75);
+  background: var(--gold);
+  box-shadow: 0 0 8px rgba(227, 172, 107, 0.8);
   flex-shrink: 0;
 }
 
@@ -224,11 +244,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(156, 163, 175, 0.75);
+  color: rgba(244, 236, 224, 0.62);
   transition: color 0.13s ease;
 }
 
-.item:hover .iconWrap { color: #a78bfa; }
+.item:hover .iconWrap { color: var(--gold); }
 
 .label {
   white-space: nowrap;
@@ -265,10 +285,10 @@
 
   background: transparent;
   border: 1px solid transparent;
-  color: rgba(156, 163, 175, 0.70);
+  color: rgba(244, 236, 224, 0.66);
 
   cursor: pointer;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -277,17 +297,18 @@
 }
 
 .themeBtn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #f0eeff;
-  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(244, 236, 224, 0.06);
+  color: var(--cream);
+  border-color: rgba(244, 236, 224, 0.08);
 }
+.themeBtn:hover .iconWrap { color: var(--gold); }
 
 .logoutBtn:hover {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.20);
-  color: #fca5a5;
+  background: rgba(217, 122, 78, 0.16);
+  border-color: rgba(217, 122, 78, 0.30);
+  color: #f0b794;
 }
-.logoutBtn:hover .iconWrap { color: #f87171; }
+.logoutBtn:hover .iconWrap { color: var(--terra); }
 
 /* ── PROFILE ── */
 .profile {
@@ -296,8 +317,8 @@
   gap: 9px;
   padding: 9px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(244, 236, 224, 0.04);
+  border: 1px solid rgba(244, 236, 224, 0.07);
   margin-top: 2px;
   flex-shrink: 0;
 }
@@ -308,15 +329,16 @@
   border-radius: 8px;
   flex-shrink: 0;
 
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  color: #fff;
-  font-size: 12px;
+  background: linear-gradient(140deg, var(--gold), var(--terra));
+  color: var(--pine);
+  font-size: 13px;
   font-weight: 700;
+  font-family: 'Fraunces', serif;
 
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.30);
+  box-shadow: 0 2px 10px rgba(217, 122, 78, 0.30);
 }
 
 .profileText { flex: 1; min-width: 0; }
@@ -324,7 +346,7 @@
 .profileName {
   font-size: 12px;
   font-weight: 700;
-  color: #f0eeff;
+  color: var(--cream);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -332,7 +354,7 @@
 
 .profileRole {
   font-size: 10px;
-  color: rgba(156, 163, 175, 0.60);
+  color: rgba(227, 172, 107, 0.70);
   margin-top: 1px;
 }
 
@@ -344,7 +366,7 @@
 
   border: 1px solid transparent;
   background: transparent;
-  color: rgba(156, 163, 175, 0.50);
+  color: rgba(244, 236, 224, 0.45);
   cursor: pointer;
 
   display: flex;
@@ -354,8 +376,8 @@
 }
 
 .moreBtn:hover {
-  background: rgba(255, 255, 255, 0.07);
-  color: #e5e7eb;
+  background: rgba(244, 236, 224, 0.08);
+  color: var(--cream);
 }
 
 /* ──────────────────────────────────────

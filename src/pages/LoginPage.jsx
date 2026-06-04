@@ -9,7 +9,6 @@ export default function LoginPage({ onLogin }) {
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
-  const [focused,  setFocused]  = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,19 +22,17 @@ export default function LoginPage({ onLogin }) {
 
     try {
       const { user } = await authApi.login(username.trim(), password);
-
-      // Monta o objeto de sessão que o App.jsx vai usar
       onLogin({
-        id:          user.id,
-        usuarioId:   user.usuario?.id,
-        pessoaId:    user.pessoa?.id,
-        name:        user.pessoa?.nome,
-        username:    user.usuario?.username,
-        email:       user.pessoa?.email,
-        role:        user.cargo?.descricao ?? 'Funcionário',
-        cargo:       user.cargo,
+        id:           user.id,
+        usuarioId:    user.usuario?.id,
+        pessoaId:     user.pessoa?.id,
+        name:         user.pessoa?.nome,
+        username:     user.usuario?.username,
+        email:        user.pessoa?.email,
+        role:         user.cargo?.descricao ?? 'Funcionário',
+        cargo:        user.cargo,
         dataAdmissao: user.data_admissao,
-        avatar:      null,
+        avatar:       null,
       });
     } catch (err) {
       if (err.status === 401 || err.status === 403) {
@@ -53,150 +50,121 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className={styles.page}>
 
-      {/* ── LEFT PANEL ── */}
-      <div className={styles.left}>
-        <div className={styles.leftInner}>
-          <div className={styles.orbs}>
-            <div className={styles.orb1} />
-            <div className={styles.orb2} />
-            <div className={styles.orb3} />
-          </div>
+      {/* ── IMMERSIVE STAGE ─────────────────────────────────────────── */}
+      <aside className={styles.stage} aria-hidden="true">
+        <div className={styles.photo} />
+        <div className={styles.tint} />
+        <div className={styles.sun} />
+        <div className={styles.grain} />
 
-          <div className={styles.leftContent}>
-            <div className={styles.logoMark}>
-              <img src="/images/hotel-system-logo.svg" alt="Hotel System" className={styles.logoSvg} />
-            </div>
-
-            <div className={styles.leftText}>
-              <h2 className={styles.leftHeading}>Bem-vindo de volta</h2>
-              <p className={styles.leftDesc}>
-                Gerencie reservas, finanças e operações do hotel em um só lugar.
-              </p>
-            </div>
-
-            <div className={styles.stats}>
-              <div className={styles.stat}>
-                <span className={styles.statNum}>22</span>
-                <span className={styles.statLabel}>Quartos</span>
-              </div>
-              <div className={styles.statDivider} />
-              <div className={styles.stat}>
-                <span className={styles.statNum}>98%</span>
-                <span className={styles.statLabel}>Ocupação</span>
-              </div>
-              <div className={styles.statDivider} />
-              <div className={styles.stat}>
-                <span className={styles.statNum}>4.9</span>
-                <span className={styles.statLabel}>Avaliação</span>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.leftGrid} aria-hidden="true">
-            {Array.from({ length: 48 }).map((_, i) => (
-              <div key={i} className={styles.gridCell} />
-            ))}
-          </div>
+        <div className={styles.stageTop}>
+          <span className={styles.badge}>
+            <span className={styles.badgeDot} />
+            Estabelecido · Litoral
+          </span>
         </div>
-      </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className={styles.right}>
-        <div className={styles.formWrap}>
+        <div className={styles.stageBody}>
+          <span className={styles.kicker}>Sistema de Gestão Hoteleira</span>
+          <h2 className={styles.wordmark}>
+            Isto é<br /><em>Pousada</em>.
+          </h2>
+          <p className={styles.lede}>
+            Onde cada reserva vira uma estadia, e cada estadia, uma história
+            à beira-mar.
+          </p>
+        </div>
 
-          <div className={styles.formHeader}>
-            <div className={styles.logoSmall}>
-              <img src="/images/hotel-system-logo.svg" alt="" className={styles.logoSvgSm} />
-            </div>
-            <div>
-              <h1 className={styles.formTitle}>Hotel System</h1>
-              <p className={styles.formSub}>Acesso ao painel de gestão</p>
-            </div>
+        <ul className={styles.features}>
+          <li><span className={styles.featNum}>01</span> Reservas &amp; pernoites num só calendário</li>
+          <li><span className={styles.featNum}>02</span> Financeiro, vouchers e orçamentos</li>
+          <li><span className={styles.featNum}>03</span> Recepção em tempo real</li>
+        </ul>
+      </aside>
+
+      {/* ── FORM ────────────────────────────────────────────────────── */}
+      <main className={styles.panel}>
+        <div className={styles.panelInner}>
+
+          <header className={styles.brand}>
+            <span className={styles.monogram}>ip</span>
+            <span className={styles.brandText}>Isto é Pousada</span>
+          </header>
+
+          <div className={styles.intro}>
+            <h1 className={styles.title}>Bem-vindo de volta</h1>
+            <p className={styles.sub}>Entre para gerenciar a operação da pousada.</p>
           </div>
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
 
-            {/* Error banner */}
             {error && (
-              <div className={styles.errorBanner}>
-                <AlertCircle size={15} />
+              <div className={styles.error} role="alert">
+                <AlertCircle size={15} strokeWidth={2.2} />
                 <span>{error}</span>
               </div>
             )}
 
-            {/* Username */}
-            <div className={`${styles.fieldGroup} ${focused === 'user' ? styles.active : ''} ${error ? styles.hasError : ''}`}>
-              <label className={styles.fieldLabel} htmlFor="username">Usuário</label>
-              <div className={styles.inputWrap}>
-                <input
-                  id="username"
-                  className={styles.input}
-                  type="text"
-                  autoComplete="username"
-                  placeholder="seu.usuario"
-                  value={username}
-                  onChange={(e) => { setUsername(e.target.value); setError(''); }}
-                  onFocus={() => setFocused('user')}
-                  onBlur={() => setFocused(null)}
-                  disabled={loading}
-                  required
-                />
-              </div>
+            <div className={styles.field}>
+              <input
+                id="username"
+                className={styles.input}
+                type="text"
+                autoComplete="username"
+                placeholder=" "
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setError(''); }}
+                disabled={loading}
+                required
+              />
+              <label className={styles.label} htmlFor="username">Usuário</label>
+              <span className={styles.underline} />
             </div>
 
-            {/* Password */}
-            <div className={`${styles.fieldGroup} ${focused === 'pass' ? styles.active : ''} ${error ? styles.hasError : ''}`}>
-              <label className={styles.fieldLabel} htmlFor="password">Senha</label>
-              <div className={styles.inputWrap}>
-                <input
-                  id="password"
-                  className={`${styles.input} ${styles.inputPass}`}
-                  type={showPass ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                  onFocus={() => setFocused('pass')}
-                  onBlur={() => setFocused(null)}
-                  disabled={loading}
-                  required
-                />
-                <button
-                  type="button"
-                  className={styles.eyeBtn}
-                  onClick={() => setShowPass(v => !v)}
-                  aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
-                  tabIndex={-1}
-                >
-                  {showPass ? <Eye size={15} /> : <EyeOff size={15} />}
-                </button>
-              </div>
-            </div>
-
-            <div className={styles.forgotRow}>
-              <button type="button" className={styles.forgotBtn}>
-                Esqueceu a senha?
+            <div className={styles.field}>
+              <input
+                id="password"
+                className={styles.input}
+                type={showPass ? 'text' : 'password'}
+                autoComplete="current-password"
+                placeholder=" "
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                disabled={loading}
+                required
+              />
+              <label className={styles.label} htmlFor="password">Senha</label>
+              <span className={styles.underline} />
+              <button
+                type="button"
+                className={styles.eye}
+                onClick={() => setShowPass(v => !v)}
+                aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
+                tabIndex={-1}
+              >
+                {showPass ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
             </div>
 
+            <div className={styles.forgotRow}>
+              <button type="button" className={styles.forgot}>Esqueceu a senha?</button>
+            </div>
+
             <button className={styles.submit} disabled={loading} type="submit">
-              {loading ? (
-                <>
-                  <Loader2 size={16} className={styles.spinner} />
-                  Entrando…
-                </>
-              ) : (
-                <>
-                  Entrar
-                  <ArrowRight size={16} />
-                </>
-              )}
+              <span className={styles.submitLabel}>
+                {loading ? 'Entrando' : 'Entrar'}
+              </span>
+              {loading
+                ? <Loader2 size={17} className={styles.spinner} />
+                : <ArrowRight size={17} className={styles.submitArrow} />}
             </button>
           </form>
 
-          <p className={styles.copyright}>Hotel System © {new Date().getFullYear()}</p>
+          <footer className={styles.legal}>
+            Isto é Pousada © {new Date().getFullYear()} · Painel interno
+          </footer>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
