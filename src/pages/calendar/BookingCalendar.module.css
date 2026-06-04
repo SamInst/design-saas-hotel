@@ -617,6 +617,46 @@
 .initialsCircle   { width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 18%, transparent); color: var(--violet); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .initialsCircleSm { width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); font-size: 9px;  font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
+/* ── Gerenciar Pessoas — busca flutuante + lista estilo Cadastros ── */
+.gpSearchSticky {
+  position: sticky;
+  top: -14px;                     /* cancela o padding-top do container de scroll */
+  z-index: 5;
+  margin: -14px -16px 6px;        /* expande até as bordas do container (padding 16px) */
+  padding: 14px 16px 8px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.gpSearchBar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  transition: border-color 0.15s;
+}
+.gpSearchBar:focus-within { border-color: var(--violet); }
+.gpSearchIcon { color: var(--text-2); flex-shrink: 0; }
+.gpSearchInput {
+  flex: 1; min-width: 0; border: none; background: none; outline: none;
+  font-family: inherit; font-size: 13px; color: var(--text);
+}
+.gpSearchInput::placeholder { color: var(--text-2); }
+.gpSearchClear {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
+  border: none; background: none; color: var(--text-2); cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.gpSearchClear:hover { background: var(--surface); color: var(--text); }
+
+.gpPersonRow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+}
+.gpPersonInfo { flex: 1; min-width: 0; }
+.gpPersonName { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gpPersonMeta { font-size: 11px; font-family: var(--font-mono); color: var(--text-2); margin-top: 1px; }
+
 /* ── Financial values ──────────────────────────────────────────────────────── */
 .finRow      { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); padding: 2px 0; }
 .finTotal    { color: var(--text); font-weight: 700; }
@@ -2135,6 +2175,49 @@
   transition: background 0.12s, color 0.12s, border-color 0.12s, opacity 0.12s;
 }
 .rvBtn:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Botão único "Ações" + menu (padrão Recepção) ── */
+.rvAcoesWrap { position: relative; margin-left: auto; }
+.rvAcoesBtn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 20px; border-radius: 9px; border: none;
+  font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer;
+  color: #fff; background: #0f172a;
+  transition: background 0.12s;
+}
+.rvAcoesBtn:hover { background: #1e293b; }
+.rvAcoesBtnChevron { transition: transform 0.2s; }
+.rvAcoesBtnChevronOpen { transform: rotate(180deg); transition: transform 0.2s; }
+.rvAcoesBackdrop { position: fixed; inset: 0; z-index: 9; }
+.rvAcoesMenu {
+  position: absolute; bottom: calc(100% + 8px); right: 0;
+  min-width: 220px; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.14), 0 -2px 8px rgba(0,0,0,0.06);
+  display: flex; flex-direction: column; gap: 1px; z-index: 10;
+  animation: rvAcoesIn 0.15s ease-out;
+}
+@keyframes rvAcoesIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.rvAcoesItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border-radius: 8px; width: 100%;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  color: var(--text); background: none; border: none;
+  cursor: pointer; text-align: left;
+  transition: background 0.1s, color 0.1s, opacity 0.1s;
+}
+.rvAcoesItem:hover { background: var(--surface-2); }
+.rvAcoesItem:disabled { opacity: 0.4; cursor: default; }
+.rvAcoesItem:disabled:hover { background: none; }
+.rvAcoesItemPrimary { color: var(--violet); font-weight: 700; }
+.rvAcoesItemPrimary:hover { background: rgba(124,58,237,0.08); }
+.rvAcoesItemDanger { color: #ef4444; }
+.rvAcoesItemDanger:hover { background: rgba(239,68,68,0.09); color: #dc2626; }
+.rvAcoesDiv { height: 1px; background: var(--border); margin: 3px 4px; }
 .rvBtnPrimary {
   background: #0f172a;
   color: #fff;

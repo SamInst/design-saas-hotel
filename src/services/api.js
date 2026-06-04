@@ -412,6 +412,11 @@ export const reservaApi = {
     return request(`/reserva/${id}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
   },
 
+  /** Marca a reserva como ausente (RESERVA_AUSENTE). */
+  marcarAusente(id) {
+    return request(`/reserva/${id}/ausente`, { method: 'PUT' });
+  },
+
   /** Atualiza o status de uma lista de reservas. */
   atualizarStatus(ids, status) {
     return request('/reserva/status', { method: 'PUT', body: { ids, status } });
@@ -570,6 +575,22 @@ export const hospedagemApi = {
   /** PUT /hospedagem/{hospedagemId}/status?status=X — altera apenas o status (valida a transição) */
   alterarStatus(hospedagemId, status) {
     return request(`/hospedagem/${hospedagemId}/status`, { method: 'PUT', params: { status } });
+  },
+
+  /**
+   * GET /hospedagem/quarto/{quartoId} — reservas de um quarto, paginadas (todos os status).
+   * @param {number} quartoId
+   * @param {{ mes?, ano?, periodo?: 'anteriores'|'proximas', page?, size? }} opts
+   *        periodo vazio => filtra por mês/ano; senão ignora mês/ano.
+   */
+  buscarPorQuarto(quartoId, { mes, ano, periodo, page = 0, size = 8 } = {}) {
+    const params = { page, size };
+    if (periodo)      params.periodo = periodo;
+    else {
+      if (mes != null) params.mes = mes;
+      if (ano != null) params.ano = ano;
+    }
+    return request(`/hospedagem/quarto/${quartoId}`, { params });
   },
 
   /**
