@@ -3723,7 +3723,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               {/* Per-room hospedes */}
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Apartamento {fmtRoom(parseInt(q))}</div>
+                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}</div>
                   {isOrcSemCadastro ? (
                     <SemCadastroHospedesPicker
                       value={quartoHospedesOrc[q] || []}
@@ -3800,7 +3800,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 {/* Per-room hospedes for this period */}
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Hóspedes — Apartamento {fmtRoom(parseInt(q))}</div>
+                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}{roomDescMap[q] ? ` — ${roomDescMap[q]}` : ''}</div>
                     {isOrcSemCadastro ? (
                       <SemCadastroHospedesPicker
                         value={mpRoomHospedesOrc[q] || []}
@@ -4203,6 +4203,10 @@ export default function BookingCalendar() {
   const [reservasSelecionadas, setReservasSelecionadas] = useState(new Set());
   const [showPagMultiploModal, setShowPagMultiploModal] = useState(false);
   const [pagMultiploSaving,    setPagMultiploSaving]    = useState(false);
+  const [pagMultiploModo,      setPagMultiploModo]      = useState('unico'); // 'unico' | 'por_quarto'
+  const [showPagQuartoPicker,  setShowPagQuartoPicker]  = useState(false);
+  const [pagQuartoAlvo,        setPagQuartoAlvo]        = useState(null); // reserva escolhida (por quarto)
+  const [winWide,              setWinWide]              = useState(typeof window !== 'undefined' ? window.innerWidth >= 1080 : true);
   const [groupPanel,           setGroupPanel]           = useState(null);
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
@@ -4699,6 +4703,15 @@ export default function BookingCalendar() {
     setPagamentoModoAtivo(false);
     setReservasSelecionadas(new Set());
     setShowPagMultiploModal(false);
+    setPagMultiploModo('unico');
+    setShowPagQuartoPicker(false);
+    setPagQuartoAlvo(null);
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => setWinWide(window.innerWidth >= 1080);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const handleBarGroupEnter = useCallback((grupoId, e) => {
@@ -4725,24 +4738,30 @@ export default function BookingCalendar() {
   const handlePagamentoMultiplo = async (payment) => {
     setPagMultiploSaving(true);
     try {
+      if (pagMultiploModo === 'por_quarto') {
+        // Pagamento para o quarto escolhido apenas.
+        if (!pagQuartoAlvo) return;
+        await hospedagemApi.adicionarPagamentoMultiplo([pagQuartoAlvo.id], payment);
+        await loadReservas();
+        notify(`Pagamento adicionado ao Ap. ${fmtRoom(pagQuartoAlvo.quarto)}!`);
+        setShowPagMultiploModal(false);
+        setPagQuartoAlvo(null);
+        // permanece no modo de seleção para pagar outros quartos
+        return;
+      }
+
+      // Pagamento único: um só pagamento compartilhado por todas as reservas.
       const selecionadas = allReservas.filter((r) => reservasSelecionadas.has(r.id));
       const ids = selecionadas.map((r) => r.id);
-
-      // All selected reservations share the same (non-null) group → single group endpoint.
-      // Otherwise (any null group, or mixed groups) → normal multi-reservation payment.
       const grupos = new Set(selecionadas.map((r) => r.grupo_id).filter((g) => g != null));
       const grupoUnico = grupos.size === 1 && selecionadas.every((r) => r.grupo_id != null)
         ? [...grupos][0]
         : null;
-
       if (grupoUnico != null) {
         await hospedagemApi.adicionarPagamentoGrupo(grupoUnico, payment);
       } else {
         await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
       }
-
-      // Single reload — the group endpoint pays every member of the group (not just the
-      // selected ones), so a full refresh is both simpler and more correct than N refetches.
       await loadReservas();
       notify(`Pagamento adicionado a ${ids.length} reserva${ids.length !== 1 ? 's' : ''}!`);
       exitSelectionMode();
@@ -5159,10 +5178,29 @@ export default function BookingCalendar() {
               {' '}reserva{reservasSelecionadas.size !== 1 ? 's' : ''} selecionada{reservasSelecionadas.size !== 1 ? 's' : ''}
             </span>
           </span>
+          {reservasSelecionadas.size > 1 && (
+            <div style={{ display: 'flex', gap: 3, background: 'var(--surface-2)', borderRadius: 9, padding: 3 }}>
+              {[['unico', 'Pagamento Único'], ['por_quarto', 'Pagamento por quarto']].map(([id, label]) => (
+                <button key={id} onClick={() => setPagMultiploModo(id)}
+                  title={id === 'unico' ? 'Um único pagamento para todas as reservas' : 'Um pagamento para cada quarto'}
+                  style={{
+                    padding: '6px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    border: 'none', whiteSpace: 'nowrap',
+                    background: pagMultiploModo === id ? 'var(--violet)' : 'transparent',
+                    color: pagMultiploModo === id ? '#fff' : 'var(--text-2)',
+                  }}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             className={styles.selectionBtnPrimary}
             disabled={reservasSelecionadas.size === 0 || pagMultiploSaving}
-            onClick={() => setShowPagMultiploModal(true)}
+            onClick={() => {
+              if (pagMultiploModo === 'por_quarto') setShowPagQuartoPicker(true);
+              else setShowPagMultiploModal(true);
+            }}
           >
             <DollarSign size={13} />
             Adicionar Pagamento
@@ -5174,17 +5212,67 @@ export default function BookingCalendar() {
         </div>
       )}
 
+      {/* Por quarto: seleção do quarto + pagamento lado a lado */}
+      {showPagQuartoPicker && (() => {
+        const ladoALado = pagQuartoAlvo != null && showPagMultiploModal;
+        return (
+        <Modal open onClose={exitSelectionMode} size="sm"
+          title={<><DollarSign size={15} /> Selecione o quarto</>}
+          containerStyle={ladoALado && winWide
+            ? { transform: 'translateX(calc(-50% - 10px))', transition: 'transform 0.25s cubic-bezier(0.2,0.8,0.2,1)' }
+            : (ladoALado ? { marginTop: 'clamp(8px, 3vh, 24px)' } : undefined)}
+          backdropStyle={ladoALado && !winWide ? { alignItems: 'flex-start' } : undefined}  /* lista de quartos em cima */
+          footer={<div className={styles.footerRight}><Button variant="secondary" onClick={exitSelectionMode}>Fechar</Button></div>}
+        >
+          <div className={styles.dayRoomList}>
+            {allReservas.filter((r) => reservasSelecionadas.has(r.id)).map((r) => {
+              const pendente = Math.max(0, (r.valorTotal ?? 0) - (r.totalPago ?? 0));
+              const alvo = pagQuartoAlvo?.id === r.id;
+              return (
+                <div key={r.id}
+                  className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`]].join(' ')}
+                  style={alvo ? { outline: '2px solid var(--violet)', outlineOffset: '-1px' } : undefined}
+                  onClick={() => { setPagQuartoAlvo(r); setShowPagMultiploModal(true); }}>
+                  <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
+                  <div className={styles.searchDropInfo}>
+                    <div className={styles.searchDropName}>{r.titularNome}</div>
+                    <div className={styles.searchDropMeta}>Total {fmtBRL(r.valorTotal)} · Pendente {fmtBRL(pendente)}</div>
+                  </div>
+                  <ChevronRight size={14} style={{ color: alvo ? 'var(--violet)' : 'var(--text-2)', flexShrink: 0 }} />
+                </div>
+              );
+            })}
+          </div>
+        </Modal>
+        );
+      })()}
+
       <PaymentModal
+        key={pagQuartoAlvo?.id ?? 'multi'}
         open={showPagMultiploModal}
-        onClose={() => setShowPagMultiploModal(false)}
+        onClose={() => { setShowPagMultiploModal(false); setPagQuartoAlvo(null); }}
         onConfirm={handlePagamentoMultiplo}
         tiposPagamento={tiposPagamento}
         isSubmitting={pagMultiploSaving}
         canAplicarDesconto={false}
         canDespesaPessoal={false}
-        lastPayerName={pagMultiploLastPayer}
-        valorTotal={pagMultiploValorTotal}
-        valorPago={pagMultiploValorPago}
+        titularNome={pagQuartoAlvo ? pagQuartoAlvo.titularNome : null}
+        quartoNumero={pagQuartoAlvo ? fmtRoom(pagQuartoAlvo.quarto) : null}
+        lastPayerName={pagQuartoAlvo
+          ? ((pagQuartoAlvo.pagamentos ?? []).filter((p) => !p.cancelado).at(-1)?.nomePagador ?? null)
+          : pagMultiploLastPayer}
+        valorTotal={pagQuartoAlvo ? (pagQuartoAlvo.valorTotal ?? 0) : pagMultiploValorTotal}
+        valorPago={pagQuartoAlvo ? (pagQuartoAlvo.totalPago ?? 0) : pagMultiploValorPago}
+        containerStyle={pagQuartoAlvo
+          ? (winWide
+              ? { transform: 'translateX(calc(50% + 10px))', animation: 'none', pointerEvents: 'auto' }
+              : { marginBottom: 'clamp(8px, 3vh, 24px)', pointerEvents: 'auto' })
+          : undefined}
+        backdropStyle={pagQuartoAlvo
+          ? (winWide
+              ? { background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none', pointerEvents: 'none' }
+              : { background: 'transparent', backdropFilter: 'none', WebkitBackdropFilter: 'none', pointerEvents: 'none', alignItems: 'flex-end' })  /* pagamento embaixo */
+          : undefined}
       />
 
       {/* ── Group hover panel ── */}

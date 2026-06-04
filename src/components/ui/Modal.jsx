@@ -1,11 +1,11 @@
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
 
-export function Modal({ open, onClose, title, children, footer, size = 'md', bodyStyle, hideHeader, containerStyle }) {
+export function Modal({ open, onClose, title, children, footer, size = 'md', bodyStyle, hideHeader, containerStyle, backdropStyle }) {
   if (!open) return null;
 
   return (
-    <div className={styles.backdrop}>
+    <div className={styles.backdrop} style={backdropStyle}>
       <div className={[styles.modal, styles[size]].join(' ')} style={containerStyle}>
         {!hideHeader && (
           <div className={styles.header}>

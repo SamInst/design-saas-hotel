@@ -131,6 +131,8 @@ export function PaymentModal({
   canDespesaPessoal  = false,
   valorTotal         = null,
   valorPago          = null,
+  containerStyle     = undefined,
+  backdropStyle      = undefined,
 }) {
   const [tipoPagId,   setTipoPagId]   = useState('');
   const [nomePagador, setNomePagador] = useState('');
@@ -223,6 +225,8 @@ export function PaymentModal({
   return (
     <>
       <Modal open={open} onClose={onClose} title="Pagamento"
+        containerStyle={containerStyle}
+        backdropStyle={backdropStyle}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
