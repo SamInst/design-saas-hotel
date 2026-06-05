@@ -477,9 +477,14 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
       if (removeIds.length) await hospedagemApi.removerPessoas(reserva.id, removeIds);
 
       // Payment ops (one at a time)
+      const statusBackend = reserva.status === 'hospedado' ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA';
       for (const op of pendingOps) {
         if (op.type === 'addPagamento')
-          await hospedagemApi.adicionarPagamentos(reserva.id, op.payment);
+          await hospedagemApi.adicionarPagamentos(
+            reserva.id,
+            { pagamentos: [op.payment] },
+            { quartoId: reserva.quarto, status: statusBackend },
+          );
         else if (op.type === 'cancelPagamento')
           await reservaApi.cancelarPagamento(op.pagId, op.motivo);
       }
@@ -3501,7 +3506,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               {[['simples', 'Apartamento Único'], ['grupo', 'Vários Apartamentos']].map(([v, l]) => (
                 <button key={v} type="button"
                   className={[styles.tipoBtn, tipo === v ? styles.tipoBtnActive : ''].join(' ')}
-                  onClick={() => { setTipo(v); if (v !== 'grupo' && !isSolicitacao) setQuartos((q) => q.slice(0, 1)); }}
+                  onClick={() => { setTipo(v); if (v !== 'grupo') setPeriodoMode('unico'); if (v !== 'grupo' && !isSolicitacao) setQuartos((q) => q.slice(0, 1)); }}
                 >{l}</button>
               ))}
             </div>
@@ -3525,7 +3530,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {/* ── Step 2: Período & Hóspedes (solicitação) ─────────────────────── */}
       {step === 2 && isSolicitacao && (
         <div className={styles.formStack}>
-          {!initialRoom && (
+          {!initialRoom && tipo === 'grupo' && (
             <div className={styles.periodoTabs}>
               {[['unico', 'Período Único'], ['multiplos', 'Múltiplos Períodos']].map(([v, l]) => (
                 <button key={v} type="button"
@@ -3688,8 +3693,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {/* ── Step 2: Quarto & Período ───────────────────────────────────────── */}
       {step === 2 && !isSolicitacao && (
         <div className={styles.formStack}>
-          {/* Período mode tabs — ocultos quando um quarto específico já foi pré-selecionado */}
-          {!initialRoom && (
+          {/* Período mode tabs — só para "Vários Apartamentos"; ocultos com quarto pré-selecionado */}
+          {!initialRoom && tipo === 'grupo' && (
             <div className={styles.periodoTabs}>
               {[['unico', 'Período Único'], ['multiplos', 'Múltiplos Períodos']].map(([v, l]) => (
                 <button key={v} type="button"

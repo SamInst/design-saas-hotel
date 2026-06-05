@@ -567,9 +567,17 @@ export const hospedagemApi = {
     return request(`/hospedagem/${hospedagemId}/pessoas`, { method: 'DELETE', body: pessoasIds });
   },
 
-  /** POST /hospedagem/{hospedagemId}/pagamentos — adiciona pagamentos à hospedagem */
-  adicionarPagamentos(hospedagemId, body) {
-    return request(`/hospedagem/${hospedagemId}/pagamentos`, { method: 'POST', body });
+  /**
+   * POST /hospedagem/{hospedagemId}/pagamentos?quartoId=&status= — adiciona pagamentos à hospedagem.
+   * @param {number} hospedagemId
+   * @param {{ pagamentos: Array }} body  — Hospedagem.Request com a lista de pagamentos
+   * @param {{ quartoId?: number, status?: string }} opts  — usados para gerar o relatório financeiro
+   */
+  adicionarPagamentos(hospedagemId, body, { quartoId, status } = {}) {
+    const params = {};
+    if (quartoId != null) params.quartoId = quartoId;
+    if (status)           params.status   = status;
+    return request(`/hospedagem/${hospedagemId}/pagamentos`, { method: 'POST', body, params });
   },
 
   /** PUT /hospedagem/{hospedagemId}/status?status=X — altera apenas o status (valida a transição) */
