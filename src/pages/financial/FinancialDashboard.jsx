@@ -52,6 +52,12 @@ const accentOf = (d = '') => {
   return 'violet';
 };
 
+const ACCENT_HEX = {
+  sky: '#0ea5e9', violet: '#7c3aed', indigo: '#6366f1', emerald: '#10b981',
+  fuchsia: '#d946ef', amber: '#f59e0b', slate: '#64748b',
+};
+const methodColor = (m) => ACCENT_HEX[accentOf(m)] ?? '#7c3aed';
+
 const fmtQuarto = (q) => `Quarto ${q.id} - ${q.descricao}`;
 
 const blankAdd = () => ({
@@ -70,7 +76,6 @@ export default function FinancialDashboard() {
   const canDashboard       = can('FINANCEIRO', 'DASHBOARD');
   const canValorParcial    = can('FINANCEIRO', 'ACESSO AO CARD DE DINHEIRO');
   const canValorTotalDia   = can('FINANCEIRO', 'RECEITAS DO DIA');
-  const canAplicarDesconto = can('FINANCEIRO', 'APLICAR DESCONTO');
 
   const [grupos,         setGrupos]         = useState([]);
   const [pagamentos,     setPagamentos]     = useState({});
@@ -292,10 +297,105 @@ export default function FinancialDashboard() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        <div className={styles.mainLayout}>
+        {/* ══ DASHBOARD ══════════════════════════════════════ */}
+        {(canDashboard || canValorParcial) && (
+          <div className={styles.dash}>
+            {canDashboard ? (
+              <>
+                <div className={styles.kpiRow}>
+                  <div className={[styles.kpi, styles.kpiIn].join(' ')} style={{ animationDelay: '0ms' }}>
+                    <div className={styles.kpiTop}>
+                      <span className={styles.kpiIcon}><ArrowUpRight size={16} /></span>
+                      <span className={styles.kpiLabel}>Receita total</span>
+                    </div>
+                    <div className={styles.kpiValue}>{fmt(total.receitas)}</div>
+                  </div>
+                  <div className={[styles.kpi, styles.kpiOut].join(' ')} style={{ animationDelay: '60ms' }}>
+                    <div className={styles.kpiTop}>
+                      <span className={styles.kpiIcon}><ArrowDownRight size={16} /></span>
+                      <span className={styles.kpiLabel}>Despesa total</span>
+                    </div>
+                    <div className={styles.kpiValue}>{fmt(Math.abs(total.despesas))}</div>
+                  </div>
+                  <div className={[styles.kpi, styles.kpiNet].join(' ')} style={{ animationDelay: '120ms' }}>
+                    <div className={styles.kpiTop}>
+                      <span className={styles.kpiIcon}><Wallet size={16} /></span>
+                      <span className={styles.kpiLabel}>Lucro</span>
+                    </div>
+                    <div className={[styles.kpiValue, total.lucro < 0 ? styles.kpiNeg : ''].join(' ')}>{fmt(total.lucro)}</div>
+                    {total.receitas > 0 && (
+                      <span className={styles.kpiMargin}>Margem de {Math.round((total.lucro / total.receitas) * 100)}%</span>
+                    )}
+                  </div>
+                  {(() => {
+                    const cash = methodEntries.find(([m]) => m.toUpperCase().includes('DINHEIRO'));
+                    const cv = cash?.[1] ?? { receitas: 0, despesas: 0, lucro: 0 };
+                    return (
+                      <div className={[styles.kpi, styles.kpiCash].join(' ')} style={{ animationDelay: '180ms' }}>
+                        <div className={styles.kpiTop}>
+                          <span className={styles.kpiIcon}><Banknote size={16} /></span>
+                          <span className={styles.kpiLabel}>Saldo do Caixa</span>
+                        </div>
+                        <div className={[styles.kpiValue, cv.lucro < 0 ? styles.kpiNeg : ''].join(' ')}>{fmt(cv.lucro)}</div>
+                        <span className={styles.kpiMargin}>Dinheiro em espécie</span>
+                      </div>
+                    );
+                  })()}
+                </div>
 
-          {/* ══ COLUNA ESQUERDA ════════════════════════════ */}
-          <section className={styles.card} style={{ flex: 1, minWidth: 0 }}>
+                {methodEntries.length > 0 && (
+                  <div className={styles.dist} style={{ animationDelay: '180ms' }}>
+                    <div className={styles.distHead}>
+                      <span className={styles.distTitle}>Receita por forma de pagamento</span>
+                      <span className={styles.distTotal}>{fmt(total.receitas)}</span>
+                    </div>
+                    <div className={styles.distBar}>
+                      {methodEntries.map(([m, v]) => {
+                        const pct = total.receitas > 0 ? (v.receitas / total.receitas) * 100 : 0;
+                        if (pct <= 0) return null;
+                        return (
+                          <div key={m} className={styles.distSeg}
+                            style={{ width: `${pct}%`, background: methodColor(m) }}
+                            title={`${m}: ${fmt(v.receitas)} (${Math.round(pct)}%)`} />
+                        );
+                      })}
+                    </div>
+                    <div className={styles.distLegend}>
+                      {methodEntries.map(([m, v]) => (
+                        <div key={m} className={styles.distChip}>
+                          <span className={styles.distDot} style={{ background: methodColor(m) }} />
+                          <PayMethodIcon descricao={m} size={12} className={styles.distIcon} />
+                          <span className={styles.distName}>{m}</span>
+                          <b className={styles.distVal}>{fmt(v.receitas)}</b>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (() => {
+              const cash = methodEntries.find(([m]) => m.toUpperCase().includes('DINHEIRO'));
+              const v = cash?.[1] ?? { receitas: 0, despesas: 0, lucro: 0 };
+              return (
+                <div className={styles.cashHero}>
+                  <div className={styles.cashGlow} />
+                  <div className={styles.cashIcon}><Banknote size={22} /></div>
+                  <div className={styles.cashBody}>
+                    <span className={styles.cashLabel}>Saldo em caixa · Dinheiro</span>
+                    <div className={styles.cashSub}>
+                      <span className={styles.cashUp}><ArrowUpRight size={14} /> Entradas {fmt(v.receitas)}</span>
+                      <span className={styles.cashDown}><ArrowDownRight size={14} /> Saídas {fmt(Math.abs(v.despesas))}</span>
+                    </div>
+                  </div>
+                  <div className={styles.cashValue}>{fmt(v.lucro)}</div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ══ LANÇAMENTOS ════════════════════════════════════ */}
+        <section className={styles.card}>
             <div className={styles.tableHeader}>
               <div>
                 <h2 className={styles.h2}>Financeiro</h2>
@@ -432,59 +532,6 @@ export default function FinancialDashboard() {
               </div>
             )}
           </section>
-
-          {/* ══ COLUNA DIREITA: RESUMO ══════════════════════ */}
-          {(canDashboard || canValorParcial) && (
-            <aside className={[styles.summaryCol, !canDashboard && canValorParcial ? styles.summaryColSolo : ''].join(' ')}>
-              <div className={styles.summaryList}>
-                {canDashboard && (
-                  <div className={styles.summaryCard}>
-                    <div className={styles.summaryHead}>
-                      <div className={[styles.summaryIcon, styles.summaryIcon_violet].join(' ')}>
-                        <Wallet size={14} />
-                      </div>
-                      <span className={styles.summaryTitle}>Total</span>
-                    </div>
-                    <div className={styles.kv}>
-                      <div className={styles.kvRow}><span>Receita total</span><b className={styles.moneyPlus}>{fmt(total.receitas)}</b></div>
-                      <div className={styles.kvRow}><span>Despesa total</span><b className={styles.moneyMinus}>{fmt(total.despesas)}</b></div>
-                      <div className={styles.divider} />
-                      <div className={styles.kvRow}>
-                        <span>Lucro</span>
-                        <b className={total.lucro >= 0 ? styles.money_emerald : styles.moneyMinus}>{fmt(total.lucro)}</b>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {methodEntries
-                  .filter(([method]) => canDashboard || (canValorParcial && method.toUpperCase().includes('DINHEIRO')))
-                  .map(([method, values]) => {
-                    const ak = accentOf(method);
-                    return (
-                      <div key={method} className={styles.summaryCard}>
-                        <div className={styles.summaryHead}>
-                          <div className={[styles.summaryIcon, styles[`summaryIcon_${ak}`]].join(' ')}>
-                            <PayMethodIcon descricao={method} size={!canDashboard && canValorParcial ? 24 : 14} />
-                          </div>
-                          <span className={styles.summaryTitle}>{!canDashboard && canValorParcial ? 'Saldo do Caixa' : method}</span>
-                        </div>
-                        <div className={styles.kv}>
-                          <div className={styles.kvRow}><span>Receitas</span><b className={styles.moneyPlus}>{fmt(values.receitas)}</b></div>
-                          <div className={styles.kvRow}><span>Despesas</span><b className={styles.moneyMinus}>{fmt(values.despesas)}</b></div>
-                          <div className={styles.divider} />
-                          <div className={styles.kvRow}>
-                            <span>Total</span>
-                            <b className={values.lucro >= 0 ? styles[`money_${ak}`] : styles.moneyMinus}>{fmt(values.lucro)}</b>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            </aside>
-          )}
-        </div>
       </div>
 
       {/* ══ MODAL: DETALHE ══════════════════════════════════ */}
@@ -749,7 +796,7 @@ export default function FinancialDashboard() {
         defaultValor={parseBRL(addForm.valor)}
         tipoRegistro={addForm.tipoRegistro}
         loggedUser={loggedUser}
-        canAplicarDesconto={canAplicarDesconto}
+        canAplicarDesconto={false}
       />
       <PaymentModal
         open={showPaymentEdit}
@@ -760,7 +807,7 @@ export default function FinancialDashboard() {
         defaultValor={Math.abs(editPagamento?.valor ?? 0)}
         tipoRegistro={editTipoRegistro}
         loggedUser={loggedUser}
-        canAplicarDesconto={canAplicarDesconto}
+        canAplicarDesconto={false}
       />
 
       <Notification notification={notification} />

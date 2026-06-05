@@ -1,39 +1,212 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
+
 .page {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;          /* preso ao tamanho do navegador */
+  overflow-y: auto;          /* o scroll fica na página inteira */
+  padding-bottom: 8px;
 }
 
 .container {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   max-width: 1600px;
-  width: 100%;
   margin: 0 auto;
   padding: 0;
 }
 
+/* ═══════════════════════════════════════════════════════════
+   DASHBOARD — KPIs + distribuição (topo, acima das datas)
+   ═══════════════════════════════════════════════════════════ */
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+/* ── KPI cards ── */
+.kpiRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.kpi {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow);
+  animation: kpiRise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes kpiRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* faixa de acento no topo */
+.kpi::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+/* brilho radial sutil */
+.kpi::after {
+  content: '';
+  position: absolute; right: -30%; top: -60%;
+  width: 60%; aspect-ratio: 1; border-radius: 50%;
+  opacity: 0.10; filter: blur(8px); pointer-events: none;
+}
+.kpiIn::before   { background: linear-gradient(90deg, #10b981, #34d399); }
+.kpiOut::before  { background: linear-gradient(90deg, #f43f5e, #fb7185); }
+.kpiNet::before  { background: linear-gradient(90deg, var(--violet), #a78bfa); }
+.kpiCash::before { background: linear-gradient(90deg, #047857, #34d399); }
+.kpiIn::after   { background: #10b981; }
+.kpiOut::after  { background: #f43f5e; }
+.kpiNet::after  { background: var(--violet); }
+.kpiCash::after { background: #059669; }
+
+.kpiTop { display: flex; align-items: center; gap: 9px; }
+.kpiIcon {
+  width: 30px; height: 30px; border-radius: 9px;
+  display: grid; place-items: center; flex-shrink: 0;
+}
+.kpiIn   .kpiIcon { background: rgba(16,185,129,0.12); color: #10b981; }
+.kpiOut  .kpiIcon { background: rgba(244,63,94,0.12);  color: #f43f5e; }
+.kpiNet  .kpiIcon { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.kpiCash .kpiIcon { background: rgba(5,150,105,0.13); color: #059669; }
+.kpiLabel {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.kpiValue {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: clamp(26px, 2.8vw, 36px);
+  line-height: 1; letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.kpiNeg { color: #e11d48; }
+.kpiMargin {
+  font-size: 11px; font-weight: 600; color: var(--text-2);
+  margin-top: -4px;
+}
+
+/* ── Distribuição por forma de pagamento ── */
+.dist {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px 18px;
+  box-shadow: var(--shadow);
+  animation: kpiRise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.distHead {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.distTitle {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-2);
+}
+.distTotal {
+  font-family: 'Fraunces', serif; font-weight: 600;
+  font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.distBar {
+  display: flex; gap: 2px;
+  height: 12px; border-radius: 999px; overflow: hidden;
+  background: var(--surface-2);
+}
+.distSeg {
+  border-radius: 4px; min-width: 4px;
+  transition: width 0.6s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.15s;
+}
+.distSeg:hover { filter: brightness(1.12); }
+.distLegend {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 22px;
+  margin-top: 13px;
+}
+.distChip {
+  display: flex; align-items: center; gap: 6px; font-size: 12px;
+  min-width: 0;
+}
+.distChip .distName { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.distChip .distVal { margin-left: auto; flex-shrink: 0; }
+.distDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.distIcon { color: var(--text-2); }
+.distName { color: var(--text-2); }
+.distVal { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ── Cash hero (permissão somente "ACESSO AO CARD DE DINHEIRO") ── */
+.cashHero {
+  position: relative;
+  overflow: hidden;
+  display: flex; align-items: center; gap: clamp(14px, 2.4vw, 22px);
+  padding: clamp(14px, 1.8vw, 20px) clamp(18px, 2.4vw, 26px);
+  border-radius: 18px;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 48%, #047857 100%);
+  color: #ecfdf5;
+  box-shadow: 0 14px 38px -16px rgba(6, 78, 59, 0.6);
+  animation: kpiRise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.cashGlow {
+  position: absolute; left: -10%; bottom: -80%;
+  width: 45%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(52,211,153,0.55), transparent 65%);
+  filter: blur(8px); pointer-events: none;
+}
+.cashIcon {
+  position: relative; z-index: 1;
+  width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0;
+  display: grid; place-items: center; color: #fff;
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+}
+.cashBody {
+  position: relative; z-index: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.cashLabel {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(236,253,245,0.72);
+}
+.cashValue {
+  position: relative; z-index: 1;
+  margin-left: auto; text-align: right; flex-shrink: 0;
+  font-family: 'Fraunces', serif; font-weight: 600;
+  font-size: clamp(28px, 4vw, 42px); line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.cashSub { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; font-weight: 500; }
+.cashUp, .cashDown { display: inline-flex; align-items: center; gap: 5px; }
+.cashUp   { color: #a7f3d0; }
+.cashDown { color: #fda4af; }
+
+@media (max-width: 1040px) {
+  .kpiRow { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  .kpiRow { grid-template-columns: 1fr; }
+  .distLegend { grid-template-columns: 1fr; }
+  .cashHero { flex-wrap: wrap; }
+  .cashValue { margin-left: 0; width: 100%; text-align: left; }
+}
+
 /* ── LAYOUT PRINCIPAL ── */
 .mainLayout {
-  flex: 1;
-  min-height: 0;
   display: flex;
   gap: 20px;
-  align-items: stretch;   /* colunas preenchem a altura */
+  align-items: flex-start;
 }
 
 @media (max-width: 1024px) {
-  /* mobile/tablet: volta a rolar a página inteira (a sidebar/main já contém o scroll) */
-  .page { overflow-y: auto; display: block; }
-  .container { display: block; }
-  .mainLayout { flex-direction: column-reverse; min-height: 0; align-items: stretch; }
-  .summaryCol { width: 100%; align-self: auto; max-height: none; overflow: visible; }
-  .card { display: block; min-height: auto; height: auto; overflow: visible; }
-  .groupList { overflow: visible; flex: none; min-height: auto; }
+  .mainLayout { flex-direction: column-reverse; }
+  .summaryCol { width: 100%; }
 }
 
 /* ── CARD BASE ── */
@@ -43,13 +216,7 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 16px;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
 }
-.tableHeader { flex-shrink: 0; }
 
 /* ── TOOLBAR ── */
 .tableHeader {
@@ -83,14 +250,7 @@
 }
 
 /* ── GRUPOS ── */
-.groupList {
-  display: grid;
-  gap: 16px;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;   /* somente a lista de lançamentos rola */
-  align-content: start;
-}
+.groupList { display: grid; gap: 16px; }
 
 .group { border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
 
@@ -188,9 +348,6 @@
   width: 250px; flex-shrink: 0;
   display: flex; flex-direction: column; gap: 8px;
   padding-left: 6px;
-  align-self: flex-start;          /* fica no topo, sem esticar */
-  max-height: 100%;
-  overflow-y: auto;                /* rola só se passar da altura */
 }
 
 /* quando somente o card de dinheiro é exibido → 70% maior */
