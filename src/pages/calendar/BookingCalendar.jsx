@@ -13,6 +13,7 @@ import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
+import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -245,7 +246,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente }) {
+function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [] }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -556,6 +557,32 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     return allRoomIds.filter((r) => editAvailability.has(r));
   }, [editAvailability, allRoomIds]);
 
+  // ── Occupied nights for the selected room (real-time, from in-memory calendar) ──
+  // Builds a Set<'yyyy-MM-dd'> of nights already taken by OTHER reservations in the
+  // currently-selected room, so the inline calendar can block them as the user picks dates.
+  // Só reservas confirmadas/ativas ocupam de fato o quarto — alinhado ao backend
+  // (verificarDisponibilidadeLote bloqueia RESERVA_ATIVA/PERNOITE_ATIVO/DAY_USE_ATIVO, mas NÃO
+  // RESERVA_SOLICITADA). Solicitações pendentes, ausentes, cancelados e finalizados não bloqueiam.
+  const BLOCKING_STATUSES = useMemo(() => new Set(['confirmada', 'hospedado']), []);
+  const blockedNights = useMemo(() => {
+    const room = editQuarto[0];
+    const set = new Set();
+    if (!room) return set;
+    for (const res of reservas) {
+      if (String(res.quarto) !== String(room)) continue;
+      if (res.id === reserva.id) continue;             // ignore the reservation being edited
+      if (!BLOCKING_STATUSES.has(res.status)) continue; // ignora solicitações/ausentes/etc.
+      if (!res.dataInicio || !res.dataFim) continue;
+      const cur = new Date(res.dataInicio + 'T00:00:00');
+      const end = new Date(res.dataFim    + 'T00:00:00'); // checkout day is free (exclusive)
+      while (cur < end) {
+        set.add(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    return set;
+  }, [reservas, editQuarto, reserva.id, BLOCKING_STATUSES]);
+
   // Fetch original price once when editing starts
   useEffect(() => {
     if (!editing) return;
@@ -692,54 +719,66 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           })()}
         </div>
       ) : (
-        /* ── Single price card (always rendered) ── */
+        /* ── Single price card — Resumo Financeiro design ── */
         (() => {
           const displayTotal = editCalc?.valor_total ?? reserva.valorTotal ?? 0;
           const displayPendente = Math.max(0, displayTotal - totalPago);
+          const pct = displayTotal > 0 ? Math.min(100, Math.round(totalPago / displayTotal * 100)) : 0;
           return (
-        <div className={styles.priceCard}>
-            <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
-              <span className={styles.priceCardSummary}>
-                <span className={styles.finStripItem}>
-                  Valor Total{' '}
-                  {editCalcLoading
-                    ? <b><Loader2 size={11} className={styles.spin} /></b>
-                    : <b>{fmtBRL(displayTotal)}</b>
-                  }
-                </span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>
-                  Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>
-                  {displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / displayTotal * 100)}%)</span>}
-                </span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>
-                  Pendente <b style={{ color: displayPendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(displayPendente)}</b>
-                  {displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(displayPendente / displayTotal * 100)}%)</span>}
-                </span>
-              </span>
-            </div>
-            {editCalc?.detalhes?.length > 0 && (
-              <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
-                {editCalc.detalhes.map((d, di) => (
-                  <div key={di} className={styles.priceDetailItem}>
-                    <div className={styles.priceCardRow}>
-                      <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                    </div>
-                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
-                      <div className={styles.priceDetailSub}>
-                        <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                        {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                        {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <div className={styles.step3PriceTotal}><span>Total</span><span>{fmtBRL(editCalc.valor_total)}</span></div>
+            <div className={styles.rvFinCard}>
+              <div className={styles.rvFinHeader}>
+                <DollarSign size={13} className={styles.rvFinIcon} />
+                <span className={styles.rvFinTitle}>Resumo Financeiro</span>
               </div>
-            )}
-          </div>
+              <div className={styles.rvFinRow}>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Valor Total</span>
+                  <span className={styles.rvFinValue}>
+                    {editCalcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(displayTotal)}
+                  </span>
+                </div>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Total Pago</span>
+                  <span className={[styles.rvFinValue, styles.rvFinPaid].join(' ')}>{fmtBRL(totalPago)}</span>
+                </div>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Pendente</span>
+                  <span className={[styles.rvFinValue, displayPendente > 0 ? styles.rvFinPending : styles.rvFinPaid].join(' ')}>
+                    {fmtBRL(displayPendente)}
+                  </span>
+                </div>
+              </div>
+              {displayTotal > 0 && (
+                <div className={styles.rvFinProgress}>
+                  <div className={styles.rvFinProgressMeta}>
+                    <span>Progresso de pagamento</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className={styles.rvFinBar}>
+                    <div className={styles.rvFinBarFill} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )}
+              {editCalc?.detalhes?.length > 0 && (
+                <div className={styles.rvFinBreakdown}>
+                  {editCalc.detalhes.map((d, di) => (
+                    <div key={di} className={styles.priceDetailItem}>
+                      <div className={styles.priceCardRow}>
+                        <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                        <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                      </div>
+                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                        <div className={styles.priceDetailSub}>
+                          <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                          {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
+                          {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })()
       );
@@ -747,7 +786,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
     return (
       <>
-      <Modal open onClose={goBackFromEdit} size="md"
+      <Modal open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
         title={
           editActiveTab === 'pessoas'
             ? <><Users size={15} /> Gerenciar Pessoas — {reserva.titularNome}</>
@@ -774,13 +813,28 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           </div>
         }
       >
-        {/* ── Price card — always visible above tabs ── */}
-        <div className={styles.editPriceTop}>
-          {renderEditPriceCard()}
-        </div>
+        {/* ── Price card — on top for pessoas/pagamentos, left column for dados ── */}
+        {editActiveTab !== 'dados' && (
+          <div className={styles.editPriceTop}>
+            {renderEditPriceCard()}
+          </div>
+        )}
 
         <div className={styles.detailTabContent}>
-        {editActiveTab === 'dados' && <div className={styles.formStack}>
+        {editActiveTab === 'dados' && <div className={styles.editDados}>
+          <div className={styles.editDadosFin}>
+            <FormField label="Observação">
+              <textarea
+                className={styles.motivoTextarea}
+                placeholder="Observação sobre a reserva..."
+                rows={2}
+                value={editObs}
+                onChange={(e) => setEditObs(e.target.value)}
+              />
+            </FormField>
+            {renderEditPriceCard()}
+          </div>
+          <div className={styles.editDadosForm}>
           <FormField label="Apartamento">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
@@ -788,22 +842,51 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
               loading={editAvailLoading}
             />
           </FormField>
-          <FormField label="Período de estadia">
-            <DatePicker
-              mode="range" startDate={editCheckin} endDate={editCheckout}
-              onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
-              placeholder="Check-in → Check-out"
-            />
-          </FormField>
-          <FormField label="Observação">
-            <textarea
-              className={styles.motivoTextarea}
-              placeholder="Observação sobre a reserva..."
-              rows={2}
-              value={editObs}
-              onChange={(e) => setEditObs(e.target.value)}
-            />
-          </FormField>
+          {(() => {
+            const editNights = editCheckin && editCheckout ? diffDays(formatDate(editCheckin), formatDate(editCheckout)) : 0;
+            return (
+              <div className={styles.editCal}>
+                <div className={styles.editCalTop}>
+                  <span className={styles.editCalTopLabel}>Período de estadia</span>
+                  {(editCheckin || editCheckout) && (
+                    <button type="button" className={styles.editCalClear}
+                      onClick={() => { setEditCheckin(null); setEditCheckout(null); }}>
+                      <X size={11} /> Limpar
+                    </button>
+                  )}
+                </div>
+
+                <div className={styles.editCalSummary}>
+                  <div className={styles.editCalLeg}>
+                    <span className={styles.editCalLegKey} style={{ color: 'var(--emerald)' }}>Check-in</span>
+                    <b>{editCheckin ? fmtDateBR(formatDate(editCheckin)) : '—'}</b>
+                  </div>
+                  <div className={styles.editCalArrow}>
+                    <span className={styles.editCalNights}>{editNights > 0 ? `${editNights} ${editNights === 1 ? 'noite' : 'noites'}` : '—'}</span>
+                    <svg viewBox="0 0 24 8" width="34" height="8" fill="none"><path d="M0 4h22m0 0l-4-3.5M22 4l-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div className={[styles.editCalLeg, styles.editCalLegRight].join(' ')}>
+                    <span className={styles.editCalLegKey} style={{ color: '#f97316' }}>Check-out</span>
+                    <b>{editCheckout ? fmtDateBR(formatDate(editCheckout)) : '—'}</b>
+                  </div>
+                </div>
+
+                <DatePicker
+                  inline mode="range"
+                  startDate={editCheckin} endDate={editCheckout}
+                  disabledDates={blockedNights}
+                  onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
+                />
+
+                <div className={styles.editCalLegend}>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> Selecionado</span>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> Ocupado</span>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> Disponível</span>
+                </div>
+              </div>
+            );
+          })()}
+          </div>
         </div>}
 
         {/* ── Pessoas tab ── */}
@@ -4347,6 +4430,15 @@ export default function BookingCalendar() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate.getMonth(), viewDate.getFullYear()]);
 
+  // ── Real-time: recarrega quando outro usuário altera uma reserva ──────────
+  // O servidor faz broadcast via WebSocket após qualquer mutação no calendário.
+  // Recarregamos com debounce para agrupar rajadas (ex.: reserva em grupo).
+  const wsReloadTimer = useRef(null);
+  useCalendarSocket(() => {
+    clearTimeout(wsReloadTimer.current);
+    wsReloadTimer.current = setTimeout(() => { loadReservas(); }, 400);
+  });
+
   // Close search dropdown on outside click
   useEffect(() => {
     const h = (e) => { if (searchRef.current && !searchRef.current.contains(e.target)) setShowSearchDropdown(false); };
@@ -5172,7 +5264,7 @@ export default function BookingCalendar() {
         <SolicitacoesModal onClose={() => setShowSolicitacoes(false)}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
 
       {/* ── Multi-payment selection panel ── */}
       {pagamentoModoAtivo && (

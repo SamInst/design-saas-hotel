@@ -10,6 +10,7 @@ const DAYS         = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const sod     = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const sameDay = (a,b) => a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
 const between = (d,s,e) => d && s && e && d > s && d < e;
+const dkey    = (d) => { const x = sod(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; };
 
 const parseTyped = str => {
   const m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
@@ -44,6 +45,8 @@ export function DatePicker({
   minDate = null,
   maxDate = null,
   markedDate = null,
+  disabledDates = null,   // Set<'yyyy-MM-dd'> — occupied nights (range mode aware)
+  inline = false,         // render the calendar statically (embedded), no trigger/portal
   placeholder = 'Selecione a data',
   label,
   error = false,
@@ -51,7 +54,7 @@ export function DatePicker({
   triggerClassName = '',
 }) {
   const today = sod(new Date());
-  const [open,         setOpen]         = useState(false);
+  const [open,         setOpen]         = useState(inline);
   const [viewYear,     setViewYear]     = useState((value||startDate||today).getFullYear());
   const [viewMonth,    setViewMonth]    = useState((value||startDate||today).getMonth());
   const [hoverDate,    setHoverDate]    = useState(null);
@@ -77,8 +80,9 @@ export function DatePicker({
     });
   }, []);
 
-  // Close on outside click (covers both wrap and portal popup)
+  // Close on outside click (covers both wrap and portal popup) — skipped when inline
   useEffect(() => {
+    if (inline) return;
     const h = (e) => {
       const inWrap = ref.current    && ref.current.contains(e.target);
       const inPop  = popRef.current && popRef.current.contains(e.target);
@@ -86,11 +90,11 @@ export function DatePicker({
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
-  }, []);
+  }, [inline]);
 
   // Reposition on scroll/resize while open
   useEffect(() => {
-    if (!open) return;
+    if (inline || !open) return;
     updatePopPos();
     window.addEventListener('scroll', updatePopPos, true);
     window.addEventListener('resize', updatePopPos);
@@ -98,7 +102,7 @@ export function DatePicker({
       window.removeEventListener('scroll', updatePopPos, true);
       window.removeEventListener('resize', updatePopPos);
     };
-  }, [open, updatePopPos]);
+  }, [inline, open, updatePopPos]);
 
   // Keep displayed text in sync when not editing
   useEffect(() => {
@@ -122,21 +126,61 @@ export function DatePicker({
       : setViewMonth(m => m + 1);
   };
 
-  const isDisabled = (d) => (minDate && d < sod(minDate)) || (maxDate && d > sod(maxDate));
+  // ── Occupancy-aware helpers ────────────────────────────────────────────────
+  const blocked     = (d) => !!disabledDates && disabledDates.has(dkey(d));
+  const outOfBounds = (d) => (minDate && d < sod(minDate)) || (maxDate && d > sod(maxDate));
+  const isDisabled  = (d) => outOfBounds(d) || blocked(d);
+
+  // First occupied night strictly after `from` (the latest valid checkout lands ON it).
+  const firstBlockedAfter = (from) => {
+    if (!disabledDates || !from) return null;
+    const cur = sod(from);
+    for (let i = 0; i < 400; i++) {
+      cur.setDate(cur.getDate() + 1);
+      if (blocked(cur)) return sod(cur);
+    }
+    return null;
+  };
 
   const handleDayClick = (d) => {
-    if (isDisabled(d)) return;
     if (mode === 'single') {
-      onChange?.(d); setOpen(false); setViewMode('days'); return;
+      if (isDisabled(d)) return;
+      onChange?.(d);
+      if (!inline) { setOpen(false); setViewMode('days'); }
+      return;
     }
+
+    // ── range ──
+    if (outOfBounds(d)) return;
+
+    // starting a fresh selection
     if (!startDate || (startDate && endDate)) {
+      if (blocked(d)) return;               // a check-in can't be an occupied night
       onRangeChange?.({ start: d, end: null });
-    } else if (sod(d).getTime() === sod(startDate).getTime()) {
-      onRangeChange?.({ start: d, end: null }); // same day — restart selection
-    } else {
-      onRangeChange?.(d < startDate ? { start: d, end: startDate } : { start: startDate, end: d });
-      setOpen(false); setViewMode('days');
+      return;
     }
+
+    // clicked the same day → restart
+    if (sod(d).getTime() === sod(startDate).getTime()) {
+      onRangeChange?.({ start: d, end: null });
+      return;
+    }
+
+    // clicked earlier → becomes the new check-in (must be free + no occupied night up to old start)
+    if (d < startDate) {
+      if (blocked(d)) return;
+      const fb = firstBlockedAfter(d);
+      if (fb && fb < startDate) { onRangeChange?.({ start: d, end: null }); return; }
+      onRangeChange?.({ start: d, end: startDate });
+      if (!inline) { setOpen(false); setViewMode('days'); }
+      return;
+    }
+
+    // clicked later → it's the checkout. Valid only if no occupied night between [start, d).
+    const fb = firstBlockedAfter(startDate);
+    if (fb && d > fb) return;               // crosses an occupied night
+    onRangeChange?.({ start: startDate, end: d });
+    if (!inline) { setOpen(false); setViewMode('days'); }
   };
 
   const selectMonth = (m) => { setViewMonth(m); setViewMode('days'); };
@@ -182,7 +226,10 @@ export function DatePicker({
     : startDate && endDate  ? `${fmtD(startDate)} – ${fmtD(endDate)}`
     : startDate             ? `${fmtD(startDate)} – ...` : '';
 
-  const rangeEnd = hoverDate && startDate && !endDate ? hoverDate : endDate;
+  // Hover preview clamps at the next occupied night so the range never spans one.
+  const fbFromStart = mode === 'range' && startDate && !endDate ? firstBlockedAfter(startDate) : null;
+  const clampedHover = hoverDate && fbFromStart && hoverDate > fbFromStart ? fbFromStart : hoverDate;
+  const rangeEnd = clampedHover && startDate && !endDate ? clampedHover : endDate;
 
   const headLabel = viewMode === 'years'
     ? `${getYearRange(viewYear)[0]} – ${getYearRange(viewYear)[11]}`
@@ -196,8 +243,8 @@ export function DatePicker({
     error  ? styles.triggerError : '',
   ].join(' ');
 
-  const popup = open && (
-    <div ref={popRef} className={styles.pop} style={popStyle}>
+  const calendarInner = (
+    <>
       <div className={styles.head}>
         <button type="button" className={styles.nav} onClick={prevNav}><ChevronLeft size={14}/></button>
         <button
@@ -216,17 +263,25 @@ export function DatePicker({
           <div className={styles.grid} onMouseLeave={() => setHoverDate(null)}>
             {cells.map((d, i) => {
               if (!d) return <span key={`e${i}`}/>;
-              const dis  = isDisabled(d);
+              const oob  = outOfBounds(d);
+              const blk  = blocked(d);
               const tod  = sameDay(d, today);
               const sel  = mode==='single' ? sameDay(d,value) : sameDay(d,startDate)||sameDay(d,endDate);
               const iS   = mode==='range' && sameDay(d,startDate);
               const iE   = mode==='range' && sameDay(d,rangeEnd);
               const inR  = mode==='range' && startDate && rangeEnd && between(sod(d),sod(startDate),sod(rangeEnd));
-              const hovE = mode==='range' && !endDate && sameDay(d,hoverDate);
+              const hovE = mode==='range' && !endDate && sameDay(d,clampedHover);
               const mkd  = markedDate && !sel && sameDay(d, markedDate);
+              // checkout may land ON the next occupied night (adjacency); otherwise blocked is dead.
+              const endCandidate = mode==='range' && startDate && !endDate && fbFromStart && sameDay(d, fbFromStart);
+              const cellDisabled = mode==='single'
+                ? oob || blk
+                : (!startDate || endDate)
+                  ? oob || blk
+                  : oob || (blk && !endCandidate);
               return (
-                <button key={d.toISOString()} type="button" disabled={dis}
-                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', dis?styles.dis:'', mkd?styles.mkd:''].join(' ')}
+                <button key={d.toISOString()} type="button" disabled={cellDisabled}
+                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', mkd?styles.mkd:''].join(' ')}
                   onClick={() => handleDayClick(sod(d))}
                   onMouseEnter={() => { if (mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
                   {d.getDate()}
@@ -261,6 +316,22 @@ export function DatePicker({
           ))}
         </div>
       )}
+    </>
+  );
+
+  // ── Inline (embedded, real-time) variant ──
+  if (inline) {
+    return (
+      <div className={[styles.inline, className].join(' ')} ref={ref}>
+        {label && <label className={styles.label}>{label}</label>}
+        {calendarInner}
+      </div>
+    );
+  }
+
+  const popup = open && (
+    <div ref={popRef} className={styles.pop} style={popStyle}>
+      {calendarInner}
     </div>
   );
 
