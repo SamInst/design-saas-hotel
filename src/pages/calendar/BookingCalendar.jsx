@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
+  DoorOpen, CalendarCheck2,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -13,6 +14,7 @@ import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
+import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import styles from './BookingCalendar.module.css';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
@@ -245,7 +247,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente }) {
+function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [] }) {
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -556,6 +558,32 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     return allRoomIds.filter((r) => editAvailability.has(r));
   }, [editAvailability, allRoomIds]);
 
+  // ── Occupied nights for the selected room (real-time, from in-memory calendar) ──
+  // Builds a Set<'yyyy-MM-dd'> of nights already taken by OTHER reservations in the
+  // currently-selected room, so the inline calendar can block them as the user picks dates.
+  // Só reservas confirmadas/ativas ocupam de fato o quarto — alinhado ao backend
+  // (verificarDisponibilidadeLote bloqueia RESERVA_ATIVA/PERNOITE_ATIVO/DAY_USE_ATIVO, mas NÃO
+  // RESERVA_SOLICITADA). Solicitações pendentes, ausentes, cancelados e finalizados não bloqueiam.
+  const BLOCKING_STATUSES = useMemo(() => new Set(['confirmada', 'hospedado']), []);
+  const blockedNights = useMemo(() => {
+    const room = editQuarto[0];
+    const set = new Set();
+    if (!room) return set;
+    for (const res of reservas) {
+      if (String(res.quarto) !== String(room)) continue;
+      if (res.id === reserva.id) continue;             // ignore the reservation being edited
+      if (!BLOCKING_STATUSES.has(res.status)) continue; // ignora solicitações/ausentes/etc.
+      if (!res.dataInicio || !res.dataFim) continue;
+      const cur = new Date(res.dataInicio + 'T00:00:00');
+      const end = new Date(res.dataFim    + 'T00:00:00'); // checkout day is free (exclusive)
+      while (cur < end) {
+        set.add(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+    }
+    return set;
+  }, [reservas, editQuarto, reserva.id, BLOCKING_STATUSES]);
+
   // Fetch original price once when editing starts
   useEffect(() => {
     if (!editing) return;
@@ -692,54 +720,66 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           })()}
         </div>
       ) : (
-        /* ── Single price card (always rendered) ── */
+        /* ── Single price card — Resumo Financeiro design ── */
         (() => {
           const displayTotal = editCalc?.valor_total ?? reserva.valorTotal ?? 0;
           const displayPendente = Math.max(0, displayTotal - totalPago);
+          const pct = displayTotal > 0 ? Math.min(100, Math.round(totalPago / displayTotal * 100)) : 0;
           return (
-        <div className={styles.priceCard}>
-            <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
-              <span className={styles.priceCardSummary}>
-                <span className={styles.finStripItem}>
-                  Valor Total{' '}
-                  {editCalcLoading
-                    ? <b><Loader2 size={11} className={styles.spin} /></b>
-                    : <b>{fmtBRL(displayTotal)}</b>
-                  }
-                </span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>
-                  Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>
-                  {displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / displayTotal * 100)}%)</span>}
-                </span>
-                <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>
-                  Pendente <b style={{ color: displayPendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(displayPendente)}</b>
-                  {displayTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(displayPendente / displayTotal * 100)}%)</span>}
-                </span>
-              </span>
-            </div>
-            {editCalc?.detalhes?.length > 0 && (
-              <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
-                {editCalc.detalhes.map((d, di) => (
-                  <div key={di} className={styles.priceDetailItem}>
-                    <div className={styles.priceCardRow}>
-                      <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                    </div>
-                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
-                      <div className={styles.priceDetailSub}>
-                        <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                        {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                        {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <div className={styles.step3PriceTotal}><span>Total</span><span>{fmtBRL(editCalc.valor_total)}</span></div>
+            <div className={styles.rvFinCard}>
+              <div className={styles.rvFinHeader}>
+                <DollarSign size={13} className={styles.rvFinIcon} />
+                <span className={styles.rvFinTitle}>Resumo Financeiro</span>
               </div>
-            )}
-          </div>
+              <div className={styles.rvFinRow}>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Valor Total</span>
+                  <span className={styles.rvFinValue}>
+                    {editCalcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(displayTotal)}
+                  </span>
+                </div>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Total Pago</span>
+                  <span className={[styles.rvFinValue, styles.rvFinPaid].join(' ')}>{fmtBRL(totalPago)}</span>
+                </div>
+                <div className={styles.rvFinItem}>
+                  <span className={styles.rvFinLabel}>Pendente</span>
+                  <span className={[styles.rvFinValue, displayPendente > 0 ? styles.rvFinPending : styles.rvFinPaid].join(' ')}>
+                    {fmtBRL(displayPendente)}
+                  </span>
+                </div>
+              </div>
+              {displayTotal > 0 && (
+                <div className={styles.rvFinProgress}>
+                  <div className={styles.rvFinProgressMeta}>
+                    <span>Progresso de pagamento</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className={styles.rvFinBar}>
+                    <div className={styles.rvFinBarFill} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )}
+              {editCalc?.detalhes?.length > 0 && (
+                <div className={styles.rvFinBreakdown}>
+                  {editCalc.detalhes.map((d, di) => (
+                    <div key={di} className={styles.priceDetailItem}>
+                      <div className={styles.priceCardRow}>
+                        <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                        <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                      </div>
+                      {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                        <div className={styles.priceDetailSub}>
+                          <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                          {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
+                          {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })()
       );
@@ -747,7 +787,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 
     return (
       <>
-      <Modal open onClose={goBackFromEdit} size="md"
+      <Modal open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
         title={
           editActiveTab === 'pessoas'
             ? <><Users size={15} /> Gerenciar Pessoas — {reserva.titularNome}</>
@@ -774,13 +814,28 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           </div>
         }
       >
-        {/* ── Price card — always visible above tabs ── */}
-        <div className={styles.editPriceTop}>
-          {renderEditPriceCard()}
-        </div>
+        {/* ── Price card — on top for pessoas/pagamentos, left column for dados ── */}
+        {editActiveTab !== 'dados' && (
+          <div className={styles.editPriceTop}>
+            {renderEditPriceCard()}
+          </div>
+        )}
 
         <div className={styles.detailTabContent}>
-        {editActiveTab === 'dados' && <div className={styles.formStack}>
+        {editActiveTab === 'dados' && <div className={styles.editDados}>
+          <div className={styles.editDadosFin}>
+            <FormField label="Observação">
+              <textarea
+                className={styles.motivoTextarea}
+                placeholder="Observação sobre a reserva..."
+                rows={2}
+                value={editObs}
+                onChange={(e) => setEditObs(e.target.value)}
+              />
+            </FormField>
+            {renderEditPriceCard()}
+          </div>
+          <div className={styles.editDadosForm}>
           <FormField label="Apartamento">
             <RoomCombobox
               value={editQuarto} onChange={setEditQuarto}
@@ -788,22 +843,51 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
               loading={editAvailLoading}
             />
           </FormField>
-          <FormField label="Período de estadia">
-            <DatePicker
-              mode="range" startDate={editCheckin} endDate={editCheckout}
-              onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
-              placeholder="Check-in → Check-out"
-            />
-          </FormField>
-          <FormField label="Observação">
-            <textarea
-              className={styles.motivoTextarea}
-              placeholder="Observação sobre a reserva..."
-              rows={2}
-              value={editObs}
-              onChange={(e) => setEditObs(e.target.value)}
-            />
-          </FormField>
+          {(() => {
+            const editNights = editCheckin && editCheckout ? diffDays(formatDate(editCheckin), formatDate(editCheckout)) : 0;
+            return (
+              <div className={styles.editCal}>
+                <div className={styles.editCalTop}>
+                  <span className={styles.editCalTopLabel}>Período de estadia</span>
+                  {(editCheckin || editCheckout) && (
+                    <button type="button" className={styles.editCalClear}
+                      onClick={() => { setEditCheckin(null); setEditCheckout(null); }}>
+                      <X size={11} /> Limpar
+                    </button>
+                  )}
+                </div>
+
+                <div className={styles.editCalSummary}>
+                  <div className={styles.editCalLeg}>
+                    <span className={styles.editCalLegKey} style={{ color: 'var(--emerald)' }}>Check-in</span>
+                    <b>{editCheckin ? fmtDateBR(formatDate(editCheckin)) : '—'}</b>
+                  </div>
+                  <div className={styles.editCalArrow}>
+                    <span className={styles.editCalNights}>{editNights > 0 ? `${editNights} ${editNights === 1 ? 'noite' : 'noites'}` : '—'}</span>
+                    <svg viewBox="0 0 24 8" width="34" height="8" fill="none"><path d="M0 4h22m0 0l-4-3.5M22 4l-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div className={[styles.editCalLeg, styles.editCalLegRight].join(' ')}>
+                    <span className={styles.editCalLegKey} style={{ color: '#f97316' }}>Check-out</span>
+                    <b>{editCheckout ? fmtDateBR(formatDate(editCheckout)) : '—'}</b>
+                  </div>
+                </div>
+
+                <DatePicker
+                  inline mode="range"
+                  startDate={editCheckin} endDate={editCheckout}
+                  disabledDates={blockedNights}
+                  onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
+                />
+
+                <div className={styles.editCalLegend}>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> Selecionado</span>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> Ocupado</span>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> Disponível</span>
+                </div>
+              </div>
+            );
+          })()}
+          </div>
         </div>}
 
         {/* ── Pessoas tab ── */}
@@ -1527,13 +1611,13 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 }
 
 // ─── Day Modal ────────────────────────────────────────────────────────────────
-function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva }) {
+function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSelectReserva }) {
   const [dayList,  setDayList]  = useState([]);
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    hospedagemApi.buscar({ status: 'RESERVA_ATIVA', data: toBrDate(dateStr) })
+    hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], data: toBrDate(dateStr) })
       .then((data) => {
         const flat = Array.isArray(data) ? data : [];
         const seen = new Set();
@@ -1545,7 +1629,7 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
       })
       .catch(() => setDayList([]))
       .finally(() => setLoading(false));
-  }, [dateStr]); // eslint-disable-line
+  }, [dateStr, refreshKey]); // eslint-disable-line
 
   const dayReservas    = dayList;
   const occupiedRooms  = new Set(dayReservas.map((r) => r.quarto));
@@ -1558,11 +1642,12 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
   const chegadas   = dayReservas.filter((r) => r.dataInicio === dateStr);
   const permanecem = dayReservas.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr);
 
-  const renderDayRow = (r) => {
+  const renderDayRow = (r, lineColor) => {
     const dias     = diffDays(r.dataInicio, r.dataFim);
     const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
     return (
-      <div key={r.id} className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`]].join(' ')}
+      <div key={r.id} className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`], r.status === 'finalizado' ? styles.dayRoomDone : ''].join(' ')}
+        style={lineColor ? { borderLeftColor: lineColor } : undefined}
         onClick={() => onSelectReserva(r)}>
         <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
         <div className={styles.searchDropInfo}>
@@ -1599,15 +1684,57 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
         <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
       ) : (
         <>
-          {/* Minimalist stats strip */}
-          <div className={styles.dayStatsStrip}>
-            <span className={styles.dayStatChip}><b>{occupiedRooms.size}</b>/{totalRooms} apartamentos ocupados</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}><b>{dayReservas.length}</b> reserva{dayReservas.length !== 1 ? 's' : ''} confirmada{dayReservas.length !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}><b>{totalPeople}</b> pessoa{totalPeople !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip} style={{ color: 'var(--emerald)' }}><b>{availableRooms.length}</b> apartamentos disponíveis</span>
+          {/* Painel de métricas do dia */}
+          <div className={styles.dayMetrics}>
+            <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><BedDouble size={14} /></span>
+                <span className={styles.metricLabel}>Ocupados</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{occupiedRooms.size}</span>
+                <span className={styles.metricTotal}>/ {totalRooms}</span>
+              </div>
+              <div className={styles.metricBar}>
+                <span
+                  className={styles.metricBarFill}
+                  style={{ width: `${totalRooms ? Math.round((occupiedRooms.size / totalRooms) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
+                <span className={styles.metricLabel}>Reservas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{dayReservas.length}</span>
+              </div>
+              <span className={styles.metricSub}>confirmadas no dia</span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricAmber].join(' ')} style={{ '--i': 2 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><Users size={14} /></span>
+                <span className={styles.metricLabel}>Pessoas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{totalPeople}</span>
+              </div>
+              <span className={styles.metricSub}>hospedadas</span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricEmerald].join(' ')} style={{ '--i': 3 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><DoorOpen size={14} /></span>
+                <span className={styles.metricLabel}>Livres</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{availableRooms.length}</span>
+              </div>
+              <span className={styles.metricSub}>apartamentos</span>
+            </div>
           </div>
 
           {dayReservas.length === 0 ? (
@@ -1625,7 +1752,7 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
                     </span>
                   </div>
                   <div className={styles.dayRoomList}>
-                    {sec.list.map(renderDayRow)}
+                    {sec.list.map((r) => renderDayRow(r, sec.key === 'saidas' ? '#f97316' : undefined))}
                   </div>
                 </div>
               ))}
@@ -1707,10 +1834,30 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
         <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
       ) : (
         <>
-          <div className={styles.dayStatsStrip}>
-            <span className={styles.dayStatChip}><b>{res.totalElements}</b> reserva{res.totalElements !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}>{cat?.nome || '—'}</span>
+          <div className={[styles.dayMetrics, styles.dayMetricsRoom].join(' ')}>
+            <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
+                <span className={styles.metricLabel}>Reservas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{res.totalElements}</span>
+              </div>
+              <span className={styles.metricSub}>
+                {modo === 'mes' ? `em ${ROOM_MES_NOMES[mes - 1]}` : modo === 'anteriores' ? 'anteriores' : 'próximas'}
+              </span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><BedDouble size={14} /></span>
+                <span className={styles.metricLabel}>Categoria</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValueText}>{cat?.nome || '—'}</span>
+              </div>
+              <span className={styles.metricSub}>Apartamento {fmtRoom(room)}</span>
+            </div>
           </div>
 
           {res.content.length === 0 ? (
@@ -4215,6 +4362,7 @@ export default function BookingCalendar() {
   const [groupPanel,           setGroupPanel]           = useState(null);
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
+  const [dayRefreshKey,   setDayRefreshKey]   = useState(0);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
   const [roomModal, setRoomModal] = useState(null);
@@ -4308,8 +4456,8 @@ export default function BookingCalendar() {
     setLoading(true);
     try {
       const [curr, next] = await Promise.all([
-        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO'], mes, ano }),
-        hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes: nextMes, ano: nextAno }),
+        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], mes, ano }),
+        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_FINALIZADO'], mes: nextMes, ano: nextAno }),
       ]);
       setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
     } catch (_) {
@@ -4332,6 +4480,12 @@ export default function BookingCalendar() {
     }
   };
 
+  // Sempre que as reservas mudam (qualquer ação: ativar, hospedar, pagar, cancelar…),
+  // sinaliza o DayModal aberto para recarregar sua própria lista.
+  useEffect(() => {
+    setDayRefreshKey((v) => v + 1);
+  }, [reservas]);
+
   // ── Reload reservations when month/year changes ───────────────────────────
   useEffect(() => {
     const mes = viewDate.getMonth() + 1;
@@ -4346,6 +4500,15 @@ export default function BookingCalendar() {
     loadReservas();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate.getMonth(), viewDate.getFullYear()]);
+
+  // ── Real-time: recarrega quando outro usuário altera uma reserva ──────────
+  // O servidor faz broadcast via WebSocket após qualquer mutação no calendário.
+  // Recarregamos com debounce para agrupar rajadas (ex.: reserva em grupo).
+  const wsReloadTimer = useRef(null);
+  useCalendarSocket(() => {
+    clearTimeout(wsReloadTimer.current);
+    wsReloadTimer.current = setTimeout(() => { loadReservas(); }, 400);
+  });
 
   // Close search dropdown on outside click
   useEffect(() => {
@@ -4830,13 +4993,17 @@ export default function BookingCalendar() {
       ? Math.min(dias, Math.max(1, diffDays(orig.dataInicio, todayStr) + 1)) : null;
 
     const isCancelado   = orig.status === 'cancelado';
+    const isFinalizado  = orig.status === 'finalizado';
     const isSelSelected = pagamentoModoAtivo && reservasSelecionadas.has(orig.id);
     const isSelDimmed   = pagamentoModoAtivo && !isSelSelected;
-    const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4) : isCancelado ? Math.min(opacity, 0.55) : opacity;
+    const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4)
+      : isCancelado  ? Math.min(opacity, 0.55)
+      : isFinalizado ? Math.min(opacity, 0.6)
+      : opacity;
     // grupoCor: cor real do grupo (independe do status) — usada no ticket e no painel flutuante.
     // gColor: cor de fundo da barra — null em hospedado, mantendo o corpo cinza escuro.
     const grupoCor      = !isGhost && orig.grupo_id != null ? grupoColor(orig.grupo_id) : null;
-    const gColor        = grupoCor && orig.status !== 'hospedado' ? grupoCor : null;
+    const gColor        = grupoCor && orig.status !== 'hospedado' && orig.status !== 'finalizado' ? grupoCor : null;
 
     return (
       <div key={key}
@@ -5145,7 +5312,7 @@ export default function BookingCalendar() {
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
       )}
       {dayModal && (
-        <DayModal dateStr={dayModal.dateStr} onClose={() => setDayModal(null)} categorias={categorias}
+        <DayModal dateStr={dayModal.dateStr} refreshKey={dayRefreshKey} onClose={() => setDayModal(null)} categorias={categorias}
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
@@ -5172,7 +5339,7 @@ export default function BookingCalendar() {
         <SolicitacoesModal onClose={() => setShowSolicitacoes(false)}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} />}
+      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
 
       {/* ── Multi-payment selection panel ── */}
       {pagamentoModoAtivo && (

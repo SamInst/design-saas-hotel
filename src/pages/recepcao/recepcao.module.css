@@ -331,47 +331,83 @@
 .roomGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(251px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .roomCard {
+  --accent: #94a3b8;
+  --accent-strong: #64748b;
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
-  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  padding: 15px 15px 15px 18px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  min-height: 148px;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--surface) 94%, white 6%) 0%, var(--surface) 100%);
-  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  min-height: 150px;
+  /* Superfície neutra com leve tinta diagonal do status */
+  background:
+    linear-gradient(150deg, color-mix(in srgb, var(--accent) 8%, var(--surface)) 0%, var(--surface) 56%);
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05), 0 10px 26px -18px rgba(2, 6, 23, 0.28);
+  transition: transform .2s cubic-bezier(.2,.7,.3,1), box-shadow .2s ease, border-color .2s ease;
+  animation: roomCardIn .42s cubic-bezier(.2,.7,.3,1) backwards;
 }
+/* Luz de atmosfera no canto */
 .roomCard::before {
   content: '';
   position: absolute;
-  top: -34px;
-  right: -34px;
-  width: 90px;
-  height: 90px;
+  top: -40px;
+  right: -40px;
+  width: 124px;
+  height: 124px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(255,255,255,0.24) 0%, rgba(255,255,255,0) 72%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent) 0%, transparent 70%);
+  opacity: .5;
   pointer-events: none;
+  transition: opacity .2s ease;
+}
+/* Trilho de acento à esquerda — elemento-assinatura */
+.roomCard::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+  transition: width .2s ease, box-shadow .2s ease;
 }
 .roomCard:hover {
   transform: translateY(-4px);
-  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.12), 0 2px 10px rgba(2, 6, 23, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 1px 2px rgba(2, 6, 23, 0.05), 0 20px 38px -18px color-mix(in srgb, var(--accent) 55%, transparent);
 }
+.roomCard:hover::before { opacity: .9; }
+.roomCard:hover::after  { width: 6px; box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 65%, transparent); }
 
-.roomCard_disponivel { background: linear-gradient(165deg, rgba(16,185,129,.42) 0%, rgba(16,185,129,.20) 42%, var(--surface) 100%); border-color: rgba(16,185,129,.65); }
-.roomCard_ocupado    { background: linear-gradient(165deg, rgba(185,28,28,.45) 0%, rgba(153,27,27,.22) 42%, var(--surface) 100%); border-color: rgba(185,28,28,.60);  }
-.roomCard_reservado  { background: linear-gradient(165deg, rgba(249,115,22,.13) 0%, rgba(249,115,22,.05) 42%, var(--surface) 100%); border-color: rgba(249,115,22,.30); }
-.roomCard_limpeza    { background: linear-gradient(165deg, rgba(37,99,235,.13) 0%, rgba(37,99,235,.05) 42%, var(--surface) 100%); border-color: rgba(37,99,235,.30);  }
-.roomCard_manutencao { background: linear-gradient(160deg, #cbd5e1 0%, #b8c4d4 100%); border-color: rgba(124,58,237,.25); box-shadow: 0 6px 20px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.5); }
-.roomCard_fora       { background: linear-gradient(165deg, rgba(100,116,139,.13) 0%, rgba(100,116,139,.05) 42%, var(--surface) 100%); border-color: rgba(100,116,139,.30); }
+@keyframes roomCardIn {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* Revelação em cascata na carga inicial */
+.roomGrid > .roomCard:nth-child(1)  { animation-delay: 20ms;  }
+.roomGrid > .roomCard:nth-child(2)  { animation-delay: 50ms;  }
+.roomGrid > .roomCard:nth-child(3)  { animation-delay: 80ms;  }
+.roomGrid > .roomCard:nth-child(4)  { animation-delay: 110ms; }
+.roomGrid > .roomCard:nth-child(5)  { animation-delay: 140ms; }
+.roomGrid > .roomCard:nth-child(6)  { animation-delay: 170ms; }
+.roomGrid > .roomCard:nth-child(7)  { animation-delay: 200ms; }
+.roomGrid > .roomCard:nth-child(8)  { animation-delay: 230ms; }
+.roomGrid > .roomCard:nth-child(n+9){ animation-delay: 260ms; }
+
+/* Acento por status (claro / escuro coerentes) */
+.roomCard_disponivel { --accent: #34d399; --accent-strong: #059669; }
+.roomCard_ocupado    { --accent: #f87171; --accent-strong: #dc2626; }
+.roomCard_reservado  { --accent: #fb923c; --accent-strong: #ea580c; }
+.roomCard_limpeza    { --accent: #60a5fa; --accent-strong: #2563eb; }
+.roomCard_manutencao { --accent: #a78bfa; --accent-strong: #7c3aed; }
+.roomCard_fora       { --accent: #94a3b8; --accent-strong: #64748b; }
 
 .roomCardTop {
   display: flex;
@@ -381,23 +417,24 @@
 }
 
 .roomCardNum {
-  font-size: 30px;
+  font-size: 27px;
   font-weight: 800;
   line-height: 1;
   flex-shrink: 0;
-  letter-spacing: -0.02em;
-  text-shadow: 0 1px 0 rgba(255,255,255,.28);
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
 }
 .roomCardNum_disponivel { color: #059669; }
 .roomCardNum_ocupado    { color: #dc2626; }
 .roomCardNum_reservado  { color: #ea580c; }
 .roomCardNum_limpeza    { color: #2563eb; }
-.roomCardNum_manutencao { color: #a78bfa; } /* bright on dark bg */
+.roomCardNum_manutencao { color: #7c3aed; }
 .roomCardNum_fora       { color: #64748b; }
 :root[data-theme="dark"] .roomCardNum_disponivel { color: #34d399; }
 :root[data-theme="dark"] .roomCardNum_ocupado    { color: #f87171; }
 :root[data-theme="dark"] .roomCardNum_reservado  { color: #fb923c; }
 :root[data-theme="dark"] .roomCardNum_limpeza    { color: #60a5fa; }
+:root[data-theme="dark"] .roomCardNum_manutencao { color: #a78bfa; }
 :root[data-theme="dark"] .roomCardNum_fora       { color: #94a3b8; }
 
 .roomCardBody {
@@ -466,17 +503,7 @@
   text-overflow: ellipsis;
 }
 
-/* ── Manutenção card: dark text on light gray bg ── */
-.roomCard_manutencao .roomCardLabel,
-.roomCard_manutencao .roomCardGuest { color: #1e293b; }
-.roomCard_manutencao .roomCardMeta,
-.roomCard_manutencao .roomCardDesc,
-.roomCard_manutencao .roomCardPeriod { color: #64748b; }
-.roomCard_manutencao .roomCardTipo {
-  color: #64748b;
-  background: rgba(0,0,0,0.05);
-  border-color: rgba(0,0,0,0.08);
-}
+/* Manutenção agora usa superfície neutra — texto segue os tokens do tema. */
 
 /* Badges row (pernoite / dayuse) */
 .roomCardBadges {
@@ -514,19 +541,21 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 6px 4px;
-  border-radius: 7px;
-  background: rgba(0,0,0,0.04);
-  border: 1px solid rgba(0,0,0,0.07);
+  padding: 7px 4px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   color: var(--text-2);
   min-width: 0;
   overflow: visible;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
 }
 .bedGridCellActive {
-  background: rgba(16,185,129,0.12);
-  border-color: rgba(16,185,129,0.30);
-  color: #059669;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  color: var(--accent-strong);
 }
+:root[data-theme="dark"] .bedGridCellActive { color: var(--accent); }
 .bedGridQty {
   font-size: 12px;
   font-weight: 700;
@@ -606,15 +635,26 @@
 
 /* ── Status badges ─────────────────────────────────────────────────────────── */
 .statusBadge {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
-  padding: 3px 9px;
-  border-radius: 4px;
+  padding: 3px 9px 3px 8px;
+  border-radius: 999px;
   border: 1px solid;
   white-space: nowrap;
   backdrop-filter: blur(4px);
+}
+.statusBadge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 16%, transparent);
 }
 .badge_disponivel { background: rgba(16, 185, 129, 0.12); color: #059669; border-color: rgba(16, 185, 129, 0.3); }
 .badge_ocupado    { background: rgba(220, 38, 38, 0.12);   color: #dc2626; border-color: rgba(220, 38, 38, 0.3);   }

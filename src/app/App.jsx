@@ -9,10 +9,7 @@ import RegistersPage       from '../pages/registers/RegistersPage';
 import EmployeeManagement  from '../pages/employees/EmployeeManagement';
 import RolePermissions     from '../pages/permissions/RolePermissions';
 import InventoryManagement from '../pages/inventory/InventoryManagement';
-import RoomsManagement     from '../pages/rooms/RoomsManagement';
 import PricingManagement   from '../pages/pricing/PricingManagement';
-import StaysManagement     from '../pages/stays/StaysManagement';
-import DayUseManagement   from '../pages/dayuse/DayUseManagement';
 import RecepcaoPage from '../pages/recepcao/RecepcaoPage';
 import BookingCalendar    from '../pages/calendar/BookingCalendar';
 
@@ -22,10 +19,7 @@ const PAGE_MAP = {
   employees:   <EmployeeManagement />,
   permissions: <RolePermissions />,
   inventory:   <InventoryManagement />,
-  rooms:       <RoomsManagement />,
   pricing:     <PricingManagement />,
-  stays:       <StaysManagement />,
-  dayuse:      <DayUseManagement />,
   reception:   <RecepcaoPage />,
   bookings:    <BookingCalendar />,
 };

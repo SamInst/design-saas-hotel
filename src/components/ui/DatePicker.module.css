@@ -94,6 +94,40 @@
 .dis { opacity:.3; cursor:not-allowed; }
 .hint { margin:8px 0 0; font-size:11px; color:var(--text-2); text-align:center; }
 
+/* ── Occupied night (blocked by another reservation) ── */
+.blk {
+  color:#dc2626 !important;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #dc2626 9%, transparent) 0 4px,
+      transparent 4px 7px
+    ) !important;
+  cursor:not-allowed;
+  opacity:.85;
+}
+.blk:hover:not(:disabled) { background:rgba(220,38,38,.16) !important; }
+/* a checkout that lands on the next occupied night stays readable */
+.blk.rE {
+  background:var(--violet) !important; color:#fff !important;
+  box-shadow:0 2px 8px rgba(124,58,237,.35);
+}
+.blk.hovE { background:rgba(124,58,237,.22) !important; color:var(--violet) !important; }
+
+/* ── Inline (embedded, real-time) variant ── */
+.inline {
+  display:flex; flex-direction:column; gap:6px; width:100%;
+  background:var(--surface); border:1px solid var(--card-border);
+  border-radius:14px; padding:14px 16px 16px;
+}
+.inline .head { margin-bottom:8px; }
+.inline .grid { gap:3px; }
+.inline .day {
+  font-size:13px; font-weight:550; border-radius:9px;
+}
+.inline .wday { font-size:10px; }
+:root[data-theme="dark"] .inline { background:var(--surface-2); }
+
 /* Marked reference date (e.g. check-in shown in checkout calendar) */
 .mkd::after {
   content: '';

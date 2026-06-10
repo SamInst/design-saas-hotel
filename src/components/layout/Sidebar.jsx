@@ -1,7 +1,7 @@
 import {
-  BedDouble, Clock, CalendarDays, Wallet, Package,
+  CalendarDays, Wallet, Package,
   Tag, LogOut, Sun, Moon, ChevronLeft, ChevronRight, MoreVertical,
-  DoorOpen, UserCog, Users, ShieldCheck, Building2,
+  UserCog, Users, ShieldCheck, Building2,
 } from 'lucide-react';
 import styles from './Sidebar.module.css';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -10,9 +10,6 @@ import { usePermissions } from '../../hooks/usePermissions';
 // tela: 'ADMIN' = tela de administrador total (vê tudo)
 const NAV_ITEMS = [
   { id: 'reception',   label: 'Recepção',            icon: Building2,  tela: 'DASHBOARD'          },
-  { id: 'stays',       label: 'Pernoites',            icon: BedDouble,  tela: 'PERNOITES'          },
-  { id: 'rooms',       label: 'Apartamentos',         icon: DoorOpen,   tela: 'APARTAMENTOS'       },
-  { id: 'dayuse',      label: 'Day Use',              icon: Clock,      tela: 'DAY USE'            },
   { id: 'bookings',    label: 'Reservas',             icon: CalendarDays,tela: 'RESERVAS'          },
   { id: 'financial',   label: 'Financeiro',           icon: Wallet,     tela: 'FINANCEIRO'         },
   { id: 'inventory',   label: 'Itens',                icon: Package,    tela: 'ITENS'              },

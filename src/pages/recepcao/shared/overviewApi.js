@@ -115,11 +115,30 @@ export const OVERVIEW_ROOMS_CATS = [
 const _STATUS_MAP = {
   DISPONIVEL:      ROOM_STATUS.DISPONIVEL,
   OCUPADO:         ROOM_STATUS.OCUPADO,
+  LIMPEZA:         ROOM_STATUS.LIMPEZA,
   EM_LIMPEZA:      ROOM_STATUS.LIMPEZA,
   MANUTENCAO:      ROOM_STATUS.MANUTENCAO,
   FORA_DE_SERVICO: ROOM_STATUS.FORA_DE_SERVICO,
   RESERVADO:       ROOM_STATUS.RESERVADO,
 };
+
+// Hospedagem.Status (backend) → { tipo de serviço, status curto usado na UI }
+function _mapServicoStatus(s) {
+  switch (s) {
+    case 'PERNOITE_ATIVO':                         return { tipo: 'pernoite', status: PERNOITE_STATUS.ATIVO };
+    case 'PERNOITE_FINALIZADO':                    return { tipo: 'pernoite', status: PERNOITE_STATUS.FINALIZADO };
+    case 'PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE': return { tipo: 'pernoite', status: PERNOITE_STATUS.FINALIZADO_PENDENTE };
+    case 'PERNOITE_CANCELADO':                     return { tipo: 'pernoite', status: PERNOITE_STATUS.CANCELADO };
+    case 'DAY_USE_ATIVO':
+    case 'DAY_USE_SOLICITADO':                     return { tipo: 'dayuse',   status: DAYUSE_STATUS.ATIVO };
+    case 'DAY_USE_FINALIZADO':                     return { tipo: 'dayuse',   status: DAYUSE_STATUS.FINALIZADO };
+    case 'DAY_USE_FINALIZADO_PAGAMENTO_PENDENTE':  return { tipo: 'dayuse',   status: DAYUSE_STATUS.FINALIZADO_PENDENTE };
+    case 'DAY_USE_CANCELADO':                      return { tipo: 'dayuse',   status: DAYUSE_STATUS.CANCELADO };
+    case 'RESERVA_ATIVA':                          return { tipo: 'reserva',  status: 'RESERVA_ATIVA' };
+    case 'RESERVA_SOLICITADA':                     return { tipo: 'reserva',  status: 'RESERVA_SOLICITADA' };
+    default:                                       return { tipo: null,       status: s ?? '' };
+  }
+}
 
 function _normalizePessoa(p) {
   // API may wrap person under p.pessoa (reserva shape) or be flat (pernoite shape)
@@ -147,6 +166,7 @@ function _normalizeConsumo(c) {
     valorUnitario: unit,
     valorTotal: c.valor_total ?? (unit * qty),
     despesaPessoal: c.despesa_pessoal ?? false,
+    cancelado: c.cancelado ?? false,
     pagamento: pag ? {
       nomePagador:   pag.nome_pagador ?? '',
       formaPagamento: pag.tipo_pagamento?.descricao ?? '',
@@ -175,8 +195,9 @@ function _normalizeDiaria(d) {
     id: d.id,
     idx: (d.numero ?? 1) - 1,
     num: d.numero ?? 1,
-    dataInicio: d.data_hora_inicio ?? '',
-    dataFim: d.data_hora_fim ?? '',
+    // Hospedagem.Diaria usa checkin/checkout; mantém fallback ao formato antigo
+    dataInicio: d.checkin ?? d.data_hora_inicio ?? '',
+    dataFim:    d.checkout ?? d.data_hora_fim ?? '',
     valor: d.valor ?? 0,
     hospedes: (d.pessoas ?? []).map(_normalizePessoa),
     consumos: (d.consumos ?? []).map(c => ({ ..._normalizeConsumo(c), diariaId: d.id })),
@@ -184,62 +205,71 @@ function _normalizeDiaria(d) {
   };
 }
 
-function _normalizeServico(svc, tipo) {
-  if (!svc) return null;
-  const diarias    = (svc.diarias    ?? []).map(_normalizeDiaria);
-  const pagamentos = (svc.pagamentos ?? []).map(_normalizePagamento);
-  const totalPago   = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
-  const consumoSum  = diarias.flatMap(d => d.consumos).reduce((s, c) => s + (c.valorTotal ?? 0), 0);
-  const valorTotal  = (svc.valor_total ?? 0) + consumoSum;
-  // Unwrap nested pessoa shape (reserva) or flat shape (pernoite)
-  const hospedes   = (svc.pessoas ?? []).map(_normalizePessoa);
-  const titular    = hospedes.find(p => p.titular) ?? hospedes[0];
-  // Dates: reserva uses data_hora_entrada/saida; pernoite uses check_in/check_out
-  const checkin  = svc.data_hora_entrada ?? svc.check_in  ?? '';
-  const checkout = svc.data_hora_saida   ?? svc.check_out ?? '';
+// h: Hospedagem completa (status PERNOITE_/DAY_USE_/RESERVA_…); q: Quarto (p/ tipo de acomodação)
+function _normalizeServico(h, q) {
+  if (!h) return null;
+  const { tipo, status } = _mapServicoStatus(h.status);
+
+  const diarias    = (h.diarias    ?? []).map(_normalizeDiaria);
+  const pagamentos = (h.pagamentos ?? []).map(_normalizePagamento);
+  // Consumos agora vêm no nível da hospedagem (não mais aninhados por diária)
+  const consumos   = (h.consumos   ?? []).map(_normalizeConsumo);
+  const pessoas    = (h.pessoas     ?? []).map(_normalizePessoa);
+
+  const totalPago  = pagamentos.filter(p => !p.cancelado).reduce((s, p) => s + p.valor, 0);
+  const consumoSum = consumos.filter(c => !c.cancelado).reduce((s, c) => s + (c.valorTotal ?? 0), 0);
+  const valorTotal = (h.valor_total ?? 0) + consumoSum;
+  const titular    = pessoas.find(p => p.titular) ?? pessoas[0];
+
+  const checkin  = h.data_hora_checkin  ?? '';
+  const checkout = h.data_hora_checkout ?? '';
+
   return {
     tipo,
-    id: svc.id,
+    id: h.id,
     titularNome: titular?.nome ?? null,
-    tipoAcomodacao: svc.tipo_ocupacao ?? '',
+    tipoAcomodacao: q?.descricao ?? '',
     periodo: `${checkin} - ${checkout}`,
     chegadaPrevista: checkin,
     saidaPrevista:   checkout,
-    status: svc.status ?? '',
-    totalDiarias: svc.quantidade_diarias ?? diarias.length,
-    diariaAtual:  svc.numero_diaria_atual ?? 0,
+    status,
+    statusBackend: h.status ?? '',
+    totalDiarias: h.quantidade_diarias ?? diarias.length,
+    diariaAtual:  h.numero_diaria_atual ?? 0,
     valorTotal,
     totalPago,
     pagamentoPendente: Math.max(0, valorTotal - totalPago),
-    hospedes,
-    consumos: diarias.flatMap(d => d.consumos),
+    observacao: h.observacao ?? '',
+    grupoId: h.grupo_id ?? null,
+    motivoCancelamento: h.motivo_cancelamento ?? null,
+    pessoasOrcamento: h.pessoas_orcamento ?? [],
+    hospedes: pessoas,
+    consumos,
     pagamentos,
     diarias,
   };
 }
 
-// API shape: { data, categorias: [{ id, nome, descricao, hospedagens: [{ quarto, quarto_pernoite, quarto_dayuse }] }] }
-function _normalizeHospedagem(h, cat) {
-  const q = h.quarto;
+// API shape: { data, categorias: [{ id, nome, descricao, quartos: [{ quarto, hospedagem }] }] }
+function _normalizeHospedagem(item, cat) {
+  const q = item.quarto;
+  const h = item.hospedagem ?? null;
 
-  let servico = null;
-  if (h.quarto_pernoite)     servico = _normalizeServico(h.quarto_pernoite, 'pernoite');
-  else if (h.quarto_dayuse)  servico = _normalizeServico(h.quarto_dayuse,  'dayuse');
-  else if (h.quarto_reserva) servico = _normalizeServico(h.quarto_reserva, 'reserva');
+  const servico = _normalizeServico(h, q);
 
   const lm = q.quarto_limpeza;
   const limpeza = lm ? {
     id: lm.id,
-    responsavel: lm.responsavel ?? lm.funcionario?.nome ?? '',
+    responsavel: lm.nome_responsavel ?? lm.responsavel ?? lm.funcionario?.nome ?? '',
     inicio: lm.data_hora_inicio ?? '',
   } : null;
 
   const mn = q.quarto_manutencao;
   const manutencao = mn ? {
     id: mn.id,
-    responsavel: mn.responsavel ?? '',
+    responsavel: mn.nome_responsavel ?? mn.responsavel ?? mn.funcionario?.nome ?? '',
     descricao: mn.descricao ?? '',
-    previsaoFim: mn.previsao_fim ?? '',
+    previsaoFim: mn.data_hora_fim ?? mn.previsao_fim ?? '',
   } : null;
 
   return {
@@ -257,10 +287,10 @@ function _normalizeHospedagem(h, cat) {
       rede:     q.quantidade_rede           ?? 0,
     },
     status: (() => {
-      if (h.quarto_pernoite || h.quarto_dayuse) return ROOM_STATUS.OCUPADO;
-      if (h.quarto_reserva)                     return ROOM_STATUS.RESERVADO;
-      if (q.quarto_limpeza)                     return ROOM_STATUS.LIMPEZA;
-      if (q.quarto_manutencao)                  return ROOM_STATUS.MANUTENCAO;
+      if (servico?.tipo === 'pernoite' || servico?.tipo === 'dayuse') return ROOM_STATUS.OCUPADO;
+      if (servico?.tipo === 'reserva')                                return ROOM_STATUS.RESERVADO;
+      if (q.quarto_limpeza)                                           return ROOM_STATUS.LIMPEZA;
+      if (q.quarto_manutencao)                                        return ROOM_STATUS.MANUTENCAO;
       return _STATUS_MAP[q.status] ?? ROOM_STATUS.DISPONIVEL;
     })(),
     servico,
@@ -286,8 +316,8 @@ async function _reload() {
   const data = await recepcaoApi.listar();
   const rooms = [];
   for (const cat of (data?.categorias ?? [])) {
-    for (const h of (cat.hospedagens ?? [])) {
-      rooms.push(_normalizeHospedagem(h, cat));
+    for (const item of (cat.quartos ?? [])) {
+      rooms.push(_normalizeHospedagem(item, cat));
     }
   }
   _cache = rooms;
@@ -510,9 +540,13 @@ export const overviewApi = {
   },
 
   async removerConsumo(quartoId, consumoId) {
-    const room   = _find(quartoId);
+    const room    = _find(quartoId);
     const diarias = room?.servico?.diarias ?? [];
-    const diaria  = diarias.find(d => d.consumos.some(c => c.id === consumoId));
+    // Consumos vêm no nível da hospedagem (sem vínculo de diária no payload);
+    // tenta localizar pela diária, senão usa a diária atual / última como alvo do endpoint.
+    const diaria  = diarias.find(d => d.consumos.some(c => c.id === consumoId))
+      ?? diarias.find(d => d.num === room?.servico?.diariaAtual)
+      ?? diarias[diarias.length - 1];
     if (diaria?.id && consumoId) {
       await recepcaoApi.removerConsumo(diaria.id, consumoId);
     }
