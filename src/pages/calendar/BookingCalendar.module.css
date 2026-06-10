@@ -295,7 +295,7 @@
 .bar_hospedado .barBadge { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.35); color: #fff; }
 
 .bar_finalizado {
-  background: #9ca3af;
+  background: #374151; /* mesmo cinza do ATIVO; o esmaecido vem da opacidade da barra */
   box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 .bar_finalizado .barName  { color: rgba(255,255,255,0.95); }
@@ -356,7 +356,7 @@
 .bar_confirmada .barStatusTag, .bar_confirmada .barStatusTagInline { background: color-mix(in srgb, #10b981 70%, #000); }
 .bar_solicitada .barStatusTag, .bar_solicitada .barStatusTagInline { background: color-mix(in srgb, #f59e0b 70%, #000); }
 .bar_hospedado  .barStatusTag, .bar_hospedado  .barStatusTagInline { background: color-mix(in srgb, #374151 70%, #000); }
-.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #9ca3af 70%, #000); }
+.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #374151 70%, #000); }
 .bar_cancelado  .barStatusTag, .bar_cancelado  .barStatusTagInline { background: color-mix(in srgb, #ef4444 70%, #000); }
 .bar_orcamento  .barStatusTag, .bar_orcamento  .barStatusTagInline { background: color-mix(in srgb, #6366f1 55%, #000); }
 
@@ -681,6 +681,10 @@
 .dayRoom_hospedado  { border-left-color: #8b5cf6; }
 .dayRoom_finalizado { border-left-color: #0f766e; }
 .dayRoom_cancelado  { border-left-color: #ef4444; }
+/* PERNOITE_FINALIZADO: mesmo cinza do ATIVO, porém mais esmaecido (concluído) */
+.dayRoomDone { border-left-color: #6b7280; opacity: .6; }
+.dayRoomDone:hover { opacity: .82; }
+.dayRoomDone .dayRoomBadge { background: rgba(55, 65, 81, 0.12); color: #374151; }
 .dayRoomBadge { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; font-family: var(--font-mono), monospace; }
 .dayRoomBadge_confirmada { background: rgba(16,185,129,0.12); color: #10b981; }
 .dayRoomBadge_solicitada { background: rgba(245,158,11,0.12); color: #f59e0b; }
@@ -1532,15 +1536,141 @@
 .spin { animation: spin 0.8s linear infinite; }
 
 /* ── Day Modal stats ─────────────────────────────────────────────────────── */
-.dayStatsStrip {
-  display: flex; align-items: center; justify-content: space-around;
-  padding: 8px 12px; margin-bottom: 8px;
-  background: var(--surface-2); border-radius: var(--radius);
-  border: 1px solid var(--border);
+/* ── Painel de métricas (DayModal / RoomModal) ────────────────────────────── */
+.dayMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.dayStatChip { flex: 1; text-align: center; font-size: 12px; color: var(--text-2); white-space: nowrap; }
-.dayStatChip b { font-weight: 600; color: var(--text); }
-.dayStatDivider { width: 1px; height: 12px; background: var(--border); flex-shrink: 0; }
+.metricCard {
+  --mc: var(--violet);
+  position: relative;
+  overflow: hidden;
+  padding: 13px 14px 14px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  transition: transform .2s cubic-bezier(.2, .7, .3, 1), box-shadow .2s ease, border-color .2s ease;
+  animation: metricIn .45s cubic-bezier(.2, .7, .3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 65ms);
+}
+/* Brilho de destaque no canto */
+.metricCard::before {
+  content: '';
+  position: absolute;
+  top: -45%; right: -30%;
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--mc) 0%, transparent 70%);
+  opacity: .15;
+  pointer-events: none;
+}
+/* Barra de acento à esquerda */
+.metricCard::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 13px; bottom: 13px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--mc);
+  opacity: .9;
+}
+.metricCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 26px -10px color-mix(in srgb, var(--mc) 45%, transparent);
+  border-color: color-mix(in srgb, var(--mc) 38%, var(--border));
+}
+.metricHead {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.metricIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--mc) 15%, transparent);
+  color: var(--mc);
+  flex-shrink: 0;
+}
+.metricLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.metricValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.metricValue {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.metricTotal {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.metricSub {
+  display: block;
+  margin-top: 7px;
+  font-size: 10.5px;
+  color: var(--text-2);
+}
+.metricBar {
+  margin-top: 10px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mc) 15%, transparent);
+  overflow: hidden;
+}
+.metricBarFill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mc) 70%, #fff 30%), var(--mc));
+  animation: metricBarGrow .7s cubic-bezier(.2, .7, .3, 1) .15s backwards;
+}
+/* Variante 2 colunas (RoomModal) e valor em texto (categoria) */
+.dayMetricsRoom { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.metricValueText {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.01em;
+  color: var(--text);
+}
+.metricViolet  { --mc: #7c3aed; }
+.metricIndigo  { --mc: #4f46e5; }
+.metricAmber   { --mc: #f59e0b; }
+.metricEmerald { --mc: #10b981; }
+
+@keyframes metricIn {
+  from { opacity: 0; transform: translateY(9px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes metricBarGrow {
+  from { transform: scaleX(0); transform-origin: left; }
+  to   { transform: scaleX(1); transform-origin: left; }
+}
+@media (max-width: 560px) {
+  .dayMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .dayStats {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   padding: 12px 14px; border-bottom: 1px solid var(--border);

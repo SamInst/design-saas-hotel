@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
+  DoorOpen, CalendarCheck2,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -1610,13 +1611,13 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
 }
 
 // ─── Day Modal ────────────────────────────────────────────────────────────────
-function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva }) {
+function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSelectReserva }) {
   const [dayList,  setDayList]  = useState([]);
   const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    hospedagemApi.buscar({ status: 'RESERVA_ATIVA', data: toBrDate(dateStr) })
+    hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], data: toBrDate(dateStr) })
       .then((data) => {
         const flat = Array.isArray(data) ? data : [];
         const seen = new Set();
@@ -1628,7 +1629,7 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
       })
       .catch(() => setDayList([]))
       .finally(() => setLoading(false));
-  }, [dateStr]); // eslint-disable-line
+  }, [dateStr, refreshKey]); // eslint-disable-line
 
   const dayReservas    = dayList;
   const occupiedRooms  = new Set(dayReservas.map((r) => r.quarto));
@@ -1641,11 +1642,12 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
   const chegadas   = dayReservas.filter((r) => r.dataInicio === dateStr);
   const permanecem = dayReservas.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr);
 
-  const renderDayRow = (r) => {
+  const renderDayRow = (r, lineColor) => {
     const dias     = diffDays(r.dataInicio, r.dataFim);
     const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
     return (
-      <div key={r.id} className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`]].join(' ')}
+      <div key={r.id} className={[styles.dayRoomRow, styles[`dayRoom_${r.status}`], r.status === 'finalizado' ? styles.dayRoomDone : ''].join(' ')}
+        style={lineColor ? { borderLeftColor: lineColor } : undefined}
         onClick={() => onSelectReserva(r)}>
         <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
         <div className={styles.searchDropInfo}>
@@ -1682,15 +1684,57 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
         <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
       ) : (
         <>
-          {/* Minimalist stats strip */}
-          <div className={styles.dayStatsStrip}>
-            <span className={styles.dayStatChip}><b>{occupiedRooms.size}</b>/{totalRooms} apartamentos ocupados</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}><b>{dayReservas.length}</b> reserva{dayReservas.length !== 1 ? 's' : ''} confirmada{dayReservas.length !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}><b>{totalPeople}</b> pessoa{totalPeople !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip} style={{ color: 'var(--emerald)' }}><b>{availableRooms.length}</b> apartamentos disponíveis</span>
+          {/* Painel de métricas do dia */}
+          <div className={styles.dayMetrics}>
+            <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><BedDouble size={14} /></span>
+                <span className={styles.metricLabel}>Ocupados</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{occupiedRooms.size}</span>
+                <span className={styles.metricTotal}>/ {totalRooms}</span>
+              </div>
+              <div className={styles.metricBar}>
+                <span
+                  className={styles.metricBarFill}
+                  style={{ width: `${totalRooms ? Math.round((occupiedRooms.size / totalRooms) * 100) : 0}%` }}
+                />
+              </div>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
+                <span className={styles.metricLabel}>Reservas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{dayReservas.length}</span>
+              </div>
+              <span className={styles.metricSub}>confirmadas no dia</span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricAmber].join(' ')} style={{ '--i': 2 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><Users size={14} /></span>
+                <span className={styles.metricLabel}>Pessoas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{totalPeople}</span>
+              </div>
+              <span className={styles.metricSub}>hospedadas</span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricEmerald].join(' ')} style={{ '--i': 3 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><DoorOpen size={14} /></span>
+                <span className={styles.metricLabel}>Livres</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{availableRooms.length}</span>
+              </div>
+              <span className={styles.metricSub}>apartamentos</span>
+            </div>
           </div>
 
           {dayReservas.length === 0 ? (
@@ -1708,7 +1752,7 @@ function DayModal({ dateStr, onClose, onNewReserva, categorias, onSelectReserva 
                     </span>
                   </div>
                   <div className={styles.dayRoomList}>
-                    {sec.list.map(renderDayRow)}
+                    {sec.list.map((r) => renderDayRow(r, sec.key === 'saidas' ? '#f97316' : undefined))}
                   </div>
                 </div>
               ))}
@@ -1790,10 +1834,30 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
         <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
       ) : (
         <>
-          <div className={styles.dayStatsStrip}>
-            <span className={styles.dayStatChip}><b>{res.totalElements}</b> reserva{res.totalElements !== 1 ? 's' : ''}</span>
-            <span className={styles.dayStatDivider} />
-            <span className={styles.dayStatChip}>{cat?.nome || '—'}</span>
+          <div className={[styles.dayMetrics, styles.dayMetricsRoom].join(' ')}>
+            <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
+                <span className={styles.metricLabel}>Reservas</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValue}>{res.totalElements}</span>
+              </div>
+              <span className={styles.metricSub}>
+                {modo === 'mes' ? `em ${ROOM_MES_NOMES[mes - 1]}` : modo === 'anteriores' ? 'anteriores' : 'próximas'}
+              </span>
+            </div>
+
+            <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
+              <div className={styles.metricHead}>
+                <span className={styles.metricIcon}><BedDouble size={14} /></span>
+                <span className={styles.metricLabel}>Categoria</span>
+              </div>
+              <div className={styles.metricValueRow}>
+                <span className={styles.metricValueText}>{cat?.nome || '—'}</span>
+              </div>
+              <span className={styles.metricSub}>Apartamento {fmtRoom(room)}</span>
+            </div>
           </div>
 
           {res.content.length === 0 ? (
@@ -4298,6 +4362,7 @@ export default function BookingCalendar() {
   const [groupPanel,           setGroupPanel]           = useState(null);
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
+  const [dayRefreshKey,   setDayRefreshKey]   = useState(0);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
   const [roomModal, setRoomModal] = useState(null);
@@ -4391,8 +4456,8 @@ export default function BookingCalendar() {
     setLoading(true);
     try {
       const [curr, next] = await Promise.all([
-        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO'], mes, ano }),
-        hospedagemApi.buscar({ status: 'RESERVA_ATIVA', mes: nextMes, ano: nextAno }),
+        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], mes, ano }),
+        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_FINALIZADO'], mes: nextMes, ano: nextAno }),
       ]);
       setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
     } catch (_) {
@@ -4414,6 +4479,12 @@ export default function BookingCalendar() {
       // ignore solicitacoes load failures here
     }
   };
+
+  // Sempre que as reservas mudam (qualquer ação: ativar, hospedar, pagar, cancelar…),
+  // sinaliza o DayModal aberto para recarregar sua própria lista.
+  useEffect(() => {
+    setDayRefreshKey((v) => v + 1);
+  }, [reservas]);
 
   // ── Reload reservations when month/year changes ───────────────────────────
   useEffect(() => {
@@ -4922,13 +4993,17 @@ export default function BookingCalendar() {
       ? Math.min(dias, Math.max(1, diffDays(orig.dataInicio, todayStr) + 1)) : null;
 
     const isCancelado   = orig.status === 'cancelado';
+    const isFinalizado  = orig.status === 'finalizado';
     const isSelSelected = pagamentoModoAtivo && reservasSelecionadas.has(orig.id);
     const isSelDimmed   = pagamentoModoAtivo && !isSelSelected;
-    const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4) : isCancelado ? Math.min(opacity, 0.55) : opacity;
+    const barOpacity    = isSelDimmed ? Math.min(opacity, 0.4)
+      : isCancelado  ? Math.min(opacity, 0.55)
+      : isFinalizado ? Math.min(opacity, 0.6)
+      : opacity;
     // grupoCor: cor real do grupo (independe do status) — usada no ticket e no painel flutuante.
     // gColor: cor de fundo da barra — null em hospedado, mantendo o corpo cinza escuro.
     const grupoCor      = !isGhost && orig.grupo_id != null ? grupoColor(orig.grupo_id) : null;
-    const gColor        = grupoCor && orig.status !== 'hospedado' ? grupoCor : null;
+    const gColor        = grupoCor && orig.status !== 'hospedado' && orig.status !== 'finalizado' ? grupoCor : null;
 
     return (
       <div key={key}
@@ -5237,7 +5312,7 @@ export default function BookingCalendar() {
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
       )}
       {dayModal && (
-        <DayModal dateStr={dayModal.dateStr} onClose={() => setDayModal(null)} categorias={categorias}
+        <DayModal dateStr={dayModal.dateStr} refreshKey={dayRefreshKey} onClose={() => setDayModal(null)} categorias={categorias}
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
