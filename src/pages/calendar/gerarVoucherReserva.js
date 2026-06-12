@@ -43,6 +43,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
       const calc = precosCalc[`${quartoId}_${pi}`] ?? { valor_total: 0, detalhes: [], sazonalidades_aplicadas: [] };
       const hospedes = p.roomHospedes?.[quartoId] || [];
       const desc     = roomDescMap[quartoId] || '';
+      const obs      = (quartosObs?.[`${quartoId}_${pi}`] || '').trim();
 
       let detalhesHtml = '';
       if ((calc.detalhes || []).length > 0) {
@@ -85,6 +86,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
           ${hospedes.length > 0 ? `<div class="quarto-section">${hospedesHtml}</div>` : ''}
           ${detalhesHtml}
           ${sazHtml}
+          ${obs ? `<div><span class="obs-label">Observação</span><div class="obs-box">${obs.replace(/\n/g, '<br>')}</div></div>` : ''}
           <div class="total-row">
             <span class="total-label">Total</span>
             <span class="total-val">${brl(calc.valor_total)}</span>
@@ -145,8 +147,10 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
       </div>
     </div>` : '';
 
+  // Pagamentos do tipo "PENDENTE" são apenas registro provisório e não somam no total pago.
+  const isPagPendente = (forma) => String(forma ?? '').trim().toUpperCase() === 'PENDENTE';
   const totalGeral = grandTotal + consumosTotal;
-  const totalPago = pagamentos.reduce((s, p) => s + (p.valor ?? 0), 0);
+  const totalPago = pagamentos.filter((p) => !isPagPendente(p.formaPagamento)).reduce((s, p) => s + (p.valor ?? 0), 0);
   const pendente  = totalGeral - totalPago;
 
   const pagsHtml = pagamentos.length > 0 ? `
@@ -167,7 +171,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
             ${dtPag || p.formaPagamento ? `<span class="pag-data">${[dtPag, p.formaPagamento].filter(Boolean).join(' · ')}</span>` : ''}
             ${p.funcionario ? `<span class="pag-func">registrado por ${p.funcionario}</span>` : ''}
           </div>
-          <span class="pag-val">${brl(p.valor)}</span>
+          <span class="pag-val"${isPagPendente(p.formaPagamento) ? ' style="color:#f97316"' : ''}>${brl(p.valor)}</span>
         </div>`;
       }).join('')}
     </div>` : '';

@@ -65,6 +65,12 @@ const mapStatus = (r) => {
   return 'confirmada';
 };
 
+// Pagamentos do tipo "PENDENTE" são apenas um registro provisório (a forma real é
+// definida depois). Servem para guardar uma informação/descrição e NÃO entram na
+// soma do valor pago / card de preços.
+const isPagamentoPendente = (forma) =>
+  String(forma ?? '').trim().toUpperCase() === 'PENDENTE';
+
 // ─── Normalize backend Reserva → frontend shape ───────────────────────────────
 // API response: pessoas[i] = { id, pessoa: {id, nome, cpf, ...}, representante }
 //               pagamentos[i] = { id, pagamento: {uuid, tipo_pagamento, nome_pagador, valor, ...} }
@@ -77,7 +83,9 @@ const normalizeReserva = (r) => {
   // Unwrap nested pagamento objects
   const pagsRaw   = r.pagamentos ?? [];
   const pags      = pagsRaw.map((p) => p.pagamento ?? p);
-  const totalPago = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
+  const totalPago = pags
+    .filter((p) => !isPagamentoPendente(p.tipo_pagamento?.descricao ?? p.forma_pagamento))
+    .reduce((s, p) => s + (p.valor ?? 0), 0);
 
   // Suporte a campos legados e novos nomes de data
   const dataEntrada   = r.data_hora_entrada   ?? r.data_hora_checkin  ?? '';
@@ -305,7 +313,7 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const [acoesOpen,          setAcoesOpen]          = useState(false);
 
   // ── Derived ────────────────────────────────────────────────────────────────
-  const totalPago  = pagamentos.filter((p) => !p.cancelado).reduce((s, p) => s + (p.valor ?? 0), 0);
+  const totalPago  = pagamentos.filter((p) => !p.cancelado && !isPagamentoPendente(p.formaPagamento)).reduce((s, p) => s + (p.valor ?? 0), 0);
   const pendente   = reserva.valorTotal - totalPago;
   const dias       = diffDays(reserva.dataInicio, reserva.dataFim);
   const cat        = categorias.find((c) => c.quartos.includes(reserva.quarto));
@@ -3991,9 +3999,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         // Financial totals
         const grandTotal   = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
         const isMultiRoom  = tipo === 'grupo' || quartos.length > 1;
-        const totalPago    = pagModo === 'unico'
-          ? pagUnico.reduce((s, p) => s + (p.valor ?? 0), 0)
-          : Object.values(quartosPag).flat().reduce((s, p) => s + (p.valor ?? 0), 0);
+        const formaDoPag   = (p) => p.formaPagamento ?? p.tipo_pagamento?.descricao
+          ?? tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao;
+        const totalPago    = (pagModo === 'unico' ? pagUnico : Object.values(quartosPag).flat())
+          .filter((p) => !isPagamentoPendente(formaDoPag(p)))
+          .reduce((s, p) => s + (p.valor ?? 0), 0);
         const pendente     = Math.max(0, grandTotal - totalPago);
 
         return (
@@ -4291,13 +4301,16 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         // showPagModalRoom holds the composite rKey `${roomId}_${periodoIdx}` (per-room mode)
         const [roomId, roomPi] = showPagModalRoom != null ? showPagModalRoom.split('_') : [null, null];
         let pagVTotal, pagVPago;
+        const formaDoPag = (p) => p.formaPagamento ?? p.tipo_pagamento?.descricao
+          ?? tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao;
+        const somaPagos = (arr) => arr.filter((p) => !isPagamentoPendente(formaDoPag(p))).reduce((s, p) => s + (p.valor ?? 0), 0);
         if (pagModo === 'unico') {
           pagVTotal = grandTotalModal || null;
-          pagVPago  = pagUnico.reduce((s, p) => s + (p.valor ?? 0), 0);
+          pagVPago  = somaPagos(pagUnico);
         } else {
           pagVTotal = showPagModalRoom != null ? (precosCalc[showPagModalRoom]?.valor_total ?? null) : null;
           pagVPago  = showPagModalRoom != null
-            ? (quartosPag[showPagModalRoom] || []).reduce((s, p) => s + (p.valor ?? 0), 0)
+            ? somaPagos(quartosPag[showPagModalRoom] || [])
             : null;
         }
         return (
@@ -4625,7 +4638,7 @@ export default function BookingCalendar() {
     uniquePags.sort((a, b) => (b.dataRegistro ?? '').localeCompare(a.dataRegistro ?? ''));
     return {
       pagMultiploValorTotal: selecionadas.reduce((s, r) => s + (r.valorTotal ?? 0), 0),
-      pagMultiploValorPago:  uniquePags.reduce((s, p) => s + (p.valor ?? 0), 0),
+      pagMultiploValorPago:  uniquePags.filter((p) => !isPagamentoPendente(p.formaPagamento)).reduce((s, p) => s + (p.valor ?? 0), 0),
       pagMultiploLastPayer:  uniquePags[0]?.nomePagador ?? null,
     };
   }, [reservasSelecionadas, allReservas]);
@@ -5501,7 +5514,7 @@ export default function BookingCalendar() {
                 );
                 const uniquePags  = Array.from(seenPags.values());
                 const totalGrupo  = members.reduce((s, r) => s + (r.valorTotal ?? 0), 0);
-                const pagoGrupo   = uniquePags.reduce((s, p) => s + (p.valor ?? 0), 0);
+                const pagoGrupo   = uniquePags.filter((p) => !isPagamentoPendente(p.formaPagamento)).reduce((s, p) => s + (p.valor ?? 0), 0);
                 const pendente    = Math.max(0, totalGrupo - pagoGrupo);
                 return (
                   <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
