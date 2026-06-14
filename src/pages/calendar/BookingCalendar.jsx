@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  DoorOpen, CalendarCheck2,
+  DoorOpen, CalendarCheck2, Tag,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -11,11 +11,20 @@ import { FormField }     from '../../components/ui/Input';
 import { DatePicker }    from '../../components/ui/DatePicker';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
+import { PriceAdjustmentModal, computeAdjustedTotal, describeAdjustment } from '../../components/ui/PriceAdjustmentModal';
 import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
 import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import styles from './BookingCalendar.module.css';
+
+// Botão "Gerenciar Preços" anexado ao card de preço (à direita do botão de ocultar).
+const priceAdjBtnStyle = (active) => ({
+  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px',
+  border: 'none', borderLeft: '1px solid var(--border, #2a2a35)',
+  background: active ? 'color-mix(in srgb, var(--accent, #6366f1) 18%, transparent)' : 'transparent',
+  color: active ? 'var(--accent, #6366f1)' : 'var(--text-2, #9aa)', cursor: 'pointer',
+});
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
 const parseBrDate = (s) => {
@@ -3261,6 +3270,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const [calcLoading,      setCalcLoading]      = useState(false);
   const [showPriceDetails, setShowPriceDetails] = useState(true);
   const [roomPriceOpen,    setRoomPriceOpen]    = useState({}); // { [`${q}_${pi}`]: bool }
+  const [priceAdj,         setPriceAdj]         = useState({}); // { [rKey]: { mode, sign, value, qtdPessoas } }
+  const [adjModalKey,      setAdjModalKey]      = useState(null); // rKey do modal de ajuste aberto
   const [apiAvailability,      setApiAvailability]      = useState(null); // Set<roomId> | null
   const [mpApiAvailability,    setMpApiAvailability]    = useState(null); // Set<roomId> | null
   const [availLoading,         setAvailLoading]         = useState(false);
@@ -3414,6 +3425,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     setPrecosCalc({});
     setShowPriceDetails(false);
     setRoomPriceOpen({});
+    setPriceAdj({});
     try {
       const displayPeriodos = periodoMode === 'unico'
         ? [{ rooms: quartos, checkin: checkinStr, checkout: checkoutStr, roomHospedes: quartoHospedes, roomHospedesOrc: quartoHospedesOrc }]
@@ -3453,6 +3465,25 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   };
 
   const handleGoToStep3 = async () => { setStep(3); await runCalcPrecos(); };
+
+  // Base original (sem ajuste) de uma hospedagem a partir dos detalhes calculados.
+  const baseForKey = (rKey) => {
+    const calc = precosCalc[rKey];
+    const baseDiarias = (calc?.detalhes || []).map((d) => ({ valor: d.valor_final ?? 0 }));
+    const baseTotal = baseDiarias.length
+      ? baseDiarias.reduce((s, d) => s + d.valor, 0)
+      : (calc?.valor_total ?? 0);
+    return { baseTotal, baseDiarias };
+  };
+
+  // Monta o snapshot novo_preco para o corpo de criação (apenas se houver ajuste).
+  const buildNovoPreco = (rKey) => {
+    const adj = priceAdj[rKey];
+    if (!adj) return null;
+    const { baseTotal, baseDiarias } = baseForKey(rKey);
+    const { valorTotal, requestFields } = computeAdjustedTotal({ baseTotal, baseDiarias, ...adj });
+    return { ...requestFields, valor_total: valorTotal };
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -3570,6 +3601,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         const pessoasIds = (hospedes || [])
           .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
           .map((h) => parseInt(h.id));
+        const novoPreco = buildNovoPreco(rKey);
         return {
           quarto_id:          parseInt(quartoId),
           status:             'RESERVA_ATIVA',
@@ -3579,6 +3611,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
           ...(roomPags.length   ? { pagamentos: roomPags } : {}),
           ...(quartosObs[rKey]?.trim() ? { observacao: quartosObs[rKey].trim() } : {}),
+          ...(novoPreco ? { novo_preco: novoPreco } : {}),
         };
       };
 
@@ -3610,7 +3643,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       title={<><Plus size={15} /> {isSolicitacao ? 'Nova Solicitação' : forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
       footer={
         <div className={styles.footerSpread}>
-          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); } }}>Voltar</Button>}</div>
+          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>Voltar</Button>}</div>
           <div className={styles.footerRight}>
             {step < STEPS.length ? (
               <Button variant="primary"
@@ -3999,6 +4032,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         // Financial totals
         const grandTotal   = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
         const isMultiRoom  = tipo === 'grupo' || quartos.length > 1;
+        // Ajuste de preço por hospedagem: no card principal só quando há uma única hospedagem.
+        const singleHosp   = !isMultiRoom && periodoMode === 'unico';
+        const mainKey      = `${quartos[0]}_0`;
         const formaDoPag   = (p) => p.formaPagamento ?? p.tipo_pagamento?.descricao
           ?? tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao;
         const totalPago    = (pagModo === 'unico' ? pagUnico : Object.values(quartosPag).flat())
@@ -4009,10 +4045,33 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         return (
           <div className={styles.step3Root}>
 
+            {/* ── Modal de ajuste de preço (Gerenciar Preços) ── */}
+            {adjModalKey && precosCalc[adjModalKey] && (() => {
+              const { baseTotal, baseDiarias } = baseForKey(adjModalKey);
+              const key = adjModalKey;
+              return (
+                <PriceAdjustmentModal
+                  open
+                  onClose={() => setAdjModalKey(null)}
+                  baseTotal={baseTotal}
+                  baseDiarias={baseDiarias}
+                  initial={priceAdj[key]}
+                  onApply={(result, raw) => {
+                    setPriceAdj((prev) => ({ ...prev, [key]: raw }));
+                    setPrecosCalc((prev) => (prev[key]
+                      ? { ...prev, [key]: { ...prev[key], valor_total: result.valorTotal } }
+                      : prev));
+                  }}
+                />
+              );
+            })()}
+
             {/* ── Collapsible price card ── */}
             <div className={styles.priceCard} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'stretch' }}>
               <button
                 className={styles.priceCardHeader}
+                style={{ flex: 1, minWidth: 0 }}
                 onClick={() => !calcLoading && setShowPriceDetails((v) => !v)}
               >
                 <span className={styles.priceCardSummary}>
@@ -4034,6 +4093,17 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   <ChevronDown size={14} className={showPriceDetails ? styles.priceCardChevronOpen : styles.priceCardChevron} />
                 )}
               </button>
+              {singleHosp && !calcLoading && precosCalc[mainKey] && (
+                <button
+                  type="button"
+                  title="Gerenciar Preços"
+                  onClick={() => setAdjModalKey(mainKey)}
+                  style={priceAdjBtnStyle(!!priceAdj[mainKey])}
+                >
+                  <Tag size={15} />
+                </button>
+              )}
+              </div>
 
               {showPriceDetails && !calcLoading && (
                 <div className={styles.priceCardBody}>
@@ -4059,6 +4129,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                               )}
                             </div>
                           ))}
+                          {priceAdj[`${q}_${pi}`] && (() => {
+                            const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
+                            const diff = (calc.valor_total ?? 0) - base;
+                            return (
+                              <div className={styles.priceDetailItem}>
+                                <div className={styles.priceCardRow}>
+                                  <span className={styles.step3PriceDesc}>{describeAdjustment(priceAdj[`${q}_${pi}`])}</span>
+                                  <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
+                                    {diff > 0 ? '+' : ''}{fmtBRL(diff)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                           <div className={styles.step3PriceTotal}>
                             <span>Total</span>
                             <span>{fmtBRL(calc.valor_total)}</span>
@@ -4118,8 +4202,10 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                         {/* Per-room price card (multi-room only) */}
                         {multiRoom && (rCalc || calcLoading) && (
                           <div className={styles.priceCard} style={{ marginBottom: 10 }}>
+                            <div style={{ display: 'flex', alignItems: 'stretch' }}>
                             <button
                               className={styles.priceCardHeader}
+                              style={{ flex: 1, minWidth: 0 }}
                               onClick={() => !calcLoading && setRoomPriceOpen((prev) => ({ ...prev, [rKey]: !prev[rKey] }))}
                             >
                               <span className={styles.priceCardSummary}>
@@ -4135,6 +4221,17 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                 <ChevronDown size={14} className={roomPriceOpen[rKey] ? styles.priceCardChevronOpen : styles.priceCardChevron} />
                               )}
                             </button>
+                            {!calcLoading && rCalc && (
+                              <button
+                                type="button"
+                                title="Gerenciar Preços"
+                                onClick={() => setAdjModalKey(rKey)}
+                                style={priceAdjBtnStyle(!!priceAdj[rKey])}
+                              >
+                                <Tag size={15} />
+                              </button>
+                            )}
+                            </div>
                             {roomPriceOpen[rKey] && !calcLoading && rCalc && (
                               <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
                                 {rCalc.detalhes?.map((d, di) => (
@@ -4152,6 +4249,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                                     )}
                                   </div>
                                 ))}
+                                {priceAdj[rKey] && (() => {
+                                  const base = (rCalc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
+                                  const diff = (rCalc.valor_total ?? 0) - base;
+                                  return (
+                                    <div className={styles.priceDetailItem}>
+                                      <div className={styles.priceCardRow}>
+                                        <span className={styles.step3PriceDesc}>{describeAdjustment(priceAdj[rKey])}</span>
+                                        <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
+                                          {diff > 0 ? '+' : ''}{fmtBRL(diff)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
                                 <div className={styles.step3PriceTotal}>
                                   <span>Total do apartamento {fmtRoom(parseInt(q))}</span>
                                   <span>{fmtBRL(rCalc.valor_total)}</span>

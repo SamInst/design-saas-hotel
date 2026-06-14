@@ -14,6 +14,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { TimeInput }                from '../../components/ui/TimeInput';
 import { PaymentModal }             from '../../components/ui/PaymentModal';
+import { PriceAdjustmentModal, novoPrecoToState } from '../../components/ui/PriceAdjustmentModal';
 import { Notification }             from '../../components/ui/Notification';
 import {
   overviewApi,
@@ -646,6 +647,7 @@ export default function RecepcaoPage() {
   // Gerenciar modals
   const [showGerenciarPag, setShowGerenciarPag]         = useState(false);
   const [showGerenciarConsumo, setShowGerenciarConsumo] = useState(false);
+  const [showGerenciarPreco, setShowGerenciarPreco]     = useState(false);
   const [editingPag, setEditingPag]                     = useState(null);
 
 
@@ -2305,6 +2307,9 @@ export default function RecepcaoPage() {
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarConsumo(true); }}>
                           <ShoppingCart size={14} /> Gerenciar Consumos
                         </button>
+                        <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPreco(true); }}>
+                          <Tag size={14} /> Gerenciar Preços
+                        </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
                           <Users size={14} /> Gerenciar Pessoas
                         </button>
@@ -3705,6 +3710,41 @@ export default function RecepcaoPage() {
               </div>
             )}
           </Modal>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Gerenciar Preços (ajuste manual)
+      ═══════════════════════════════════════════════════════ */}
+      {showGerenciarPreco && selectedRoom?.servico && (() => {
+        const sv = selectedRoom.servico;
+        const baseDiarias = (sv.diarias || []).map((d) => ({ id: d.id, valor: d.valor ?? 0 }));
+        const baseTotal = baseDiarias.reduce((s, d) => s + (d.valor || 0), 0);
+        return (
+          <PriceAdjustmentModal
+            open
+            onClose={() => setShowGerenciarPreco(false)}
+            baseTotal={baseTotal}
+            baseDiarias={baseDiarias}
+            initial={novoPrecoToState(sv.novoPreco)}
+            onApply={async (result) => {
+              try {
+                setSaving(true);
+                const body = {
+                  ...result.requestFields,
+                  valor_total: result.valorTotal,
+                  diarias: result.diarias ?? undefined,
+                };
+                const updated = await overviewApi.gerenciarPreco(selectedRoom.id, body);
+                if (updated) setQuartos((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
+                notify('Preço atualizado.');
+              } catch (e) {
+                notify('Erro ao atualizar preço: ' + e.message, 'error');
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
         );
       })()}
 

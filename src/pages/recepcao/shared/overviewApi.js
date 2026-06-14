@@ -241,6 +241,7 @@ function _normalizeServico(h, q) {
     pagamentoPendente: Math.max(0, valorTotal - totalPago),
     observacao: h.observacao ?? '',
     grupoId: h.grupo_id ?? null,
+    novoPreco: h.novo_preco ?? null,
     motivoCancelamento: h.motivo_cancelamento ?? null,
     pessoasOrcamento: h.pessoas_orcamento ?? [],
     hospedes: pessoas,
@@ -467,6 +468,14 @@ export const overviewApi = {
         },
       };
     });
+  },
+
+  // Ajuste manual de preço ("Gerenciar Preços"). body já calculado no front-end.
+  async gerenciarPreco(quartoId, body) {
+    const hospedagemId = _find(quartoId)?.servico?.id;
+    if (hospedagemId) await recepcaoApi.gerenciarPreco(hospedagemId, body);
+    await _reload();
+    return _find(quartoId);
   },
 
   async adicionarDiaria(id) {

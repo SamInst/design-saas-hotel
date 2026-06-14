@@ -557,6 +557,15 @@ export const hospedagemApi = {
     return request(`/hospedagem/buscar${qsStr ? `?${qsStr}` : ''}`);
   },
 
+  /**
+   * POST /hospedagem/{hospedagemId}/preco — ajuste manual de preço ("Gerenciar Preços").
+   * body: { quantidade_diarias?, quantidade_pessoas?, valor_diaria?, porcentagem?, valor_desconto?,
+   *         valor_total, diarias?: [{ id, valor }] }
+   */
+  gerenciarPreco(hospedagemId, body) {
+    return request(`/hospedagem/${hospedagemId}/preco`, { method: 'POST', body });
+  },
+
   /** POST /hospedagem/{hospedagemId}/pessoas — adiciona lista de pessoas por ID */
   adicionarPessoas(hospedagemId, pessoasIds) {
     return request(`/hospedagem/${hospedagemId}/pessoas`, { method: 'POST', body: pessoasIds });
@@ -899,6 +908,7 @@ export const recepcaoApi = {
   adicionarConsumos:     (diariaId, items)     => request(`/diarias/${diariaId}/consumos`, { method: 'POST', body: items }),
   removerConsumo:        (diariaId, consumoId) => request(`/diarias/${diariaId}/consumos/${consumoId}`, { method: 'DELETE' }),
   alterarStatusDiaria:   (id, status)          => request(`/diarias/${id}/status`, { method: 'PUT', params: { status } }),
+  gerenciarPreco:        (hospedagemId, body)  => request(`/hospedagem/${hospedagemId}/preco`, { method: 'POST', body }),
 };
 
 // ─────────────────────────────────────────────────────────────
