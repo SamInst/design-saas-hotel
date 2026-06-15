@@ -8,6 +8,24 @@ const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const fmtBRL = (v) =>
   (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Máscara de moeda (mesmo padrão do campo "Valor *" do PaymentModal).
+const maskBRL = (v) => {
+  const digits = String(v ?? '').replace(/\D/g, '');
+  if (!digits) return '';
+  return (parseInt(digits, 10) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+const parseBRL = (v) => {
+  const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+};
+
+// Converte o valor numérico (snapshot/back-end) para o texto exibido no campo.
+const valueToDisplay = (mode, num) => {
+  if (num == null || num === '') return '';
+  if (mode === 'porcentagem') return String(num);
+  return maskBRL(String(Math.round(Number(num) * 100)));
+};
+
 /**
  * Cálculo puro do total ajustado ("Gerenciar Preços"). Todo o cálculo é feito no front-end;
  * o resultado (valor_total, diárias e os campos do snapshot) é enviado ao back-end.
@@ -85,13 +103,13 @@ export function describeAdjustment(raw) {
 const MODE_ICONS = { diaria: CalendarDays, desconto: Tag, porcentagem: Percent };
 
 const modeLabel = (key, sign) => {
-  if (key === 'diaria') return 'Valor por diária';
+  if (key === 'diaria') return 'Por diária';
   if (key === 'desconto') {
-    return sign === 'desconto' ? 'Valor de desconto sobre o total' : 'Valor adicional sobre o total';
+    return sign === 'desconto' ? 'Sobre o total' : 'Sobre o total';
   }
   return sign === 'desconto'
-    ? 'Desconto por porcentagem sobre o total'
-    : 'Adicional por porcentagem sobre o total';
+    ? 'Porcentagem sobre o total'
+    : 'Porcentagem sobre o total';
 };
 
 const modeHint = (key) => {
@@ -117,15 +135,18 @@ const card = (active) => ({
 export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply }) {
   const [sign, setSign] = useState(initial?.sign ?? 'desconto');
   const [mode, setMode] = useState(initial?.mode ?? 'desconto');
-  const [value, setValue] = useState(initial?.value ?? '');
+  const [value, setValue] = useState(() => valueToDisplay(initial?.mode ?? 'desconto', initial?.value));
+
+  // Modos em reais usam máscara de moeda; a porcentagem permanece numérica.
+  const numericValue = mode === 'porcentagem' ? (Number(value) || 0) : parseBRL(value);
 
   const result = useMemo(
-    () => computeAdjustedTotal({ baseTotal, baseDiarias, mode, sign, value }),
-    [baseTotal, baseDiarias, mode, sign, value],
+    () => computeAdjustedTotal({ baseTotal, baseDiarias, mode, sign, value: numericValue }),
+    [baseTotal, baseDiarias, mode, sign, numericValue],
   );
 
   const diff = result.valorTotal - baseTotal;
-  const canApply = value !== '' && Number(value) >= 0 && (mode !== 'diaria' || baseDiarias.length > 0);
+  const canApply = value !== '' && numericValue >= 0 && (mode !== 'diaria' || baseDiarias.length > 0);
   const showSign = mode !== 'diaria';
 
   const fieldLabel =
@@ -144,7 +165,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
             variant="primary"
             disabled={!canApply}
             onClick={() => {
-              onApply(result, { mode, sign, value: Number(value) || 0 });
+              onApply(result, { mode, sign, value: numericValue });
               onClose();
             }}
           >
@@ -191,15 +212,47 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
 
         {/* Campo do modo ativo */}
         <FormField label={fieldLabel}>
-          <Input
-            type="number"
-            min="0"
-            step={mode === 'porcentagem' ? '1' : '0.01'}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={mode === 'porcentagem' ? 'Ex.: 10' : mode === 'diaria' ? 'Ex.: 150,00' : 'Ex.: 50,00'}
-          />
+          {mode === 'porcentagem' ? (
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Ex.: 10"
+            />
+          ) : (
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={value}
+              onChange={(e) => setValue(maskBRL(e.target.value))}
+              placeholder="R$ 0,00"
+            />
+          )}
         </FormField>
+
+        {/* Prévia por diária — desconto/adicional aplicado a cada diária (modo "Por diária") */}
+        {mode === 'diaria' && numericValue > 0 && baseDiarias.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, borderTop: '1px solid var(--border, #2a2a35)', paddingTop: 10 }}>
+            {baseDiarias.map((d, i) => {
+              const novo = result.diarias?.[i]?.valor ?? 0;
+              const dd = novo - (d.valor || 0);
+              return (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ color: 'var(--text-2, #9aa)' }}>Diária {i + 1}</span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text-2, #9aa)' }}>{fmtBRL(d.valor)}</span>
+                    <span>{fmtBRL(novo)}</span>
+                    <span style={{ color: dd < 0 ? '#10b981' : dd > 0 ? '#f97316' : 'inherit', minWidth: 72, textAlign: 'right' }}>
+                      {dd > 0 ? '+' : ''}{fmtBRL(dd)}
+                    </span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Prévia — mostra a diferença em relação ao valor original */}
         <div style={{ borderTop: '1px solid var(--border, #2a2a35)', paddingTop: 10, fontSize: 13 }}>

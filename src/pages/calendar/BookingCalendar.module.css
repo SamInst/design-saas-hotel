@@ -2313,6 +2313,62 @@
 .rvPayAmount { font-size: 13px; font-weight: 700; color: #10b981; white-space: nowrap; align-self: center; }
 .rvPayAmountCancelado { font-size: 13px; font-weight: 600; color: var(--text-2); text-decoration: line-through; white-space: nowrap; align-self: center; }
 
+/* ── Estilo "overnight" — espelha o modal de pernoite da Recepção ────────────── */
+.ovPeriodDark { background: #1e293b; border-radius: 12px; }
+.ovPeriodDark .ovDatesRow {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.08);
+  border-radius: 12px;
+}
+.ovPeriodDark .ovDateLabel  { color: rgba(255,255,255,0.45); }
+.ovPeriodDark .ovDateValue  { color: #fff; }
+.ovPeriodDark .ovDateTime   { color: rgba(255,255,255,0.5); }
+.ovPeriodDark .ovDateArrow  { color: rgba(255,255,255,0.3); }
+.ovPeriodDark .ovNightsCell { border-color: rgba(255,255,255,0.12); }
+.ovPeriodDark .ovNightsNum  { color: #fff; }
+.ovPeriodDark .ovNightsLabel { color: rgba(255,255,255,0.45); }
+
+.ovDatesRow {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; flex-shrink: 0;
+}
+.ovDateCell { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.ovDateCellRight { text-align: right; }
+.ovDateLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
+.ovDateValue { font-size: 14px; font-weight: 700; color: var(--text); }
+.ovDateTime  { font-size: 11px; color: var(--text-2); }
+.ovDateArrow { display: flex; align-items: center; color: var(--text-2); padding: 0 12px; flex-shrink: 0; }
+.ovNightsCell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 0 0 16px; border-left: 1px solid var(--border); margin-left: 4px; min-width: 56px; }
+.ovNightsNum   { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
+.ovNightsLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+
+.ovFinCard { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 0; }
+.ovFinRow    { display: flex; gap: 10px; justify-content: space-between; padding: 0 4px; }
+.ovFinItem   { display: flex; flex-direction: column; gap: 2px; }
+.ovFinItem:nth-child(2) { align-items: center; }
+.ovFinItem:last-child   { align-items: flex-end; }
+.ovFinLabel  { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+.ovFinValue  { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.ovFinPending { color: #d97706; }
+.ovFinPaid    { color: #059669; }
+:root[data-theme="dark"] .ovFinPending { color: #fbbf24; }
+:root[data-theme="dark"] .ovFinPaid    { color: #34d399; }
+.ovFinProgress { display: flex; flex-direction: column; gap: 5px; padding: 0 4px; }
+.ovFinProgressMeta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
+.ovFinBar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.ovFinBarFill { height: 100%; background: #059669; border-radius: 3px; transition: width 0.3s ease; }
+:root[data-theme="dark"] .ovFinBarFill { background: #34d399; }
+
+.ovPriceInline { display: flex; flex-direction: column; gap: 12px; }
+.ovDiariasCard { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
+.ovDiariasCard .ovPriceConsumoTotal { border-top: 1px solid var(--border); font-weight: 600; }
+.ovPriceCardRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 12px; }
+.ovPriceConsumoTotal { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 12px 6px; font-size: 12px; font-weight: 600; color: var(--text); }
+.ovDiariaDesc { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.ovDiariaNum  { font-size: 12px; font-weight: 600; color: var(--text); }
+.ovDiariaDate { font-size: 11px; color: var(--text-2); }
+
 /* Observação box */
 .rvObsBox {
   background: var(--surface-2);

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
@@ -11,9 +11,9 @@ import { FormField }     from '../../components/ui/Input';
 import { DatePicker }    from '../../components/ui/DatePicker';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
-import { PriceAdjustmentModal, computeAdjustedTotal, describeAdjustment } from '../../components/ui/PriceAdjustmentModal';
+import { PriceAdjustmentModal, computeAdjustedTotal, describeAdjustment, novoPrecoToState } from '../../components/ui/PriceAdjustmentModal';
 import { addDaysStr }        from './calendarMocks';
-import { gerarVoucherReserva } from './gerarVoucherReserva';
+import { gerarVoucherReserva, ADJ_OBS_PREFIX } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
 import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import styles from './BookingCalendar.module.css';
@@ -83,7 +83,7 @@ const isPagamentoPendente = (forma) =>
 // ─── Normalize backend Reserva → frontend shape ───────────────────────────────
 // API response: pessoas[i] = { id, pessoa: {id, nome, cpf, ...}, representante }
 //               pagamentos[i] = { id, pagamento: {uuid, tipo_pagamento, nome_pagador, valor, ...} }
-const normalizeReserva = (r) => {
+export const normalizeReserva = (r) => {
   // Unwrap nested pessoa objects
   const pessoasRaw = r.pessoas ?? [];
   const pessoas    = pessoasRaw.map((p) => p.pessoa ?? p);
@@ -143,6 +143,7 @@ const normalizeReserva = (r) => {
       };
     }),
     valorTotal: r.valor_total ?? 0,
+    novoPreco: r.novo_preco ?? null,
     totalPago,
     motivoCancelamento: r.motivo_cancelamento?.motivo_cancelamento ?? null,
     dataMotivo:         r.motivo_cancelamento?.data_hora_registro   ?? null,
@@ -264,7 +265,13 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 }
 
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
-function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [] }) {
+// `overnight` — quando informado, o modal opera em modo "pernoite" (Recepção):
+//   muda apenas os botões do menu Ações e usa as diárias/dados fornecidos no objeto.
+//   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
+//     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
+//     onVoucher, onCancelar }
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, allowHospedarAnytime = false }) {
+  const isOvernight = !!overnight;
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -320,6 +327,10 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   const [confirmRemovePessoa, setConfirmRemovePessoa] = useState(null); // { id, nome }
   const [showVoucherChoice,  setShowVoucherChoice]  = useState(false);
   const [acoesOpen,          setAcoesOpen]          = useState(false);
+  const [showAdjPreco,       setShowAdjPreco]       = useState(false);
+  const [adjCalc,            setAdjCalc]            = useState(null);   // { valor_total, detalhes }
+  const [viewTab,            setViewTab]            = useState('informacoes'); // aba do modal de visualização
+  const [infoCalc,           setInfoCalc]           = useState(null);   // diárias calculadas (aba Informações)
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const totalPago  = pagamentos.filter((p) => !p.cancelado && !isPagamentoPendente(p.formaPagamento)).reduce((s, p) => s + (p.valor ?? 0), 0);
@@ -363,6 +374,50 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     if (temConsumos) setShowVoucherChoice(true);
     else handleDownloadVoucher(false);
   };
+
+  // ── Gerenciar Preços (ajuste manual) ───────────────────────────────────────
+  // Calcula as diárias atuais (base, sem ajuste) e abre o mesmo modal usado na
+  // criação. Ao aplicar, persiste o novo valor_total na reserva.
+  const openGerenciarPreco = async () => {
+    setShowAdjPreco(true);
+    setAdjCalc(null);
+    try {
+      const res = await reservaApi.calcularPreco([{
+        fk_quarto:    parseInt(reserva.quarto),
+        data_entrada: toBrDate(reserva.dataInicio),
+        data_saida:   toBrDate(reserva.dataFim),
+        ...buildGuestCalcParams(pessoas),
+      }]);
+      setAdjCalc(Array.isArray(res) ? res[0] : res);
+    } catch (e) {
+      onNotify?.(e?.message ?? 'Erro ao calcular preço.', 'error');
+      setShowAdjPreco(false);
+    }
+  };
+
+  // Carrega as diárias (detalhes) para a aba "Informações". Só quando há quarto e período.
+  // No modo pernoite as diárias já vêm prontas em overnight.diariasDetalhes — não busca.
+  useEffect(() => {
+    if (isOvernight) { setInfoCalc(null); return; }
+    if (reserva.quarto == null || !reserva.dataInicio || !reserva.dataFim) { setInfoCalc(null); return; }
+    let cancelled = false;
+    reservaApi.calcularPreco([{
+      fk_quarto:    parseInt(reserva.quarto),
+      data_entrada: toBrDate(reserva.dataInicio),
+      data_saida:   toBrDate(reserva.dataFim),
+      ...buildGuestCalcParams(pessoas),
+    }]).then((res) => { if (!cancelled) setInfoCalc(Array.isArray(res) ? res[0] : res); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [reserva.id, reserva.quarto, reserva.dataInicio, reserva.dataFim, pessoas.length]); // eslint-disable-line
+
+  // Em modo pernoite os dados vêm via props e mudam após cada ação na Recepção.
+  // Re-sincroniza as listas internas sem remontar o modal (preserva aba e rolagem).
+  useEffect(() => {
+    if (!isOvernight) return;
+    setPessoas(reserva.hospedes ?? []);
+    setPagamentos(reserva.pagamentos ?? []);
+  }, [isOvernight, reserva.id, (reserva.hospedes ?? []).length, (reserva.pagamentos ?? []).length, reserva.valorTotal]); // eslint-disable-line
 
   // ── Phone display mask ─────────────────────────────────────────────────────
   const fmtPhone = (v) => {
@@ -1083,8 +1138,8 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
   };
   const todayStr = formatDate(new Date());
   // Pode hospedar quando o check-in é hoje ou já passou (inclui reservas com checkout vencido).
-  // Nunca quando o check-in é no futuro.
-  const canCheckin = reserva.dataInicio <= todayStr;
+  // Nunca quando o check-in é no futuro — salvo allowHospedarAnytime (Recepção: hóspede no balcão).
+  const canCheckin = allowHospedarAnytime || reserva.dataInicio <= todayStr;
   const roomDesc = roomDescMap[reserva.quarto] || roomDescMap[String(reserva.quarto)] || '';
   const catNome = cat?.nome || reserva.categoria || '';
   const roomDisplay = [roomDesc || `Ap. ${fmtRoom(reserva.quarto)}`, catNome].filter(Boolean).join(' · ');
@@ -1098,6 +1153,17 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
     cancelado: 'Reserva Cancelada', orcamento: 'Orçamento',
   };
   const canEdit = reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && reserva.status !== 'orcamento' && reserva.status !== 'solicitada';
+
+  // Diárias do card de preço: no modo pernoite vêm prontas; senão, do cálculo.
+  const effectiveDetalhes = isOvernight ? (overnight.diariasDetalhes ?? []) : (infoCalc?.detalhes ?? []);
+
+  // Lista de pessoas exibida (suporta orçamento sem cadastro).
+  const guestList =
+    (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0)
+      ? reserva.pessoasOrcamento
+      : (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0)
+        ? [{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]
+        : pessoas;
 
   return (
     <>
@@ -1123,38 +1189,25 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           <button className={styles.rvCloseBtn} onClick={handleClose}><X size={16} /></button>
         </div>
 
-        {/* ── Scrollable body ── */}
-        <div className={styles.rvBody}>
-          <div className={styles.rvTwoCol}>
+        {/* ── Tab bar ── */}
+        <div className={styles.detailTabs}>
+          {[
+            ['informacoes', 'Informações'],
+            ['pessoas',     `Pessoas (${guestList.length})`],
+            ['pagamentos',  `Pagamentos (${pagamentos.filter((p) => !p.cancelado).length})`],
+          ].map(([t, label]) => (
+            <button key={t} className={[styles.detailTab, viewTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setViewTab(t)}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-            {/* ── Left column: obs, guests (+ dates when orcamento) ── */}
-            <div className={[styles.rvLeft, reserva.status === 'orcamento' ? styles.rvLeftFull : ''].join(' ')}>
+        {/* ── Tab body ── */}
+        <div className={styles.detailTabContent}>
 
-              {/* Dates shown here only for orcamento (no right column) */}
-              {reserva.status === 'orcamento' && (
-                <div className={styles.rvDatesRow}>
-                  <div className={styles.rvDateCell}>
-                    <div className={styles.rvDateLabel}>Check-in</div>
-                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
-                    <div className={styles.rvDateTime}>{checkinTime}h</div>
-                  </div>
-                  <div className={styles.rvDateArrow}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                  </div>
-                  <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
-                    <div className={styles.rvDateLabel}>Check-out</div>
-                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
-                    <div className={styles.rvDateTime}>{checkoutTime}h</div>
-                  </div>
-                  <div className={styles.rvDateCellNights}>
-                    <div className={styles.rvNightsNum}>{dias}</div>
-                    <div className={styles.rvNightsLabel}>Diárias</div>
-                  </div>
-                </div>
-              )}
-
+          {/* ─── Informações: período, resumo financeiro, diárias, observação ─── */}
+          {viewTab === 'informacoes' && (
+            <>
               {/* Cancel reason */}
               {reserva.status === 'cancelado' && reserva.motivoCancelamento && (
                 <div className={styles.rvCancelBlock}>
@@ -1166,48 +1219,129 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                 </div>
               )}
 
-              {/* Guests */}
-              {(() => {
-                const renderGuestTable = (list) => {
-                  const titular = list[0];
-                  const acomps = list.slice(1);
-                  const renderRow = (h) => (
-                    <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
-                      <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
-                      <div className={styles.rvGuestInfo}>
-                        <div className={styles.rvGuestName}>{h.nome}</div>
-                        {(h.telefone || h.dataNascimento) && (
-                          <div className={styles.rvGuestMeta}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
-                        )}
-                        {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
+              {/* Período (card escuro) */}
+              <div className={styles.ovPeriodDark}>
+                <div className={styles.ovDatesRow}>
+                  <div className={styles.ovDateCell}>
+                    <div className={styles.ovDateLabel}>Check-in</div>
+                    <div className={styles.ovDateValue}>{toBrDate(reserva.dataInicio)}</div>
+                    <div className={styles.ovDateTime}>{checkinTime}h</div>
+                  </div>
+                  <div className={styles.ovDateArrow}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                    </svg>
+                  </div>
+                  <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                    <div className={styles.ovDateLabel}>Check-out</div>
+                    <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
+                    <div className={styles.ovDateTime}>{checkoutTime}h</div>
+                  </div>
+                  <div className={styles.ovNightsCell}>
+                    <div className={styles.ovNightsNum}>{dias}</div>
+                    <div className={styles.ovNightsLabel}>Diárias</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Price card — resumo financeiro + diárias */}
+              <div className={styles.ovFinCard}>
+                <div className={styles.ovFinRow}>
+                  <div className={styles.ovFinItem}>
+                    <span className={styles.ovFinLabel}>Valor Total</span>
+                    <span className={styles.ovFinValue}>{fmtBRL(displayTotal)}</span>
+                  </div>
+                  <div className={styles.ovFinItem}>
+                    <span className={styles.ovFinLabel}>Total Pago</span>
+                    <span className={styles.ovFinValue}>{fmtBRL(totalPago)}</span>
+                  </div>
+                  <div className={styles.ovFinItem}>
+                    <span className={styles.ovFinLabel}>Pendente</span>
+                    <span className={[styles.ovFinValue, displayPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                      {fmtBRL(displayPendente)}
+                    </span>
+                  </div>
+                </div>
+                {displayTotal > 0 && (() => {
+                  const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
+                  return (
+                    <div className={styles.ovFinProgress}>
+                      <div className={styles.ovFinProgressMeta}>
+                        <span>Progresso de pagamento</span>
+                        <span>{pct}%</span>
+                      </div>
+                      <div className={styles.ovFinBar}>
+                        <div className={styles.ovFinBarFill} style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );
+                })()}
+                {effectiveDetalhes.length > 0 && (() => {
+                  // Ajuste manual persistido ("Gerenciar Preços"). No modo "Por diária" o
+                  // desconto/adicional aparece em cada diária; nos demais, em uma linha única.
+                  const adj = reserva.novoPreco ? novoPrecoToState(reserva.novoPreco) : null;
+                  const baseDiarias = effectiveDetalhes.map((d) => ({ valor: d.valor_final ?? 0 }));
+                  const baseTotal = baseDiarias.reduce((s, d) => s + d.valor, 0);
+                  const isDiariaAdj = adj?.mode === 'diaria';
+                  // Total ajustado calculado a partir das diárias + ajuste (isola o desconto/adicional
+                  // de outros valores, como consumos, que entram no valorTotal no modo pernoite).
+                  const adjResult = adj ? computeAdjustedTotal({ baseTotal, baseDiarias, ...adj }) : null;
+                  const novoValor = isDiariaAdj ? (adjResult?.diarias?.[0]?.valor ?? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100)) : null;
+                  const totalFinal = adjResult ? adjResult.valorTotal : (reserva.valorTotal ?? baseTotal);
+                  const aggDiff = totalFinal - baseTotal;
+                  const funcAjuste = reserva.novoPreco?.funcionario?.nome;
                   return (
-                    <div className={styles.rvGuestTable}>
-                      <div className={styles.rvGuestSectionHeader}>Titular</div>
-                      {renderRow(titular)}
-                      {acomps.length > 0 && (
-                        <>
-                          <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
-                          {acomps.map(renderRow)}
-                        </>
-                      )}
+                    <div className={styles.ovPriceInline}>
+                      <div className={styles.ovDiariasCard}>
+                        <div className={styles.ovDiariasList}>
+                          {effectiveDetalhes.map((d, di) => {
+                            const dd = isDiariaAdj ? novoValor - (d.valor_final ?? 0) : 0;
+                            return (
+                              <div key={di} className={styles.ovPriceCardRow}>
+                                <div className={styles.ovDiariaDesc}>
+                                  <span className={styles.ovDiariaNum}>{d.descricao}</span>
+                                  {d.sazonalidade?.descricao && <span className={styles.ovDiariaDate}>{d.sazonalidade.descricao}</span>}
+                                  {d.valor_criancas > 0 && <span className={styles.ovDiariaDate}>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                                  {isDiariaAdj && dd !== 0 && (
+                                    <span className={styles.ovDiariaDate} style={{ color: dd < 0 ? '#10b981' : '#f97316' }}>
+                                      {dd < 0 ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(dd))}
+                                    </span>
+                                  )}
+                                </div>
+                                {isDiariaAdj ? (
+                                  <span className={styles.step3PriceVal} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span style={{ textDecoration: 'line-through', opacity: 0.6 }}>{fmtBRL(d.valor_final)}</span>
+                                    {fmtBRL(novoValor)}
+                                  </span>
+                                ) : (
+                                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {adj && !isDiariaAdj && (
+                            <div className={styles.ovPriceCardRow}>
+                              <div className={styles.ovDiariaDesc}>
+                                <span className={styles.ovDiariaNum} style={{ color: aggDiff < 0 ? '#10b981' : '#f97316' }}>{describeAdjustment(adj)}</span>
+                                {funcAjuste && <span className={styles.ovDiariaDate}>por {funcAjuste}</span>}
+                              </div>
+                              <span className={styles.step3PriceVal} style={{ color: aggDiff < 0 ? '#10b981' : '#f97316' }}>
+                                {aggDiff > 0 ? '+' : ''}{fmtBRL(aggDiff)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {(adj || effectiveDetalhes.length > 1) && (
+                          <div className={styles.ovPriceConsumoTotal}>
+                            <span>{adj ? 'Total' : 'Total diárias'}</span>
+                            <span>{fmtBRL(adj ? totalFinal : baseTotal)}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
-                };
-
-                if (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0) {
-                  return renderGuestTable(reserva.pessoasOrcamento);
-                }
-                if (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0) {
-                  return renderGuestTable([{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]);
-                }
-                if (pessoas.length === 0) {
-                  return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
-                }
-                return renderGuestTable(pessoas);
-              })()}
+                })()}
+              </div>
 
               {/* Observação */}
               {reserva.observacao && (
@@ -1216,92 +1350,109 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                   <div className={styles.rvObsText}>{reserva.observacao}</div>
                 </div>
               )}
-            </div>
+            </>
+          )}
 
-            {/* ── Right column: period + financial summary + payments ── */}
-            {reserva.status !== 'orcamento' && (
-              <div className={styles.rvRight}>
-                {/* Dates + nights */}
-                <div className={styles.rvDatesRow}>
-                  <div className={styles.rvDateCell}>
-                    <div className={styles.rvDateLabel}>Check-in</div>
-                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataInicio)}</div>
-                    <div className={styles.rvDateTime}>{checkinTime}h</div>
-                  </div>
-                  <div className={styles.rvDateArrow}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-                    </svg>
-                  </div>
-                  <div className={[styles.rvDateCell, styles.rvDateCellRight].join(' ')}>
-                    <div className={styles.rvDateLabel}>Check-out</div>
-                    <div className={styles.rvDateValue}>{toBrDate(reserva.dataFim)}</div>
-                    <div className={styles.rvDateTime}>{checkoutTime}h</div>
-                  </div>
-                  <div className={styles.rvDateCellNights}>
-                    <div className={styles.rvNightsNum}>{dias}</div>
-                    <div className={styles.rvNightsLabel}>Diárias</div>
-                  </div>
-                </div>
-                <div className={styles.rvFinCard}>
-                  <div className={styles.rvFinHeader}>
-                    <DollarSign size={13} className={styles.rvFinIcon} />
-                    <span className={styles.rvFinTitle}>Resumo Financeiro</span>
-                  </div>
-                  <div className={styles.rvFinRow}>
-                    <div className={styles.rvFinItem}>
-                      <span className={styles.rvFinLabel}>Valor Total</span>
-                      <span className={styles.rvFinValue}>{fmtBRL(displayTotal)}</span>
-                    </div>
-                    <div className={styles.rvFinItem}>
-                      <span className={styles.rvFinLabel}>Total Pago</span>
-                      <span className={styles.rvFinValue}>{fmtBRL(totalPago)}</span>
-                    </div>
-                    <div className={styles.rvFinItem}>
-                      <span className={styles.rvFinLabel}>Pendente</span>
-                      <span className={[styles.rvFinValue, displayPendente > 0 ? styles.rvFinPending : styles.rvFinPaid].join(' ')}>
-                        {fmtBRL(displayPendente)}
-                      </span>
-                    </div>
-                  </div>
-                  {displayTotal > 0 && (() => {
-                    const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
-                    return (
-                      <div className={styles.rvFinProgress}>
-                        <div className={styles.rvFinProgressMeta}>
-                          <span>Progresso de pagamento</span>
-                          <span>{pct}%</span>
-                        </div>
-                        <div className={styles.rvFinBar}>
-                          <div className={styles.rvFinBarFill} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div className={styles.rvPayList}>
-                  {pagamentos.length === 0 && <div className={styles.rvEmptyState}>Nenhum pagamento registrado.</div>}
-                  {pagamentos.map((p) => (
-                    <div key={p.id} className={[styles.rvPayItem, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')} onClick={() => setViewPagamento(p)}>
-                      <div className={styles.rvPayInfo}>
-                        <div className={styles.rvPayDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</div>
-                        {p.nomePagador && <div className={styles.rvPayPayer}>{p.nomePagador}</div>}
-                        {(p.dataRegistro || p.formaPagamento) && <div className={styles.rvPayMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>}
-                        {p.funcionario && <div className={styles.rvPayFunc}>registrado por {p.funcionario}</div>}
-                      </div>
-                      <span className={p.cancelado ? styles.rvPayAmountCancelado : styles.rvPayAmount}>{fmtBRL(p.valor)}</span>
-                    </div>
-                  ))}
+          {/* ─── Pessoas ─── */}
+          {viewTab === 'pessoas' && (() => {
+            const renderRow = (h) => (
+              <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
+                <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
+                <div className={styles.rvGuestInfo}>
+                  <div className={styles.rvGuestName}>{h.nome}</div>
+                  {(h.telefone || h.dataNascimento) && (
+                    <div className={styles.rvGuestMeta}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
+                  )}
+                  {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
                 </div>
               </div>
-            )}
+            );
+            if (guestList.length === 0) return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
+            const titular = guestList[0];
+            const acomps = guestList.slice(1);
+            return (
+              <div className={styles.rvGuestTable}>
+                <div className={styles.rvGuestSectionHeader}>Titular</div>
+                {renderRow(titular)}
+                {acomps.length > 0 && (
+                  <>
+                    <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
+                    {acomps.map(renderRow)}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
-          </div>
+          {/* ─── Pagamentos ─── */}
+          {viewTab === 'pagamentos' && (
+            <div className={styles.rvPayList}>
+              {pagamentos.length === 0 && <div className={styles.rvEmptyState}>Nenhum pagamento registrado.</div>}
+              {pagamentos.map((p) => (
+                <div key={p.id} className={[styles.rvPayItem, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')} onClick={() => setViewPagamento(p)}>
+                  <div className={styles.rvPayInfo}>
+                    <div className={styles.rvPayDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</div>
+                    {p.nomePagador && <div className={styles.rvPayPayer}>{p.nomePagador}</div>}
+                    {(p.dataRegistro || p.formaPagamento) && <div className={styles.rvPayMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>}
+                    {p.funcionario && <div className={styles.rvPayFunc}>registrado por {p.funcionario}</div>}
+                  </div>
+                  <span className={p.cancelado ? styles.rvPayAmountCancelado : styles.rvPayAmount}>{fmtBRL(p.valor)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Footer actions ── */}
         <div className={styles.rvFooter}>
-          {reserva.status === 'orcamento' ? (
+          {isOvernight ? (() => {
+            // Menu Ações dirigido por lista — único botão, itens conforme o contexto
+            // (pernoite usa os callbacks padrão; reservado/etc. passam overnight.acoes).
+            const acoesItems = (overnight.acoes ?? [
+              overnight.onAcionarLimpeza      && { label: 'Acionar Limpeza',      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 21h18"/><path d="M7 21V11l5-4 5 4v10"/><path d="M10 21v-4h4v4"/></svg>, onClick: overnight.onAcionarLimpeza },
+              overnight.onGerenciarDiarias    && { label: 'Gerenciar Diárias',    icon: <CalendarDays size={15}/>, onClick: overnight.onGerenciarDiarias },
+              overnight.onAdicionarConsumo    && { label: 'Adicionar Consumo',    icon: <Plus size={15}/>,        onClick: overnight.onAdicionarConsumo },
+              overnight.onGerenciarPagamentos && { label: 'Gerenciar Pagamentos', icon: <DollarSign size={15}/>,  onClick: overnight.onGerenciarPagamentos },
+              overnight.onGerenciarPreco      && { label: 'Gerenciar Preços',     icon: <Tag size={15}/>,         onClick: overnight.onGerenciarPreco },
+              overnight.onGerenciarPessoas    && { label: 'Gerenciar Pessoas',    icon: <Users size={15}/>,       onClick: overnight.onGerenciarPessoas },
+              overnight.onVoucher             && { label: 'Voucher',              icon: <FileDown size={15}/>,    onClick: overnight.onVoucher },
+              overnight.onFinalizar           && { label: 'Finalizar Pernoite',   icon: <Check size={15}/>,       onClick: overnight.onFinalizar, primary: true, divider: true },
+              overnight.onCancelar            && { label: 'Cancelar Pernoite',    icon: <XCircle size={14}/>,     onClick: overnight.onCancelar,  danger: true },
+            ]).filter(Boolean);
+            return (
+            <>
+            {overnight.hasLimpeza && overnight.onFinalizarLimpeza && (
+              <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
+                onClick={() => overnight.onFinalizarLimpeza()}
+                title={overnight.limpezaResponsavel ? `Limpeza: ${overnight.limpezaResponsavel}` : undefined}>
+                <Check size={14} /> Finalizar Limpeza{overnight.limpezaResponsavel ? ` · ${overnight.limpezaResponsavel}` : ''}
+              </button>
+            )}
+            <div className={styles.rvAcoesWrap}>
+              {acoesOpen && (
+                <>
+                  <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
+                  <div className={styles.rvAcoesMenu}>
+                    {acoesItems.map((a, i) => (
+                      <Fragment key={i}>
+                        {a.divider && <div className={styles.rvAcoesDiv} />}
+                        <button
+                          className={[styles.rvAcoesItem, a.primary ? styles.rvAcoesItemPrimary : '', a.danger ? styles.rvAcoesItemDanger : ''].join(' ')}
+                          onClick={() => { setAcoesOpen(false); a.onClick(); }}>
+                          {a.icon} {a.label}
+                        </button>
+                      </Fragment>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button className={styles.rvAcoesBtn} onClick={() => setAcoesOpen((v) => !v)}>
+                Ações <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+              </button>
+            </div>
+            </>
+            );
+          })() : reserva.status === 'orcamento' ? (
             <>
               <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>Ativar Reserva</button>
               <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>Cancelar</button>
@@ -1338,6 +1489,9 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
                     </button>
                     <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
                       <DollarSign size={15}/> Gerenciar Pagamentos
+                    </button>
+                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
+                      <Tag size={15}/> Gerenciar Preços
                     </button>
                     {reserva.status === 'confirmada' && (
                       <button className={styles.rvAcoesItem}
@@ -1623,6 +1777,34 @@ function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite,
           Há alterações não salvas em pessoas ou pagamentos. Deseja descartá-las?
         </p>
       </Modal>
+
+      {/* ── Gerenciar Preços (ajuste manual) ── */}
+      {showAdjPreco && (
+        adjCalc ? (() => {
+          const baseDiarias = (adjCalc.detalhes || []).map((d) => ({ valor: d.valor_final ?? 0 }));
+          const baseTotal = baseDiarias.length
+            ? baseDiarias.reduce((s, d) => s + d.valor, 0)
+            : (adjCalc.valor_total ?? 0);
+          return (
+            <PriceAdjustmentModal
+              open
+              onClose={() => setShowAdjPreco(false)}
+              baseTotal={baseTotal}
+              baseDiarias={baseDiarias}
+              onApply={(result) => {
+                // onUpdate (handleUpdateReserva) já re-sincroniza e notifica.
+                onUpdate(reserva.id, { valor_total: result.valorTotal }).catch(() => {});
+              }}
+            />
+          );
+        })() : (
+          <Modal open onClose={() => setShowAdjPreco(false)} size="sm" title="Gerenciar Preços">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
+              <Loader2 size={16} className={styles.spin} /> Calculando preço...
+            </div>
+          </Modal>
+        )
+      )}
     </>
   );
 }
@@ -3485,6 +3667,65 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
     return { ...requestFields, valor_total: valorTotal };
   };
 
+  // Renderiza as diárias de um cálculo + o ajuste de preço. No modo "Por diária" o
+  // desconto/adicional é mostrado em cada diária; nos demais modos, em uma linha única.
+  const renderPriceDetalhes = (calc, adjKey) => {
+    const adj = priceAdj[adjKey];
+    const isDiariaAdj = adj?.mode === 'diaria';
+    const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
+    return (
+      <>
+        {calc.detalhes?.map((d, di) => {
+          const dd = isDiariaAdj ? novoValor - (d.valor_final ?? 0) : 0;
+          return (
+            <div key={di} className={styles.priceDetailItem}>
+              <div className={styles.priceCardRow}>
+                <span className={styles.step3PriceDesc}>{d.descricao}</span>
+                {isDiariaAdj ? (
+                  <span className={styles.step3PriceVal} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text-2)', fontWeight: 400 }}>{fmtBRL(d.valor_final)}</span>
+                    {fmtBRL(novoValor)}
+                  </span>
+                ) : (
+                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
+                )}
+              </div>
+              {isDiariaAdj
+                ? (dd !== 0 && (
+                    <div className={styles.priceDetailSub}>
+                      <span style={{ color: dd < 0 ? '#10b981' : '#f97316' }}>
+                        {dd < 0 ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(dd))}
+                      </span>
+                    </div>
+                  ))
+                : ((d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
+                    <div className={styles.priceDetailSub}>
+                      <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
+                      {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
+                      {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                    </div>
+                  ))}
+            </div>
+          );
+        })}
+        {adj && !isDiariaAdj && (() => {
+          const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
+          const diff = (calc.valor_total ?? 0) - base;
+          return (
+            <div className={styles.priceDetailItem}>
+              <div className={styles.priceCardRow}>
+                <span className={styles.step3PriceDesc}>{describeAdjustment(adj)}</span>
+                <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
+                  {diff > 0 ? '+' : ''}{fmtBRL(diff)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+      </>
+    );
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -4061,6 +4302,19 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                     setPrecosCalc((prev) => (prev[key]
                       ? { ...prev, [key]: { ...prev[key], valor_total: result.valorTotal } }
                       : prev));
+                    // Registra/atualiza a alteração de valor na observação do apartamento.
+                    setQuartosObs((prev) => {
+                      const atual = prev[key] || '';
+                      const semNota = atual
+                        .split('\n')
+                        .filter((l) => !l.trim().startsWith(ADJ_OBS_PREFIX))
+                        .join('\n')
+                        .trim();
+                      const mudou = Math.abs(result.valorTotal - baseTotal) >= 0.005;
+                      if (!mudou) return { ...prev, [key]: semNota };
+                      const nota = `${ADJ_OBS_PREFIX} ${describeAdjustment(raw)} (novo total ${fmtBRL(result.valorTotal)})`;
+                      return { ...prev, [key]: semNota ? `${semNota}\n${nota}` : nota };
+                    });
                   }}
                 />
               );
@@ -4114,35 +4368,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                       return (
                         <div key={`${q}_${pi}`} className={styles.priceCardRoom}>
                           <div className={styles.priceCardRoomLabel}>Apartamento {fmtRoom(parseInt(q))}</div>
-                          {calc.detalhes?.map((d, di) => (
-                            <div key={di} className={styles.priceDetailItem}>
-                              <div className={styles.priceCardRow}>
-                                <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                                <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                              </div>
-                              {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
-                                <div className={styles.priceDetailSub}>
-                                  <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                                  {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                                  {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                          {priceAdj[`${q}_${pi}`] && (() => {
-                            const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
-                            const diff = (calc.valor_total ?? 0) - base;
-                            return (
-                              <div className={styles.priceDetailItem}>
-                                <div className={styles.priceCardRow}>
-                                  <span className={styles.step3PriceDesc}>{describeAdjustment(priceAdj[`${q}_${pi}`])}</span>
-                                  <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
-                                    {diff > 0 ? '+' : ''}{fmtBRL(diff)}
-                                  </span>
-                                </div>
-                              </div>
-                            );
-                          })()}
+                          {renderPriceDetalhes(calc, `${q}_${pi}`)}
                           <div className={styles.step3PriceTotal}>
                             <span>Total</span>
                             <span>{fmtBRL(calc.valor_total)}</span>
@@ -4234,35 +4460,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                             </div>
                             {roomPriceOpen[rKey] && !calcLoading && rCalc && (
                               <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
-                                {rCalc.detalhes?.map((d, di) => (
-                                  <div key={di} className={styles.priceDetailItem}>
-                                    <div className={styles.priceCardRow}>
-                                      <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                                      <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                                    </div>
-                                    {(d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
-                                      <div className={styles.priceDetailSub}>
-                                        <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                                        {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                                        {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                                {priceAdj[rKey] && (() => {
-                                  const base = (rCalc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
-                                  const diff = (rCalc.valor_total ?? 0) - base;
-                                  return (
-                                    <div className={styles.priceDetailItem}>
-                                      <div className={styles.priceCardRow}>
-                                        <span className={styles.step3PriceDesc}>{describeAdjustment(priceAdj[rKey])}</span>
-                                        <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
-                                          {diff > 0 ? '+' : ''}{fmtBRL(diff)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
+                                {renderPriceDetalhes(rCalc, rKey)}
                                 <div className={styles.step3PriceTotal}>
                                   <span>Total do apartamento {fmtRoom(parseInt(q))}</span>
                                   <span>{fmtBRL(rCalc.valor_total)}</span>

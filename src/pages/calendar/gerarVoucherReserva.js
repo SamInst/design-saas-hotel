@@ -1,3 +1,7 @@
+// Prefixo da linha de observação gerada ao ajustar o preço ("Gerenciar Preços").
+// É um registro interno e NÃO deve ser impresso no voucher.
+export const ADJ_OBS_PREFIX = 'Ajuste de preço:';
+
 const initials = (nome) => {
   const p = (nome || '').trim().split(/\s+/).filter(Boolean);
   if (!p.length) return '?';
@@ -43,7 +47,11 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
       const calc = precosCalc[`${quartoId}_${pi}`] ?? { valor_total: 0, detalhes: [], sazonalidades_aplicadas: [] };
       const hospedes = p.roomHospedes?.[quartoId] || [];
       const desc     = roomDescMap[quartoId] || '';
-      const obs      = (quartosObs?.[`${quartoId}_${pi}`] || '').trim();
+      const obs      = (quartosObs?.[`${quartoId}_${pi}`] || '')
+        .split('\n')
+        .filter((l) => !l.trim().startsWith(ADJ_OBS_PREFIX))
+        .join('\n')
+        .trim();
 
       let detalhesHtml = '';
       if ((calc.detalhes || []).length > 0) {

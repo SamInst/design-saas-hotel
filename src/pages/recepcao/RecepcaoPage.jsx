@@ -23,8 +23,9 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './shared/overviewApi';
-import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
+import { ReservaModal, normalizeReserva } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -490,6 +491,7 @@ export default function RecepcaoPage() {
 
   // Filters 2
   const [filterTipoOcupacao, setFilterTipoOcupacao] = useState('');
+  const [groupByGroup, setGroupByGroup] = useState(false);
   const [filterDateStart, setFilterDateStart]       = useState(null);
   const [filterDateEnd, setFilterDateEnd]           = useState(null);
   const [dateGroupCollapsed, setDateGroupCollapsed] = useState({});
@@ -509,6 +511,8 @@ export default function RecepcaoPage() {
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [detailTab, setDetailTab]       = useState('dados');
   const [svGuests, setSvGuests]         = useState([]); // enriched with telefone/email
+  const [reservaFull, setReservaFull]   = useState(null); // reserva normalizada (modo reserva completo)
+  const [tiposPagamentoReais, setTiposPagamentoReais] = useState([]); // [{ id, descricao }] do back-end
 
   // Pernoite detail — diária navigation
   const [detailDiariaIdx, setDetailDiariaIdx] = useState(0);
@@ -671,6 +675,13 @@ export default function RecepcaoPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Tipos de pagamento reais (para o modal de reserva — "Gerenciar Pagamentos").
+  useEffect(() => {
+    enumApi.tipoPagamento()
+      .then((res) => setTiposPagamentoReais(Array.isArray(res) ? res : (res?.content ?? [])))
+      .catch(() => {});
+  }, []);
+
   // ── Pessoa search for Gerenciar Pessoas modal ──────────────────────────────────
   useEffect(() => {
     if (!showAlterarPessoas || !apSearch || apSearch.length < 2) {
@@ -689,13 +700,18 @@ export default function RecepcaoPage() {
     return () => { cancelled = true; clearTimeout(tid); };
   }, [apSearch, showAlterarPessoas]);
 
-  // ── 1-second tick for active Day Uses ────────────────────────────────────────
+  // ── Tick para Day Uses ativos ────────────────────────────────────────────────
+  // 1s só quando o detalhe de um day-use ativo está aberto (relógio HH:MM:SS).
+  // Senão, apenas 30s para manter o tempo (em minutos) dos cards atualizado — assim
+  // a página não re-renderiza a cada segundo sem motivo (ex.: vendo um pernoite).
   useEffect(() => {
-    const hasActive = quartos.some((q) => q.servico?.tipo === 'dayuse' && q.servico.status === DAYUSE_STATUS.ATIVO);
-    if (!hasActive) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const sel = selectedRoom?.servico;
+    const detailClock = sel?.tipo === 'dayuse' && sel.status === DAYUSE_STATUS.ATIVO;
+    const anyActive   = quartos.some((q) => q.servico?.tipo === 'dayuse' && q.servico.status === DAYUSE_STATUS.ATIVO);
+    if (!detailClock && !anyActive) return;
+    const id = setInterval(() => setTick((t) => t + 1), detailClock ? 1000 : 30000);
     return () => clearInterval(id);
-  }, [quartos]);
+  }, [quartos, selectedRoom]);
 
   // ── Nova Hospedagem computed ──────────────────────────────────────────────────
   const nhPessoas = nhHospedes.length || 1;
@@ -777,6 +793,21 @@ export default function RecepcaoPage() {
     return [...seen.values()];
   }, [quartos]);
 
+  // Categorias com a lista de quartos (formato exigido pelo ReservaModal em modo reserva).
+  const categoriasFull = useMemo(() => {
+    const m = new Map();
+    quartos.forEach((q) => {
+      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, quartos: [] });
+      m.get(q.categoriaId).quartos.push(q.id);
+    });
+    return [...m.values()];
+  }, [quartos]);
+  const roomDescMapFull = useMemo(() => {
+    const d = {};
+    quartos.forEach((q) => { d[q.id] = q.tipoOcupacao ?? q.descricao ?? ''; });
+    return d;
+  }, [quartos]);
+
   const byCategory = apiCategories.map((cat) => ({
     ...cat,
     rooms:       filteredQuartos.filter((q) => q.categoriaId === cat.id),
@@ -785,6 +816,23 @@ export default function RecepcaoPage() {
     ocupados:    quartos.filter((q) => q.categoriaId === cat.id && [ROOM_STATUS.OCUPADO, ROOM_STATUS.RESERVADO].includes(q.status)).length,
     emServico:   quartos.filter((q) => q.categoriaId === cat.id && [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(q.status)).length,
   }));
+
+  // Agrupamento "Por grupo" — quartos com grupo_id juntos, ordenados pelo id do grupo.
+  const groupSections = useMemo(() => {
+    const withGroup = new Map();
+    const noGroup = [];
+    filteredQuartos.forEach((q) => {
+      const gid = q.servico?.grupoId ?? null;
+      if (gid == null) { noGroup.push(q); return; }
+      if (!withGroup.has(gid)) withGroup.set(gid, []);
+      withGroup.get(gid).push(q);
+    });
+    const sections = [...withGroup.entries()]
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([gid, rooms]) => ({ key: `g-${gid}`, title: `Grupo #${gid}`, rooms }));
+    if (noGroup.length) sections.push({ key: 'no-group', title: 'Sem grupo', rooms: noGroup });
+    return sections;
+  }, [filteredQuartos]);
 
   const isDateFilterActive = !!(filterDateStart);
 
@@ -878,6 +926,25 @@ export default function RecepcaoPage() {
     return () => { cancelled = true; };
   }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reservado: busca a hospedagem completa (GET /hospedagem/{id}) e normaliza — mesmo
+  // objeto/comportamento do modal de reserva do calendário.
+  useEffect(() => {
+    const sv = selectedRoom?.servico;
+    if (!selectedRoom || sv?.tipo !== 'reserva' || !sv?.id) { setReservaFull(null); return; }
+    let cancelled = false;
+    setReservaFull(null);
+    const roomId = selectedRoom.id;
+    hospedagemApi.buscarPorId(sv.id)
+      .then((r) => {
+        if (cancelled || !r) return;
+        const norm = normalizeReserva(r);
+        if (norm.quarto == null) { norm.quarto = roomId; norm.quartoId = roomId; }
+        setReservaFull(norm);
+      })
+      .catch(() => { if (!cancelled) notify('Erro ao carregar reserva.', 'error'); });
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (serviceModal?.type !== 'limpeza') return;
     setFuncLoading(true);
@@ -893,17 +960,48 @@ export default function RecepcaoPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const toggleCollapse = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
-  const openDetail = (room) => {
+  const openDetail = useCallback((room) => {
     setSelectedRoom(room);
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
     setDiariaTab('detalhes');
     setConsumoCart([]);
     setConsumoCartPag(null);
-  };
+  }, []);
 
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
   const closeAcoes  = () => { setOvAcoesOpen(false); setVoucherPicking(false); };
+
+  // Adapta um quarto (servico de pernoite/reserva) ao formato que o ReservaModal espera.
+  const buildStayReserva = (room, status) => {
+    const sv = room.servico;
+    const brToIso = (s) => { const d = (s || '').split(' ')[0]; const [dd, mm, yy] = d.split('/'); return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : ''; };
+    return {
+      id: sv.id ?? room.id,
+      quarto: room.numero,
+      quartoId: room.numero,
+      categoria: room.categoria ?? '',
+      titularNome: sv.titularNome || `Apartamento ${room.numero}`,
+      funcionario: sv.funcionario?.nome ?? sv.funcionario ?? null,
+      observacao: sv.observacao ?? null,
+      dataInicio: brToIso(sv.chegadaPrevista),
+      dataFim: brToIso(sv.saidaPrevista),
+      chegadaPrevista: sv.chegadaPrevista,
+      saidaPrevista: sv.saidaPrevista,
+      status,
+      hospedes: (svGuests.length ? svGuests : (sv.hospedes || [])).map((h) => ({
+        id: h.id, nome: h.nome, cpf: h.cpf ?? '', telefone: h.telefone ?? '', email: h.email ?? '', dataNascimento: h.dataNascimento ?? '',
+      })),
+      pagamentos: (sv.pagamentos || []).map((p) => ({
+        id: p.id, descricao: p.descricao ?? '', formaPagamento: p.formaPagamento ?? '', nomePagador: p.nomePagador ?? '',
+        valor: p.valor ?? 0, cancelado: p.cancelado ?? false, dataRegistro: p.data ?? p.dataRegistro ?? '', funcionario: p.funcionario?.nome ?? p.funcionario ?? '',
+      })),
+      valorTotal: sv.valorTotal ?? 0,
+      novoPreco: sv.novoPreco ?? null,
+      pessoasOrcamento: [],
+    };
+  };
+  const stayDiarias = (sv) => (sv.diarias || []).map((d) => ({ descricao: `Diária ${d.num}`, valor_final: d.valor ?? 0 }));
 
   const openNovoServico = (tipo, room) => {
     setNovoRoom(room);
@@ -2308,7 +2406,7 @@ export default function RecepcaoPage() {
                           <ShoppingCart size={14} /> Gerenciar Consumos
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPreco(true); }}>
-                          <Tag size={14} /> Gerenciar Preços
+                          <Tag size={14} /> Gerenciar Preços A
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
                           <Users size={14} /> Gerenciar Pessoas
@@ -2734,9 +2832,14 @@ export default function RecepcaoPage() {
   };
 
   // ── Room Row ──────────────────────────────────────────────────────────────
-  const RoomCard = ({ room }) => {
+  // useCallback dá ao componente uma identidade estável entre renders; sem isso,
+  // por ser definido dentro do componente, todos os cards REMONTAM (recriam o DOM)
+  // a cada ação/render da página, causando o "piscar"/atualização constante.
+  const RoomCard = useCallback(({ room }) => {
     const sk        = roomStatusKey(room.status);
     const sv        = room.servico;
+    // Pernoite com limpeza acionada: card mostra as cores divididas (ocupado + limpeza).
+    const splitClean = sv?.tipo === 'pernoite' && !!room.limpeza;
     const isDuAtivo = sv?.tipo === 'dayuse' && sv.status === DAYUSE_STATUS.ATIVO;
     const elapsed   = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
     const guestCount  = sv?.hospedes?.length ?? 0;
@@ -2752,11 +2855,18 @@ export default function RecepcaoPage() {
       : [];
 
     return (
-      <div className={[styles.roomCard, styles[`roomCard_${sk}`]].join(' ')} onClick={() => openDetail(room)}>
+      <div className={[styles.roomCard, styles[`roomCard_${sk}`], splitClean ? styles.roomCardSplitClean : ''].join(' ')} onClick={() => openDetail(room)}>
         {/* Top row: number + status badge */}
         <div className={styles.roomCardTop}>
           <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
-          <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
+          {splitClean ? (
+            <span className={styles.statusBadgeSplit}>
+              <span className={[styles.statusSeg, styles.statusSegOcupado].join(' ')}>{room.status}</span>
+              <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>Em Limpeza</span>
+            </span>
+          ) : (
+            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
+          )}
         </div>
 
         {/* Content by status */}
@@ -2812,6 +2922,9 @@ export default function RecepcaoPage() {
               {sv.pagamentoPendente > 0 && (
                 <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
               )}
+              {splitClean && room.limpeza?.responsavel && (
+                <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> Limpeza: {room.limpeza.responsavel}</span>
+              )}
             </>
           )}
 
@@ -2859,7 +2972,7 @@ export default function RecepcaoPage() {
         </div>
       </div>
     );
-  };
+  }, [openDetail]);
 
   // ── Hospede search result component ──────────────────────────────────────────
   const HospedeResults = ({ results, onAdd }) =>
@@ -2978,6 +3091,14 @@ export default function RecepcaoPage() {
               )}
             </div>
           </div>
+          <button
+            type="button"
+            className={[styles.filterToggleBtn, groupByGroup ? styles.filterToggleBtnActive : ''].join(' ')}
+            onClick={() => setGroupByGroup((v) => !v)}
+            title="Agrupar por grupo"
+          >
+            <Users size={14} /> Por grupo
+          </button>
         </div>
 
         {/* ── Category / Date groups ── */}
@@ -3004,6 +3125,24 @@ export default function RecepcaoPage() {
                     </div>
                   </div>
                 )}
+              </div>
+            ))
+        ) : groupByGroup ? (
+          /* ── Group view (Por grupo) ── */
+          groupSections.length === 0
+            ? <div className={styles.emptyState}>Nenhum quarto com os filtros aplicados.</div>
+            : groupSections.map((g) => (
+              <div key={g.key} className={styles.catSection}>
+                <div className={styles.catHeader} style={{ cursor: 'default' }}>
+                  <div className={styles.catHeaderLeft}>
+                    <Users size={14} style={{ color: 'var(--text-2)' }} />
+                    <span className={styles.catName}>{g.title}</span>
+                  </div>
+                  <span className={styles.dateGroupCount}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className={styles.catBody}>
+                  <div className={styles.roomGrid}>{g.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
+                </div>
               </div>
             ))
         ) : (
@@ -3039,28 +3178,98 @@ export default function RecepcaoPage() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Detalhe do Quarto
       ═══════════════════════════════════════════════════════ */}
-      {selectedRoom && (() => {
-        const isServiceCard = [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(selectedRoom.status);
-        const isFullscreen  = ['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo);
+      {/* Pernoite (overnight) usa o mesmo modal das reservas, mudando só os botões de Ações. */}
+      {selectedRoom && selectedRoom.servico?.tipo === 'pernoite' && (() => {
+        const sv = selectedRoom.servico;
+        const reservaAdapter = buildStayReserva(selectedRoom, 'hospedado');
+        const diariasDetalhes = stayDiarias(sv);
         return (
+          <ReservaModal
+            key={`ov-${sv.id}`}
+            reserva={reservaAdapter}
+            onClose={closeDetail}
+            onNotify={notify}
+            categorias={[]}
+            tiposPagamento={tiposPagamentoOv}
+            roomDescMap={{}}
+            overnight={{
+              diariasDetalhes,
+              hasLimpeza:           !!selectedRoom.limpeza,
+              limpezaResponsavel:   selectedRoom.limpeza?.responsavel ?? '',
+              onFinalizarLimpeza:   () => handleFinalizarLimpeza(selectedRoom),
+              onAcionarLimpeza:     () => { closeDetail(); openService('limpeza', selectedRoom); },
+              onGerenciarDiarias:   () => openGerenciarDiarias(),
+              onAdicionarConsumo:   () => setShowGerenciarConsumo(true),
+              onGerenciarPagamentos:() => setShowGerenciarPag(true),
+              onGerenciarPreco:     () => setShowGerenciarPreco(true),
+              onGerenciarPessoas:   () => { setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); },
+              onVoucher:            () => gerarVoucherHospedagem({ quarto: selectedRoom, servico: sv, incluirConsumo: false }),
+              onFinalizar:          () => handleClickFinalizar(),
+              onCancelar:           () => setConfirmModal({ action: 'cancelar' }),
+            }}
+          />
+        );
+      })()}
+
+      {/* Reservado: modal de reserva completo (idêntico ao do calendário). */}
+      {selectedRoom && selectedRoom.servico?.tipo === 'reserva' && (
+        reservaFull ? (
+          <ReservaModal
+            key={`rv-${reservaFull.id}`}
+            reserva={reservaFull}
+            allowHospedarAnytime
+            onClose={() => { setReservaFull(null); closeDetail(); }}
+            onNotify={notify}
+            categorias={categoriasFull}
+            roomDescMap={roomDescMapFull}
+            tiposPagamento={tiposPagamentoReais}
+            reservas={[]}
+            onUpdate={async (id, body) => {
+              const upd = await reservaApi.editar(id, body);
+              setReservaFull(normalizeReserva(upd ?? { ...body, id }));
+              await load();
+              notify('Reserva atualizada!');
+            }}
+            onMoverPernoite={async (id) => {
+              try { await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO'); await load(); notify('Hospedagem iniciada.'); }
+              catch (e) { notify('Erro: ' + e.message, 'error'); }
+            }}
+            onCancel={async (id, motivo) => {
+              await reservaApi.cancelar(id, motivo);
+              await load();
+              setReservaFull(null);
+              closeDetail();
+              notify('Reserva cancelada.');
+            }}
+            onAusente={async (id) => {
+              await reservaApi.marcarAusente(id);
+              await load();
+              setReservaFull(null);
+              closeDetail();
+              notify('Reserva marcada como ausente.');
+            }}
+            onSync={(norm) => { setReservaFull(norm); load(); }}
+          />
+        ) : (
+          <Modal open onClose={closeDetail} size="sm" title="Reserva">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
+              <Loader2 size={16} className={styles.spin} /> Carregando reserva...
+            </div>
+          </Modal>
+        )
+      )}
+
+      {selectedRoom && !['pernoite', 'reserva'].includes(selectedRoom.servico?.tipo) && (
         <Modal
           open={!!selectedRoom}
           onClose={closeDetail}
           size="lg"
-          hideHeader={isFullscreen}
           title={renderDetailTitle()}
-          footer={isFullscreen ? undefined : renderDetailFooter()}
-          containerStyle={isFullscreen
-            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(520px, 96vw)', maxWidth: 'min(520px, 96vw)' }
-            : undefined}
-          bodyStyle={isFullscreen
-            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
-            : undefined}
+          footer={renderDetailFooter()}
         >
           {renderDetailContent()}
         </Modal>
-        );
-      })()}
+      )}
 
       <NovoServicoModal
         novoModal={novoModal} setNovoModal={setNovoModal} novoRoom={novoRoom}

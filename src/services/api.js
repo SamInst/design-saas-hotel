@@ -557,6 +557,11 @@ export const hospedagemApi = {
     return request(`/hospedagem/buscar${qsStr ? `?${qsStr}` : ''}`);
   },
 
+  /** GET /hospedagem/{hospedagemId} — busca uma hospedagem/reserva completa por ID. */
+  buscarPorId(hospedagemId) {
+    return request(`/hospedagem/${hospedagemId}`);
+  },
+
   /**
    * POST /hospedagem/{hospedagemId}/preco — ajuste manual de preço ("Gerenciar Preços").
    * body: { quantidade_diarias?, quantidade_pessoas?, valor_diaria?, porcentagem?, valor_desconto?,
