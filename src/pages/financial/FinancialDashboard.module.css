@@ -249,6 +249,16 @@
   background: #fff; color: var(--violet); font-size: 10px; font-weight: 800; margin-left: 2px;
 }
 
+.clearFilterBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex: none;
+  color: #dc2626; background: rgba(220,38,38,0.08);
+  border: 1px solid rgba(220,38,38,0.25); transition: all .12s;
+}
+.clearFilterBtn:hover {
+  color: #fff; background: #dc2626; border-color: #dc2626;
+}
+
 /* ── GRUPOS ── */
 .groupList { display: grid; gap: 16px; }
 
@@ -265,6 +275,15 @@
 .groupRight      { display: flex; flex-direction: column; align-items: stretch; gap: 3px; font-size: 12px; min-width: 220px; }
 .groupRightItem  { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .groupRightLabel { font-size: 11px; font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.dayReportBtn {
+  align-self: flex-end; margin-top: 4px;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 7px; cursor: pointer;
+  font-size: 11px; font-weight: 600;
+  color: var(--violet); background: rgba(124,58,237,0.08);
+  border: 1px solid rgba(124,58,237,0.20); transition: background .12s;
+}
+.dayReportBtn:hover { background: rgba(124,58,237,0.16); }
 @media (max-width: 600px) {
   .groupHeader { flex-wrap: wrap; row-gap: 0; }
   .groupRight  { width: 100%; min-width: 0; padding-left: 0; margin-top: 10px; font-size: 11px; }

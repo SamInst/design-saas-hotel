@@ -3,7 +3,7 @@ import {
   CreditCard, Calendar, Filter, Search, ChevronDown, Plus, Edit2,
   Wallet, Banknote, Smartphone, Building2, Clock,
   ArrowUpRight, ArrowDownRight, Minus,
-  Loader2, AlertCircle, Download, Tag,
+  Loader2, AlertCircle, Download, Tag, X,
 } from 'lucide-react';
 
 import { Button }           from '../../components/ui/Button';
@@ -14,6 +14,7 @@ import { DatePicker }       from '../../components/ui/DatePicker';
 import { PaymentModal }     from '../../components/ui/PaymentModal';
 import { relatorioApi, enumApi, quartoApi, funcionarioApi, arquivoApi } from '../../services/api';
 import { usePermissions } from '../../hooks/usePermissions';
+import { relatorioDiaPdf, relatorioFiltroPdf } from './financeiroReport';
 
 import styles from './FinancialDashboard.module.css';
 
@@ -282,6 +283,35 @@ export default function FinancialDashboard() {
 
   const nFilters = Object.keys(activeFilters).length;
 
+  // ── RELATÓRIOS PDF ────────────────────────────────────────
+  const filtrosDescricao = () => {
+    const parts = [];
+    if (activeFilters.data_inicio || activeFilters.data_fim) {
+      parts.push(`Período: ${activeFilters.data_inicio ?? '…'} a ${activeFilters.data_fim ?? '…'}`);
+    }
+    if (activeFilters.registro) {
+      parts.push(`Tipo: ${activeFilters.registro === 'ENTRADA' ? 'Entradas' : 'Saídas'}`);
+    }
+    if (activeFilters.tipo_pagamento_id) {
+      const tp = tiposPagamento.find(t => t.id === activeFilters.tipo_pagamento_id);
+      parts.push(`Pagamento: ${tp?.descricao ?? activeFilters.tipo_pagamento_id}`);
+    }
+    if (activeFilters.quarto_id) {
+      const q = quartos.find(x => x.id === activeFilters.quarto_id);
+      parts.push(`Quarto: ${q ? fmtQuarto(q) : activeFilters.quarto_id}`);
+    }
+    if (activeFilters.funcionario_id) {
+      const f = funcionarios.find(x => x.id === activeFilters.funcionario_id);
+      parts.push(`Funcionário: ${f?.pessoa?.nome ?? activeFilters.funcionario_id}`);
+    }
+    return parts.join(' · ');
+  };
+
+  const baixarRelatorioFiltro = () =>
+    relatorioFiltroPdf({ grupos, total, pagamentos, filtros: filtrosDescricao() });
+
+  const baixarRelatorioDia = (grupo) => relatorioDiaPdf(grupo);
+
   // Helpers para exibir pagamento chips nos formulários
   const descPag = (pag) => {
     if (!pag) return null;
@@ -413,6 +443,17 @@ export default function FinancialDashboard() {
                     {nFilters > 0 && <span className={styles.filterBadge}>{nFilters}</span>}
                   </Button>
                 )}
+                {canFiltros && nFilters > 0 && (
+                  <button type="button" className={styles.clearFilterBtn}
+                    onClick={clearFilter} title="Remover filtros" aria-label="Remover filtros">
+                    <X size={14} />
+                  </button>
+                )}
+                {canFiltros && nFilters > 0 && (
+                  <Button onClick={baixarRelatorioFiltro} title="Baixar relatório da busca filtrada">
+                    <Download size={14} /> Relatório PDF
+                  </Button>
+                )}
                 {canNovoLancamento && (
                   <Button variant="primary" onClick={() => setShowAdd(true)}>
                     <Plus size={14} /> Adicionar
@@ -432,7 +473,8 @@ export default function FinancialDashboard() {
               </div>
             ) : (
               <div className={styles.groupList}>
-                {visibleGrupos.map(({ data, total_entrada_dia, total_saida_dia, lucro_total_dia, _items }) => {
+                {visibleGrupos.map((g) => {
+                  const { data, total_entrada_dia, total_saida_dia, lucro_total_dia, _items } = g;
                   const isOpen = !!expanded[data];
                   const dayL   = lucro_total_dia ?? 0;
 
@@ -460,6 +502,13 @@ export default function FinancialDashboard() {
                               <span className={styles.groupRightLabel}>Lucro do dia:</span>
                               <b className={dayL >= 0 ? styles.money_emerald : styles.moneyMinus}>{fmt(dayL)}</b>
                             </span>
+                            <button
+                              type="button"
+                              className={styles.dayReportBtn}
+                              title="Baixar relatório do dia"
+                              onClick={(e) => { e.stopPropagation(); baixarRelatorioDia(g); }}>
+                              <Download size={12} /> Relatório do dia
+                            </button>
                           </div>
                         )}
                       </div>

@@ -2360,6 +2360,29 @@
 .ovFinBarFill { height: 100%; background: #059669; border-radius: 3px; transition: width 0.3s ease; }
 :root[data-theme="dark"] .ovFinBarFill { background: #34d399; }
 
+/* Card de grupo no card de preço — total/pago/pendente somados do grupo */
+.ovGroupCard {
+  margin: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--violet) 7%, transparent);
+  overflow: hidden;
+}
+.ovGroupHeader {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 10px;
+  font-size: 11px; font-weight: 700; color: var(--violet);
+  border-bottom: 1px solid color-mix(in srgb, var(--violet) 18%, var(--border));
+}
+.ovGroupTotals { display: flex; }
+.ovGroupTotalItem {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 7px 4px;
+}
+.ovGroupTotalItem:not(:last-child) { border-right: 1px solid color-mix(in srgb, var(--violet) 14%, var(--border)); }
+.ovGroupTLabel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
+.ovGroupTVal   { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; }
+
 .ovPriceInline { display: flex; flex-direction: column; gap: 12px; }
 .ovDiariasCard { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
 .ovDiariasCard .ovPriceConsumoTotal { border-top: 1px solid var(--border); font-weight: 600; }

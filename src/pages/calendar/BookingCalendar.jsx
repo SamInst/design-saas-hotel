@@ -270,7 +270,7 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 //   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
 //     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
 //     onVoucher, onCancelar }
-export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, allowHospedarAnytime = false }) {
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, allowHospedarAnytime = false, groupInfo = null }) {
   const isOvernight = !!overnight;
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
@@ -1262,6 +1262,27 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     </span>
                   </div>
                 </div>
+                {groupInfo && (
+                  <div className={styles.ovGroupCard}>
+                    <div className={styles.ovGroupHeader}>
+                      <Users size={12} /> Grupo · {groupInfo.count} apartamento{groupInfo.count !== 1 ? 's' : ''} (total do grupo)
+                    </div>
+                    <div className={styles.ovGroupTotals}>
+                      <div className={styles.ovGroupTotalItem}>
+                        <span className={styles.ovGroupTLabel}>Total</span>
+                        <span className={styles.ovGroupTVal}>{fmtBRL(groupInfo.total)}</span>
+                      </div>
+                      <div className={styles.ovGroupTotalItem}>
+                        <span className={styles.ovGroupTLabel}>Pago</span>
+                        <span className={[styles.ovGroupTVal, styles.ovFinPaid].join(' ')}>{fmtBRL(groupInfo.pago)}</span>
+                      </div>
+                      <div className={styles.ovGroupTotalItem}>
+                        <span className={styles.ovGroupTLabel}>Pendente</span>
+                        <span className={[styles.ovGroupTVal, groupInfo.pendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>{fmtBRL(groupInfo.pendente)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {displayTotal > 0 && (() => {
                   const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
                   return (
