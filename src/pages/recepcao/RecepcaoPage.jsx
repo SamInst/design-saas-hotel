@@ -14,7 +14,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { TimeInput }                from '../../components/ui/TimeInput';
 import { PaymentModal }             from '../../components/ui/PaymentModal';
-import { PriceAdjustmentModal, novoPrecoToState } from '../../components/ui/PriceAdjustmentModal';
+import { PriceAdjustmentModal, novoPrecoToState, computeAdjustedTotal, describeAdjustment } from '../../components/ui/PriceAdjustmentModal';
 import { Notification }             from '../../components/ui/Notification';
 import {
   overviewApi,
@@ -510,6 +510,80 @@ export default function RecepcaoPage() {
 
   // Add Quarto
   const [showAddQuarto, setShowAddQuarto] = useState(false);
+  const [savingRoom, setSavingRoom] = useState(false);
+  // "Adicionar/Editar Quarto" — a descrição é o campo principal; os tipos de ocupação são
+  // um multi-select cujos itens (em MAIÚSCULAS) são mesclados na própria descrição.
+  const blankRoomForm = () => ({
+    id: null, numero: '', categoriaId: '', descricao: '',
+    quantidade_pessoas: '', casal: '', solteiro: '', beliche: '', rede: '',
+    status: 'DISPONIVEL', editing: false,
+  });
+  const [roomForm, setRoomForm] = useState(blankRoomForm());
+  const setRF = (k, v) => setRoomForm((f) => ({ ...f, [k]: v }));
+  const addRoomTokens = (roomForm.descricao || '').split('·').map((t) => t.trim()).filter(Boolean);
+  const toggleAddRoomTipo = (t) => {
+    const TT = t.toUpperCase();
+    setRoomForm((f) => {
+      const toks = (f.descricao || '').split('·').map((s) => s.trim()).filter(Boolean);
+      const next = toks.includes(TT) ? toks.filter((x) => x !== TT) : [...toks, TT];
+      return { ...f, descricao: next.join(' · ') };
+    });
+  };
+  const closeAddQuarto = () => { setShowAddQuarto(false); setRoomForm(blankRoomForm()); };
+  // Sugestão do número: o seguinte ao maior número de quarto existente.
+  const nextRoomNumero = String(
+    quartos.reduce((m, q) => Math.max(m, parseInt(q.numero, 10) || 0), 0) + 1,
+  ).padStart(2, '0');
+  const openAddQuarto = () => { setRoomForm({ ...blankRoomForm(), numero: nextRoomNumero }); setShowAddQuarto(true); };
+  const openEditQuarto = async (room) => {
+    try {
+      const res  = await quartoApi.listar({ id: room.id, size: 1 });
+      const full = res?.content?.[0] ?? (Array.isArray(res) ? res[0] : null) ?? {};
+      setRoomForm({
+        id: room.id,
+        numero: room.numero ?? String(room.id),
+        categoriaId: String(room.categoriaId ?? ''),
+        descricao: (full.descricao ?? room.descricao ?? '').toUpperCase(),
+        quantidade_pessoas: String(full.quantidade_pessoas ?? ''),
+        casal:    full.quantidade_cama_casal     ?? room.camas?.casal    ?? 0,
+        solteiro: full.quantidade_cama_solteiro  ?? room.camas?.solteiro ?? 0,
+        beliche:  full.quantidade_beliche        ?? room.camas?.beliche  ?? 0,
+        rede:     full.quantidade_rede           ?? room.camas?.rede     ?? 0,
+        status:   full.status ?? 'DISPONIVEL',
+        editing: true,
+      });
+      setShowAddQuarto(true);
+      closeDetail();
+    } catch (e) { notify('Erro ao carregar quarto: ' + (e.message || ''), 'error'); }
+  };
+  const handleSaveRoom = async () => {
+    const f = roomForm;
+    if (!f.editing && !String(f.numero).trim()) { notify('Informe o número do quarto.', 'error'); return; }
+    if (!f.categoriaId) { notify('Selecione a categoria.', 'error'); return; }
+    setSavingRoom(true);
+    try {
+      const base = {
+        descricao: (f.descricao || '').toUpperCase(),
+        categoria: { id: Number(f.categoriaId) },
+        quantidade_pessoas: Number(f.quantidade_pessoas) || 1,
+        quantidade_cama_casal:    Number(f.casal)    || 0,
+        quantidade_cama_solteiro: Number(f.solteiro) || 0,
+        quantidade_rede:          Number(f.rede)     || 0,
+        quantidade_beliche:       Number(f.beliche)  || 0,
+      };
+      if (f.editing) {
+        await quartoApi.editar({ id: f.id, ...base, status: f.status });
+        notify(`Quarto ${f.numero} atualizado.`);
+      } else {
+        await quartoApi.criar({ numero: Number(f.numero), ...base });
+        notify(`Quarto ${f.numero} criado.`);
+      }
+      await load();
+      closeAddQuarto();
+    } catch (e) {
+      notify('Erro ao salvar quarto: ' + (e.message || ''), 'error');
+    } finally { setSavingRoom(false); }
+  };
 
   // Detail modal
   const [selectedRoom, setSelectedRoom] = useState(null);
@@ -541,6 +615,8 @@ export default function RecepcaoPage() {
   const [nhCalcLoading, setNhCalcLoading]           = useState(false);
   const [nhShowPriceDetail, setNhShowPriceDetail]   = useState(false);
   const [nhShowPagForm, setNhShowPagForm]           = useState(false);
+  const [nhPriceAdj, setNhPriceAdj]                 = useState(null);   // { mode, sign, value } — Gerenciar Preços
+  const [showNhPreco, setShowNhPreco]               = useState(false);
   const [savingNh, setSavingNh]                     = useState(false);
 
   // Detail — Add Hóspede (pernoite/dayuse existing)
@@ -631,6 +707,7 @@ export default function RecepcaoPage() {
 
   // Confirm (finalizar / cancelar)
   const [confirmModal, setConfirmModal] = useState(null); // { action: 'cancelar' }
+  const [cancelMotivo, setCancelMotivo] = useState('');
   const [pendingPayWarning, setPendingPayWarning] = useState(false);
   const [checkoutAntecipado, setCheckoutAntecipado] = useState(false);
   // Atribuir limpeza ao finalizar
@@ -727,7 +804,14 @@ export default function RecepcaoPage() {
     diffDays(nhCheckinDate, nhCheckoutDate),
     [nhCheckinDate, nhCheckoutDate]
   );
-  const nhTotalHosp  = nhCalc?.valor_total ?? (nhPrecoDiaria * nhTotalDias);
+  // Ajuste manual de preço ("Gerenciar Preços") no novo pernoite — espelha a reserva.
+  const nhBaseDiarias = (nhCalc?.detalhes || []).map((d) => ({ valor: d.valor_final ?? 0 }));
+  const nhBaseTotal   = nhBaseDiarias.length
+    ? nhBaseDiarias.reduce((s, d) => s + d.valor, 0)
+    : (nhCalc?.valor_total ?? (nhPrecoDiaria * nhTotalDias));
+  const nhAdjResult = nhPriceAdj ? computeAdjustedTotal({ baseTotal: nhBaseTotal, baseDiarias: nhBaseDiarias, ...nhPriceAdj }) : null;
+  const nhTotalHosp  = nhAdjResult ? nhAdjResult.valorTotal : nhBaseTotal;
+  const nhNovoPreco  = (nhPriceAdj && nhAdjResult) ? { ...nhAdjResult.requestFields, valor_total: nhAdjResult.valorTotal } : null;
   const nhTotalPago  = nhPagamentos.reduce((s, p) => s + p.valor, 0);
   const nhPendente   = Math.max(0, nhTotalHosp - nhTotalPago);
 
@@ -1076,6 +1160,7 @@ export default function RecepcaoPage() {
       setNhPagamentos([]);
       setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor('');
       setNhCalc(null); setNhCalcLoading(false); setNhShowPriceDetail(false); setNhShowPagForm(false);
+      setNhPriceAdj(null); setShowNhPreco(false);
     } else {
       setNduForm(blankNduForm());
     }
@@ -1122,6 +1207,15 @@ export default function RecepcaoPage() {
     finally { setSaving(false); }
   };
 
+  // datetime-local "2026-06-19T14:00" → "19/06/2026 14:00" (formato do back-end)
+  const dtLocalToBr = (s) => {
+    if (!s) return undefined;
+    const [date, time] = s.split('T');
+    if (!date) return undefined;
+    const [y, m, d] = date.split('-');
+    return `${d}/${m}/${y} ${time || '00:00'}`;
+  };
+
   const handleService = async () => {
     if (!serviceModal) return;
     const { type, room } = serviceModal;
@@ -1129,7 +1223,11 @@ export default function RecepcaoPage() {
     try {
       let updated;
       if (type === 'limpeza')     updated = await overviewApi.marcarLimpeza(room.id, svcForm);
-      else if (type === 'manutencao') updated = await overviewApi.marcarManutencao(room.id, svcForm);
+      else if (type === 'manutencao') updated = await overviewApi.marcarManutencao(room.id, {
+        ...svcForm,
+        dataHoraInicio: dtLocalToBr(svcForm.dataHoraInicio),
+        dataHoraFim:    dtLocalToBr(svcForm.dataHoraFim),
+      });
       else                         updated = await overviewApi.marcarForaDeServico(room.id, svcForm);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
       notify(`Quarto ${room.numero} → ${updated.status}.`);
@@ -1157,28 +1255,33 @@ export default function RecepcaoPage() {
   // ── Criar Pernoite (Nova Hospedagem) ─────────────────────────────────────────
   const handleCriarPernoite = async () => {
     if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify('Preencha as data de chegada e saída.', 'error'); return; }
+    const pessoas = nhHospedes.map((h) => h.id).filter(Boolean);
+    if (pessoas.length === 0) { notify('Adicione ao menos um hóspede.', 'error'); return; }
     setSavingNh(true);
     try {
-      const chegada  = `${dateToDisplay(nhCheckinDate)} 14:00`;
-      const saida    = `${dateToDisplay(nhCheckoutDate)} 12:00`;
-      const dias     = Math.max(1, diffDays(nhCheckinDate, nhCheckoutDate));
-      const valorDiaria = calcPrecoDiaria(novoRoom.categoria, nhHospedes.length || 1);
-      const valorTotal  = valorDiaria * dias;
-      const totalPago   = nhPagamentos.reduce((s, p) => s + p.valor, 0);
-      const titular = nhHospedes[0]?.nome || 'Hóspede';
-      const servico = {
-        titularNome: titular, tipoAcomodacao: novoRoom.tipoOcupacao,
-        periodo: `${dateToDisplay(nhCheckinDate)} - ${dateToDisplay(nhCheckoutDate)}`,
-        chegadaPrevista: chegada, saidaPrevista: saida,
-        status: PERNOITE_STATUS.ATIVO, totalDiarias: dias, diariaAtual: 1,
-        valorTotal, totalPago, pagamentoPendente: Math.max(0, valorTotal - totalPago),
-        hospedes: nhHospedes, consumos: [], pagamentos: nhPagamentos, diarias: [],
+      const chegada = `${dateToDisplay(nhCheckinDate)} 14:00`;
+      const saida   = `${dateToDisplay(nhCheckoutDate)} 12:00`;
+      // Cria a hospedagem já ATIVA (pernoite) — POST /hospedagem/pernoite com status PERNOITE_ATIVO.
+      const request = {
+        quarto_id: novoRoom.id,
+        status: 'PERNOITE_ATIVO',
+        data_hora_checkin:  chegada,
+        data_hora_checkout: saida,
+        pessoas,
+        pagamentos: nhPagamentos.map((p) => ({
+          tipo_pagamento: { id: p.tipoPagamentoId },
+          nome_pagador:   p.nomePagador,
+          descricao:      p.descricao || undefined,
+          valor:          p.valor,
+        })),
+        valor_total: nhTotalHosp,
+        ...(nhNovoPreco ? { novo_preco: nhNovoPreco } : {}),
       };
-      const updated = await overviewApi.criarPernoite(novoRoom.id, servico);
-      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Pernoite criado! ${titular} — Apt. ${novoRoom.numero}.`);
+      await hospedagemApi.criarPernoite([request]);
+      await load();
+      notify(`Pernoite criado — Apt. ${novoRoom.numero}.`);
       setNovoModal(null);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
     finally { setSavingNh(false); }
   };
 
@@ -1289,6 +1392,23 @@ export default function RecepcaoPage() {
 
   const handleCancelar = async () => {
     if (!selectedRoom) return;
+    const sv = selectedRoom.servico;
+    // Pernoite ativo → cancelar via HospedagemController (PUT /hospedagem/{id}/cancelar).
+    if (sv?.tipo === 'pernoite' && sv?.id) {
+      if (!cancelMotivo.trim()) { notify('Informe o motivo do cancelamento.', 'error'); return; }
+      setSaving(true);
+      try {
+        await hospedagemApi.cancelar(sv.id, { fk_hospedagem: sv.id, motivo_cancelamento: cancelMotivo.trim() });
+        await load();
+        notify('Pernoite cancelado.');
+        setConfirmModal(null);
+        setCancelMotivo('');
+        closeDetail();
+      } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
+      finally { setSaving(false); }
+      return;
+    }
+    // Demais serviços (day use, etc.) — fluxo existente.
     setSaving(true);
     try {
       const updated = await overviewApi.cancelarServico(selectedRoom.id);
@@ -1790,7 +1910,7 @@ export default function RecepcaoPage() {
     if (s.status === ROOM_STATUS.DISPONIVEL) {
       const dispTabs  = [
         { id: 'dados',   label: 'Dados' },
-        { id: 'consumo', label: 'Consumo' },
+        { id: 'consumo', label: 'Itens' },
       ];
       return (
         <>
@@ -2726,6 +2846,9 @@ export default function RecepcaoPage() {
               <>
                 <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
                 <div className={styles.ovAcoesMenu}>
+                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openEditQuarto(s); }}>
+                    <Pencil size={14} /> Editar Quarto
+                  </button>
                   <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
                     <Sparkles size={14} /> Limpeza
                   </button>
@@ -2733,10 +2856,10 @@ export default function RecepcaoPage() {
                     <Wrench size={14} /> Manutenção
                   </button>
                   <div className={styles.ovAcoesDiv} />
-                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
+                  <button className={styles.ovAcoesItem} style={{ color: 'var(--violet)' }} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
                     <BedDouble size={14} /> Novo Pernoite
                   </button>
-                  <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); openNovoServico('dayuse', s); }}>
+                  <button className={styles.ovAcoesItem} style={{ color: 'var(--text-2)', opacity: 0.5, cursor: 'not-allowed' }} disabled title="Em breve">
                     <Clock size={14} /> Novo Day Use
                   </button>
                 </div>
@@ -3105,7 +3228,7 @@ export default function RecepcaoPage() {
                 triggerClassName={styles.headerControlField}
               />
             </div>
-            <Button variant="primary" className={styles.headerControlBtn} onClick={() => setShowAddQuarto(true)}>
+            <Button variant="primary" className={styles.headerControlBtn} onClick={openAddQuarto}>
               <Plus size={14} /> Adicionar Quarto
             </Button>
           </div>
@@ -3413,8 +3536,22 @@ export default function RecepcaoPage() {
         saving={saving} handleCriarDayUse={handleCriarDayUse}
         nduForm={nduForm} setNduForm={setNduForm}
         nduHosp={nduHosp} addNduHospede={addNduHospede} remNduHospede={remNduHospede}
-        tiposPagamentoOv={tiposPagamentoOv}
+        tiposPagamentoOv={tiposPagamentoReais}
+        onGerenciarPreco={() => setShowNhPreco(true)}
+        priceAdjDesc={nhPriceAdj ? describeAdjustment(nhPriceAdj) : null}
       />
+
+      {/* Gerenciar Preços — novo pernoite (espelha a reserva) */}
+      {showNhPreco && (
+        <PriceAdjustmentModal
+          open
+          onClose={() => setShowNhPreco(false)}
+          baseTotal={nhBaseTotal}
+          baseDiarias={nhBaseDiarias}
+          initial={nhPriceAdj}
+          onApply={(_result, raw) => setNhPriceAdj(raw)}
+        />
+      )}
 
       <EncerrarModal
         open={encerrarModal && selectedRoom?.servico?.tipo === 'dayuse'}
@@ -3615,6 +3752,18 @@ export default function RecepcaoPage() {
               <FormField label="Responsável">
                 <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
               </FormField>
+              {serviceModal.type === 'manutencao' && (
+                <div className={styles.grid2}>
+                  <FormField label="Início (data e hora)">
+                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraInicio}
+                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
+                  </FormField>
+                  <FormField label="Término (data e hora)">
+                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraFim}
+                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
+                  </FormField>
+                </div>
+              )}
               <FormField label="Descrição">
                 <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
               </FormField>
@@ -3629,59 +3778,79 @@ export default function RecepcaoPage() {
       {showAddQuarto && (
         <Modal
           open
-          onClose={() => setShowAddQuarto(false)}
+          onClose={closeAddQuarto}
           size="sm"
-          title={<><Plus size={15} /> Adicionar Quarto</>}
+          title={<><Plus size={15} /> {roomForm.editing ? `Editar Quarto ${roomForm.numero}` : 'Adicionar Quarto'}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={() => setShowAddQuarto(false)}>Cancelar</Button>
-              <Button variant="primary" className={styles.addRoomSaveBtn} onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setShowAddQuarto(false); }}>Salvar quarto</Button>
+              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={closeAddQuarto} disabled={savingRoom}>Cancelar</Button>
+              <Button variant="primary" className={styles.addRoomSaveBtn} onClick={handleSaveRoom} disabled={savingRoom}>
+                {savingRoom ? <><Loader2 size={14} className={styles.spin} /> Salvando...</> : (roomForm.editing ? 'Salvar alterações' : 'Salvar quarto')}
+              </Button>
             </div>
           }
         >
           <div className={styles.addRoomModal}>
             <div className={styles.grid2}>
               <FormField label="Número *">
-                <Input className={styles.addRoomField} placeholder="Ex: 23" />
+                <Input className={styles.addRoomField} type="number" value={roomForm.numero}
+                  onChange={(e) => setRF('numero', e.target.value)}
+                  readOnly={roomForm.editing} placeholder={`Ex: ${nextRoomNumero}`} />
               </FormField>
               <FormField label="Categoria *">
-                <Select className={styles.addRoomField}>
+                <Select className={styles.addRoomField} value={roomForm.categoriaId} onChange={(e) => setRF('categoriaId', e.target.value)}>
                   <option value="">Categoria do quarto</option>
-                  <option>Standard</option>
-                  <option>Luxo</option>
-                  <option>Suíte</option>
+                  {apiCategories.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </Select>
               </FormField>
             </div>
 
+            {/* Descrição (campo principal) + Tipo de Ocupação (multi-select mesclado) */}
             <FormField label="Descrição">
-              <Input className={styles.addRoomField} placeholder="Descrição do quarto..." />
+              <Input
+                className={styles.addRoomField}
+                value={roomForm.descricao}
+                readOnly
+                placeholder="Selecione os tipos de ocupação abaixo..."
+              />
+              <div className={styles.tipoChips}>
+                {TIPOS_OCUPACAO.map((t) => {
+                  const on = addRoomTokens.includes(t.toUpperCase());
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className={[styles.tipoChip, on ? styles.tipoChipOn : ''].join(' ')}
+                      onClick={() => toggleAddRoomTipo(t)}
+                    >
+                      {on && <Check size={11} />} {t}
+                    </button>
+                  );
+                })}
+              </div>
             </FormField>
 
-            <div className={styles.grid2}>
-              <FormField label="Tipo de Ocupação *">
-                <Select className={styles.addRoomField}>
-                  <option value="">Tipo de ocupação</option>
-                  {TIPOS_OCUPACAO.map((t) => <option key={t}>{t}</option>)}
-                </Select>
-              </FormField>
-              <FormField label="Qtd. máx. de pessoas">
-                <Input className={styles.addRoomField} type="number" min="1" max="10" placeholder="Ex: 2" />
-              </FormField>
-            </div>
+            <FormField label="Qtd. máx. de pessoas">
+              <Input className={styles.addRoomField} type="number" min="1" max="10" value={roomForm.quantidade_pessoas}
+                onChange={(e) => setRF('quantidade_pessoas', e.target.value)} placeholder="Ex: 2" />
+            </FormField>
 
             <div className={styles.addRoomBedsGrid}>
               <FormField label="Camas de casal">
-                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.casal}
+                  onChange={(e) => setRF('casal', e.target.value)} placeholder="0" />
               </FormField>
               <FormField label="Camas solteiro">
-                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.solteiro}
+                  onChange={(e) => setRF('solteiro', e.target.value)} placeholder="0" />
               </FormField>
               <FormField label="Beliches">
-                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.beliche}
+                  onChange={(e) => setRF('beliche', e.target.value)} placeholder="0" />
               </FormField>
               <FormField label="Redes">
-                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.rede}
+                  onChange={(e) => setRF('rede', e.target.value)} placeholder="0" />
               </FormField>
             </div>
           </div>
@@ -4231,6 +4400,7 @@ export default function RecepcaoPage() {
         checkoutAntecipado={checkoutAntecipado} setCheckoutAntecipado={setCheckoutAntecipado}
         pendingPayWarning={pendingPayWarning} setPendingPayWarning={setPendingPayWarning}
         confirmModal={confirmModal} setConfirmModal={setConfirmModal}
+        cancelMotivo={cancelMotivo} setCancelMotivo={setCancelMotivo}
         selectedRoom={selectedRoom}
         limpezaFuncs={limpezaFuncs} limpezaFuncsLoading={limpezaFuncsLoading}
         limpezaFuncId={limpezaFuncId} setLimpezaFuncId={setLimpezaFuncId}

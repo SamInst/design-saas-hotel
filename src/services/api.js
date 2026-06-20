@@ -304,6 +304,12 @@ export const quartoApi = {
   listar(params)     { return request('/quarto', { params }); },
   buscarPorId(id)    { return request(`/quarto/${id}`); },
   atualizar(id, body){ return request(`/quarto/${id}`, { method: 'PUT', body }); },
+  // POST /quarto — cria um quarto. body: Quarto.Request
+  //   { numero, descricao, categoria:{id}, quantidade_pessoas, quantidade_cama_casal,
+  //     quantidade_cama_solteiro, quantidade_rede, quantidade_beliche }
+  criar(body)        { return request('/quarto', { method: 'POST', body }); },
+  // PUT /quarto — edita um quarto. body: Quarto.Update (igual ao Request + id + status)
+  editar(body)       { return request('/quarto', { method: 'PUT', body }); },
   // GET /quarto/{id}/itens → [{ id, item:{id,descricao}, quantidade_atual, quantidade_padrao }]
   itens(id)          { return request(`/quarto/${id}/itens`); },
   // POST /quarto/{id}/itens — { item:{id}, quantidade_atual, quantidade_padrao }
@@ -563,6 +569,17 @@ export const hospedagemApi = {
   },
 
   /**
+   * POST /hospedagem/pernoite — cria um ou mais pernoites diretamente (status PERNOITE_ATIVO),
+   * sem passar por reserva. Mesmo corpo do criarAtiva de reserva.
+   * @param {object|object[]} bodies            – um ou mais Hospedagem.Request (status: 'PERNOITE_ATIVO')
+   * @param {boolean}         [pagamentoUnico]  – quando true, o pagamento do primeiro item é vinculado aos demais
+   */
+  criarPernoite(bodies, pagamentoUnico) {
+    const params = pagamentoUnico != null ? { pagamentoUnico } : undefined;
+    return request('/hospedagem/pernoite', { method: 'POST', body: Array.isArray(bodies) ? bodies : [bodies], params });
+  },
+
+  /**
    * POST /hospedagem/{hospedagemId}/preco — ajuste manual de preço ("Gerenciar Preços").
    * body: { quantidade_diarias?, quantidade_pessoas?, valor_diaria?, porcentagem?, valor_desconto?,
    *         valor_total, diarias?: [{ id, valor }] }
@@ -597,6 +614,15 @@ export const hospedagemApi = {
   /** PUT /hospedagem/{hospedagemId}/status?status=X — altera apenas o status (valida a transição) */
   alterarStatus(hospedagemId, status) {
     return request(`/hospedagem/${hospedagemId}/status`, { method: 'PUT', params: { status } });
+  },
+
+  /** PUT /hospedagem/{hospedagemId}/ativar — ativa o pernoite (Hospedagem.Request no body). */
+  ativar(hospedagemId, body) {
+    return request(`/hospedagem/${hospedagemId}/ativar`, { method: 'PUT', body });
+  },
+  /** PUT /hospedagem/{hospedagemId}/cancelar — cancela o pernoite (MotivoCancelamentoHospedagem.Request). */
+  cancelar(hospedagemId, motivo) {
+    return request(`/hospedagem/${hospedagemId}/cancelar`, { method: 'PUT', body: motivo });
   },
 
   /**

@@ -1,4 +1,4 @@
-import { BedDouble, ChevronDown, Clock, CreditCard, Loader2, Plus, Trash2, XCircle } from 'lucide-react';
+import { BedDouble, ChevronDown, Clock, CreditCard, Loader2, Plus, Tag, Trash2, XCircle } from 'lucide-react';
 import { Modal }                    from '../../../../components/ui/Modal';
 import { Button }                   from '../../../../components/ui/Button';
 import { Input, Select, FormField } from '../../../../components/ui/Input';
@@ -32,6 +32,7 @@ export default function NovoServicoModal({
   nduHosp, addNduHospede, remNduHospede,
   // Shared
   tiposPagamentoOv,
+  onGerenciarPreco, priceAdjDesc,
 }) {
   return (
     <>
@@ -69,8 +70,10 @@ export default function NovoServicoModal({
               />
               {nhCheckinDate && nhCheckoutDate && (
                 <div className={styles.nhPriceCard}>
+                  <div style={{ display: 'flex', alignItems: 'stretch' }}>
                   <button
                     className={styles.nhPriceCardHeader}
+                    style={{ flex: 1, minWidth: 0 }}
                     onClick={() => !nhCalcLoading && setNhShowPriceDetail((v) => !v)}
                   >
                     <span className={styles.nhFinStrip}>
@@ -94,6 +97,22 @@ export default function NovoServicoModal({
                       <ChevronDown size={14} className={nhShowPriceDetail ? styles.nhChevronOpen : styles.nhChevron} />
                     )}
                   </button>
+                  {onGerenciarPreco && !nhCalcLoading && (
+                    <button
+                      type="button"
+                      title={priceAdjDesc ? `Preço ajustado · ${priceAdjDesc}` : 'Gerenciar Preços'}
+                      onClick={onGerenciarPreco}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px',
+                        border: 'none', borderLeft: '1px solid var(--border)',
+                        background: priceAdjDesc ? 'color-mix(in srgb, var(--violet) 18%, transparent)' : 'transparent',
+                        color: priceAdjDesc ? 'var(--violet)' : 'var(--text-2)', cursor: 'pointer',
+                      }}
+                    >
+                      <Tag size={15} />
+                    </button>
+                  )}
+                  </div>
 
                   {nhShowPriceDetail && !nhCalcLoading && nhCalc?.detalhes?.length > 0 && (
                     <div className={styles.nhPriceCardBody}>
@@ -120,6 +139,7 @@ export default function NovoServicoModal({
                       </div>
                     </div>
                   )}
+
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle, Loader2, Sparkles, XCircle } from 'lucide-react';
 import { Modal }  from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
-import { Select } from '../../../../components/ui/Input';
+import { Select, Input } from '../../../../components/ui/Input';
 import { fmtBRL } from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
 
@@ -10,6 +10,7 @@ export default function AtribuirLimpezaModal({
   checkoutAntecipado, setCheckoutAntecipado,
   pendingPayWarning, setPendingPayWarning,
   confirmModal, setConfirmModal,
+  cancelMotivo, setCancelMotivo,
   selectedRoom,
   limpezaFuncs, limpezaFuncsLoading,
   limpezaFuncId, setLimpezaFuncId,
@@ -76,27 +77,36 @@ export default function AtribuirLimpezaModal({
       )}
 
       {/* ─ Confirmar Cancelar Serviço ─ */}
-      {confirmModal && selectedRoom && (
+      {confirmModal && selectedRoom && (() => {
+        const isPernoite = selectedRoom.servico?.tipo === 'pernoite';
+        return (
         <Modal
           open
-          onClose={() => setConfirmModal(null)}
+          onClose={() => { setConfirmModal(null); setCancelMotivo?.(''); }}
           size="sm"
-          title={<><XCircle size={15} /> Cancelar Serviço</>}
+          title={<><XCircle size={15} /> {isPernoite ? 'Cancelar Pernoite' : 'Cancelar Serviço'}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setConfirmModal(null)}>Voltar</Button>
-              <Button variant="danger" onClick={handleCancelar} disabled={saving}>
+              <Button variant="secondary" onClick={() => { setConfirmModal(null); setCancelMotivo?.(''); }}>Voltar</Button>
+              <Button variant="danger" onClick={handleCancelar} disabled={saving || (isPernoite && !(cancelMotivo || '').trim())}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                Cancelar Serviço
+                {isPernoite ? 'Cancelar Pernoite' : 'Cancelar Serviço'}
               </Button>
             </div>
           }
         >
-          <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-            Confirma o cancelamento do serviço no <strong>Apt. {selectedRoom.numero}</strong>? O quarto ficará disponível.
+          <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, marginBottom: isPernoite ? 14 : 0 }}>
+            Confirma o cancelamento do {isPernoite ? 'pernoite' : 'serviço'} no <strong>Apt. {selectedRoom.numero}</strong>? O quarto ficará disponível.
           </p>
+          {isPernoite && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Motivo do cancelamento *</label>
+              <Input value={cancelMotivo || ''} onChange={(e) => setCancelMotivo?.(e.target.value)} placeholder="Ex.: Desistência do hóspede" autoFocus />
+            </div>
+          )}
         </Modal>
-      )}
+        );
+      })()}
 
       {/* ─ Atribuir Limpeza ao Finalizar ─ */}
       {atribuirLimpezaModal && selectedRoom && (

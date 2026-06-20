@@ -2317,6 +2317,22 @@
   box-shadow: none !important;
 }
 
+/* Multi-select de Tipo de Ocupação (mesclado na Descrição) */
+.tipoChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tipoChip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.tipoChip:hover { border-color: rgba(124, 58, 237, 0.4); color: var(--text); }
+.tipoChipOn {
+  border-color: rgba(124, 58, 237, 0.45);
+  background: rgba(124, 58, 237, 0.1);
+  color: var(--violet);
+}
+
 .addRoomField:focus {
   box-shadow: none !important;
   border-color: rgba(124, 58, 237, 0.42) !important;
