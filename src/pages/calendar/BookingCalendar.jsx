@@ -340,7 +340,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const allRoomIds = categorias.flatMap((c) => c.quartos);
 
   // ── Voucher download ───────────────────────────────────────────────────────
-  const handleDownloadVoucher = (incluirConsumos = false) => {
+  const handleDownloadVoucher = async (incluirConsumos = false) => {
     const _u = userStorage.get();
     const displayPeriodos = [{
       checkin: reserva.dataInicio,
@@ -348,8 +348,39 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       rooms: [String(reserva.quarto)],
       roomHospedes: { [String(reserva.quarto)]: pessoas },
     }];
+    // Busca as diárias reais para incluir as meias diárias no ticket (linha própria, valor pela
+    // metade) — como uma diária extra cobrada por meia.
+    let detalhesTicket = (effectiveDetalhes ?? []).map((d) => ({ ...d }));
+    let sazTicket = [
+      ...new Map(
+        (effectiveDetalhes ?? [])
+          .map((d) => d.sazonalidade)
+          .filter(Boolean)
+          .map((s) => [s.descricao, s]),
+      ).values(),
+    ];
+    try {
+      const h = await hospedagemApi.buscarPorId(reserva.id);
+      if (h?.diarias?.length) {
+        detalhesTicket = h.diarias.map((d, i) => {
+          const ci = (d.checkin || '').split(' ')[0];
+          const co = (d.checkout || '').split(' ')[0];
+          const meia = !!d.meia_diaria;
+          return {
+            descricao: meia
+              ? `Diária ${d.numero ?? i + 1} (meia diária) · ${ci}`
+              : `Diária ${d.numero ?? i + 1} · ${ci} → ${co}`,
+            valor_final: d.valor ?? 0,
+          };
+        });
+      }
+    } catch { /* mantém os detalhes do card */ }
     const precosCalc = {
-      [`${reserva.quarto}_0`]: { valor_total: reserva.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] },
+      [`${reserva.quarto}_0`]: {
+        valor_total: reserva.valorTotal ?? 0,
+        detalhes: detalhesTicket,
+        sazonalidades_aplicadas: sazTicket,
+      },
     };
     const solicitanteData = { nome: reserva.titularNome ?? '', cpf: pessoas[0]?.cpf ?? '' };
     const pagsAtivos = pagamentos.filter((p) => !p.cancelado);
@@ -1168,6 +1199,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   return (
     <>
       <Modal open onClose={handleClose} size="lg" hideHeader bodyStyle={{ padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minHeight: 0 }}
+        containerStyle={overnight ? { maxWidth: 'min(576px, 96vw)' } : undefined}
         title={<><BedDouble size={15} /> Apartamento {fmtRoom(reserva.quarto)} — {reserva.titularNome}</>}
       >
         {/* ── Custom dark header ── */}

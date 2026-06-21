@@ -149,6 +149,7 @@ function _normalizePessoa(p) {
     cpf:      core.cpf       ?? '',
     telefone: core.telefone  ?? '',
     email:    core.email     ?? '',
+    dataNascimento: core.data_nascimento ?? core.dataNascimento ?? '',
     titular:  core.titular   ?? p.representante ?? false,
   };
 }
@@ -195,6 +196,8 @@ function _normalizeDiaria(d) {
     id: d.id,
     idx: (d.numero ?? 1) - 1,
     num: d.numero ?? 1,
+    quartoId: d.quarto?.id ?? null,
+    meiaDiaria: !!d.meia_diaria,
     // Hospedagem.Diaria usa checkin/checkout; mantém fallback ao formato antigo
     dataInicio: d.checkin ?? d.data_hora_inicio ?? '',
     dataFim:    d.checkout ?? d.data_hora_fim ?? '',

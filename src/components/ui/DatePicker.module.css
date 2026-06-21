@@ -92,6 +92,10 @@
   box-shadow:0 0 0 2px rgba(124,58,237,.30); border-radius:8px !important;
 }
 .dis { opacity:.3; cursor:not-allowed; }
+
+/* ── Somente visualização: dias não interativos (mantém navegação de mês) ── */
+.readOnly .day { cursor:default; }
+.readOnly .day:hover:not(.dis):not(.sel):not(.inR) { background:transparent; color:var(--text); }
 .hint { margin:8px 0 0; font-size:11px; color:var(--text-2); text-align:center; }
 
 /* ── Occupied night (blocked by another reservation) ── */

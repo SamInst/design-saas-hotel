@@ -642,6 +642,18 @@ export const hospedagemApi = {
   },
 
   /**
+   * PUT /hospedagem/{hospedagemId}/diarias — substitui TODAS as diárias da hospedagem
+   * ("Gerenciar Diárias"). Cada diária pode ter quarto e pessoas próprios; preços e total
+   * são recalculados no backend. Retorna a Hospedagem atualizada.
+   * @param {number} hospedagemId
+   * @param {Array<{ quarto_id: number, checkin: string, checkout: string, pessoas?: number[] }>} diarias
+   *        checkin/checkout no formato "dd/MM/yyyy HH:mm".
+   */
+  atualizarDiarias(hospedagemId, diarias) {
+    return request(`/hospedagem/${hospedagemId}/diarias`, { method: 'PUT', body: diarias });
+  },
+
+  /**
    * POST /hospedagem/pagamento-multiplo — cria um único pagamento e vincula a várias hospedagens.
    * @param {number[]} hospedagemIds
    * @param {{ tipo_pagamento: { id: number }, nome_pagador: string, descricao?: string, valor: number }} pagamento

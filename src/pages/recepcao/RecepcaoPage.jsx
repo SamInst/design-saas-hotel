@@ -33,6 +33,7 @@ import EncerrarModal        from './dayuse/modals/EncerrarModal';
 import DescontoModal        from './pernoites/modals/DescontoModal';
 import ConsumoModal         from './pernoites/modals/ConsumoModal';
 import AtribuirLimpezaModal from './pernoites/modals/AtribuirLimpezaModal';
+import GerenciarDiariasModal from './pernoites/modals/GerenciarDiariasModal';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtBRL = (v) =>
@@ -66,6 +67,27 @@ const displayToDate = (s) => {
 };
 const isoToDate = (s) => s ? new Date(s.split('T')[0] + 'T12:00:00') : null;
 const dateToISO = (d) => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
+
+// Idade a partir de "dd/MM/yyyy" (ou ISO); null se desconhecida → conta como adulto.
+const _ageFromBr = (dn) => {
+  if (!dn) return null;
+  const iso = /^\d{2}\/\d{2}\/\d{4}$/.test(dn) ? dn.split('/').reverse().join('-') : dn;
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  const now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return a;
+};
+const svOccupancy = (hospedes) => {
+  let adultos = 0, criancas = 0;
+  (hospedes || []).forEach((h) => {
+    const age = _ageFromBr(h.dataNascimento);
+    if (age != null && age < 18) criancas += 1; else adultos += 1;
+  });
+  return { adultos, criancas };
+};
 
 function calcElapsedSeconds(dataUso, horaEntrada, horaSaida = null) {
   if (!dataUso || !horaEntrada) return 0;
@@ -686,6 +708,9 @@ export default function RecepcaoPage() {
   const [showAddConsumoModal, setShowAddConsumoModal] = useState(false);
   const [consumoSaving, setConsumoSaving]             = useState(false);
 
+  // Sazonalidade por diária (modal do pernoite/hospedado) — calculada via calcularPreco
+  const [stayCalcSaz, setStayCalcSaz] = useState({ id: null, list: [] });
+
   // Gerenciar Diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
   const [gdStartDate, setGdStartDate]                   = useState(null);
@@ -1132,7 +1157,46 @@ export default function RecepcaoPage() {
       pessoasOrcamento: [],
     };
   };
-  const stayDiarias = (sv) => (sv.diarias || []).map((d) => ({ descricao: `Diária ${d.num}`, valor_final: d.valor ?? 0 }));
+  // Calcula a sazonalidade de cada diária do pernoite selecionado (mesma info da Gerenciar Diárias).
+  useEffect(() => {
+    const sv = selectedRoom?.servico;
+    if (!selectedRoom || sv?.tipo !== 'pernoite' || !sv?.diarias?.length) {
+      setStayCalcSaz({ id: null, list: [] });
+      return;
+    }
+    const datas_nascimento = (sv.hospedes || []).map((h) => h.dataNascimento).filter(Boolean);
+    if (datas_nascimento.length === 0) { setStayCalcSaz({ id: sv.id, list: [] }); return; }
+    let cancelled = false;
+    const items = sv.diarias.map((d) => ({
+      fk_quarto: d.quartoId ?? selectedRoom.id,
+      data_entrada: (d.dataInicio || '').split(' ')[0],
+      data_saida: (d.dataFim || '').split(' ')[0],
+      datas_nascimento,
+    }));
+    reservaApi.calcularPreco(items)
+      .then((res) => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: Array.isArray(res) ? res : [res] }); })
+      .catch(() => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: [] }); });
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line
+
+  const stayDiarias = (sv) => {
+    const { adultos, criancas } = svOccupancy(sv.hospedes || []);
+    const sazList = stayCalcSaz.id === sv.id ? stayCalcSaz.list : [];
+    return (sv.diarias || []).map((d, i) => {
+      const calc = sazList[i];
+      const saz =
+        calc?.sazonalidades_aplicadas?.[0]?.descricao
+        ?? calc?.detalhes?.[0]?.sazonalidade?.descricao
+        ?? null;
+      const partes = [`Diária ${d.num}`, `${adultos} adulto(s)${criancas > 0 ? ` + ${criancas} criança(s)` : ''}`];
+      if (d.meiaDiaria) partes.push('meia diária');
+      return {
+        descricao: partes.join(' · '),
+        valor_final: d.valor ?? 0,
+        ...(saz ? { sazonalidade: { descricao: saz } } : {}),
+      };
+    });
+  };
 
   // Info do grupo — total/pago/pendente somados (como no modal de grupo das reservas).
   // Pagamentos de grupo aparecem em vários quartos com o mesmo id → deduplicados.
@@ -1675,7 +1739,6 @@ export default function RecepcaoPage() {
 
   // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
   const openGerenciarDiarias = () => {
-    setGdStartDate(null); setGdEndDate(null); setGdDiariaPendentes([]);
     setShowGerenciarDiarias(true);
   };
 
@@ -4253,125 +4316,15 @@ export default function RecepcaoPage() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Gerenciar Diárias
       ═══════════════════════════════════════════════════════ */}
-      {showGerenciarDiarias && selectedRoom?.servico?.tipo === 'pernoite' && (() => {
-        const sv = selectedRoom.servico;
-        const diarias = sv.diarias || [];
-        const atualNum = sv.diariaAtual || 1;
-        const novoTotal = diarias.reduce((s, d) => s + (d.valor || 0), 0) + (parseBRL(gdValor) || 0);
-        const ultimaDiaria = gdDiariaPendentes.length > 0
-          ? gdDiariaPendentes[gdDiariaPendentes.length - 1]
-          : (diarias.length > 0 ? diarias[diarias.length - 1] : null);
-        const minDataDiaria = ultimaDiaria?.dataFim ? (() => {
-          const datePart = ultimaDiaria.dataFim.split(' ')[0]; // "dd/MM/yyyy" only
-          const [dd, mm, yyyy] = datePart.split('/');
-          return new Date(+yyyy, +mm - 1, +dd);
-        })() : null;
-        return (
-          <Modal
-            open
-            onClose={() => setShowGerenciarDiarias(false)}
-            size="md"
-            title={<><RefreshCw size={15} /> Gerenciar Diárias — Apt. {selectedRoom.numero}</>}
-            footer={
-              <div className={styles.footerRight} />
-            }
-          >
-            <div className={styles.formStack}>
-              <Button variant="primary" onClick={() => {
-                if (!minDataDiaria) { notify('Nenhuma diária registrada.', 'error'); return; }
-                const fim = new Date(minDataDiaria);
-                fim.setDate(fim.getDate() + 1);
-                handleAdicionarDiaria(minDataDiaria, fim);
-              }} disabled={savingGd || !minDataDiaria} style={{ width: '100%', marginBottom: 16 }}>
-                {savingGd && <Loader2 size={14} className={styles.spin} />}
-                <Plus size={14} /> Adicionar Diária
-              </Button>
-              {diarias.length === 0 && gdDiariaPendentes.length === 0
-                ? <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
-                : (
-                  <div className={styles.gdDiariaList} ref={gdDiariaListRef}>
-                    {diarias.map((d) => {
-                      const isCurrent = d.num === atualNum;
-                      const isPast = d.num < atualNum;
-                      const canRemove = d.num >= atualNum;
-                      return (
-                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}>
-                          <div className={styles.gdDiariaItemBody}>
-                            <div className={styles.gdDiariaTopRow}>
-                              <div className={styles.gdDiariaLeftGroup}>
-                                <span className={styles.gdDiariaNum}>Diária {d.num}</span>
-                                {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
-                              </div>
-                              <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
-                            </div>
-                            <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
-                          </div>
-                          {canRemove && !isCurrent && (
-                            <button className={styles.removeBtn} onClick={() => setGdRemoverConfirm({ diariaIdx: d.idx, diariaNum: d.num })} disabled={savingGd} title="Remover diária">
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {gdDiariaPendentes.map((d, idx) => (
-                      <div key={`pending-${idx}`} className={styles.gdDiariaItem} style={{ opacity: 0.7, borderColor: 'var(--violet)' }}>
-                        <div className={styles.gdDiariaItemBody}>
-                          <div className={styles.gdDiariaTopRow}>
-                            <div className={styles.gdDiariaLeftGroup}>
-                              <span className={styles.gdDiariaNum} style={{ color: 'var(--violet)' }}>Diária {diarias.length + idx + 1}</span>
-                              <span className={styles.gdCurrentTag} style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--violet)' }}>Pendente</span>
-                            </div>
-                            <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
-                          </div>
-                          <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
-                        </div>
-                        <button className={styles.removeBtn} onClick={() => setGdDiariaPendentes((prev) => prev.filter((_, i) => i !== idx))} title="Remover da lista">
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )
-              }
-              {gdDiariaPendentes.length > 0 && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-                  <Button variant="secondary" onClick={() => setGdDiariaPendentes([])} style={{ flex: 1 }}>Cancelar</Button>
-                  <Button variant="primary" onClick={handleConfirmarDiarias} disabled={savingGd} style={{ flex: 1 }}>
-                    {savingGd && <Loader2 size={14} className={styles.spin} />}
-                    Confirmar {gdDiariaPendentes.length} diária(s)
-                  </Button>
-                </div>
-              )}
-            </div>
-          </Modal>
-        );
-      })()}
-
-      {/* ═══════════════════════════════════════════════════════
-          MODAL — Confirmação Remover Diária
-      ═══════════════════════════════════════════════════════ */}
-      {gdRemoverConfirm && (
-        <Modal
-          open
-          onClose={() => setGdRemoverConfirm(null)}
-          size="sm"
-          title={<><AlertTriangle size={15} /> Remover Diária</>}
-          footer={
-            <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setGdRemoverConfirm(null)} disabled={savingGd}>Cancelar</Button>
-              <Button variant="danger" onClick={async () => { await handleRemoverDiaria(gdRemoverConfirm.diariaIdx); setGdRemoverConfirm(null); }} disabled={savingGd}>
-                {savingGd && <Loader2 size={14} className={styles.spin} />}
-                Remover
-              </Button>
-            </div>
-          }
-        >
-          <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14 }}>
-            Tem certeza que deseja remover a <strong>Diária {gdRemoverConfirm.diariaNum}</strong>?
-          </p>
-        </Modal>
-      )}
+      <GerenciarDiariasModal
+        open={showGerenciarDiarias && selectedRoom?.servico?.tipo === 'pernoite'}
+        onClose={() => setShowGerenciarDiarias(false)}
+        hospedagemId={selectedRoom?.servico?.id}
+        roomLabel={selectedRoom?.numero}
+        quartos={quartos}
+        onSaved={load}
+        notify={notify}
+      />
 
       <TrocaQuartoModal
         open={showTrocarQuarto && selectedRoom?.servico?.tipo === 'pernoite'}

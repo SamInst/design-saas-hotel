@@ -47,6 +47,7 @@ export function DatePicker({
   markedDate = null,
   disabledDates = null,   // Set<'yyyy-MM-dd'> — occupied nights (range mode aware)
   inline = false,         // render the calendar statically (embedded), no trigger/portal
+  readOnly = false,       // somente visualização: dias não selecionáveis (mantém navegação de mês)
   placeholder = 'Selecione a data',
   label,
   error = false,
@@ -280,10 +281,10 @@ export function DatePicker({
                   ? oob || blk
                   : oob || (blk && !endCandidate);
               return (
-                <button key={d.toISOString()} type="button" disabled={cellDisabled}
+                <button key={d.toISOString()} type="button" disabled={cellDisabled || readOnly} tabIndex={readOnly ? -1 : undefined}
                   className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', mkd?styles.mkd:''].join(' ')}
-                  onClick={() => handleDayClick(sod(d))}
-                  onMouseEnter={() => { if (mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
+                  onClick={readOnly ? undefined : () => handleDayClick(sod(d))}
+                  onMouseEnter={() => { if (!readOnly && mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
                   {d.getDate()}
                 </button>
               );
@@ -322,7 +323,7 @@ export function DatePicker({
   // ── Inline (embedded, real-time) variant ──
   if (inline) {
     return (
-      <div className={[styles.inline, className].join(' ')} ref={ref}>
+      <div className={[styles.inline, readOnly ? styles.readOnly : '', className].join(' ')} ref={ref}>
         {label && <label className={styles.label}>{label}</label>}
         {calendarInner}
       </div>
