@@ -568,6 +568,11 @@ export const hospedagemApi = {
     return request(`/hospedagem/${hospedagemId}`);
   },
 
+  /** GET /hospedagem/grupo/{grupoId}/resumo — totais consolidados do grupo ({ grupo_id, count, total, pago, pendente }). */
+  resumoGrupo(grupoId) {
+    return request(`/hospedagem/grupo/${grupoId}/resumo`);
+  },
+
   /**
    * POST /hospedagem/pernoite — cria um ou mais pernoites diretamente (status PERNOITE_ATIVO),
    * sem passar por reserva. Mesmo corpo do criarAtiva de reserva.
@@ -623,6 +628,14 @@ export const hospedagemApi = {
   /** PUT /hospedagem/{hospedagemId}/cancelar — cancela o pernoite (MotivoCancelamentoHospedagem.Request). */
   cancelar(hospedagemId, motivo) {
     return request(`/hospedagem/${hospedagemId}/cancelar`, { method: 'PUT', body: motivo });
+  },
+  /** PUT /hospedagem/{hospedagemId}/finalizar — finaliza o pernoite (PERNOITE_FINALIZADO). */
+  finalizar(hospedagemId) {
+    return request(`/hospedagem/${hospedagemId}/finalizar`, { method: 'PUT' });
+  },
+  /** PUT /hospedagem/{hospedagemId}/finalizar-pendente — finaliza com pagamento pendente. */
+  finalizarPendente(hospedagemId) {
+    return request(`/hospedagem/${hospedagemId}/finalizar-pendente`, { method: 'PUT' });
   },
 
   /**

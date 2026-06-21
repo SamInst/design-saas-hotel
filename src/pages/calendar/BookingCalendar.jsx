@@ -3,12 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  DoorOpen, CalendarCheck2, Tag,
+  DoorOpen, CalendarCheck2, Tag, Clock,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
 import { FormField }     from '../../components/ui/Input';
 import { DatePicker }    from '../../components/ui/DatePicker';
+import { TimeInput }     from '../../components/ui/TimeInput';
 import { Notification }  from '../../components/ui/Notification';
 import { PaymentModal }  from '../../components/ui/PaymentModal';
 import { PriceAdjustmentModal, computeAdjustedTotal, describeAdjustment, novoPrecoToState } from '../../components/ui/PriceAdjustmentModal';
@@ -117,6 +118,8 @@ export const normalizeReserva = (r) => {
     dataFim:                 parseBrDate(dataSaida),
     chegadaPrevista:         dataEntrada,
     saidaPrevista:           dataSaida,
+    // Há meia diária (saída tardia na última diária)? Usado para o "meio ticket" no calendário.
+    meiaDiaria:              (r.diarias ?? []).some((d) => d?.meia_diaria),
     status:                  mapStatus(r),
     hospedes: pessoas.map((p) => ({
       id:            p.id,
@@ -730,11 +733,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setEditSaving(true);
     try {
       const valorTotal = editCalc?.valor_total ?? reserva.valorTotal;
+      const editCat = categorias.find((c) => (c.quartos || []).map(String).includes(String(editQuarto[0])));
+      const eci = editCat?.checkin || '14:00';
+      const eco = editCat?.checkout || '12:00';
       await onUpdate(reserva.id, {
         quarto_id:          parseInt(editQuarto[0]),
         status:             'RESERVA_ATIVA',
-        data_hora_checkin:  `${toBrDate(formatDate(editCheckin))} 14:00`,
-        data_hora_checkout: `${toBrDate(formatDate(editCheckout))} 12:00`,
+        data_hora_checkin:  `${toBrDate(formatDate(editCheckin))} ${eci}`,
+        data_hora_checkout: `${toBrDate(formatDate(editCheckout))} ${eco}`,
         observacao:         editObs.trim(),
         ...(valorTotal != null ? { valor_total: valorTotal } : {}),
       });
@@ -1188,6 +1194,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // Diárias do card de preço: no modo pernoite vêm prontas; senão, do cálculo.
   const effectiveDetalhes = isOvernight ? (overnight.diariasDetalhes ?? []) : (infoCalc?.detalhes ?? []);
 
+  // Total original (sem desconto) vs. com desconto — para exibir o valor original riscado no card.
+  const ovAdj = reserva.novoPreco ? novoPrecoToState(reserva.novoPreco) : null;
+  const ovBaseDiarias = (effectiveDetalhes ?? []).map((d) => ({ valor: d.valor_final ?? 0 }));
+  const ovBaseTotal = ovBaseDiarias.reduce((s, d) => s + (d.valor || 0), 0);
+  const ovAdjResult = ovAdj ? computeAdjustedTotal({ baseTotal: ovBaseTotal, baseDiarias: ovBaseDiarias, ...ovAdj }) : null;
+  // displayTotal pode incluir consumos (Recepção); preserva esse delta no valor original riscado.
+  const ovConsumosDelta = ovAdjResult ? (displayTotal - ovAdjResult.valorTotal) : 0;
+  const ovOriginalTotal = ovBaseTotal + ovConsumosDelta;
+  const ovHasDiscount = ovAdjResult != null && Math.abs(ovOriginalTotal - displayTotal) > 0.01;
+
   // Lista de pessoas exibida (suporta orçamento sem cadastro).
   const guestList =
     (reserva.status === 'orcamento' && (reserva.pessoasOrcamento?.length ?? 0) > 0)
@@ -1281,7 +1297,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.ovFinRow}>
                   <div className={styles.ovFinItem}>
                     <span className={styles.ovFinLabel}>Valor Total</span>
-                    <span className={styles.ovFinValue}>{fmtBRL(displayTotal)}</span>
+                    <span className={styles.ovFinValue}>
+                      {ovHasDiscount && (
+                        <s style={{ color: 'var(--text-2)', fontWeight: 400, marginRight: 6, opacity: 0.8 }}>
+                          {fmtBRL(ovOriginalTotal)}
+                        </s>
+                      )}
+                      {fmtBRL(displayTotal)}
+                    </span>
                   </div>
                   <div className={styles.ovFinItem}>
                     <span className={styles.ovFinLabel}>Total Pago</span>
@@ -3519,6 +3542,30 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   const allRoomIds = useMemo(() => categorias.flatMap((c) => c.quartos), [categorias]);
 
+  // Horários (checkin/checkout) definidos pela categoria do quarto (fallback 14:00 / 12:00).
+  const roomCatTimes = (quartoId) => {
+    const cat = categorias.find((c) => (c.quartos || []).map(String).includes(String(quartoId)));
+    return { checkin: cat?.checkin || '14:00', checkout: cat?.checkout || '12:00' };
+  };
+
+  // Se algum quarto selecionado tem uma MEIA DIÁRIA encerrando no dia do check-in, o quarto só fica
+  // livre após aquele horário — o funcionário precisa definir a hora de entrada manualmente.
+  const [checkinHour, setCheckinHour] = useState('');
+  const halfDailyMinCheckin = useMemo(() => {
+    if (periodoMode !== 'unico' || !checkinStr || !quartos.length) return null;
+    let max = null;
+    for (const r of (reservas || [])) {
+      if (!r.meiaDiaria || r.dataFim !== checkinStr) continue;
+      if (!quartos.map(String).includes(String(r.quarto))) continue;
+      const hr = (r.saidaPrevista || '').split(' ')[1]?.slice(0, 5);
+      if (hr && (!max || hr > max)) max = hr;
+    }
+    return max;
+  }, [periodoMode, checkinStr, quartos, reservas]);
+  useEffect(() => {
+    if (halfDailyMinCheckin) setCheckinHour((h) => (h && h >= halfDailyMinCheckin ? h : halfDailyMinCheckin));
+  }, [halfDailyMinCheckin]);
+
   // Fetch availability from API whenever unico-mode dates change
   useEffect(() => {
     if (!checkin || !checkout || !allRoomIds.length) { setApiAvailability(null); setAvailLoading(false); return; }
@@ -3790,11 +3837,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
         const buildSolBody = (quartoId, ci, co, hospedesOrc, obs, periodoIdx) => {
           const valorTotal = precosCalc[`${quartoId}_${periodoIdx}`]?.valor_total;
+          const ct = roomCatTimes(quartoId);
           return {
             quarto_id:          parseInt(quartoId),
             status:             'RESERVA_SOLICITADA',
-            data_hora_checkin:  `${toBrDate(ci)} 10:00`,
-            data_hora_checkout: `${toBrDate(co)} 12:00`,
+            data_hora_checkin:  `${toBrDate(ci)} ${ct.checkin}`,
+            data_hora_checkout: `${toBrDate(co)} ${ct.checkout}`,
             pessoas_orcamento:  hospedesOrc.map((h) => ({
               nome: h.nome,
               ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
@@ -3838,11 +3886,12 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 nome: h.nome,
                 ...(h.dataNascimento ? { data_nascimento: isoToBrLocal(h.dataNascimento) } : {}),
               }));
+          const ct = roomCatTimes(quartoId);
           return {
             quarto_id:         parseInt(quartoId),
             status:            'ORCAMENTO',
-            data_hora_checkin:  `${toBrDate(dataEntrada)} 10:00`,
-            data_hora_checkout: `${toBrDate(dataSaida)} 12:00`,
+            data_hora_checkin:  `${toBrDate(dataEntrada)} ${ct.checkin}`,
+            data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
             pessoas_orcamento:  pessoasOrc,
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
             ...(obs ? { observacao: obs } : {}),
@@ -3896,11 +3945,14 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           .filter((h) => h.id && !String(h.id).startsWith('tmp-'))
           .map((h) => parseInt(h.id));
         const novoPreco = buildNovoPreco(rKey);
+        const ct = roomCatTimes(quartoId);
+        // Quando há meia diária encerrando no dia do check-in, usa a hora definida pelo funcionário.
+        const ciHora = (periodoMode === 'unico' && halfDailyMinCheckin && checkinHour) ? checkinHour : ct.checkin;
         return {
           quarto_id:          parseInt(quartoId),
           status:             'RESERVA_ATIVA',
-          data_hora_checkin:  `${toBrDate(dataEntrada)} 14:00`,
-          data_hora_checkout: `${toBrDate(dataSaida)} 12:00`,
+          data_hora_checkin:  `${toBrDate(dataEntrada)} ${ciHora}`,
+          data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
           ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
           ...(roomPags.length   ? { pagamentos: roomPags } : {}),
@@ -3908,6 +3960,13 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           ...(novoPreco ? { novo_preco: novoPreco } : {}),
         };
       };
+
+      // Meia diária no dia do check-in: exige hora de entrada e não pode ser antes do término dela.
+      if (halfDailyMinCheckin && (!checkinHour || checkinHour < halfDailyMinCheckin)) {
+        onNotify?.(`A hora de check-in deve ser após o término da meia diária (${halfDailyMinCheckin}).`, 'error');
+        setSaving(false);
+        return;
+      }
 
       const allBodies = [];
       if (periodoMode === 'multiplos') {
@@ -4223,6 +4282,20 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                   )}
                 </div>
               ))}
+              {halfDailyMinCheckin && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>
+                    <Clock size={13} /> Hora de check-in (meia diária anterior)
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
+                    Há uma meia diária encerrando às <b>{halfDailyMinCheckin}</b> no dia do check-in.
+                    Defina a hora de entrada — não pode ser anterior a esse horário.
+                  </p>
+                  <div style={{ maxWidth: 150 }}>
+                    <TimeInput value={checkinHour} onChange={setCheckinHour} />
+                  </div>
+                </div>
+              )}
             </>
           )}
 
@@ -4787,7 +4860,13 @@ export default function BookingCalendar() {
                 .filter((r) => (r.categoriaId ?? r.categoria?.id) === c.id)
                 .map((r) => r.id);
             }
-            return { id: c.id, nome: c.nome, quartos };
+            return {
+              id: c.id,
+              nome: c.nome,
+              quartos,
+              checkin:  c.hora_checkin  ?? c.checkin  ?? null,
+              checkout: c.hora_checkout ?? c.checkout ?? null,
+            };
           })
           .filter((c) => c.quartos.length > 0),
       );
@@ -5469,6 +5548,16 @@ export default function BookingCalendar() {
         </div>
         {endInView && !isGhost && !pagamentoModoAtivo && (
           <div className={[styles.resizeHandle, styles.resizeHandleRight].join(' ')} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-r')} />
+        )}
+        {/* Meio ticket (meia diária) — estende metade de célula até a borda, cor do ticket a 70%. */}
+        {!isGhost && orig.meiaDiaria && endInView && (
+          <div
+            className={styles.barHalf}
+            style={{ width: HALF, ...(gColor ? { background: gColor } : {}) }}
+            title="Meia diária — saída tardia"
+          >
+            <Clock size={12} />
+          </div>
         )}
       </div>
     );

@@ -5,6 +5,7 @@ import { Button } from '../../../../components/ui/Button';
 import { Select } from '../../../../components/ui/Input';
 import { DatePicker } from '../../../../components/ui/DatePicker';
 import { TimeInput } from '../../../../components/ui/TimeInput';
+import { computeAdjustedTotal, novoPrecoToState, describeAdjustment } from '../../../../components/ui/PriceAdjustmentModal';
 import { reservaApi, hospedagemApi } from '../../../../services/api';
 import { fmtBRL } from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
@@ -61,6 +62,7 @@ export default function GerenciarDiariasModal({
   const [saving, setSaving]     = useState(false);
   const [rows, setRows]         = useState([]);
   const [hospedes, setHospedes] = useState([]); // pessoas do pernoite (usadas no cálculo de todas as diárias)
+  const [novoPreco, setNovoPreco] = useState(null); // ajuste manual de preço vigente ("Gerenciar Preços")
   const [mainRoomId, setMainRoomId] = useState(null); // quarto do pernoite (calendário de disponibilidade)
   const [calcLoading, setCalcLoading] = useState(false);
   const [busyByRoom, setBusyByRoom]   = useState({});
@@ -81,6 +83,7 @@ export default function GerenciarDiariasModal({
           id: p.id, nome: p.nome, dataNascimento: p.data_nascimento ?? p.dataNascimento ?? '',
         }));
         setHospedes(pessoas);
+        setNovoPreco(h.novo_preco ?? null);
         const roomId = h.quarto?.id ?? (h.diarias?.[0]?.quarto?.id) ?? null;
         defaultRef.current = { roomId };
         setMainRoomId(roomId);
@@ -183,8 +186,18 @@ export default function GerenciarDiariasModal({
     return () => { cancelled = true; };
   }, [calcSig, open]); // eslint-disable-line
 
-  const total = rows.reduce((s, r) => s + (r.valor || 0), 0);
+  // Total base (soma das diárias) e total final com o ajuste de preço vigente aplicado.
+  const baseTotal = rows.reduce((s, r) => s + (r.valor || 0), 0);
+  const adjState = novoPreco ? novoPrecoToState(novoPreco) : null;
+  const adjResult = adjState
+    ? computeAdjustedTotal({ baseTotal, baseDiarias: rows.map((r) => ({ valor: r.valor || 0 })), ...adjState })
+    : null;
+  const total = adjResult ? adjResult.valorTotal : baseTotal;
+  const adjDesc = adjState ? describeAdjustment(adjState) : null;
   const occupancy = useMemo(() => splitOccupancy(hospedes), [hospedes]);
+  // Diárias que já passaram (checkin antes de hoje) não podem ser removidas/editadas — só viram meia.
+  const today = dateOnly(new Date());
+  const isPastRow = (r) => dateOnly(r.checkin) < today;
   const stayStart = rows.length ? rows.reduce((m, r) => (!m || r.checkin < m ? r.checkin : m), null) : null;
   const stayEnd = rows.length ? rows.reduce((m, r) => (!m || r.checkout > m ? r.checkout : m), null) : null;
   const mainBusy = busyByRoom[mainRoomId];
@@ -206,6 +219,12 @@ export default function GerenciarDiariasModal({
     ...(busyByRoom[mainRoomId] instanceof Set ? busyByRoom[mainRoomId] : []),
   ]);
   const nextDateBusy = nextBusySet.has(dkey(nextStart));
+
+  // Horários (checkin/checkout) definidos pela categoria do quarto da diária.
+  const roomTimes = (quartoId) => {
+    const q = quartos.find((x) => x.id === quartoId);
+    return { checkin: q?.categoriaCheckin || '14:00', checkout: q?.categoriaCheckout || '12:00' };
+  };
 
   // ── Row mutations ────────────────────────────────────────────────────────────
   const patchRow = (key, patch) => setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -229,8 +248,9 @@ export default function GerenciarDiariasModal({
     setRows((prev) => {
       let list = prev;
       // Só a última diária pode ser meia: ao adicionar outra, a anterior volta a ser inteira.
+      // (diárias já encerradas não são alteradas.)
       const lastIdx = prev.length - 1;
-      if (prev[lastIdx]?.meiaDiaria) {
+      if (prev[lastIdx]?.meiaDiaria && !isPastRow(prev[lastIdx])) {
         const ci0 = dateOnly(prev[lastIdx].checkin);
         const co0 = new Date(ci0); co0.setDate(co0.getDate() + 1);
         list = prev.map((r, i) => (i === lastIdx ? { ...r, meiaDiaria: false, checkin: ci0, checkout: co0 } : r));
@@ -262,20 +282,21 @@ export default function GerenciarDiariasModal({
     if (invalid) { notify?.('Verifique o quarto e o período de cada diária.', 'error'); return; }
     const meiaInvalida = rows.find((r) => r.meiaDiaria && !/^\d{2}:\d{2}$/.test(r.horaSaida || ''));
     if (meiaInvalida) { notify?.('Informe a hora de saída da meia diária.', 'error'); return; }
-    // A meia diária começa às 12:00 (checkout da diária anterior); a saída precisa ser depois disso.
-    const meiaHora = rows.find((r) => r.meiaDiaria && (r.horaSaida || '') <= '12:00');
-    if (meiaHora) { notify?.('A hora de saída da meia diária deve ser após as 12:00.', 'error'); return; }
+    // A meia diária começa no checkout da categoria (fim da diária anterior); a saída precisa ser depois.
+    const meiaHora = rows.find((r) => r.meiaDiaria && (r.horaSaida || '') <= roomTimes(r.quartoId).checkout);
+    if (meiaHora) { notify?.(`A hora de saída da meia diária deve ser após o checkout da categoria.`, 'error'); return; }
     setSaving(true);
     try {
       const pessoas = hospedes.map((h) => h.id).filter(Boolean);
       const body = rows.map((r) => {
+        const ct = roomTimes(r.quartoId);
         if (r.meiaDiaria) {
           const dia = brDateOnly(r.checkin);
           return {
             quarto_id: r.quartoId,
-            // Meia diária: mesmo dia da diária anterior; começa no checkout dela (12:00) para não
-            // sobrepor, e o checkout recebe a hora definida no front.
-            checkin: `${dia} 12:00`,
+            // Meia diária: mesmo dia da diária anterior; começa no checkout da categoria (fim da
+            // diária anterior) para não sobrepor, e o checkout recebe a hora definida no front.
+            checkin: `${dia} ${ct.checkout}`,
             checkout: `${dia} ${r.horaSaida}`,
             meia_diaria: true,
             pessoas,
@@ -283,8 +304,9 @@ export default function GerenciarDiariasModal({
         }
         return {
           quarto_id: r.quartoId,
-          checkin: `${brDateOnly(r.checkin)} 14:00`,
-          checkout: `${brDateOnly(r.checkout)} 12:00`,
+          // Datas/horas das diárias inteiras definidas pelo checkin/checkout da categoria.
+          checkin: `${brDateOnly(r.checkin)} ${ct.checkin}`,
+          checkout: `${brDateOnly(r.checkout)} ${ct.checkout}`,
           meia_diaria: false,
           pessoas,
         };
@@ -324,7 +346,7 @@ export default function GerenciarDiariasModal({
         <div className={styles.formStack}>
           {/* ── Price summary ── */}
           <div className={styles.nhPriceCard}>
-            <div className={styles.nhPriceCardHeader} style={{ cursor: 'default' }}>
+            <div className={styles.nhPriceCardHeader} style={{ cursor: 'default', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
               <span className={styles.nhFinStrip}>
                 <span className={styles.nhFinStripItem}>
                   Total{' '}
@@ -333,6 +355,11 @@ export default function GerenciarDiariasModal({
                 <span className={styles.nhFinStripDivider} />
                 <span className={styles.nhFinStripItem}>Diárias <b>{rows.length}</b></span>
               </span>
+              {adjDesc && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--violet)' }}>
+                  Subtotal {fmtBRL(baseTotal)} · {adjDesc}
+                </span>
+              )}
             </div>
           </div>
 
@@ -358,20 +385,23 @@ export default function GerenciarDiariasModal({
               {rows.map((r, idx) => {
                 const busy = busyByRoom[r.quartoId];
                 const { adultos, criancas } = occupancy;
+                const past = isPastRow(r);
+                // Apenas a última diária pode ter o checkbox de meia diária (nova ou já encerrada).
+                const canMeia = idx === rows.length - 1;
                 const sazNomes = [
                   ...new Set([
                     ...(r.calc?.sazonalidades_aplicadas ?? []).map((s) => s?.descricao).filter(Boolean),
                     ...(r.calc?.detalhes ?? []).map((d) => d?.sazonalidade?.descricao).filter(Boolean),
                   ]),
                 ];
-                const showBelow = (r.meiaDiaria && !r.isNew) || sazNomes.length > 0;
+                const showBelow = (r.meiaDiaria && !canMeia) || past || sazNomes.length > 0;
                 return (
                   <div key={r.key} className={styles.gdCard}>
                     <div className={styles.gdCardHeader}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                           <span className={styles.gdCardNum}>Diária {idx + 1}</span>
-                          {r.isNew && idx === rows.length - 1 && (
+                          {canMeia && (
                             <label className={styles.gdMeiaCheck}>
                               <input
                                 type="checkbox"
@@ -384,7 +414,8 @@ export default function GerenciarDiariasModal({
                         </div>
                         {showBelow && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            {r.meiaDiaria && !r.isNew && <span className={styles.gdMeiaTag}>Meia diária</span>}
+                            {past && <span className={styles.gdPastTag}>Encerrada</span>}
+                            {r.meiaDiaria && !canMeia && <span className={styles.gdMeiaTag}>Meia diária</span>}
                             {sazNomes.map((n) => (
                               <span key={n} className={styles.nhSazChip}>{n}</span>
                             ))}
@@ -398,9 +429,11 @@ export default function GerenciarDiariasModal({
                         <span className={styles.gdCardVal}>
                           {calcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(r.valor)}
                         </span>
-                        <button className={styles.removeBtn} onClick={() => setConfirmRemove({ key: r.key, num: idx + 1 })} disabled={saving} title="Remover diária">
-                          <Trash2 size={13} />
-                        </button>
+                        {!past && (
+                          <button className={styles.removeBtn} onClick={() => setConfirmRemove({ key: r.key, num: idx + 1 })} disabled={saving} title="Remover diária">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -410,7 +443,7 @@ export default function GerenciarDiariasModal({
                           <label className={styles.gdFieldLabel}>{r.meiaDiaria ? 'Data · Hora de saída' : 'Período'}</label>
                           {r.meiaDiaria ? (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 96px', gap: 8 }}>
-                              {idx > 0 ? (
+                              {(idx > 0 || past) ? (
                                 // Data fixa = checkout da diária anterior; só a hora é editável.
                                 <div className={styles.gdReadonlyDate} title="Data definida pela diária anterior">
                                   {brDateOnly(r.checkin)}
@@ -425,6 +458,10 @@ export default function GerenciarDiariasModal({
                               )}
                               <TimeInput value={r.horaSaida} onChange={(v) => patchRow(r.key, { horaSaida: v })} />
                             </div>
+                          ) : past ? (
+                            <div className={styles.gdReadonlyDate} title="Diária encerrada">
+                              {brDateOnly(r.checkin)} → {brDateOnly(r.checkout)}
+                            </div>
                           ) : (
                             <DatePicker
                               mode="range"
@@ -437,11 +474,17 @@ export default function GerenciarDiariasModal({
                         </div>
                         <div className={styles.formStack} style={{ gap: 5 }}>
                           <label className={styles.gdFieldLabel}>Quarto</label>
-                          <Select value={r.quartoId ?? ''} onChange={(e) => patchRow(r.key, { quartoId: Number(e.target.value) })}>
-                            {quartos.map((q) => (
-                              <option key={q.id} value={q.id}>Apt. {q.numero} · {q.tipoOcupacao || q.categoria}</option>
-                            ))}
-                          </Select>
+                          {past ? (
+                            <div className={styles.gdReadonlyDate} title="Diária encerrada">
+                              Apt. {quartos.find((q) => q.id === r.quartoId)?.numero ?? r.quartoId}
+                            </div>
+                          ) : (
+                            <Select value={r.quartoId ?? ''} onChange={(e) => patchRow(r.key, { quartoId: Number(e.target.value) })}>
+                              {quartos.map((q) => (
+                                <option key={q.id} value={q.id}>Apt. {q.numero} · {q.tipoOcupacao || q.categoria}</option>
+                              ))}
+                            </Select>
+                          )}
                         </div>
                       </div>
                     </div>

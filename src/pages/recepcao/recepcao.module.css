@@ -2718,6 +2718,16 @@
   padding: 2px 7px;
   white-space: nowrap;
 }
+.gdPastTag {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
 .gdCardPeople {
   font-size: 12px;
   font-weight: 600;

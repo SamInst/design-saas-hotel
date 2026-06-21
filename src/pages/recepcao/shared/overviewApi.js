@@ -282,6 +282,8 @@ function _normalizeHospedagem(item, cat) {
     categoriaId: cat.id,
     categoria: cat.nome,
     categoriaDescricao: cat.descricao ?? '',
+    categoriaCheckin:  cat.checkin  ?? null,  // "HH:mm" definido na categoria
+    categoriaCheckout: cat.checkout ?? null,
     tipoOcupacao: q.descricao ?? '',
     descricao: q.descricao ?? '',
     camas: {

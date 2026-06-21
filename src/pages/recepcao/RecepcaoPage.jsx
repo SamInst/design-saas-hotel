@@ -710,6 +710,8 @@ export default function RecepcaoPage() {
 
   // Sazonalidade por diária (modal do pernoite/hospedado) — calculada via calcularPreco
   const [stayCalcSaz, setStayCalcSaz] = useState({ id: null, list: [] });
+  // Resumo consolidado do grupo (todas as hospedagens, mesmo finalizadas) — backend.
+  const [groupResumo, setGroupResumo] = useState(null);
 
   // Gerenciar Diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
@@ -1164,7 +1166,11 @@ export default function RecepcaoPage() {
       setStayCalcSaz({ id: null, list: [] });
       return;
     }
-    const datas_nascimento = (sv.hospedes || []).map((h) => h.dataNascimento).filter(Boolean);
+    // calcularPreco espera datas no formato dd/MM/yyyy; converte ISO (yyyy-MM-dd) quando necessário.
+    const datas_nascimento = (sv.hospedes || [])
+      .map((h) => h.dataNascimento)
+      .filter(Boolean)
+      .map((dn) => (/^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn));
     if (datas_nascimento.length === 0) { setStayCalcSaz({ id: sv.id, list: [] }); return; }
     let cancelled = false;
     const items = sv.diarias.map((d) => ({
@@ -1178,6 +1184,22 @@ export default function RecepcaoPage() {
       .catch(() => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: [] }); });
     return () => { cancelled = true; };
   }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line
+
+  // Busca o total do grupo (todas as hospedagens do grupo) quando o quarto selecionado está em grupo.
+  useEffect(() => {
+    const gid = selectedRoom?.servico?.grupoId ?? null;
+    if (gid == null) { setGroupResumo(null); return; }
+    let cancelled = false;
+    hospedagemApi.resumoGrupo(gid)
+      .then((r) => {
+        if (cancelled) return;
+        setGroupResumo(r && r.count > 1
+          ? { id: gid, count: r.count, total: r.total, pago: r.pago, pendente: r.pendente }
+          : null);
+      })
+      .catch(() => { if (!cancelled) setGroupResumo(null); });
+    return () => { cancelled = true; };
+  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.grupoId]); // eslint-disable-line
 
   const stayDiarias = (sv) => {
     const { adultos, criancas } = svOccupancy(sv.hospedes || []);
@@ -1323,8 +1345,9 @@ export default function RecepcaoPage() {
     if (pessoas.length === 0) { notify('Adicione ao menos um hóspede.', 'error'); return; }
     setSavingNh(true);
     try {
-      const chegada = `${dateToDisplay(nhCheckinDate)} 14:00`;
-      const saida   = `${dateToDisplay(nhCheckoutDate)} 12:00`;
+      // Horários definidos pela categoria do quarto (fallback 14:00 / 12:00).
+      const chegada = `${dateToDisplay(nhCheckinDate)} ${novoRoom.categoriaCheckin || '14:00'}`;
+      const saida   = `${dateToDisplay(nhCheckoutDate)} ${novoRoom.categoriaCheckout || '12:00'}`;
       // Cria a hospedagem já ATIVA (pernoite) — POST /hospedagem/pernoite com status PERNOITE_ATIVO.
       const request = {
         quarto_id: novoRoom.id,
@@ -1439,7 +1462,11 @@ export default function RecepcaoPage() {
     const pernoiteId = selectedRoom.servico?.id;
     setSaving(true);
     try {
-      if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, status);
+      // Finaliza o pernoite via HospedagemController (PUT /hospedagem/{id}/finalizar[-pendente]).
+      if (pernoiteId) {
+        if (status === 'FINALIZADO_PAGAMENTO_PENDENTE') await hospedagemApi.finalizarPendente(pernoiteId);
+        else await hospedagemApi.finalizar(pernoiteId);
+      }
       await recepcaoApi.acionarLimpeza(selectedRoom.id, {
         funcionario: funcId ? { id: Number(funcId) } : undefined,
       });
@@ -3461,7 +3488,7 @@ export default function RecepcaoPage() {
           <ReservaModal
             key={`ov-${sv.id}`}
             reserva={reservaAdapter}
-            groupInfo={buildGroupInfo(selectedRoom)}
+            groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
             onClose={closeDetail}
             onNotify={notify}
             categorias={[]}
@@ -3492,7 +3519,7 @@ export default function RecepcaoPage() {
           <ReservaModal
             key={`rv-${reservaFull.id}`}
             reserva={reservaFull}
-            groupInfo={buildGroupInfo(selectedRoom)}
+            groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
             allowHospedarAnytime
             onClose={() => { setReservaFull(null); closeDetail(); }}
             onNotify={notify}
