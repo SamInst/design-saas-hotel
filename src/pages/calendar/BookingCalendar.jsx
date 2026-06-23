@@ -1294,50 +1294,76 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
               {/* Price card — resumo financeiro + diárias */}
               <div className={styles.ovFinCard}>
-                <div className={styles.ovFinRow}>
-                  <div className={styles.ovFinItem}>
-                    <span className={styles.ovFinLabel}>Valor Total</span>
-                    <span className={styles.ovFinValue}>
-                      {ovHasDiscount && (
-                        <s style={{ color: 'var(--text-2)', fontWeight: 400, marginRight: 6, opacity: 0.8 }}>
-                          {fmtBRL(ovOriginalTotal)}
-                        </s>
-                      )}
-                      {fmtBRL(displayTotal)}
-                    </span>
-                  </div>
-                  <div className={styles.ovFinItem}>
-                    <span className={styles.ovFinLabel}>Total Pago</span>
-                    <span className={styles.ovFinValue}>{fmtBRL(totalPago)}</span>
-                  </div>
-                  <div className={styles.ovFinItem}>
-                    <span className={styles.ovFinLabel}>Pendente</span>
-                    <span className={[styles.ovFinValue, displayPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
-                      {fmtBRL(displayPendente)}
-                    </span>
-                  </div>
-                </div>
+                {/* Em grupo: linha de cima = totais do grupo (todos os pernoites); abaixo = pernoite atual. */}
                 {groupInfo && (
-                  <div className={styles.ovGroupCard}>
-                    <div className={styles.ovGroupHeader}>
-                      <Users size={12} /> Grupo · {groupInfo.count} apartamento{groupInfo.count !== 1 ? 's' : ''} (total do grupo)
+                  <div className={styles.ovFinRow}>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Valor Total (Grupo · {groupInfo.count} apartamento{groupInfo.count !== 1 ? 's' : ''})</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(groupInfo.total)}</span>
                     </div>
-                    <div className={styles.ovGroupTotals}>
-                      <div className={styles.ovGroupTotalItem}>
-                        <span className={styles.ovGroupTLabel}>Total</span>
-                        <span className={styles.ovGroupTVal}>{fmtBRL(groupInfo.total)}</span>
-                      </div>
-                      <div className={styles.ovGroupTotalItem}>
-                        <span className={styles.ovGroupTLabel}>Pago</span>
-                        <span className={[styles.ovGroupTVal, styles.ovFinPaid].join(' ')}>{fmtBRL(groupInfo.pago)}</span>
-                      </div>
-                      <div className={styles.ovGroupTotalItem}>
-                        <span className={styles.ovGroupTLabel}>Pendente</span>
-                        <span className={[styles.ovGroupTVal, groupInfo.pendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>{fmtBRL(groupInfo.pendente)}</span>
-                      </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinValue}>{fmtBRL(groupInfo.pago)}</span>
+                    </div>
+                    <div className={styles.ovFinItem}>
+                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={[styles.ovFinValue, groupInfo.pendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                        {fmtBRL(groupInfo.pendente)}
+                      </span>
                     </div>
                   </div>
                 )}
+                <div className={styles.ovFinRow} style={groupInfo ? { borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 } : undefined}>
+                  {groupInfo ? (() => {
+                    // Pernoite individual: total das diárias (com desconto) e valor por diária.
+                    const numDiarias = effectiveDetalhes.length || 1;
+                    const totalPernoite = ovAdjResult ? ovAdjResult.valorTotal : ovBaseTotal;
+                    const valorDiaria = numDiarias > 0 ? totalPernoite / numDiarias : totalPernoite;
+                    return (
+                      <>
+                        <div className={styles.ovFinItem}>
+                          <span className={styles.ovFinLabel}>Valor diária</span>
+                          <span className={styles.ovFinValue}>{fmtBRL(valorDiaria)}</span>
+                        </div>
+                        <div className={styles.ovFinItem}>
+                          <span className={styles.ovFinLabel}>Total pernoite</span>
+                          <span className={styles.ovFinValue}>
+                            {ovHasDiscount && (
+                              <s style={{ color: 'var(--text-2)', fontWeight: 400, marginRight: 6, opacity: 0.8 }}>
+                                {fmtBRL(ovOriginalTotal)}
+                              </s>
+                            )}
+                            {fmtBRL(totalPernoite)}
+                          </span>
+                        </div>
+                      </>
+                    );
+                  })() : (
+                    <>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Valor Total</span>
+                        <span className={styles.ovFinValue}>
+                          {ovHasDiscount && (
+                            <s style={{ color: 'var(--text-2)', fontWeight: 400, marginRight: 6, opacity: 0.8 }}>
+                              {fmtBRL(ovOriginalTotal)}
+                            </s>
+                          )}
+                          {fmtBRL(displayTotal)}
+                        </span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Total Pago</span>
+                        <span className={styles.ovFinValue}>{fmtBRL(totalPago)}</span>
+                      </div>
+                      <div className={styles.ovFinItem}>
+                        <span className={styles.ovFinLabel}>Pendente</span>
+                        <span className={[styles.ovFinValue, displayPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
+                          {fmtBRL(displayPendente)}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
                 {displayTotal > 0 && (() => {
                   const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
                   return (
