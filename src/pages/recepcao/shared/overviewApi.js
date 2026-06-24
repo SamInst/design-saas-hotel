@@ -407,7 +407,7 @@ export const overviewApi = {
       valor:          p.valor,
     }));
     if (pagamentos.length && pernoite?.id) {
-      await recepcaoApi.adicionarPagamentos(pernoite.id, pagamentos);
+      await recepcaoApi.adicionarPagamentos(pernoite.id, pagamentos, { quartoId: id, status: pernoite?.status || 'PERNOITE_ATIVO' });
     }
     await _reload();
     return _find(id);
@@ -454,7 +454,7 @@ export const overviewApi = {
         nome_pagador:   pag.nomePagador || '',
         descricao:      pag.descricao   || undefined,
         valor:          pag.valor,
-      }]);
+      }], { quartoId: id, status: room?.servico?.statusBackend || undefined });
       await _reload();
       return _find(id);
     }

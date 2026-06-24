@@ -42,12 +42,15 @@ export function DatePicker({
   endDate = null,
   onChange,
   onRangeChange,
+  onMonthChange,          // (year, month0) — fired when the visible month changes (month is 0-based)
   minDate = null,
   maxDate = null,
   markedDate = null,
   disabledDates = null,   // Set<'yyyy-MM-dd'> — occupied nights (range mode aware)
+  occupancy = null,       // Map<'yyyy-MM-dd', {am,pm}> — midday half-day occupancy (range mode)
   inline = false,         // render the calendar statically (embedded), no trigger/portal
   readOnly = false,       // somente visualização: dias não selecionáveis (mantém navegação de mês)
+  lockMonth = false,      // trava o mês exibido: esconde as setas e desativa o seletor de mês/ano
   placeholder = 'Selecione a data',
   label,
   error = false,
@@ -112,6 +115,11 @@ export function DatePicker({
     }
   }, [value, inputFocused, mode]); // eslint-disable-line
 
+  // Notify parent of the currently-visible month so it can load occupancy on demand.
+  useEffect(() => {
+    onMonthChange?.(viewYear, viewMonth);
+  }, [viewYear, viewMonth]); // eslint-disable-line
+
   const prevNav = () => {
     if (viewMode === 'years')  setViewYear(y => y - 12);
     else if (viewMode === 'months') setViewYear(y => y - 1);
@@ -143,6 +151,35 @@ export function DatePicker({
     return null;
   };
 
+  // ── Midday occupancy (half-day) helpers — active only when `occupancy` is given ──
+  // A stay runs from midday(check-in) to midday(check-out): the check-in day is busy in the
+  // afternoon (pm), the check-out day busy in the morning (am), middle days busy all day.
+  const useHalf  = !!occupancy;
+  const occAt    = (d) => useHalf ? occupancy.get(dkey(d)) : null;
+  const amBusy   = (d) => { const o = occAt(d); return !!(o && o.am); };
+  const pmBusy   = (d) => { const o = occAt(d); return !!(o && o.pm); };
+  // A new check-in needs the afternoon free; a new check-out needs the morning free.
+  const canStartHalf = (d) => !pmBusy(d);
+  const canEndHalf   = (d) => !amBusy(d);
+  // First day after `from` that the new stay cannot fully occupy (any busy half).
+  const firstObstacleAfter = (from) => {
+    if (!useHalf || !from) return null;
+    const cur = sod(from);
+    for (let i = 0; i < 400; i++) {
+      cur.setDate(cur.getDate() + 1);
+      if (amBusy(cur) || pmBusy(cur)) return sod(cur);
+    }
+    return null;
+  };
+  // Latest selectable checkout for a given check-in (inclusive).
+  const maxEndForStart = (start) => {
+    const f = firstObstacleAfter(start);
+    if (!f) return null;                   // no limit
+    if (pmBusy(f) && !amBusy(f)) return f;  // obstacle is another check-in → check out that morning
+    const prev = sod(f); prev.setDate(prev.getDate() - 1);
+    return prev;
+  };
+
   const handleDayClick = (d) => {
     if (mode === 'single') {
       if (isDisabled(d)) return;
@@ -154,6 +191,37 @@ export function DatePicker({
     // ── range ──
     if (outOfBounds(d)) return;
 
+    // ── midday (half-day) selection ──
+    if (useHalf) {
+      // starting a fresh selection
+      if (!startDate || (startDate && endDate)) {
+        if (!canStartHalf(d)) return;        // afternoon already taken
+        onRangeChange?.({ start: d, end: null });
+        return;
+      }
+      // clicked the same day → restart
+      if (sod(d).getTime() === sod(startDate).getTime()) {
+        onRangeChange?.({ start: d, end: null });
+        return;
+      }
+      // clicked earlier → becomes the new check-in
+      if (d < startDate) {
+        if (!canStartHalf(d)) return;
+        const me = maxEndForStart(d);
+        if ((me && startDate > me) || !canEndHalf(startDate)) { onRangeChange?.({ start: d, end: null }); return; }
+        onRangeChange?.({ start: d, end: startDate });
+        if (!inline) { setOpen(false); setViewMode('days'); }
+        return;
+      }
+      // clicked later → it's the checkout
+      const me = maxEndForStart(startDate);
+      if ((me && d > me) || !canEndHalf(d)) return;
+      onRangeChange?.({ start: startDate, end: d });
+      if (!inline) { setOpen(false); setViewMode('days'); }
+      return;
+    }
+
+    // ── legacy full-night selection (disabledDates Set) ──
     // starting a fresh selection
     if (!startDate || (startDate && endDate)) {
       if (blocked(d)) return;               // a check-in can't be an occupied night
@@ -227,8 +295,10 @@ export function DatePicker({
     : startDate && endDate  ? `${fmtD(startDate)} – ${fmtD(endDate)}`
     : startDate             ? `${fmtD(startDate)} – ...` : '';
 
-  // Hover preview clamps at the next occupied night so the range never spans one.
-  const fbFromStart = mode === 'range' && startDate && !endDate ? firstBlockedAfter(startDate) : null;
+  // Hover preview clamps at the latest valid checkout so the range never spans an occupied night.
+  const fbFromStart = mode === 'range' && startDate && !endDate
+    ? (useHalf ? maxEndForStart(startDate) : firstBlockedAfter(startDate))
+    : null;
   const clampedHover = hoverDate && fbFromStart && hoverDate > fbFromStart ? fbFromStart : hoverDate;
   const rangeEnd = clampedHover && startDate && !endDate ? clampedHover : endDate;
 
@@ -247,15 +317,17 @@ export function DatePicker({
   const calendarInner = (
     <>
       <div className={styles.head}>
-        <button type="button" className={styles.nav} onClick={prevNav}><ChevronLeft size={14}/></button>
+        {!lockMonth && <button type="button" className={styles.nav} onClick={prevNav}><ChevronLeft size={14}/></button>}
         <button
           type="button"
           className={styles.headBtn}
-          onClick={() => setViewMode(vm => vm === 'days' ? 'months' : 'years')}
+          disabled={lockMonth}
+          style={lockMonth ? { cursor: 'default' } : undefined}
+          onClick={lockMonth ? undefined : () => setViewMode(vm => vm === 'days' ? 'months' : 'years')}
         >
           {headLabel}
         </button>
-        <button type="button" className={styles.nav} onClick={nextNav}><ChevronRight size={14}/></button>
+        {!lockMonth && <button type="button" className={styles.nav} onClick={nextNav}><ChevronRight size={14}/></button>}
       </div>
 
       {viewMode === 'days' && (
@@ -265,7 +337,13 @@ export function DatePicker({
             {cells.map((d, i) => {
               if (!d) return <span key={`e${i}`}/>;
               const oob  = outOfBounds(d);
-              const blk  = blocked(d);
+              // Occupancy: full day, or only one half — am = morning/left, pm = afternoon/right.
+              const amB    = useHalf && amBusy(d);
+              const pmB    = useHalf && pmBusy(d);
+              const fullB  = amB && pmB;
+              const blk    = useHalf ? fullB : blocked(d);   // "fully occupied" look
+              const halfAM = useHalf && amB && !fullB;       // check-out morning  → left half
+              const halfPM = useHalf && pmB && !fullB;       // check-in afternoon → right half
               const tod  = sameDay(d, today);
               const sel  = mode==='single' ? sameDay(d,value) : sameDay(d,startDate)||sameDay(d,endDate);
               const iS   = mode==='range' && sameDay(d,startDate);
@@ -275,14 +353,23 @@ export function DatePicker({
               const mkd  = markedDate && !sel && sameDay(d, markedDate);
               // checkout may land ON the next occupied night (adjacency); otherwise blocked is dead.
               const endCandidate = mode==='range' && startDate && !endDate && fbFromStart && sameDay(d, fbFromStart);
-              const cellDisabled = mode==='single'
-                ? oob || blk
-                : (!startDate || endDate)
-                  ? oob || blk
-                  : oob || (blk && !endCandidate);
+              let cellDisabled;
+              if (mode === 'single') {
+                cellDisabled = oob || blk;
+              } else if (useHalf) {
+                if (!startDate || endDate) {
+                  cellDisabled = oob || !canStartHalf(d);                    // picking check-in
+                } else {
+                  const validEnd   = d > startDate && (!fbFromStart || d <= fbFromStart) && canEndHalf(d);
+                  const validStart = d <= startDate && canStartHalf(d);       // restart / earlier check-in
+                  cellDisabled = oob || !(validEnd || validStart);
+                }
+              } else {
+                cellDisabled = (!startDate || endDate) ? oob || blk : oob || (blk && !endCandidate);
+              }
               return (
                 <button key={d.toISOString()} type="button" disabled={cellDisabled || readOnly} tabIndex={readOnly ? -1 : undefined}
-                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', mkd?styles.mkd:''].join(' ')}
+                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', halfAM?styles.hAM:'', halfPM?styles.hPM:'', mkd?styles.mkd:''].join(' ')}
                   onClick={readOnly ? undefined : () => handleDayClick(sod(d))}
                   onMouseEnter={() => { if (!readOnly && mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
                   {d.getDate()}

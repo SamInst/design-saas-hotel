@@ -273,22 +273,6 @@
 .bar:hover  { filter: brightness(1.08); }
 .bar:active { cursor: grabbing; }
 
-/* Meio ticket (meia diária): metade de célula além da borda direita, cor do ticket a 70%. */
-.barHalf {
-  position: absolute;
-  top: 0; bottom: 0;
-  left: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: inherit;
-  opacity: 0.7;
-  border-radius: 0 5px 5px 0;
-  color: #fff;
-  pointer-events: none;
-  box-shadow: inset 1px 0 0 rgba(255,255,255,0.4);
-}
-
 .bar_confirmada {
   background: #10b981;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
@@ -311,7 +295,7 @@
 .bar_hospedado .barBadge { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.35); color: #fff; }
 
 .bar_finalizado {
-  background: #374151; /* mesmo cinza do ATIVO; o esmaecido vem da opacidade da barra */
+  background: #9ca3af;
   box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 .bar_finalizado .barName  { color: rgba(255,255,255,0.95); }
@@ -372,7 +356,7 @@
 .bar_confirmada .barStatusTag, .bar_confirmada .barStatusTagInline { background: color-mix(in srgb, #10b981 70%, #000); }
 .bar_solicitada .barStatusTag, .bar_solicitada .barStatusTagInline { background: color-mix(in srgb, #f59e0b 70%, #000); }
 .bar_hospedado  .barStatusTag, .bar_hospedado  .barStatusTagInline { background: color-mix(in srgb, #374151 70%, #000); }
-.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #374151 70%, #000); }
+.bar_finalizado .barStatusTag, .bar_finalizado .barStatusTagInline { background: color-mix(in srgb, #9ca3af 70%, #000); }
 .bar_cancelado  .barStatusTag, .bar_cancelado  .barStatusTagInline { background: color-mix(in srgb, #ef4444 70%, #000); }
 .bar_orcamento  .barStatusTag, .bar_orcamento  .barStatusTagInline { background: color-mix(in srgb, #6366f1 55%, #000); }
 
@@ -427,10 +411,11 @@
   cursor: pointer; white-space: nowrap; margin-bottom: -1px;
   transition: all 0.12s;
 }
+
 .detailTab:hover { color: var(--violet); }
 .detailTabActive { color: var(--violet) !important; border-bottom-color: var(--violet) !important; font-weight: 600; }
 
-.detailTabContent { height: 500px; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.detailTabContent { height: 440px; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .detailTabContent::-webkit-scrollbar { width: 5px; }
 .detailTabContent::-webkit-scrollbar-track { background: transparent; }
 .detailTabContent::-webkit-scrollbar-thumb { background: rgba(107,114,128,0.28); border-radius: 999px; }
@@ -633,46 +618,6 @@
 .initialsCircle   { width: 32px; height: 32px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 18%, transparent); color: var(--violet); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .initialsCircleSm { width: 24px; height: 24px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); font-size: 9px;  font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-/* ── Gerenciar Pessoas — busca flutuante + lista estilo Cadastros ── */
-.gpSearchSticky {
-  position: sticky;
-  top: -14px;                     /* cancela o padding-top do container de scroll */
-  z-index: 5;
-  margin: -14px -16px 6px;        /* expande até as bordas do container (padding 16px) */
-  padding: 14px 16px 8px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-}
-.gpSearchBar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface-2);
-  transition: border-color 0.15s;
-}
-.gpSearchBar:focus-within { border-color: var(--violet); }
-.gpSearchIcon { color: var(--text-2); flex-shrink: 0; }
-.gpSearchInput {
-  flex: 1; min-width: 0; border: none; background: none; outline: none;
-  font-family: inherit; font-size: 13px; color: var(--text);
-}
-.gpSearchInput::placeholder { color: var(--text-2); }
-.gpSearchClear {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
-  border: none; background: none; color: var(--text-2); cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-}
-.gpSearchClear:hover { background: var(--surface); color: var(--text); }
-
-.gpPersonRow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 11px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface);
-}
-.gpPersonInfo { flex: 1; min-width: 0; }
-.gpPersonName { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gpPersonMeta { font-size: 11px; font-family: var(--font-mono); color: var(--text-2); margin-top: 1px; }
-
 /* ── Financial values ──────────────────────────────────────────────────────── */
 .finRow      { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); padding: 2px 0; }
 .finTotal    { color: var(--text); font-weight: 700; }
@@ -697,10 +642,6 @@
 .dayRoom_hospedado  { border-left-color: #8b5cf6; }
 .dayRoom_finalizado { border-left-color: #0f766e; }
 .dayRoom_cancelado  { border-left-color: #ef4444; }
-/* PERNOITE_FINALIZADO: mesmo cinza do ATIVO, porém mais esmaecido (concluído) */
-.dayRoomDone { border-left-color: #6b7280; opacity: .6; }
-.dayRoomDone:hover { opacity: .82; }
-.dayRoomDone .dayRoomBadge { background: rgba(55, 65, 81, 0.12); color: #374151; }
 .dayRoomBadge { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; font-family: var(--font-mono), monospace; }
 .dayRoomBadge_confirmada { background: rgba(16,185,129,0.12); color: #10b981; }
 .dayRoomBadge_solicitada { background: rgba(245,158,11,0.12); color: #f59e0b; }
@@ -1418,86 +1359,6 @@
 .editPriceTop .priceCard { margin-bottom: 0; }
 .editPriceTop .editCompareGrid { margin-bottom: 0; }
 
-/* ── Edit: inline date-range calendar ───────────────────────────────────────── */
-.editCal { display: flex; flex-direction: column; gap: 10px; }
-
-.editCalTop { display: flex; align-items: center; justify-content: space-between; }
-.editCalTopLabel {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--text-2);
-}
-.editCalClear {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 600; color: var(--text-2);
-  background: transparent; border: none; cursor: pointer; padding: 2px 4px;
-  border-radius: 6px; transition: color 0.12s, background 0.12s;
-}
-.editCalClear:hover { color: #dc2626; background: rgba(220,38,38,0.08); }
-
-/* range summary band */
-.editCalSummary {
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
-  padding: 10px 14px; border-radius: 12px;
-  background: var(--surface-2); border: 1px solid var(--border);
-}
-.editCalLeg { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.editCalLegRight { text-align: right; align-items: flex-end; }
-.editCalLegKey { font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
-.editCalLeg b {
-  font-size: 14px; font-weight: 700; color: var(--text);
-  font-variant-numeric: tabular-nums; white-space: nowrap;
-}
-.editCalArrow {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  color: var(--text-2);
-}
-.editCalNights {
-  font-size: 11px; font-weight: 700; color: var(--violet);
-  white-space: nowrap; letter-spacing: 0.01em;
-}
-
-/* legend under the calendar */
-.editCalLegend {
-  display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center;
-  padding-top: 2px;
-}
-.editCalLegendItem {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 11px; font-weight: 500; color: var(--text-2);
-}
-.editCalLegendItem i { width: 11px; height: 11px; border-radius: 4px; flex-shrink: 0; }
-.lgSel  { background: var(--violet); box-shadow: 0 1px 3px rgba(124,58,237,0.4); }
-.lgBlk  {
-  background:
-    repeating-linear-gradient(-45deg, rgba(220,38,38,0.85) 0 2px, rgba(220,38,38,0.18) 2px 4px);
-}
-.lgFree { background: var(--surface); border: 1.5px solid var(--card-border); }
-
-/* ── Edit: two-column layout (financial left, room+calendar right) ──────────── */
-.editDados { display: flex; flex-direction: column; gap: 14px; }
-.editDadosForm { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.editDadosFin { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
-.editDadosFin .rvFinCard,
-.editPriceTop .rvFinCard { margin: 0; }
-
-@media (min-width: 760px) {
-  .editDados {
-    display: grid;
-    grid-template-columns: minmax(240px, 300px) 1fr;
-    gap: 18px;
-    align-items: start;
-  }
-  .editDadosFin { position: sticky; top: 0; }
-  .detailTabContent { height: 600px; }
-}
-
-/* price breakdown inside the Resumo Financeiro card */
-.rvFinBreakdown {
-  display: flex; flex-direction: column; gap: 8px;
-  padding: 10px 12px 11px;
-  border-top: 1px solid var(--border);
-}
-
 /* ── Month picker ───────────────────────────────────────────────────────────── */
 .monthPickerCard {
   position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
@@ -1552,141 +1413,15 @@
 .spin { animation: spin 0.8s linear infinite; }
 
 /* ── Day Modal stats ─────────────────────────────────────────────────────── */
-/* ── Painel de métricas (DayModal / RoomModal) ────────────────────────────── */
-.dayMetrics {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.metricCard {
-  --mc: var(--violet);
-  position: relative;
-  overflow: hidden;
-  padding: 13px 14px 14px;
-  border-radius: 14px;
-  background: var(--surface);
+.dayStatsStrip {
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 8px 12px; margin-bottom: 8px;
+  background: var(--surface-2); border-radius: var(--radius);
   border: 1px solid var(--border);
-  box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
-  transition: transform .2s cubic-bezier(.2, .7, .3, 1), box-shadow .2s ease, border-color .2s ease;
-  animation: metricIn .45s cubic-bezier(.2, .7, .3, 1) backwards;
-  animation-delay: calc(var(--i, 0) * 65ms);
 }
-/* Brilho de destaque no canto */
-.metricCard::before {
-  content: '';
-  position: absolute;
-  top: -45%; right: -30%;
-  width: 96px; height: 96px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--mc) 0%, transparent 70%);
-  opacity: .15;
-  pointer-events: none;
-}
-/* Barra de acento à esquerda */
-.metricCard::after {
-  content: '';
-  position: absolute;
-  left: 0; top: 13px; bottom: 13px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
-  background: var(--mc);
-  opacity: .9;
-}
-.metricCard:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 26px -10px color-mix(in srgb, var(--mc) 45%, transparent);
-  border-color: color-mix(in srgb, var(--mc) 38%, var(--border));
-}
-.metricHead {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-bottom: 10px;
-}
-.metricIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px; height: 26px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--mc) 15%, transparent);
-  color: var(--mc);
-  flex-shrink: 0;
-}
-.metricLabel {
-  font-size: 10.5px;
-  font-weight: 700;
-  letter-spacing: .085em;
-  text-transform: uppercase;
-  color: var(--text-2);
-}
-.metricValueRow {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-}
-.metricValue {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -.02em;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.metricTotal {
-  font-family: var(--font-mono), ui-monospace, monospace;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
-.metricSub {
-  display: block;
-  margin-top: 7px;
-  font-size: 10.5px;
-  color: var(--text-2);
-}
-.metricBar {
-  margin-top: 10px;
-  height: 4px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--mc) 15%, transparent);
-  overflow: hidden;
-}
-.metricBarFill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--mc) 70%, #fff 30%), var(--mc));
-  animation: metricBarGrow .7s cubic-bezier(.2, .7, .3, 1) .15s backwards;
-}
-/* Variante 2 colunas (RoomModal) e valor em texto (categoria) */
-.dayMetricsRoom { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.metricValueText {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -.01em;
-  color: var(--text);
-}
-.metricViolet  { --mc: #7c3aed; }
-.metricIndigo  { --mc: #4f46e5; }
-.metricAmber   { --mc: #f59e0b; }
-.metricEmerald { --mc: #10b981; }
-
-@keyframes metricIn {
-  from { opacity: 0; transform: translateY(9px) scale(.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes metricBarGrow {
-  from { transform: scaleX(0); transform-origin: left; }
-  to   { transform: scaleX(1); transform-origin: left; }
-}
-@media (max-width: 560px) {
-  .dayMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
+.dayStatChip { flex: 1; text-align: center; font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.dayStatChip b { font-weight: 600; color: var(--text); }
+.dayStatDivider { width: 1px; height: 12px; background: var(--border); flex-shrink: 0; }
 .dayStats {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   padding: 12px 14px; border-bottom: 1px solid var(--border);
@@ -2329,85 +2064,6 @@
 .rvPayAmount { font-size: 13px; font-weight: 700; color: #10b981; white-space: nowrap; align-self: center; }
 .rvPayAmountCancelado { font-size: 13px; font-weight: 600; color: var(--text-2); text-decoration: line-through; white-space: nowrap; align-self: center; }
 
-/* ── Estilo "overnight" — espelha o modal de pernoite da Recepção ────────────── */
-.ovPeriodDark { background: #1e293b; border-radius: 12px; }
-.ovPeriodDark .ovDatesRow {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.08);
-  border-radius: 12px;
-}
-.ovPeriodDark .ovDateLabel  { color: rgba(255,255,255,0.45); }
-.ovPeriodDark .ovDateValue  { color: #fff; }
-.ovPeriodDark .ovDateTime   { color: rgba(255,255,255,0.5); }
-.ovPeriodDark .ovDateArrow  { color: rgba(255,255,255,0.3); }
-.ovPeriodDark .ovNightsCell { border-color: rgba(255,255,255,0.12); }
-.ovPeriodDark .ovNightsNum  { color: #fff; }
-.ovPeriodDark .ovNightsLabel { color: rgba(255,255,255,0.45); }
-
-.ovDatesRow {
-  display: flex; align-items: stretch; gap: 0;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px; flex-shrink: 0;
-}
-.ovDateCell { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-.ovDateCellRight { text-align: right; }
-.ovDateLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
-.ovDateValue { font-size: 14px; font-weight: 700; color: var(--text); }
-.ovDateTime  { font-size: 11px; color: var(--text-2); }
-.ovDateArrow { display: flex; align-items: center; color: var(--text-2); padding: 0 12px; flex-shrink: 0; }
-.ovNightsCell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 0 0 16px; border-left: 1px solid var(--border); margin-left: 4px; min-width: 56px; }
-.ovNightsNum   { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
-.ovNightsLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
-
-.ovFinCard { display: flex; flex-direction: column; gap: 10px; padding: 6px 0 0; }
-.ovFinRow    { display: flex; gap: 10px; justify-content: space-between; padding: 0 4px; }
-.ovFinItem   { display: flex; flex-direction: column; gap: 2px; }
-.ovFinItem:nth-child(2) { align-items: center; }
-.ovFinItem:last-child   { align-items: flex-end; }
-.ovFinLabel  { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
-.ovFinValue  { font-size: 16px; font-weight: 700; color: var(--text); white-space: nowrap; }
-.ovFinPending { color: #d97706; }
-.ovFinPaid    { color: #059669; }
-:root[data-theme="dark"] .ovFinPending { color: #fbbf24; }
-:root[data-theme="dark"] .ovFinPaid    { color: #34d399; }
-.ovFinProgress { display: flex; flex-direction: column; gap: 5px; padding: 0 4px; }
-.ovFinProgressMeta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-2); }
-.ovFinBar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-.ovFinBarFill { height: 100%; background: #059669; border-radius: 3px; transition: width 0.3s ease; }
-:root[data-theme="dark"] .ovFinBarFill { background: #34d399; }
-
-/* Card de grupo no card de preço — total/pago/pendente somados do grupo */
-.ovGroupCard {
-  margin: 0 4px;
-  border: 1px solid color-mix(in srgb, var(--violet) 30%, var(--border));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--violet) 7%, transparent);
-  overflow: hidden;
-}
-.ovGroupHeader {
-  display: flex; align-items: center; gap: 5px;
-  padding: 6px 10px;
-  font-size: 11px; font-weight: 700; color: var(--violet);
-  border-bottom: 1px solid color-mix(in srgb, var(--violet) 18%, var(--border));
-}
-.ovGroupTotals { display: flex; }
-.ovGroupTotalItem {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 7px 4px;
-}
-.ovGroupTotalItem:not(:last-child) { border-right: 1px solid color-mix(in srgb, var(--violet) 14%, var(--border)); }
-.ovGroupTLabel { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-2); }
-.ovGroupTVal   { font-size: 14px; font-weight: 700; color: var(--text); white-space: nowrap; }
-
-.ovPriceInline { display: flex; flex-direction: column; gap: 12px; }
-.ovDiariasCard { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-top: 4px; }
-.ovDiariasCard .ovPriceConsumoTotal { border-top: 1px solid var(--border); font-weight: 600; }
-.ovPriceCardRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 12px; }
-.ovPriceConsumoTotal { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 12px 6px; font-size: 12px; font-weight: 600; color: var(--text); }
-.ovDiariaDesc { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
-.ovDiariaNum  { font-size: 12px; font-weight: 600; color: var(--text); }
-.ovDiariaDate { font-size: 11px; color: var(--text-2); }
-
 /* Observação box */
 .rvObsBox {
   background: var(--surface-2);
@@ -2482,7 +2138,7 @@
 .rvBtn:disabled { opacity: 0.45; cursor: default; }
 
 /* ── Botão único "Ações" + menu (padrão Recepção) ── */
-.rvAcoesWrap { position: relative; margin-left: auto; }
+.rvAcoesWrap { position: relative; }
 .rvAcoesBtn {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 9px 20px; border-radius: 9px; border: none;

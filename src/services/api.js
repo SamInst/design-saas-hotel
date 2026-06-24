@@ -956,7 +956,14 @@ export const recepcaoApi = {
   finalizarLimpeza:      (limpezaId)           => request(`/quarto/limpeza/${limpezaId}/finalizar`, { method: 'PATCH' }),
   criarPernoite:         (body)                => request('/pernoites', { method: 'POST', body }),
   alterarStatusPernoite: (id, status)          => request(`/pernoites/${id}/status`, { method: 'PUT', params: { status } }),
-  adicionarPagamentos:   (id, pags)            => request(`/pernoites/${id}/pagamentos`, { method: 'POST', body: pags }),
+  adicionarPagamentos:   (id, pags, { quartoId, status } = {}) => {
+    // Pagamentos são adicionados à HOSPEDAGEM (não ao pernoite):
+    // POST /hospedagem/{hospedagemId}/pagamentos com body Hospedagem.Request ({ pagamentos }).
+    const params = {};
+    if (quartoId != null) params.quartoId = quartoId;
+    if (status)           params.status   = status;
+    return request(`/hospedagem/${id}/pagamentos`, { method: 'POST', body: { pagamentos: pags }, params });
+  },
   cancelarPagamento:     (uuid, motivo)        => request(`/pernoites/pagamentos/${uuid}`, { method: 'DELETE', body: { motivo_cancelamento: motivo } }),
   adicionarPessoas:      (diariaId, ids)       => request(`/diarias/${diariaId}/pessoas`, { method: 'POST', body: { pessoa_ids: ids } }),
   removerPessoa:         (diariaId, pessoaId)  => request(`/diarias/${diariaId}/pessoas/${pessoaId}`, { method: 'DELETE' }),

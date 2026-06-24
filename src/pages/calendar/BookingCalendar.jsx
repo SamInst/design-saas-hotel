@@ -671,24 +671,71 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // (verificarDisponibilidadeLote bloqueia RESERVA_ATIVA/PERNOITE_ATIVO/DAY_USE_ATIVO, mas NÃO
   // RESERVA_SOLICITADA). Solicitações pendentes, ausentes, cancelados e finalizados não bloqueiam.
   const BLOCKING_STATUSES = useMemo(() => new Set(['confirmada', 'hospedado']), []);
-  const blockedNights = useMemo(() => {
+
+  // The parent only keeps the current+next month in memory, so navigating the inline
+  // calendar to other months would show no occupied nights. Lazily fetch reservations for
+  // any month the user navigates to and accumulate them here.
+  const [extraReservas, setExtraReservas] = useState([]);
+  const fetchedMonthsRef = useRef(new Set());
+  const handleEditMonthChange = useCallback((year, month0) => {
+    const key = `${year}-${month0}`;
+    if (fetchedMonthsRef.current.has(key)) return;
+    fetchedMonthsRef.current.add(key);
+    hospedagemApi.buscar({
+      status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'],
+      mes: month0 + 1,
+      ano: year,
+    }).then((data) => {
+      // /hospedagem/buscar returns a FLAT array of reservations (same as loadReservas).
+      const items = Array.isArray(data) ? data : [];
+      const seen = new Set();
+      const norm = [];
+      for (const r of items) {
+        if (!seen.has(r.id)) { seen.add(r.id); norm.push(normalizeReserva(r)); }
+      }
+      const valid = norm.filter((r) => r.dataInicio);
+      setExtraReservas((prev) => {
+        const known = new Set(prev.map((r) => r.id));
+        return [...prev, ...valid.filter((r) => !known.has(r.id))];
+      });
+    }).catch(() => { fetchedMonthsRef.current.delete(key); }); // allow retry on failure
+  }, []);
+
+  // Occupancy with midday semantics: a stay runs from MIDDAY of check-in to MIDDAY of
+  // check-out. So per calendar day we track which half is taken:
+  //   • check-in day      → afternoon busy  (pm / right half)
+  //   • full middle nights → whole day busy (am + pm)
+  //   • check-out day     → morning busy    (am / left half)
+  // This lets back-to-back reservations share a day (one leaves in the morning, the next
+  // arrives in the afternoon). Map<'yyyy-MM-dd', { am: boolean, pm: boolean }>.
+  const occupancy = useMemo(() => {
     const room = editQuarto[0];
-    const set = new Set();
-    if (!room) return set;
-    for (const res of reservas) {
+    const map = new Map();
+    if (!room) return map;
+    const dkey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const mark = (d, half) => {
+      const k = dkey(d);
+      const cur = map.get(k) || { am: false, pm: false };
+      cur[half] = true;
+      map.set(k, cur);
+    };
+    const seen = new Set();
+    const all = [...reservas, ...extraReservas].filter((r) => (seen.has(r.id) ? false : seen.add(r.id)));
+    for (const res of all) {
       if (String(res.quarto) !== String(room)) continue;
       if (res.id === reserva.id) continue;             // ignore the reservation being edited
       if (!BLOCKING_STATUSES.has(res.status)) continue; // ignora solicitações/ausentes/etc.
       if (!res.dataInicio || !res.dataFim) continue;
-      const cur = new Date(res.dataInicio + 'T00:00:00');
-      const end = new Date(res.dataFim    + 'T00:00:00'); // checkout day is free (exclusive)
-      while (cur < end) {
-        set.add(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
-        cur.setDate(cur.getDate() + 1);
-      }
+      const start = new Date(res.dataInicio + 'T00:00:00');
+      const end   = new Date(res.dataFim    + 'T00:00:00');
+      if (!(start < end)) continue;
+      mark(start, 'pm');                               // check-in: afternoon busy
+      const cur = new Date(start); cur.setDate(cur.getDate() + 1);
+      while (cur < end) { mark(cur, 'am'); mark(cur, 'pm'); cur.setDate(cur.getDate() + 1); } // full nights
+      mark(end, 'am');                                 // check-out: morning busy
     }
-    return set;
-  }, [reservas, editQuarto, reserva.id, BLOCKING_STATUSES]);
+    return map;
+  }, [reservas, extraReservas, editQuarto, reserva.id, BLOCKING_STATUSES]);
 
   // Fetch original price once when editing starts
   useEffect(() => {
@@ -984,13 +1031,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <DatePicker
                   inline mode="range"
                   startDate={editCheckin} endDate={editCheckout}
-                  disabledDates={blockedNights}
+                  occupancy={occupancy}
+                  minDate={new Date()}
+                  onMonthChange={handleEditMonthChange}
                   onRangeChange={({ start, end }) => { setEditCheckin(start); setEditCheckout(end); }}
                 />
 
                 <div className={styles.editCalLegend}>
                   <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> Selecionado</span>
                   <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> Ocupado</span>
+                  <span className={styles.editCalLegendItem}><i className={styles.lgHalf} /> Entrada/saída (meio-dia)</span>
                   <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> Disponível</span>
                 </div>
               </div>
@@ -4553,6 +4603,40 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
               </div>
             )}
 
+            {/* ── Pagamento único section (logo abaixo do seletor) ── */}
+            {!isOrcamento && !isSolicitacao && isMultiRoom && pagModo === 'unico' && (
+              <div className={styles.step3PayArea} style={{ marginTop: 8, marginBottom: 8 }}>
+                <div className={styles.step3PagLabel}>Pagamento</div>
+                <div className={styles.step3PayHeader}>
+                  <button className={styles.step3AddPagBtn} onClick={() => setShowPagModal(true)}>
+                    <Plus size={11} /> Adicionar pagamento
+                  </button>
+                </div>
+                {pagUnico.length === 0
+                  ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
+                  : pagUnico.map((p) => {
+                      const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
+                      return (
+                        <div key={p._localId} className={styles.step3PagRow}>
+                          <div className={styles.step3PagRowTop}>
+                            <span className={styles.step3PagDesc}>{p.descricao || tipDesc}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                              <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
+                              <button type="button" className={styles.removeIconBtn}
+                                onClick={() => setPagUnico((prev) => prev.filter((x) => x._localId !== p._localId))}>
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className={styles.step3PagMeta}>{p._criadoEm} · {tipDesc}</div>
+                          {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
+                        </div>
+                      );
+                    })
+                }
+              </div>
+            )}
+
             {/* ── Períodos + quartos + hóspedes ── */}
             {displayPeriodos.map((p, pi) => {
               const ci = p.checkin ? formatDate(p.checkin) : checkinStr;
@@ -4714,40 +4798,6 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
                 </div>
               );
             })}
-
-            {/* ── Pagamento único section ── */}
-            {!isOrcamento && !isSolicitacao && isMultiRoom && pagModo === 'unico' && (
-              <div className={styles.step3PayArea} style={{ marginTop: 8 }}>
-                <div className={styles.step3PagLabel}>Pagamento</div>
-                <div className={styles.step3PayHeader}>
-                  <button className={styles.step3AddPagBtn} onClick={() => setShowPagModal(true)}>
-                    <Plus size={11} /> Adicionar pagamento
-                  </button>
-                </div>
-                {pagUnico.length === 0
-                  ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
-                  : pagUnico.map((p) => {
-                      const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
-                      return (
-                        <div key={p._localId} className={styles.step3PagRow}>
-                          <div className={styles.step3PagRowTop}>
-                            <span className={styles.step3PagDesc}>{p.descricao || tipDesc}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-                              <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
-                              <button type="button" className={styles.removeIconBtn}
-                                onClick={() => setPagUnico((prev) => prev.filter((x) => x._localId !== p._localId))}>
-                                <Trash2 size={11} />
-                              </button>
-                            </div>
-                          </div>
-                          <div className={styles.step3PagMeta}>{p._criadoEm} · {tipDesc}</div>
-                          {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
-                        </div>
-                      );
-                    })
-                }
-              </div>
-            )}
 
           </div>
         );
@@ -5829,7 +5879,7 @@ export default function BookingCalendar() {
         <SolicitacoesModal onClose={() => setShowSolicitacoes(false)}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {selectedReserva && <ReservaModal reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
+      {selectedReserva && <ReservaModal key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
 
       {/* ── Multi-payment selection panel ── */}
       {pagamentoModoAtivo && (

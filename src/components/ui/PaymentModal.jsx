@@ -191,6 +191,20 @@ export function PaymentModal({
     }
   };
 
+  // ── 100% quick-fill ──────────────────────────────────────────
+  const total100 = valorTotal != null && valorTotal > 0 ? Math.round(valorTotal * 100) / 100 : null;
+  const is100    = total100 != null && valorNum > 0 && Math.abs(valorNum - total100) < 0.005;
+  const aplicar100 = (checked) => {
+    if (checked && total100 != null) {
+      setValor(maskBRL(String(Math.round(total100 * 100))));
+      setDescricao(quartoNumero ? `PAGAMENTO DE 100% PARA O QUARTO ${quartoNumero}` : 'PAGAMENTO DE 100%');
+      if (titularNome) setNomePagador(titularNome.toUpperCase());
+    } else {
+      setValor('');
+      setDescricao('');
+    }
+  };
+
   const valorFinal = desconto
     ? desconto.porcentagem !== undefined
       ? Math.max(0, valorNum * (1 - desconto.porcentagem / 100))
@@ -315,11 +329,21 @@ export function PaymentModal({
               )}
             </FormField>
 
-            {metade != null && (
-              <label className={styles.checkRow}>
-                <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
-                <span>Pagamento de 50% <b>({fmtBRL(metade)})</b></span>
-              </label>
+            {(metade != null || total100 != null) && (
+              <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                {metade != null && (
+                  <label className={styles.checkRow}>
+                    <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
+                    <span>Pagamento de 50% <b>({fmtBRL(metade)})</b></span>
+                  </label>
+                )}
+                {total100 != null && (
+                  <label className={styles.checkRow}>
+                    <input type="checkbox" checked={is100} onChange={e => aplicar100(e.target.checked)} />
+                    <span>Pagamento de 100% <b>({fmtBRL(total100)})</b></span>
+                  </label>
+                )}
+              </div>
             )}
 
             <div className={styles.rowGrid}>

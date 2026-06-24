@@ -22,7 +22,7 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './overviewMocks';
-import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './gerarVoucherHospedagem';
 import styles from './OverviewManagement.module.css';
 
@@ -604,6 +604,10 @@ export default function OverviewManagement() {
   const [savingGd, setSavingGd]                         = useState(false);
   const [gdRemoverConfirm, setGdRemoverConfirm]         = useState(null); // { diariaIdx, diariaNum }
   const gdDiariaListRef                                 = useRef(null);
+  // Diária selecionada para o calendário de disponibilidade (espelha o calendário do "Editar Reserva").
+  const [gdSelDiariaIdx, setGdSelDiariaIdx]             = useState(null);
+  const [gdBusy, setGdBusy]                             = useState(null); // Map<'yyyy-MM-dd', {am,pm}> | null
+  const [gdBusyLoading, setGdBusyLoading]              = useState(false);
 
   // Trocar Quarto modal
   const [showTrocarQuarto, setShowTrocarQuarto]   = useState(false);
@@ -1360,8 +1364,54 @@ export default function OverviewManagement() {
   // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
   const openGerenciarDiarias = () => {
     setGdStartDate(null); setGdEndDate(null); setGdDiariaPendentes([]);
+    // Por padrão, a diária atual (a de hoje) já vem selecionada para o calendário.
+    const sv = selectedRoom?.servico;
+    const atual = (sv?.diarias ?? []).find((d) => d.num === (sv.diariaAtual || 1))
+      ?? (sv?.diarias ?? [])[ (sv?.diarias?.length ?? 1) - 1 ]
+      ?? null;
+    setGdSelDiariaIdx(atual ? atual.idx : null);
     setShowGerenciarDiarias(true);
   };
+
+  // ── Disponibilidade do quarto (ocupação meia-diária) p/ o calendário ──────────
+  // Espelha a ocupação do calendário do "Editar Reserva": pernoite/reserva de OUTRAS
+  // hospedagens marcam o quarto (entrada à tarde / saída de manhã / noites cheias).
+  const GD_BLOCKING = ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'DAY_USE_ATIVO'];
+  useEffect(() => {
+    if (!showGerenciarDiarias || !selectedRoom?.id) { setGdBusy(null); return; }
+    const roomId = selectedRoom.id;
+    const ownId = selectedRoom.servico?.id;
+    let cancelled = false;
+    setGdBusyLoading(true);
+    setGdBusy(null);
+    const parseBr = (s) => (s ? displayToDate(String(s).split(' ')[0]) : null);
+    hospedagemApi.buscarPorQuarto(roomId, { periodo: 'proximas', size: 200 })
+      .then((res) => {
+        if (cancelled) return;
+        const list = res?.content ?? (Array.isArray(res) ? res : []);
+        const map = new Map();
+        const mark = (d, half) => {
+          const k = dateToISO(d);
+          const cur = map.get(k) || { am: false, pm: false };
+          cur[half] = true;
+          map.set(k, cur);
+        };
+        list.forEach((h) => {
+          if (h.id === ownId || !GD_BLOCKING.includes(h.status)) return;
+          const ci = parseBr(h.data_hora_checkin);
+          const co = parseBr(h.data_hora_checkout);
+          if (!ci || !co || !(ci < co)) return;
+          mark(ci, 'pm');                              // check-in: tarde ocupada
+          const cur = new Date(ci); cur.setDate(cur.getDate() + 1);
+          while (cur < co) { mark(cur, 'am'); mark(cur, 'pm'); cur.setDate(cur.getDate() + 1); }
+          mark(co, 'am');                              // check-out: manhã ocupada
+        });
+        setGdBusy(map);
+      })
+      .catch(() => { if (!cancelled) setGdBusy(new Map()); })
+      .finally(() => { if (!cancelled) setGdBusyLoading(false); });
+    return () => { cancelled = true; };
+  }, [showGerenciarDiarias, selectedRoom?.id]); // eslint-disable-line
 
   const handleAdicionarDiaria = (dataInicio, dataFim) => {
     if (!dataInicio || !dataFim) { notify('Preencha o período da nova diária.', 'error'); return; }
@@ -3878,6 +3928,12 @@ export default function OverviewManagement() {
           const [dd, mm, yyyy] = datePart.split('/');
           return new Date(+yyyy, +mm - 1, +dd);
         })() : null;
+        // Calendário de disponibilidade (espelha o "Editar Reserva"): aparece ao selecionar a diária.
+        const dPart = (s) => (s ? String(s).split(' ')[0] : '');
+        const selDiaria = diarias.find((d) => d.idx === gdSelDiariaIdx) ?? null;
+        const selStart = selDiaria ? displayToDate(dPart(selDiaria.dataInicio)) : null;
+        const selEnd = selDiaria ? displayToDate(dPart(selDiaria.dataFim)) : null;
+        const gdPct = sv.valorTotal > 0 ? Math.min(100, Math.round((sv.totalPago || 0) / sv.valorTotal * 100)) : 0;
         return (
           <Modal
             open
@@ -3889,6 +3945,41 @@ export default function OverviewManagement() {
             }
           >
             <div className={styles.formStack}>
+              {/* ── Resumo Financeiro (espelhado do "Editar Reserva") ── */}
+              <div className={styles.gdFinCard}>
+                <div className={styles.gdFinHeader}>
+                  <DollarSign size={13} className={styles.gdFinIcon} />
+                  <span className={styles.gdFinTitle}>Resumo Financeiro</span>
+                </div>
+                <div className={styles.gdFinRow}>
+                  <div className={styles.gdFinItem}>
+                    <span className={styles.gdFinLabel}>Valor Total</span>
+                    <span className={styles.gdFinValue}>{fmtBRL(sv.valorTotal)}</span>
+                  </div>
+                  <div className={styles.gdFinItem}>
+                    <span className={styles.gdFinLabel}>Total Pago</span>
+                    <span className={[styles.gdFinValue, styles.gdFinPaid].join(' ')}>{fmtBRL(sv.totalPago || 0)}</span>
+                  </div>
+                  <div className={styles.gdFinItem}>
+                    <span className={styles.gdFinLabel}>Pendente</span>
+                    <span className={[styles.gdFinValue, (sv.pagamentoPendente || 0) > 0 ? styles.gdFinPending : styles.gdFinPaid].join(' ')}>
+                      {fmtBRL(sv.pagamentoPendente || 0)}
+                    </span>
+                  </div>
+                </div>
+                {sv.valorTotal > 0 && (
+                  <div className={styles.gdFinProgress}>
+                    <div className={styles.gdFinProgressMeta}>
+                      <span>Progresso de pagamento</span>
+                      <span>{gdPct}%</span>
+                    </div>
+                    <div className={styles.gdFinBar}>
+                      <div className={styles.gdFinBarFill} style={{ width: `${gdPct}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Button variant="primary" onClick={() => {
                 if (!minDataDiaria) { notify('Nenhuma diária registrada.', 'error'); return; }
                 const fim = new Date(minDataDiaria);
@@ -3906,8 +3997,12 @@ export default function OverviewManagement() {
                       const isCurrent = d.num === atualNum;
                       const isPast = d.num < atualNum;
                       const canRemove = d.num >= atualNum;
+                      const isSel = d.idx === gdSelDiariaIdx;
                       return (
-                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}>
+                        <div key={d.idx}
+                          className={[styles.gdDiariaItem, styles.gdDiariaItemClickable, isSel ? styles.gdDiariaItemSel : '', isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}
+                          onClick={() => setGdSelDiariaIdx(d.idx)}
+                          title="Ver disponibilidade desta diária">
                           <div className={styles.gdDiariaItemBody}>
                             <div className={styles.gdDiariaTopRow}>
                               <div className={styles.gdDiariaLeftGroup}>
@@ -3919,7 +4014,7 @@ export default function OverviewManagement() {
                             <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
                           </div>
                           {canRemove && !isCurrent && (
-                            <button className={styles.removeBtn} onClick={() => setGdRemoverConfirm({ diariaIdx: d.idx, diariaNum: d.num })} disabled={savingGd} title="Remover diária">
+                            <button className={styles.removeBtn} onClick={(e) => { e.stopPropagation(); setGdRemoverConfirm({ diariaIdx: d.idx, diariaNum: d.num }); }} disabled={savingGd} title="Remover diária">
                               <Trash2 size={13} />
                             </button>
                           )}
@@ -3946,6 +4041,44 @@ export default function OverviewManagement() {
                   </div>
                 )
               }
+
+              {/* ── Calendário de disponibilidade (espelha o "Editar Reserva") ──
+                   Aparece ao selecionar a diária; mostra as datas ocupadas do quarto. */}
+              {selDiaria && (
+                <div className={styles.gdEditCal}>
+                  <div className={styles.gdEditCalTop}>
+                    <span className={styles.gdEditCalTopLabel}>Disponibilidade · Diária {selDiaria.num}</span>
+                    {gdBusyLoading && <Loader2 size={12} className={styles.spin} />}
+                  </div>
+                  <div className={styles.gdEditCalSummary}>
+                    <div className={styles.gdEditCalLeg}>
+                      <span className={styles.gdEditCalLegKey} style={{ color: 'var(--emerald)' }}>Check-in</span>
+                      <b>{dPart(selDiaria.dataInicio) || '—'}</b>
+                    </div>
+                    <div className={styles.gdEditCalArrow}>
+                      <svg viewBox="0 0 24 8" width="34" height="8" fill="none"><path d="M0 4h22m0 0l-4-3.5M22 4l-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+                    <div className={[styles.gdEditCalLeg, styles.gdEditCalLegRight].join(' ')}>
+                      <span className={styles.gdEditCalLegKey} style={{ color: '#f97316' }}>Check-out</span>
+                      <b>{dPart(selDiaria.dataFim) || '—'}</b>
+                    </div>
+                  </div>
+                  <DatePicker
+                    key={gdSelDiariaIdx}
+                    inline readOnly mode="range"
+                    startDate={selStart} endDate={selEnd}
+                    occupancy={gdBusy}
+                    onRangeChange={() => {}}
+                  />
+                  <div className={styles.gdEditCalLegend}>
+                    <span className={styles.gdEditCalLegendItem}><i className={styles.gdLgSel} /> Diária</span>
+                    <span className={styles.gdEditCalLegendItem}><i className={styles.gdLgBlk} /> Ocupado</span>
+                    <span className={styles.gdEditCalLegendItem}><i className={styles.gdLgHalf} /> Entrada/saída (meio-dia)</span>
+                    <span className={styles.gdEditCalLegendItem}><i className={styles.gdLgFree} /> Disponível</span>
+                  </div>
+                </div>
+              )}
+
               {gdDiariaPendentes.length > 0 && (
                 <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
                   <Button variant="secondary" onClick={() => setGdDiariaPendentes([])} style={{ flex: 1 }}>Cancelar</Button>

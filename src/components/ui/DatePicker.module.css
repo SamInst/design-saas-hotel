@@ -118,6 +118,28 @@
 }
 .blk.hovE { background:rgba(124,58,237,.22) !important; color:var(--violet) !important; }
 
+/* ── Half-day occupancy (midday check-in / check-out) ──
+   The stay runs from midday(check-in) to midday(check-out), so a boundary day is only
+   half-occupied: check-out mornings paint the LEFT half, check-in afternoons the RIGHT half.
+   These days stay selectable (the free half can host a back-to-back reservation). */
+.hAM, .hPM {
+  background-image:
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, #dc2626 16%, transparent) 0 4px,
+      transparent 4px 7px
+    );
+  background-repeat: no-repeat;
+  background-size: 50% 100%;
+}
+.hAM { background-position: left center; }   /* check-out morning → left half */
+.hPM { background-position: right center; }  /* check-in afternoon → right half */
+/* both halves busy from different reservations → behave like a full day */
+.hAM.hPM { background-size: 100% 100%; }
+/* selection / hover overlays win over the half tint */
+.hAM.sel, .hPM.sel, .hAM.rS, .hPM.rS, .hAM.rE, .hPM.rE,
+.hAM.inR, .hPM.inR, .hAM.hovE, .hPM.hovE { background-image: none; }
+
 /* ── Inline (embedded, real-time) variant ── */
 .inline {
   display:flex; flex-direction:column; gap:6px; width:100%;

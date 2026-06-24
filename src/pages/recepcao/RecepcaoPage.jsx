@@ -14,7 +14,7 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { DatePicker }               from '../../components/ui/DatePicker';
 import { TimeInput }                from '../../components/ui/TimeInput';
 import { PaymentModal }             from '../../components/ui/PaymentModal';
-import { PriceAdjustmentModal, novoPrecoToState, computeAdjustedTotal, describeAdjustment } from '../../components/ui/PriceAdjustmentModal';
+import { PriceAdjustmentModal, novoPrecoToState } from '../../components/ui/PriceAdjustmentModal';
 import { Notification }             from '../../components/ui/Notification';
 import {
   overviewApi,
@@ -23,9 +23,8 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './shared/overviewApi';
-import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
-import { ReservaModal, normalizeReserva } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -33,7 +32,6 @@ import EncerrarModal        from './dayuse/modals/EncerrarModal';
 import DescontoModal        from './pernoites/modals/DescontoModal';
 import ConsumoModal         from './pernoites/modals/ConsumoModal';
 import AtribuirLimpezaModal from './pernoites/modals/AtribuirLimpezaModal';
-import GerenciarDiariasModal from './pernoites/modals/GerenciarDiariasModal';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtBRL = (v) =>
@@ -67,27 +65,6 @@ const displayToDate = (s) => {
 };
 const isoToDate = (s) => s ? new Date(s.split('T')[0] + 'T12:00:00') : null;
 const dateToISO = (d) => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
-
-// Idade a partir de "dd/MM/yyyy" (ou ISO); null se desconhecida → conta como adulto.
-const _ageFromBr = (dn) => {
-  if (!dn) return null;
-  const iso = /^\d{2}\/\d{2}\/\d{4}$/.test(dn) ? dn.split('/').reverse().join('-') : dn;
-  const d = new Date(iso);
-  if (isNaN(d)) return null;
-  const now = new Date();
-  let a = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
-  return a;
-};
-const svOccupancy = (hospedes) => {
-  let adultos = 0, criancas = 0;
-  (hospedes || []).forEach((h) => {
-    const age = _ageFromBr(h.dataNascimento);
-    if (age != null && age < 18) criancas += 1; else adultos += 1;
-  });
-  return { adultos, criancas };
-};
 
 function calcElapsedSeconds(dataUso, horaEntrada, horaSaida = null) {
   if (!dataUso || !horaEntrada) return 0;
@@ -513,11 +490,6 @@ export default function RecepcaoPage() {
 
   // Filters 2
   const [filterTipoOcupacao, setFilterTipoOcupacao] = useState('');
-  const [groupByGroup, setGroupByGroup] = useState(false);
-  const [pagModoAtivo, setPagModoAtivo] = useState(false);            // modo seleção p/ pagamento múltiplo
-  const [selectedOvernights, setSelectedOvernights] = useState(new Set()); // ids de hospedagem (pernoite)
-  const [showPagMulti, setShowPagMulti] = useState(false);
-  const [pagMultiSaving, setPagMultiSaving] = useState(false);
   const [filterDateStart, setFilterDateStart]       = useState(null);
   const [filterDateEnd, setFilterDateEnd]           = useState(null);
   const [dateGroupCollapsed, setDateGroupCollapsed] = useState({});
@@ -532,87 +504,11 @@ export default function RecepcaoPage() {
 
   // Add Quarto
   const [showAddQuarto, setShowAddQuarto] = useState(false);
-  const [savingRoom, setSavingRoom] = useState(false);
-  // "Adicionar/Editar Quarto" — a descrição é o campo principal; os tipos de ocupação são
-  // um multi-select cujos itens (em MAIÚSCULAS) são mesclados na própria descrição.
-  const blankRoomForm = () => ({
-    id: null, numero: '', categoriaId: '', descricao: '',
-    quantidade_pessoas: '', casal: '', solteiro: '', beliche: '', rede: '',
-    status: 'DISPONIVEL', editing: false,
-  });
-  const [roomForm, setRoomForm] = useState(blankRoomForm());
-  const setRF = (k, v) => setRoomForm((f) => ({ ...f, [k]: v }));
-  const addRoomTokens = (roomForm.descricao || '').split('·').map((t) => t.trim()).filter(Boolean);
-  const toggleAddRoomTipo = (t) => {
-    const TT = t.toUpperCase();
-    setRoomForm((f) => {
-      const toks = (f.descricao || '').split('·').map((s) => s.trim()).filter(Boolean);
-      const next = toks.includes(TT) ? toks.filter((x) => x !== TT) : [...toks, TT];
-      return { ...f, descricao: next.join(' · ') };
-    });
-  };
-  const closeAddQuarto = () => { setShowAddQuarto(false); setRoomForm(blankRoomForm()); };
-  // Sugestão do número: o seguinte ao maior número de quarto existente.
-  const nextRoomNumero = String(
-    quartos.reduce((m, q) => Math.max(m, parseInt(q.numero, 10) || 0), 0) + 1,
-  ).padStart(2, '0');
-  const openAddQuarto = () => { setRoomForm({ ...blankRoomForm(), numero: nextRoomNumero }); setShowAddQuarto(true); };
-  const openEditQuarto = async (room) => {
-    try {
-      const res  = await quartoApi.listar({ id: room.id, size: 1 });
-      const full = res?.content?.[0] ?? (Array.isArray(res) ? res[0] : null) ?? {};
-      setRoomForm({
-        id: room.id,
-        numero: room.numero ?? String(room.id),
-        categoriaId: String(room.categoriaId ?? ''),
-        descricao: (full.descricao ?? room.descricao ?? '').toUpperCase(),
-        quantidade_pessoas: String(full.quantidade_pessoas ?? ''),
-        casal:    full.quantidade_cama_casal     ?? room.camas?.casal    ?? 0,
-        solteiro: full.quantidade_cama_solteiro  ?? room.camas?.solteiro ?? 0,
-        beliche:  full.quantidade_beliche        ?? room.camas?.beliche  ?? 0,
-        rede:     full.quantidade_rede           ?? room.camas?.rede     ?? 0,
-        status:   full.status ?? 'DISPONIVEL',
-        editing: true,
-      });
-      setShowAddQuarto(true);
-      closeDetail();
-    } catch (e) { notify('Erro ao carregar quarto: ' + (e.message || ''), 'error'); }
-  };
-  const handleSaveRoom = async () => {
-    const f = roomForm;
-    if (!f.editing && !String(f.numero).trim()) { notify('Informe o número do quarto.', 'error'); return; }
-    if (!f.categoriaId) { notify('Selecione a categoria.', 'error'); return; }
-    setSavingRoom(true);
-    try {
-      const base = {
-        descricao: (f.descricao || '').toUpperCase(),
-        categoria: { id: Number(f.categoriaId) },
-        quantidade_pessoas: Number(f.quantidade_pessoas) || 1,
-        quantidade_cama_casal:    Number(f.casal)    || 0,
-        quantidade_cama_solteiro: Number(f.solteiro) || 0,
-        quantidade_rede:          Number(f.rede)     || 0,
-        quantidade_beliche:       Number(f.beliche)  || 0,
-      };
-      if (f.editing) {
-        await quartoApi.editar({ id: f.id, ...base, status: f.status });
-        notify(`Quarto ${f.numero} atualizado.`);
-      } else {
-        await quartoApi.criar({ numero: Number(f.numero), ...base });
-        notify(`Quarto ${f.numero} criado.`);
-      }
-      await load();
-      closeAddQuarto();
-    } catch (e) {
-      notify('Erro ao salvar quarto: ' + (e.message || ''), 'error');
-    } finally { setSavingRoom(false); }
-  };
 
   // Detail modal
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [detailTab, setDetailTab]       = useState('dados');
   const [svGuests, setSvGuests]         = useState([]); // enriched with telefone/email
-  const [reservaFull, setReservaFull]   = useState(null); // reserva normalizada (modo reserva completo)
-  const [tiposPagamentoReais, setTiposPagamentoReais] = useState([]); // [{ id, descricao }] do back-end
 
   // Pernoite detail — diária navigation
   const [detailDiariaIdx, setDetailDiariaIdx] = useState(0);
@@ -637,8 +533,6 @@ export default function RecepcaoPage() {
   const [nhCalcLoading, setNhCalcLoading]           = useState(false);
   const [nhShowPriceDetail, setNhShowPriceDetail]   = useState(false);
   const [nhShowPagForm, setNhShowPagForm]           = useState(false);
-  const [nhPriceAdj, setNhPriceAdj]                 = useState(null);   // { mode, sign, value } — Gerenciar Preços
-  const [showNhPreco, setShowNhPreco]               = useState(false);
   const [savingNh, setSavingNh]                     = useState(false);
 
   // Detail — Add Hóspede (pernoite/dayuse existing)
@@ -708,11 +602,6 @@ export default function RecepcaoPage() {
   const [showAddConsumoModal, setShowAddConsumoModal] = useState(false);
   const [consumoSaving, setConsumoSaving]             = useState(false);
 
-  // Sazonalidade por diária (modal do pernoite/hospedado) — calculada via calcularPreco
-  const [stayCalcSaz, setStayCalcSaz] = useState({ id: null, list: [] });
-  // Resumo consolidado do grupo (todas as hospedagens, mesmo finalizadas) — backend.
-  const [groupResumo, setGroupResumo] = useState(null);
-
   // Gerenciar Diárias modal
   const [showGerenciarDiarias, setShowGerenciarDiarias] = useState(false);
   const [gdStartDate, setGdStartDate]                   = useState(null);
@@ -734,7 +623,6 @@ export default function RecepcaoPage() {
 
   // Confirm (finalizar / cancelar)
   const [confirmModal, setConfirmModal] = useState(null); // { action: 'cancelar' }
-  const [cancelMotivo, setCancelMotivo] = useState('');
   const [pendingPayWarning, setPendingPayWarning] = useState(false);
   const [checkoutAntecipado, setCheckoutAntecipado] = useState(false);
   // Atribuir limpeza ao finalizar
@@ -783,13 +671,6 @@ export default function RecepcaoPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Tipos de pagamento reais (para o modal de reserva — "Gerenciar Pagamentos").
-  useEffect(() => {
-    enumApi.tipoPagamento()
-      .then((res) => setTiposPagamentoReais(Array.isArray(res) ? res : (res?.content ?? [])))
-      .catch(() => {});
-  }, []);
-
   // ── Pessoa search for Gerenciar Pessoas modal ──────────────────────────────────
   useEffect(() => {
     if (!showAlterarPessoas || !apSearch || apSearch.length < 2) {
@@ -808,18 +689,13 @@ export default function RecepcaoPage() {
     return () => { cancelled = true; clearTimeout(tid); };
   }, [apSearch, showAlterarPessoas]);
 
-  // ── Tick para Day Uses ativos ────────────────────────────────────────────────
-  // 1s só quando o detalhe de um day-use ativo está aberto (relógio HH:MM:SS).
-  // Senão, apenas 30s para manter o tempo (em minutos) dos cards atualizado — assim
-  // a página não re-renderiza a cada segundo sem motivo (ex.: vendo um pernoite).
+  // ── 1-second tick for active Day Uses ────────────────────────────────────────
   useEffect(() => {
-    const sel = selectedRoom?.servico;
-    const detailClock = sel?.tipo === 'dayuse' && sel.status === DAYUSE_STATUS.ATIVO;
-    const anyActive   = quartos.some((q) => q.servico?.tipo === 'dayuse' && q.servico.status === DAYUSE_STATUS.ATIVO);
-    if (!detailClock && !anyActive) return;
-    const id = setInterval(() => setTick((t) => t + 1), detailClock ? 1000 : 30000);
+    const hasActive = quartos.some((q) => q.servico?.tipo === 'dayuse' && q.servico.status === DAYUSE_STATUS.ATIVO);
+    if (!hasActive) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [quartos, selectedRoom]);
+  }, [quartos]);
 
   // ── Nova Hospedagem computed ──────────────────────────────────────────────────
   const nhPessoas = nhHospedes.length || 1;
@@ -831,14 +707,7 @@ export default function RecepcaoPage() {
     diffDays(nhCheckinDate, nhCheckoutDate),
     [nhCheckinDate, nhCheckoutDate]
   );
-  // Ajuste manual de preço ("Gerenciar Preços") no novo pernoite — espelha a reserva.
-  const nhBaseDiarias = (nhCalc?.detalhes || []).map((d) => ({ valor: d.valor_final ?? 0 }));
-  const nhBaseTotal   = nhBaseDiarias.length
-    ? nhBaseDiarias.reduce((s, d) => s + d.valor, 0)
-    : (nhCalc?.valor_total ?? (nhPrecoDiaria * nhTotalDias));
-  const nhAdjResult = nhPriceAdj ? computeAdjustedTotal({ baseTotal: nhBaseTotal, baseDiarias: nhBaseDiarias, ...nhPriceAdj }) : null;
-  const nhTotalHosp  = nhAdjResult ? nhAdjResult.valorTotal : nhBaseTotal;
-  const nhNovoPreco  = (nhPriceAdj && nhAdjResult) ? { ...nhAdjResult.requestFields, valor_total: nhAdjResult.valorTotal } : null;
+  const nhTotalHosp  = nhCalc?.valor_total ?? (nhPrecoDiaria * nhTotalDias);
   const nhTotalPago  = nhPagamentos.reduce((s, p) => s + p.valor, 0);
   const nhPendente   = Math.max(0, nhTotalHosp - nhTotalPago);
 
@@ -908,21 +777,6 @@ export default function RecepcaoPage() {
     return [...seen.values()];
   }, [quartos]);
 
-  // Categorias com a lista de quartos (formato exigido pelo ReservaModal em modo reserva).
-  const categoriasFull = useMemo(() => {
-    const m = new Map();
-    quartos.forEach((q) => {
-      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, quartos: [] });
-      m.get(q.categoriaId).quartos.push(q.id);
-    });
-    return [...m.values()];
-  }, [quartos]);
-  const roomDescMapFull = useMemo(() => {
-    const d = {};
-    quartos.forEach((q) => { d[q.id] = q.tipoOcupacao ?? q.descricao ?? ''; });
-    return d;
-  }, [quartos]);
-
   const byCategory = apiCategories.map((cat) => ({
     ...cat,
     rooms:       filteredQuartos.filter((q) => q.categoriaId === cat.id),
@@ -931,50 +785,6 @@ export default function RecepcaoPage() {
     ocupados:    quartos.filter((q) => q.categoriaId === cat.id && [ROOM_STATUS.OCUPADO, ROOM_STATUS.RESERVADO].includes(q.status)).length,
     emServico:   quartos.filter((q) => q.categoriaId === cat.id && [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(q.status)).length,
   }));
-
-  // Agrupamento "Por grupo" — quartos com grupo_id juntos, ordenados pelo id do grupo.
-  const groupSections = useMemo(() => {
-    const withGroup = new Map();
-    const noGroup = [];
-    filteredQuartos.forEach((q) => {
-      const gid = q.servico?.grupoId ?? null;
-      if (gid == null) { noGroup.push(q); return; }
-      if (!withGroup.has(gid)) withGroup.set(gid, []);
-      withGroup.get(gid).push(q);
-    });
-    const sections = [...withGroup.entries()]
-      .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .map(([gid, rooms]) => ({ key: `g-${gid}`, title: `Grupo #${gid}`, rooms }));
-    if (noGroup.length) sections.push({ key: 'no-group', title: 'Sem grupo', rooms: noGroup });
-    return sections;
-  }, [filteredQuartos]);
-
-  // Pernoites selecionados (para o pagamento múltiplo) e seus totais.
-  const selectedRoomsList = useMemo(
-    () => quartos.filter((q) => q.servico?.tipo === 'pernoite' && selectedOvernights.has(q.servico.id)),
-    [quartos, selectedOvernights],
-  );
-  const pagMultiTotal = selectedRoomsList.reduce((s, q) => s + (q.servico?.valorTotal ?? 0), 0);
-  const pagMultiPago  = selectedRoomsList.reduce((s, q) => s + (q.servico?.totalPago ?? 0), 0);
-
-  const handlePagamentoMultiplo = async (payment) => {
-    setPagMultiSaving(true);
-    try {
-      const ids = [...selectedOvernights];
-      const grupos = new Set(selectedRoomsList.map((q) => q.servico?.grupoId).filter((g) => g != null));
-      const grupoUnico = grupos.size === 1 && selectedRoomsList.every((q) => q.servico?.grupoId != null)
-        ? [...grupos][0] : null;
-      if (grupoUnico != null) await hospedagemApi.adicionarPagamentoGrupo(grupoUnico, payment);
-      else                    await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
-      await load();
-      notify(`Pagamento adicionado a ${ids.length} pernoite${ids.length !== 1 ? 's' : ''}!`);
-      exitPagModo();
-    } catch (e) {
-      notify(e?.message ?? 'Erro ao adicionar pagamento.', 'error');
-    } finally {
-      setPagMultiSaving(false);
-    }
-  };
 
   const isDateFilterActive = !!(filterDateStart);
 
@@ -1068,25 +878,6 @@ export default function RecepcaoPage() {
     return () => { cancelled = true; };
   }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reservado: busca a hospedagem completa (GET /hospedagem/{id}) e normaliza — mesmo
-  // objeto/comportamento do modal de reserva do calendário.
-  useEffect(() => {
-    const sv = selectedRoom?.servico;
-    if (!selectedRoom || sv?.tipo !== 'reserva' || !sv?.id) { setReservaFull(null); return; }
-    let cancelled = false;
-    setReservaFull(null);
-    const roomId = selectedRoom.id;
-    hospedagemApi.buscarPorId(sv.id)
-      .then((r) => {
-        if (cancelled || !r) return;
-        const norm = normalizeReserva(r);
-        if (norm.quarto == null) { norm.quarto = roomId; norm.quartoId = roomId; }
-        setReservaFull(norm);
-      })
-      .catch(() => { if (!cancelled) notify('Erro ao carregar reserva.', 'error'); });
-    return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
-
   useEffect(() => {
     if (serviceModal?.type !== 'limpeza') return;
     setFuncLoading(true);
@@ -1102,141 +893,17 @@ export default function RecepcaoPage() {
   // ── Handlers ─────────────────────────────────────────────────────────────────
   const toggleCollapse = (id) => setCollapsed((p) => ({ ...p, [id]: !p[id] }));
 
-  const openDetail = useCallback((room) => {
+  const openDetail = (room) => {
     setSelectedRoom(room);
     setDetailTab('dados');
     setDetailDiariaIdx(Math.max(0, (room.servico?.diariaAtual || 1) - 1));
     setDiariaTab('detalhes');
     setConsumoCart([]);
     setConsumoCartPag(null);
-  }, []);
+  };
 
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
   const closeAcoes  = () => { setOvAcoesOpen(false); setVoucherPicking(false); };
-
-  // ── Seleção para pagamento múltiplo (vários pernoites / por grupo) ──────────────
-  const toggleOvernight = useCallback((room) => {
-    const id = room.servico?.id;
-    if (room.servico?.tipo !== 'pernoite' || id == null) return;
-    setSelectedOvernights((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-  const exitPagModo = useCallback(() => {
-    setPagModoAtivo(false);
-    setSelectedOvernights(new Set());
-    setShowPagMulti(false);
-  }, []);
-
-  // Adapta um quarto (servico de pernoite/reserva) ao formato que o ReservaModal espera.
-  const buildStayReserva = (room, status) => {
-    const sv = room.servico;
-    const brToIso = (s) => { const d = (s || '').split(' ')[0]; const [dd, mm, yy] = d.split('/'); return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : ''; };
-    return {
-      id: sv.id ?? room.id,
-      quarto: room.numero,
-      quartoId: room.numero,
-      categoria: room.categoria ?? '',
-      titularNome: sv.titularNome || `Apartamento ${room.numero}`,
-      funcionario: sv.funcionario?.nome ?? sv.funcionario ?? null,
-      observacao: sv.observacao ?? null,
-      dataInicio: brToIso(sv.chegadaPrevista),
-      dataFim: brToIso(sv.saidaPrevista),
-      chegadaPrevista: sv.chegadaPrevista,
-      saidaPrevista: sv.saidaPrevista,
-      status,
-      hospedes: (svGuests.length ? svGuests : (sv.hospedes || [])).map((h) => ({
-        id: h.id, nome: h.nome, cpf: h.cpf ?? '', telefone: h.telefone ?? '', email: h.email ?? '', dataNascimento: h.dataNascimento ?? '',
-      })),
-      pagamentos: (sv.pagamentos || []).map((p) => ({
-        id: p.id, descricao: p.descricao ?? '', formaPagamento: p.formaPagamento ?? '', nomePagador: p.nomePagador ?? '',
-        valor: p.valor ?? 0, cancelado: p.cancelado ?? false, dataRegistro: p.data ?? p.dataRegistro ?? '', funcionario: p.funcionario?.nome ?? p.funcionario ?? '',
-      })),
-      valorTotal: sv.valorTotal ?? 0,
-      novoPreco: sv.novoPreco ?? null,
-      pessoasOrcamento: [],
-    };
-  };
-  // Calcula a sazonalidade de cada diária do pernoite selecionado (mesma info da Gerenciar Diárias).
-  useEffect(() => {
-    const sv = selectedRoom?.servico;
-    if (!selectedRoom || sv?.tipo !== 'pernoite' || !sv?.diarias?.length) {
-      setStayCalcSaz({ id: null, list: [] });
-      return;
-    }
-    // calcularPreco espera datas no formato dd/MM/yyyy; converte ISO (yyyy-MM-dd) quando necessário.
-    const datas_nascimento = (sv.hospedes || [])
-      .map((h) => h.dataNascimento)
-      .filter(Boolean)
-      .map((dn) => (/^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn));
-    if (datas_nascimento.length === 0) { setStayCalcSaz({ id: sv.id, list: [] }); return; }
-    let cancelled = false;
-    const items = sv.diarias.map((d) => ({
-      fk_quarto: d.quartoId ?? selectedRoom.id,
-      data_entrada: (d.dataInicio || '').split(' ')[0],
-      data_saida: (d.dataFim || '').split(' ')[0],
-      datas_nascimento,
-    }));
-    reservaApi.calcularPreco(items)
-      .then((res) => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: Array.isArray(res) ? res : [res] }); })
-      .catch(() => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: [] }); });
-    return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line
-
-  // Busca o total do grupo (todas as hospedagens do grupo) quando o quarto selecionado está em grupo.
-  useEffect(() => {
-    const gid = selectedRoom?.servico?.grupoId ?? null;
-    if (gid == null) { setGroupResumo(null); return; }
-    let cancelled = false;
-    hospedagemApi.resumoGrupo(gid)
-      .then((r) => {
-        if (cancelled) return;
-        setGroupResumo(r && r.count > 1
-          ? { id: gid, count: r.count, total: r.total, pago: r.pago, pendente: r.pendente }
-          : null);
-      })
-      .catch(() => { if (!cancelled) setGroupResumo(null); });
-    return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.grupoId]); // eslint-disable-line
-
-  const stayDiarias = (sv) => {
-    const { adultos, criancas } = svOccupancy(sv.hospedes || []);
-    const sazList = stayCalcSaz.id === sv.id ? stayCalcSaz.list : [];
-    return (sv.diarias || []).map((d, i) => {
-      const calc = sazList[i];
-      const saz =
-        calc?.sazonalidades_aplicadas?.[0]?.descricao
-        ?? calc?.detalhes?.[0]?.sazonalidade?.descricao
-        ?? null;
-      const partes = [`Diária ${d.num}`, `${adultos} adulto(s)${criancas > 0 ? ` + ${criancas} criança(s)` : ''}`];
-      if (d.meiaDiaria) partes.push('meia diária');
-      return {
-        descricao: partes.join(' · '),
-        valor_final: d.valor ?? 0,
-        ...(saz ? { sazonalidade: { descricao: saz } } : {}),
-      };
-    });
-  };
-
-  // Info do grupo — total/pago/pendente somados (como no modal de grupo das reservas).
-  // Pagamentos de grupo aparecem em vários quartos com o mesmo id → deduplicados.
-  const buildGroupInfo = (room) => {
-    const gid = room.servico?.grupoId ?? null;
-    if (gid == null) return null;
-    const members = quartos.filter((q) => q.servico?.grupoId === gid);
-    if (members.length <= 1) return null;
-    const total = members.reduce((s, q) => s + (q.servico?.valorTotal ?? 0), 0);
-    const seen = new Map();
-    members.forEach((q) => (q.servico?.pagamentos ?? []).forEach((p) => {
-      if (!p.cancelado && !seen.has(p.id)) seen.set(p.id, p);
-    }));
-    const pago = [...seen.values()]
-      .filter((p) => String(p.forma ?? p.formaPagamento ?? '').toUpperCase() !== 'PENDENTE')
-      .reduce((s, p) => s + (p.valor ?? 0), 0);
-    return { id: gid, count: members.length, total, pago, pendente: Math.max(0, total - pago) };
-  };
 
   const openNovoServico = (tipo, room) => {
     setNovoRoom(room);
@@ -1246,7 +913,6 @@ export default function RecepcaoPage() {
       setNhPagamentos([]);
       setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor('');
       setNhCalc(null); setNhCalcLoading(false); setNhShowPriceDetail(false); setNhShowPagForm(false);
-      setNhPriceAdj(null); setShowNhPreco(false);
     } else {
       setNduForm(blankNduForm());
     }
@@ -1293,15 +959,6 @@ export default function RecepcaoPage() {
     finally { setSaving(false); }
   };
 
-  // datetime-local "2026-06-19T14:00" → "19/06/2026 14:00" (formato do back-end)
-  const dtLocalToBr = (s) => {
-    if (!s) return undefined;
-    const [date, time] = s.split('T');
-    if (!date) return undefined;
-    const [y, m, d] = date.split('-');
-    return `${d}/${m}/${y} ${time || '00:00'}`;
-  };
-
   const handleService = async () => {
     if (!serviceModal) return;
     const { type, room } = serviceModal;
@@ -1309,11 +966,7 @@ export default function RecepcaoPage() {
     try {
       let updated;
       if (type === 'limpeza')     updated = await overviewApi.marcarLimpeza(room.id, svcForm);
-      else if (type === 'manutencao') updated = await overviewApi.marcarManutencao(room.id, {
-        ...svcForm,
-        dataHoraInicio: dtLocalToBr(svcForm.dataHoraInicio),
-        dataHoraFim:    dtLocalToBr(svcForm.dataHoraFim),
-      });
+      else if (type === 'manutencao') updated = await overviewApi.marcarManutencao(room.id, svcForm);
       else                         updated = await overviewApi.marcarForaDeServico(room.id, svcForm);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
       notify(`Quarto ${room.numero} → ${updated.status}.`);
@@ -1341,34 +994,28 @@ export default function RecepcaoPage() {
   // ── Criar Pernoite (Nova Hospedagem) ─────────────────────────────────────────
   const handleCriarPernoite = async () => {
     if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify('Preencha as data de chegada e saída.', 'error'); return; }
-    const pessoas = nhHospedes.map((h) => h.id).filter(Boolean);
-    if (pessoas.length === 0) { notify('Adicione ao menos um hóspede.', 'error'); return; }
     setSavingNh(true);
     try {
-      // Horários definidos pela categoria do quarto (fallback 14:00 / 12:00).
-      const chegada = `${dateToDisplay(nhCheckinDate)} ${novoRoom.categoriaCheckin || '14:00'}`;
-      const saida   = `${dateToDisplay(nhCheckoutDate)} ${novoRoom.categoriaCheckout || '12:00'}`;
-      // Cria a hospedagem já ATIVA (pernoite) — POST /hospedagem/pernoite com status PERNOITE_ATIVO.
-      const request = {
-        quarto_id: novoRoom.id,
-        status: 'PERNOITE_ATIVO',
-        data_hora_checkin:  chegada,
-        data_hora_checkout: saida,
-        pessoas,
-        pagamentos: nhPagamentos.map((p) => ({
-          tipo_pagamento: { id: p.tipoPagamentoId },
-          nome_pagador:   p.nomePagador,
-          descricao:      p.descricao || undefined,
-          valor:          p.valor,
-        })),
-        valor_total: nhTotalHosp,
-        ...(nhNovoPreco ? { novo_preco: nhNovoPreco } : {}),
+      const chegada  = `${dateToDisplay(nhCheckinDate)} 14:00`;
+      const saida    = `${dateToDisplay(nhCheckoutDate)} 12:00`;
+      const dias     = Math.max(1, diffDays(nhCheckinDate, nhCheckoutDate));
+      const valorDiaria = calcPrecoDiaria(novoRoom.categoria, nhHospedes.length || 1);
+      const valorTotal  = valorDiaria * dias;
+      const totalPago   = nhPagamentos.reduce((s, p) => s + p.valor, 0);
+      const titular = nhHospedes[0]?.nome || 'Hóspede';
+      const servico = {
+        titularNome: titular, tipoAcomodacao: novoRoom.tipoOcupacao,
+        periodo: `${dateToDisplay(nhCheckinDate)} - ${dateToDisplay(nhCheckoutDate)}`,
+        chegadaPrevista: chegada, saidaPrevista: saida,
+        status: PERNOITE_STATUS.ATIVO, totalDiarias: dias, diariaAtual: 1,
+        valorTotal, totalPago, pagamentoPendente: Math.max(0, valorTotal - totalPago),
+        hospedes: nhHospedes, consumos: [], pagamentos: nhPagamentos, diarias: [],
       };
-      await hospedagemApi.criarPernoite([request]);
-      await load();
-      notify(`Pernoite criado — Apt. ${novoRoom.numero}.`);
+      const updated = await overviewApi.criarPernoite(novoRoom.id, servico);
+      setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
+      notify(`Pernoite criado! ${titular} — Apt. ${novoRoom.numero}.`);
       setNovoModal(null);
-    } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
+    } catch (e) { notify('Erro: ' + e.message, 'error'); }
     finally { setSavingNh(false); }
   };
 
@@ -1462,11 +1109,7 @@ export default function RecepcaoPage() {
     const pernoiteId = selectedRoom.servico?.id;
     setSaving(true);
     try {
-      // Finaliza o pernoite via HospedagemController (PUT /hospedagem/{id}/finalizar[-pendente]).
-      if (pernoiteId) {
-        if (status === 'FINALIZADO_PAGAMENTO_PENDENTE') await hospedagemApi.finalizarPendente(pernoiteId);
-        else await hospedagemApi.finalizar(pernoiteId);
-      }
+      if (pernoiteId) await recepcaoApi.alterarStatusPernoite(pernoiteId, status);
       await recepcaoApi.acionarLimpeza(selectedRoom.id, {
         funcionario: funcId ? { id: Number(funcId) } : undefined,
       });
@@ -1483,23 +1126,6 @@ export default function RecepcaoPage() {
 
   const handleCancelar = async () => {
     if (!selectedRoom) return;
-    const sv = selectedRoom.servico;
-    // Pernoite ativo → cancelar via HospedagemController (PUT /hospedagem/{id}/cancelar).
-    if (sv?.tipo === 'pernoite' && sv?.id) {
-      if (!cancelMotivo.trim()) { notify('Informe o motivo do cancelamento.', 'error'); return; }
-      setSaving(true);
-      try {
-        await hospedagemApi.cancelar(sv.id, { fk_hospedagem: sv.id, motivo_cancelamento: cancelMotivo.trim() });
-        await load();
-        notify('Pernoite cancelado.');
-        setConfirmModal(null);
-        setCancelMotivo('');
-        closeDetail();
-      } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
-      finally { setSaving(false); }
-      return;
-    }
-    // Demais serviços (day use, etc.) — fluxo existente.
     setSaving(true);
     try {
       const updated = await overviewApi.cancelarServico(selectedRoom.id);
@@ -1766,6 +1392,7 @@ export default function RecepcaoPage() {
 
   // ── Gerenciar Diárias handlers ────────────────────────────────────────────────
   const openGerenciarDiarias = () => {
+    setGdStartDate(null); setGdEndDate(null); setGdDiariaPendentes([]);
     setShowGerenciarDiarias(true);
   };
 
@@ -2000,7 +1627,7 @@ export default function RecepcaoPage() {
     if (s.status === ROOM_STATUS.DISPONIVEL) {
       const dispTabs  = [
         { id: 'dados',   label: 'Dados' },
-        { id: 'consumo', label: 'Itens' },
+        { id: 'consumo', label: 'Consumo' },
       ];
       return (
         <>
@@ -2681,7 +2308,7 @@ export default function RecepcaoPage() {
                           <ShoppingCart size={14} /> Gerenciar Consumos
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPreco(true); }}>
-                          <Tag size={14} /> Gerenciar Preços A
+                          <Tag size={14} /> Gerenciar Preços
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
                           <Users size={14} /> Gerenciar Pessoas
@@ -2936,9 +2563,6 @@ export default function RecepcaoPage() {
               <>
                 <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
                 <div className={styles.ovAcoesMenu}>
-                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openEditQuarto(s); }}>
-                    <Pencil size={14} /> Editar Quarto
-                  </button>
                   <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
                     <Sparkles size={14} /> Limpeza
                   </button>
@@ -2946,10 +2570,10 @@ export default function RecepcaoPage() {
                     <Wrench size={14} /> Manutenção
                   </button>
                   <div className={styles.ovAcoesDiv} />
-                  <button className={styles.ovAcoesItem} style={{ color: 'var(--violet)' }} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
+                  <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
                     <BedDouble size={14} /> Novo Pernoite
                   </button>
-                  <button className={styles.ovAcoesItem} style={{ color: 'var(--text-2)', opacity: 0.5, cursor: 'not-allowed' }} disabled title="Em breve">
+                  <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); openNovoServico('dayuse', s); }}>
                     <Clock size={14} /> Novo Day Use
                   </button>
                 </div>
@@ -3110,15 +2734,9 @@ export default function RecepcaoPage() {
   };
 
   // ── Room Row ──────────────────────────────────────────────────────────────
-  // useCallback dá ao componente uma identidade estável entre renders; sem isso,
-  // por ser definido dentro do componente, todos os cards REMONTAM (recriam o DOM)
-  // a cada ação/render da página, causando o "piscar"/atualização constante.
-  const RoomCard = useCallback(({ room, selectMode = false, selected = false, onToggle }) => {
+  const RoomCard = ({ room }) => {
     const sk        = roomStatusKey(room.status);
     const sv        = room.servico;
-    const selectable = sv?.tipo === 'pernoite';
-    // Pernoite com limpeza acionada: card mostra as cores divididas (ocupado + limpeza).
-    const splitClean = sv?.tipo === 'pernoite' && !!room.limpeza;
     const isDuAtivo = sv?.tipo === 'dayuse' && sv.status === DAYUSE_STATUS.ATIVO;
     const elapsed   = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
     const guestCount  = sv?.hospedes?.length ?? 0;
@@ -3134,32 +2752,11 @@ export default function RecepcaoPage() {
       : [];
 
     return (
-      <div
-        className={[
-          styles.roomCard,
-          styles[`roomCard_${sk}`],
-          splitClean ? styles.roomCardSplitClean : '',
-          selectMode && selected ? styles.roomCardSelected : '',
-          selectMode && !selectable ? styles.roomCardDimmed : '',
-        ].join(' ')}
-        onClick={() => { if (selectMode) { onToggle?.(room); } else { openDetail(room); } }}
-      >
-        {selectMode && selectable && (
-          <span className={[styles.roomCardCheck, selected ? styles.roomCardCheckOn : ''].join(' ')}>
-            {selected && <CheckCircle size={16} />}
-          </span>
-        )}
+      <div className={[styles.roomCard, styles[`roomCard_${sk}`]].join(' ')} onClick={() => openDetail(room)}>
         {/* Top row: number + status badge */}
         <div className={styles.roomCardTop}>
           <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
-          {splitClean ? (
-            <span className={styles.statusBadgeSplit}>
-              <span className={[styles.statusSeg, styles.statusSegOcupado].join(' ')}>{room.status}</span>
-              <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>Em Limpeza</span>
-            </span>
-          ) : (
-            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
-          )}
+          <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
         </div>
 
         {/* Content by status */}
@@ -3215,9 +2812,6 @@ export default function RecepcaoPage() {
               {sv.pagamentoPendente > 0 && (
                 <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
               )}
-              {splitClean && room.limpeza?.responsavel && (
-                <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> Limpeza: {room.limpeza.responsavel}</span>
-              )}
             </>
           )}
 
@@ -3265,7 +2859,7 @@ export default function RecepcaoPage() {
         </div>
       </div>
     );
-  }, [openDetail]);
+  };
 
   // ── Hospede search result component ──────────────────────────────────────────
   const HospedeResults = ({ results, onAdd }) =>
@@ -3318,7 +2912,7 @@ export default function RecepcaoPage() {
                 triggerClassName={styles.headerControlField}
               />
             </div>
-            <Button variant="primary" className={styles.headerControlBtn} onClick={openAddQuarto}>
+            <Button variant="primary" className={styles.headerControlBtn} onClick={() => setShowAddQuarto(true)}>
               <Plus size={14} /> Adicionar Quarto
             </Button>
           </div>
@@ -3384,22 +2978,6 @@ export default function RecepcaoPage() {
               )}
             </div>
           </div>
-          <button
-            type="button"
-            className={[styles.filterToggleBtn, groupByGroup ? styles.filterToggleBtnActive : ''].join(' ')}
-            onClick={() => setGroupByGroup((v) => !v)}
-            title="Agrupar por grupo"
-          >
-            <Users size={14} /> Por grupo
-          </button>
-          <button
-            type="button"
-            className={[styles.filterToggleBtn, pagModoAtivo ? styles.filterToggleBtnActive : ''].join(' ')}
-            onClick={() => { if (pagModoAtivo) exitPagModo(); else setPagModoAtivo(true); }}
-            title="Selecionar vários pernoites e lançar um pagamento (por grupo)"
-          >
-            <DollarSign size={14} /> Pagamento múltiplo
-          </button>
         </div>
 
         {/* ── Category / Date groups ── */}
@@ -3422,28 +3000,10 @@ export default function RecepcaoPage() {
                 {!isDateGroupCollapsed(group.date) && (
                   <div className={styles.catBody}>
                     <div className={styles.roomGrid}>
-                      {group.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}
+                      {group.rooms.map((room) => <RoomCard key={room.id} room={room} />)}
                     </div>
                   </div>
                 )}
-              </div>
-            ))
-        ) : groupByGroup ? (
-          /* ── Group view (Por grupo) ── */
-          groupSections.length === 0
-            ? <div className={styles.emptyState}>Nenhum quarto com os filtros aplicados.</div>
-            : groupSections.map((g) => (
-              <div key={g.key} className={styles.catSection}>
-                <div className={styles.catHeader} style={{ cursor: 'default' }}>
-                  <div className={styles.catHeaderLeft}>
-                    <Users size={14} style={{ color: 'var(--text-2)' }} />
-                    <span className={styles.catName}>{g.title}</span>
-                  </div>
-                  <span className={styles.dateGroupCount}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
-                </div>
-                <div className={styles.catBody}>
-                  <div className={styles.roomGrid}>{g.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}</div>
-                </div>
               </div>
             ))
         ) : (
@@ -3467,7 +3027,7 @@ export default function RecepcaoPage() {
                 <div className={styles.catBody}>
                   {cat.rooms.length === 0
                     ? <div className={styles.catEmpty}>Nenhum quarto com os filtros aplicados.</div>
-                    : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}</div>
+                    : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
                   }
                 </div>
               )}
@@ -3479,134 +3039,28 @@ export default function RecepcaoPage() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Detalhe do Quarto
       ═══════════════════════════════════════════════════════ */}
-      {/* Pernoite (overnight) usa o mesmo modal das reservas, mudando só os botões de Ações. */}
-      {selectedRoom && selectedRoom.servico?.tipo === 'pernoite' && (() => {
-        const sv = selectedRoom.servico;
-        const reservaAdapter = buildStayReserva(selectedRoom, 'hospedado');
-        const diariasDetalhes = stayDiarias(sv);
+      {selectedRoom && (() => {
+        const isServiceCard = [ROOM_STATUS.LIMPEZA, ROOM_STATUS.MANUTENCAO, ROOM_STATUS.FORA_DE_SERVICO].includes(selectedRoom.status);
+        const isFullscreen  = ['pernoite', 'reserva'].includes(selectedRoom?.servico?.tipo);
         return (
-          <ReservaModal
-            key={`ov-${sv.id}`}
-            reserva={reservaAdapter}
-            groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
-            onClose={closeDetail}
-            onNotify={notify}
-            categorias={[]}
-            tiposPagamento={tiposPagamentoOv}
-            roomDescMap={{}}
-            overnight={{
-              diariasDetalhes,
-              hasLimpeza:           !!selectedRoom.limpeza,
-              limpezaResponsavel:   selectedRoom.limpeza?.responsavel ?? '',
-              onFinalizarLimpeza:   () => handleFinalizarLimpeza(selectedRoom),
-              onAcionarLimpeza:     () => { closeDetail(); openService('limpeza', selectedRoom); },
-              onGerenciarDiarias:   () => openGerenciarDiarias(),
-              onAdicionarConsumo:   () => setShowGerenciarConsumo(true),
-              onGerenciarPagamentos:() => setShowGerenciarPag(true),
-              onGerenciarPreco:     () => setShowGerenciarPreco(true),
-              onGerenciarPessoas:   () => { setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); },
-              onVoucher:            () => gerarVoucherHospedagem({ quarto: selectedRoom, servico: sv, incluirConsumo: false }),
-              onFinalizar:          () => handleClickFinalizar(),
-              onCancelar:           () => setConfirmModal({ action: 'cancelar' }),
-            }}
-          />
-        );
-      })()}
-
-      {/* Reservado: modal de reserva completo (idêntico ao do calendário). */}
-      {selectedRoom && selectedRoom.servico?.tipo === 'reserva' && (
-        reservaFull ? (
-          <ReservaModal
-            key={`rv-${reservaFull.id}`}
-            reserva={reservaFull}
-            groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
-            allowHospedarAnytime
-            onClose={() => { setReservaFull(null); closeDetail(); }}
-            onNotify={notify}
-            categorias={categoriasFull}
-            roomDescMap={roomDescMapFull}
-            tiposPagamento={tiposPagamentoReais}
-            reservas={[]}
-            onUpdate={async (id, body) => {
-              const upd = await reservaApi.editar(id, body);
-              setReservaFull(normalizeReserva(upd ?? { ...body, id }));
-              await load();
-              notify('Reserva atualizada!');
-            }}
-            onMoverPernoite={async (id) => {
-              try { await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO'); await load(); notify('Hospedagem iniciada.'); }
-              catch (e) { notify('Erro: ' + e.message, 'error'); }
-            }}
-            onCancel={async (id, motivo) => {
-              await reservaApi.cancelar(id, motivo);
-              await load();
-              setReservaFull(null);
-              closeDetail();
-              notify('Reserva cancelada.');
-            }}
-            onAusente={async (id) => {
-              await reservaApi.marcarAusente(id);
-              await load();
-              setReservaFull(null);
-              closeDetail();
-              notify('Reserva marcada como ausente.');
-            }}
-            onSync={(norm) => { setReservaFull(norm); load(); }}
-          />
-        ) : (
-          <Modal open onClose={closeDetail} size="sm" title="Reserva">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
-              <Loader2 size={16} className={styles.spin} /> Carregando reserva...
-            </div>
-          </Modal>
-        )
-      )}
-
-      {selectedRoom && !['pernoite', 'reserva'].includes(selectedRoom.servico?.tipo) && (
         <Modal
           open={!!selectedRoom}
           onClose={closeDetail}
           size="lg"
+          hideHeader={isFullscreen}
           title={renderDetailTitle()}
-          footer={renderDetailFooter()}
+          footer={isFullscreen ? undefined : renderDetailFooter()}
+          containerStyle={isFullscreen
+            ? { height: window.innerWidth <= 980 ? 'min(90vh, 680px)' : 'clamp(480px, 74vh, 640px)', width: 'min(520px, 96vw)', maxWidth: 'min(520px, 96vw)' }
+            : undefined}
+          bodyStyle={isFullscreen
+            ? { padding: 0, gap: 0, display: 'flex', flexDirection: 'column', overflow: window.innerWidth <= 980 ? 'auto' : 'hidden', flex: 1, minHeight: 0 }
+            : undefined}
         >
           {renderDetailContent()}
         </Modal>
-      )}
-
-      {/* ── Barra de seleção — pagamento múltiplo (vários pernoites / por grupo) ── */}
-      {pagModoAtivo && (
-        <div className={styles.selectionPanel}>
-          <span className={styles.selectionCount}>
-            <b>{selectedOvernights.size}</b>
-            <span className={styles.selectionCountSub}>
-              {' '}pernoite{selectedOvernights.size !== 1 ? 's' : ''} selecionado{selectedOvernights.size !== 1 ? 's' : ''}
-            </span>
-          </span>
-          <button
-            className={styles.selectionBtnPrimary}
-            disabled={selectedOvernights.size === 0 || pagMultiSaving}
-            onClick={() => setShowPagMulti(true)}
-          >
-            <DollarSign size={13} /> Adicionar Pagamento
-          </button>
-          <button className={styles.selectionBtnCancel} onClick={exitPagModo}>
-            <X size={13} /> Cancelar
-          </button>
-        </div>
-      )}
-
-      <PaymentModal
-        open={showPagMulti}
-        onClose={() => setShowPagMulti(false)}
-        onConfirm={handlePagamentoMultiplo}
-        tiposPagamento={tiposPagamentoReais}
-        isSubmitting={pagMultiSaving}
-        canAplicarDesconto={false}
-        canDespesaPessoal={false}
-        valorTotal={pagMultiTotal}
-        valorPago={pagMultiPago}
-      />
+        );
+      })()}
 
       <NovoServicoModal
         novoModal={novoModal} setNovoModal={setNovoModal} novoRoom={novoRoom}
@@ -3626,22 +3080,8 @@ export default function RecepcaoPage() {
         saving={saving} handleCriarDayUse={handleCriarDayUse}
         nduForm={nduForm} setNduForm={setNduForm}
         nduHosp={nduHosp} addNduHospede={addNduHospede} remNduHospede={remNduHospede}
-        tiposPagamentoOv={tiposPagamentoReais}
-        onGerenciarPreco={() => setShowNhPreco(true)}
-        priceAdjDesc={nhPriceAdj ? describeAdjustment(nhPriceAdj) : null}
+        tiposPagamentoOv={tiposPagamentoOv}
       />
-
-      {/* Gerenciar Preços — novo pernoite (espelha a reserva) */}
-      {showNhPreco && (
-        <PriceAdjustmentModal
-          open
-          onClose={() => setShowNhPreco(false)}
-          baseTotal={nhBaseTotal}
-          baseDiarias={nhBaseDiarias}
-          initial={nhPriceAdj}
-          onApply={(_result, raw) => setNhPriceAdj(raw)}
-        />
-      )}
 
       <EncerrarModal
         open={encerrarModal && selectedRoom?.servico?.tipo === 'dayuse'}
@@ -3842,18 +3282,6 @@ export default function RecepcaoPage() {
               <FormField label="Responsável">
                 <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
               </FormField>
-              {serviceModal.type === 'manutencao' && (
-                <div className={styles.grid2}>
-                  <FormField label="Início (data e hora)">
-                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraInicio}
-                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
-                  </FormField>
-                  <FormField label="Término (data e hora)">
-                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraFim}
-                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
-                  </FormField>
-                </div>
-              )}
               <FormField label="Descrição">
                 <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
               </FormField>
@@ -3868,79 +3296,59 @@ export default function RecepcaoPage() {
       {showAddQuarto && (
         <Modal
           open
-          onClose={closeAddQuarto}
+          onClose={() => setShowAddQuarto(false)}
           size="sm"
-          title={<><Plus size={15} /> {roomForm.editing ? `Editar Quarto ${roomForm.numero}` : 'Adicionar Quarto'}</>}
+          title={<><Plus size={15} /> Adicionar Quarto</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={closeAddQuarto} disabled={savingRoom}>Cancelar</Button>
-              <Button variant="primary" className={styles.addRoomSaveBtn} onClick={handleSaveRoom} disabled={savingRoom}>
-                {savingRoom ? <><Loader2 size={14} className={styles.spin} /> Salvando...</> : (roomForm.editing ? 'Salvar alterações' : 'Salvar quarto')}
-              </Button>
+              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={() => setShowAddQuarto(false)}>Cancelar</Button>
+              <Button variant="primary" className={styles.addRoomSaveBtn} onClick={() => { notify('Funcionalidade em desenvolvimento.', 'info'); setShowAddQuarto(false); }}>Salvar quarto</Button>
             </div>
           }
         >
           <div className={styles.addRoomModal}>
             <div className={styles.grid2}>
               <FormField label="Número *">
-                <Input className={styles.addRoomField} type="number" value={roomForm.numero}
-                  onChange={(e) => setRF('numero', e.target.value)}
-                  readOnly={roomForm.editing} placeholder={`Ex: ${nextRoomNumero}`} />
+                <Input className={styles.addRoomField} placeholder="Ex: 23" />
               </FormField>
               <FormField label="Categoria *">
-                <Select className={styles.addRoomField} value={roomForm.categoriaId} onChange={(e) => setRF('categoriaId', e.target.value)}>
+                <Select className={styles.addRoomField}>
                   <option value="">Categoria do quarto</option>
-                  {apiCategories.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                  <option>Standard</option>
+                  <option>Luxo</option>
+                  <option>Suíte</option>
                 </Select>
               </FormField>
             </div>
 
-            {/* Descrição (campo principal) + Tipo de Ocupação (multi-select mesclado) */}
             <FormField label="Descrição">
-              <Input
-                className={styles.addRoomField}
-                value={roomForm.descricao}
-                readOnly
-                placeholder="Selecione os tipos de ocupação abaixo..."
-              />
-              <div className={styles.tipoChips}>
-                {TIPOS_OCUPACAO.map((t) => {
-                  const on = addRoomTokens.includes(t.toUpperCase());
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      className={[styles.tipoChip, on ? styles.tipoChipOn : ''].join(' ')}
-                      onClick={() => toggleAddRoomTipo(t)}
-                    >
-                      {on && <Check size={11} />} {t}
-                    </button>
-                  );
-                })}
-              </div>
+              <Input className={styles.addRoomField} placeholder="Descrição do quarto..." />
             </FormField>
 
-            <FormField label="Qtd. máx. de pessoas">
-              <Input className={styles.addRoomField} type="number" min="1" max="10" value={roomForm.quantidade_pessoas}
-                onChange={(e) => setRF('quantidade_pessoas', e.target.value)} placeholder="Ex: 2" />
-            </FormField>
+            <div className={styles.grid2}>
+              <FormField label="Tipo de Ocupação *">
+                <Select className={styles.addRoomField}>
+                  <option value="">Tipo de ocupação</option>
+                  {TIPOS_OCUPACAO.map((t) => <option key={t}>{t}</option>)}
+                </Select>
+              </FormField>
+              <FormField label="Qtd. máx. de pessoas">
+                <Input className={styles.addRoomField} type="number" min="1" max="10" placeholder="Ex: 2" />
+              </FormField>
+            </div>
 
             <div className={styles.addRoomBedsGrid}>
               <FormField label="Camas de casal">
-                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.casal}
-                  onChange={(e) => setRF('casal', e.target.value)} placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
               <FormField label="Camas solteiro">
-                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.solteiro}
-                  onChange={(e) => setRF('solteiro', e.target.value)} placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
               <FormField label="Beliches">
-                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.beliche}
-                  onChange={(e) => setRF('beliche', e.target.value)} placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
               <FormField label="Redes">
-                <Input className={styles.addRoomField} type="number" min="0" value={roomForm.rede}
-                  onChange={(e) => setRF('rede', e.target.value)} placeholder="0" />
+                <Input className={styles.addRoomField} type="number" min="0" placeholder="0" />
               </FormField>
             </div>
           </div>
@@ -4343,15 +3751,125 @@ export default function RecepcaoPage() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Gerenciar Diárias
       ═══════════════════════════════════════════════════════ */}
-      <GerenciarDiariasModal
-        open={showGerenciarDiarias && selectedRoom?.servico?.tipo === 'pernoite'}
-        onClose={() => setShowGerenciarDiarias(false)}
-        hospedagemId={selectedRoom?.servico?.id}
-        roomLabel={selectedRoom?.numero}
-        quartos={quartos}
-        onSaved={load}
-        notify={notify}
-      />
+      {showGerenciarDiarias && selectedRoom?.servico?.tipo === 'pernoite' && (() => {
+        const sv = selectedRoom.servico;
+        const diarias = sv.diarias || [];
+        const atualNum = sv.diariaAtual || 1;
+        const novoTotal = diarias.reduce((s, d) => s + (d.valor || 0), 0) + (parseBRL(gdValor) || 0);
+        const ultimaDiaria = gdDiariaPendentes.length > 0
+          ? gdDiariaPendentes[gdDiariaPendentes.length - 1]
+          : (diarias.length > 0 ? diarias[diarias.length - 1] : null);
+        const minDataDiaria = ultimaDiaria?.dataFim ? (() => {
+          const datePart = ultimaDiaria.dataFim.split(' ')[0]; // "dd/MM/yyyy" only
+          const [dd, mm, yyyy] = datePart.split('/');
+          return new Date(+yyyy, +mm - 1, +dd);
+        })() : null;
+        return (
+          <Modal
+            open
+            onClose={() => setShowGerenciarDiarias(false)}
+            size="md"
+            title={<><RefreshCw size={15} /> Gerenciar Diárias — Apt. {selectedRoom.numero}</>}
+            footer={
+              <div className={styles.footerRight} />
+            }
+          >
+            <div className={styles.formStack}>
+              <Button variant="primary" onClick={() => {
+                if (!minDataDiaria) { notify('Nenhuma diária registrada.', 'error'); return; }
+                const fim = new Date(minDataDiaria);
+                fim.setDate(fim.getDate() + 1);
+                handleAdicionarDiaria(minDataDiaria, fim);
+              }} disabled={savingGd || !minDataDiaria} style={{ width: '100%', marginBottom: 16 }}>
+                {savingGd && <Loader2 size={14} className={styles.spin} />}
+                <Plus size={14} /> Adicionar Diária
+              </Button>
+              {diarias.length === 0 && gdDiariaPendentes.length === 0
+                ? <div className={styles.emptyList}><Calendar size={20} color="var(--text-2)" /><span>Nenhuma diária registrada</span></div>
+                : (
+                  <div className={styles.gdDiariaList} ref={gdDiariaListRef}>
+                    {diarias.map((d) => {
+                      const isCurrent = d.num === atualNum;
+                      const isPast = d.num < atualNum;
+                      const canRemove = d.num >= atualNum;
+                      return (
+                        <div key={d.idx} className={[styles.gdDiariaItem, isCurrent ? styles.gdDiariaItemCurrent : '', isPast ? styles.gdDiariaItemPast : ''].join(' ')}>
+                          <div className={styles.gdDiariaItemBody}>
+                            <div className={styles.gdDiariaTopRow}>
+                              <div className={styles.gdDiariaLeftGroup}>
+                                <span className={styles.gdDiariaNum}>Diária {d.num}</span>
+                                {isCurrent && <span className={styles.gdCurrentTag}>Atual</span>}
+                              </div>
+                              <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
+                            </div>
+                            <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
+                          </div>
+                          {canRemove && !isCurrent && (
+                            <button className={styles.removeBtn} onClick={() => setGdRemoverConfirm({ diariaIdx: d.idx, diariaNum: d.num })} disabled={savingGd} title="Remover diária">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {gdDiariaPendentes.map((d, idx) => (
+                      <div key={`pending-${idx}`} className={styles.gdDiariaItem} style={{ opacity: 0.7, borderColor: 'var(--violet)' }}>
+                        <div className={styles.gdDiariaItemBody}>
+                          <div className={styles.gdDiariaTopRow}>
+                            <div className={styles.gdDiariaLeftGroup}>
+                              <span className={styles.gdDiariaNum} style={{ color: 'var(--violet)' }}>Diária {diarias.length + idx + 1}</span>
+                              <span className={styles.gdCurrentTag} style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--violet)' }}>Pendente</span>
+                            </div>
+                            <span className={styles.gdDiariaVal}>{fmtBRL(d.valor)}</span>
+                          </div>
+                          <span className={styles.gdDiariaDate}>{d.dataInicio} → {d.dataFim}</span>
+                        </div>
+                        <button className={styles.removeBtn} onClick={() => setGdDiariaPendentes((prev) => prev.filter((_, i) => i !== idx))} title="Remover da lista">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )
+              }
+              {gdDiariaPendentes.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                  <Button variant="secondary" onClick={() => setGdDiariaPendentes([])} style={{ flex: 1 }}>Cancelar</Button>
+                  <Button variant="primary" onClick={handleConfirmarDiarias} disabled={savingGd} style={{ flex: 1 }}>
+                    {savingGd && <Loader2 size={14} className={styles.spin} />}
+                    Confirmar {gdDiariaPendentes.length} diária(s)
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL — Confirmação Remover Diária
+      ═══════════════════════════════════════════════════════ */}
+      {gdRemoverConfirm && (
+        <Modal
+          open
+          onClose={() => setGdRemoverConfirm(null)}
+          size="sm"
+          title={<><AlertTriangle size={15} /> Remover Diária</>}
+          footer={
+            <div className={styles.footerRight}>
+              <Button variant="secondary" onClick={() => setGdRemoverConfirm(null)} disabled={savingGd}>Cancelar</Button>
+              <Button variant="danger" onClick={async () => { await handleRemoverDiaria(gdRemoverConfirm.diariaIdx); setGdRemoverConfirm(null); }} disabled={savingGd}>
+                {savingGd && <Loader2 size={14} className={styles.spin} />}
+                Remover
+              </Button>
+            </div>
+          }
+        >
+          <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14 }}>
+            Tem certeza que deseja remover a <strong>Diária {gdRemoverConfirm.diariaNum}</strong>?
+          </p>
+        </Modal>
+      )}
 
       <TrocaQuartoModal
         open={showTrocarQuarto && selectedRoom?.servico?.tipo === 'pernoite'}
@@ -4380,7 +3898,6 @@ export default function RecepcaoPage() {
         checkoutAntecipado={checkoutAntecipado} setCheckoutAntecipado={setCheckoutAntecipado}
         pendingPayWarning={pendingPayWarning} setPendingPayWarning={setPendingPayWarning}
         confirmModal={confirmModal} setConfirmModal={setConfirmModal}
-        cancelMotivo={cancelMotivo} setCancelMotivo={setCancelMotivo}
         selectedRoom={selectedRoom}
         limpezaFuncs={limpezaFuncs} limpezaFuncsLoading={limpezaFuncsLoading}
         limpezaFuncId={limpezaFuncId} setLimpezaFuncId={setLimpezaFuncId}

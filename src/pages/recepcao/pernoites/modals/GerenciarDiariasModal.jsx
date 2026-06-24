@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CalendarDays, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { AlertTriangle, CalendarDays, DollarSign, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { Modal }  from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { Select } from '../../../../components/ui/Input';
@@ -56,7 +56,7 @@ let _rowSeq = 0;
 const nextKey = () => `gd-${++_rowSeq}`;
 
 export default function GerenciarDiariasModal({
-  open, onClose, hospedagemId, roomLabel, quartos = [], onSaved, notify,
+  open, onClose, hospedagemId, roomLabel, quartos = [], onSaved, notify, totalPago = 0,
 }) {
   const [loading, setLoading]   = useState(false);
   const [saving, setSaving]     = useState(false);
@@ -66,6 +66,8 @@ export default function GerenciarDiariasModal({
   const [mainRoomId, setMainRoomId] = useState(null); // quarto do pernoite (calendário de disponibilidade)
   const [calcLoading, setCalcLoading] = useState(false);
   const [busyByRoom, setBusyByRoom]   = useState({});
+  const [occByRoom, setOccByRoom]     = useState({}); // Map<'yyyy-MM-dd',{am,pm}> por quarto (calendário)
+  const [selRowKey, setSelRowKey]     = useState(null); // diária destacada no calendário (à direita)
   const [confirmRemove, setConfirmRemove] = useState(null); // { key, num }
   const defaultRef = useRef({ roomId: null });
   const listRef = useRef(null);
@@ -105,6 +107,12 @@ export default function GerenciarDiariasModal({
           })
           .sort((a, b) => a.checkin - b.checkin);
         setRows(diarias);
+        // Por padrão, a diária atual (a de hoje) já vem destacada no calendário.
+        const todayD = dateOnly(new Date());
+        const cur = diarias.find((r) => dateOnly(r.checkin) <= todayD && todayD < dateOnly(r.checkout))
+          ?? diarias.find((r) => dateOnly(r.checkin) >= todayD)
+          ?? diarias[diarias.length - 1] ?? null;
+        setSelRowKey(cur?.key ?? null);
       })
       .catch((e) => { if (!cancelled) notify?.('Erro ao carregar diárias: ' + (e.message || ''), 'error'); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -119,17 +127,37 @@ export default function GerenciarDiariasModal({
       .then((res) => {
         const list = res?.content ?? (Array.isArray(res) ? res : []);
         const set = new Set();
+        // Ocupação meia-diária (espelha o calendário do "Editar Reserva"):
+        // entrada à tarde (pm) / noites cheias / saída de manhã (am).
+        const occ = new Map();
+        const markOcc = (d, half) => {
+          const k = dkey(d);
+          const c = occ.get(k) || { am: false, pm: false };
+          c[half] = true;
+          occ.set(k, c);
+        };
         list.forEach((h) => {
           if (h.id === hospedagemId || !BLOCKING.has(h.status)) return;
           const ci = parseBr(h.data_hora_checkin), co = parseBr(h.data_hora_checkout);
           if (!ci || !co) return;
-          const cur = new Date(ci.getFullYear(), ci.getMonth(), ci.getDate());
-          const end = new Date(co.getFullYear(), co.getMonth(), co.getDate());
-          while (cur < end) { set.add(dkey(cur)); cur.setDate(cur.getDate() + 1); }
+          const cs = new Date(ci.getFullYear(), ci.getMonth(), ci.getDate());
+          const ce = new Date(co.getFullYear(), co.getMonth(), co.getDate());
+          const cur = new Date(cs);
+          while (cur < ce) { set.add(dkey(cur)); cur.setDate(cur.getDate() + 1); }
+          if (cs < ce) {
+            markOcc(cs, 'pm');
+            const c2 = new Date(cs); c2.setDate(c2.getDate() + 1);
+            while (c2 < ce) { markOcc(c2, 'am'); markOcc(c2, 'pm'); c2.setDate(c2.getDate() + 1); }
+            markOcc(ce, 'am');
+          }
         });
         setBusyByRoom((m) => ({ ...m, [roomId]: set }));
+        setOccByRoom((m) => ({ ...m, [roomId]: occ }));
       })
-      .catch(() => { setBusyByRoom((m) => ({ ...m, [roomId]: new Set() })); });
+      .catch(() => {
+        setBusyByRoom((m) => ({ ...m, [roomId]: new Set() }));
+        setOccByRoom((m) => ({ ...m, [roomId]: new Map() }));
+      });
   };
 
   useEffect(() => {
@@ -194,14 +222,20 @@ export default function GerenciarDiariasModal({
     : null;
   const total = adjResult ? adjResult.valorTotal : baseTotal;
   const adjDesc = adjState ? describeAdjustment(adjState) : null;
+  // Resumo financeiro (espelha o "Editar Reserva"): Pago vem do pernoite; Pendente = total − pago.
+  const pendente = Math.max(0, total - (totalPago || 0));
+  const pagPct = total > 0 ? Math.min(100, Math.round((totalPago || 0) / total * 100)) : 0;
   const occupancy = useMemo(() => splitOccupancy(hospedes), [hospedes]);
   // Diárias que já passaram (checkin antes de hoje) não podem ser removidas/editadas — só viram meia.
   const today = dateOnly(new Date());
   const isPastRow = (r) => dateOnly(r.checkin) < today;
   const stayStart = rows.length ? rows.reduce((m, r) => (!m || r.checkin < m ? r.checkin : m), null) : null;
   const stayEnd = rows.length ? rows.reduce((m, r) => (!m || r.checkout > m ? r.checkout : m), null) : null;
-  const mainBusy = busyByRoom[mainRoomId];
   const mainRoomLabel = quartos.find((q) => q.id === mainRoomId)?.numero ?? roomLabel;
+  // Diária destacada no calendário (à direita) e a ocupação meia-diária do seu quarto.
+  const selRow = rows.find((r) => r.key === selRowKey) ?? null;
+  const selRoomOcc = (selRow ? occByRoom[selRow.quartoId] : occByRoom[mainRoomId]) ?? null;
+  const selRoomLabel = quartos.find((q) => q.id === (selRow?.quartoId ?? mainRoomId))?.numero ?? mainRoomLabel;
   // Disponibilidade ainda carregando (null = em carregamento) → evita adicionar em data ocupada.
   const lastRoomId = rows.length ? rows[rows.length - 1].quartoId : mainRoomId;
   const availLoading = (mainRoomId != null && busyByRoom[mainRoomId] === null)
@@ -344,23 +378,45 @@ export default function GerenciarDiariasModal({
         </div>
       ) : (
         <div className={styles.formStack}>
-          {/* ── Price summary ── */}
-          <div className={styles.nhPriceCard}>
-            <div className={styles.nhPriceCardHeader} style={{ cursor: 'default', flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
-              <span className={styles.nhFinStrip}>
-                <span className={styles.nhFinStripItem}>
-                  Total{' '}
-                  {calcLoading ? <b><Loader2 size={11} className={styles.spin} /></b> : <b>{fmtBRL(total)}</b>}
-                </span>
-                <span className={styles.nhFinStripDivider} />
-                <span className={styles.nhFinStripItem}>Diárias <b>{rows.length}</b></span>
-              </span>
-              {adjDesc && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'var(--violet)' }}>
-                  Subtotal {fmtBRL(baseTotal)} · {adjDesc}
-                </span>
-              )}
+          {/* ── Resumo Financeiro (espelhado do "Editar Reserva") ── */}
+          <div className={styles.gdFinCard}>
+            <div className={styles.gdFinHeader}>
+              <DollarSign size={13} className={styles.gdFinIcon} />
+              <span className={styles.gdFinTitle}>Resumo Financeiro</span>
+              <span className={styles.gdFinDiarias}>{rows.length} diária(s)</span>
             </div>
+            <div className={styles.gdFinRow}>
+              <div className={styles.gdFinItem}>
+                <span className={styles.gdFinLabel}>Valor Total</span>
+                <span className={styles.gdFinValue}>
+                  {calcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(total)}
+                </span>
+              </div>
+              <div className={styles.gdFinItem}>
+                <span className={styles.gdFinLabel}>Total Pago</span>
+                <span className={[styles.gdFinValue, styles.gdFinPaid].join(' ')}>{fmtBRL(totalPago || 0)}</span>
+              </div>
+              <div className={styles.gdFinItem}>
+                <span className={styles.gdFinLabel}>Pendente</span>
+                <span className={[styles.gdFinValue, pendente > 0 ? styles.gdFinPending : styles.gdFinPaid].join(' ')}>
+                  {fmtBRL(pendente)}
+                </span>
+              </div>
+            </div>
+            {total > 0 && (
+              <div className={styles.gdFinProgress}>
+                <div className={styles.gdFinProgressMeta}>
+                  <span>Progresso de pagamento</span>
+                  <span>{pagPct}%</span>
+                </div>
+                <div className={styles.gdFinBar}>
+                  <div className={styles.gdFinBarFill} style={{ width: `${pagPct}%` }} />
+                </div>
+              </div>
+            )}
+            {adjDesc && (
+              <div className={styles.gdFinAdj}>Subtotal {fmtBRL(baseTotal)} · {adjDesc}</div>
+            )}
           </div>
 
           {/* Hóspedes do pernoite (usados no cálculo de todas as diárias) */}
@@ -396,7 +452,10 @@ export default function GerenciarDiariasModal({
                 ];
                 const showBelow = (r.meiaDiaria && !canMeia) || past || sazNomes.length > 0;
                 return (
-                  <div key={r.key} className={styles.gdCard}>
+                  <div key={r.key}
+                    className={[styles.gdCard, r.key === selRowKey ? styles.gdCardSel : ''].join(' ')}
+                    onClick={() => setSelRowKey(r.key)}
+                    title="Ver disponibilidade desta diária no calendário">
                     <div className={styles.gdCardHeader}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -511,19 +570,38 @@ export default function GerenciarDiariasModal({
             </div>
 
             <div className={styles.gdSplitRight}>
-              <span className={styles.gdFieldLabel}>Disponibilidade · Apt. {mainRoomLabel}</span>
+              <span className={styles.gdFieldLabel}>
+                Disponibilidade · Apt. {selRoomLabel}{selRow ? ` · Diária ${rows.indexOf(selRow) + 1}` : ''}
+              </span>
+              {/* Resumo do período da diária selecionada (datas editadas nos campos à esquerda). */}
+              <div className={styles.gdEditCalSummary}>
+                <div className={styles.gdEditCalLeg}>
+                  <span className={styles.gdEditCalLegKey} style={{ color: 'var(--emerald)' }}>Check-in</span>
+                  <b>{selRow ? brDateOnly(selRow.checkin) : '—'}</b>
+                </div>
+                <div className={styles.gdEditCalArrow}>
+                  <svg viewBox="0 0 24 8" width="34" height="8" fill="none"><path d="M0 4h22m0 0l-4-3.5M22 4l-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <div className={[styles.gdEditCalLeg, styles.gdEditCalLegRight].join(' ')}>
+                  <span className={styles.gdEditCalLegKey} style={{ color: '#f97316' }}>Check-out</span>
+                  <b>{selRow ? brDateOnly(selRow.checkout) : '—'}</b>
+                </div>
+              </div>
               <DatePicker
+                key={selRowKey}
                 inline
                 readOnly
+                lockMonth
                 mode="range"
-                startDate={stayStart}
-                endDate={stayEnd}
-                disabledDates={mainBusy && mainBusy.size ? mainBusy : null}
+                startDate={selRow ? selRow.checkin : stayStart}
+                endDate={selRow ? selRow.checkout : stayEnd}
+                occupancy={selRoomOcc}
                 onRangeChange={() => {}}
               />
               <div className={styles.gdCalLegend}>
-                <span className={styles.gdCalLegendItem}><i className={styles.gdLgSel} /> Pernoite</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgSel} /> Diária</span>
                 <span className={styles.gdCalLegendItem}><i className={styles.gdLgBlk} /> Ocupado</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgHalf} /> Entrada/saída (meio-dia)</span>
                 <span className={styles.gdCalLegendItem}><i className={styles.gdLgFree} /> Disponível</span>
               </div>
             </div>
