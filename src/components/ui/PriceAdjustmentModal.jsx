@@ -132,9 +132,11 @@ const card = (active) => ({
  * @param initial      estado inicial (use novoPrecoToState para reconstruir de um snapshot).
  * @param onApply      (result, raw) => void  — result de computeAdjustedTotal.
  */
-export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply }) {
+export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = 'Gerenciar Preços' }) {
+  // Modos disponíveis. allowDiaria=false (ex.: ajuste de grupo) remove o "Por diária".
+  const modeKeys = allowDiaria ? ['diaria', 'desconto', 'porcentagem'] : ['desconto', 'porcentagem'];
   const [sign, setSign] = useState(initial?.sign ?? 'desconto');
-  const [mode, setMode] = useState(initial?.mode ?? 'desconto');
+  const [mode, setMode] = useState(modeKeys.includes(initial?.mode) ? initial.mode : 'desconto');
   const [value, setValue] = useState(() => valueToDisplay(initial?.mode ?? 'desconto', initial?.value));
 
   // Modos em reais usam máscara de moeda; a porcentagem permanece numérica.
@@ -156,7 +158,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
     <Modal
       open={open}
       onClose={onClose}
-      title="Gerenciar Preços"
+      title={title}
       size="sm"
       footer={
         <>
@@ -196,7 +198,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
 
         {/* Modo: apenas um por vez */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {['diaria', 'desconto', 'porcentagem'].map((key) => {
+          {modeKeys.map((key) => {
             const Icon = MODE_ICONS[key];
             return (
               <button key={key} type="button" onClick={() => { setMode(key); setValue(''); }} style={card(mode === key)}>

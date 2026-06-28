@@ -422,11 +422,13 @@
 /* ── Detail modal ──────────────────────────────────────────────────────────── */
 .detailTabs { display: flex; border-bottom: 1px solid var(--border); margin: 0 0 0 0; padding: 0 16px; }
 .detailTab {
+  display: inline-flex; align-items: center; gap: 6px;
   padding: 10px 16px; font-size: 13px; font-weight: 500; color: var(--text-2);
   background: none; border: none; border-bottom: 2px solid transparent;
   cursor: pointer; white-space: nowrap; margin-bottom: -1px;
   transition: all 0.12s;
 }
+.detailTab svg { flex-shrink: 0; }
 .detailTab:hover { color: var(--violet); }
 .detailTabActive { color: var(--violet) !important; border-bottom-color: var(--violet) !important; font-weight: 600; }
 
@@ -493,6 +495,9 @@
 /* ── Remove / action icon button ───────────────────────────────────────────── */
 .removeIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
 .removeIconBtn:hover { background: #fef2f2; border-color: #fecaca; color: #ef4444; }
+
+.makeTitularBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
+.makeTitularBtn:hover { background: #fffbeb; border-color: #fde68a; color: #d97706; }
 
 /* ── Inline add-pessoa search ──────────────────────────────────────────────── */
 .addInlineBox { display: flex; flex-direction: column; gap: 4px; }
@@ -2189,6 +2194,18 @@
 .rvGuestInfo { flex: 1; min-width: 0; }
 .rvGuestName { font-size: 12px; font-weight: 600; color: var(--text); }
 .rvGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+
+.rvGuestContacts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.rvContactBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  cursor: pointer; transition: all 0.12s; text-decoration: none;
+}
+.rvContactBtnWa   { color: #16a34a; }
+.rvContactBtnWa:hover   { background: rgba(22,163,74,0.12); border-color: rgba(22,163,74,0.4); }
+.rvContactBtnMail { color: #2563eb; }
+.rvContactBtnMail:hover { background: rgba(37,99,235,0.12); border-color: rgba(37,99,235,0.4); }
 
 /* Empty state */
 .rvEmptyState {

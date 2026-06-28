@@ -25,7 +25,8 @@ import {
 } from './shared/overviewApi';
 import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
-import { ReservaModal, normalizeReserva } from '../calendar/BookingCalendar';
+import { gerarVoucherReserva } from '../calendar/gerarVoucherReserva';
+import { ReservaModal, normalizeReserva, CreateModal } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -514,10 +515,7 @@ export default function RecepcaoPage() {
   // Filters 2
   const [filterTipoOcupacao, setFilterTipoOcupacao] = useState('');
   const [groupByGroup, setGroupByGroup] = useState(false);
-  const [pagModoAtivo, setPagModoAtivo] = useState(false);            // modo seleção p/ pagamento múltiplo
-  const [selectedOvernights, setSelectedOvernights] = useState(new Set()); // ids de hospedagem (pernoite)
-  const [showPagMulti, setShowPagMulti] = useState(false);
-  const [pagMultiSaving, setPagMultiSaving] = useState(false);
+  const [showNovoPernoite, setShowNovoPernoite] = useState(false);
   const [filterDateStart, setFilterDateStart]       = useState(null);
   const [filterDateEnd, setFilterDateEnd]           = useState(null);
   const [dateGroupCollapsed, setDateGroupCollapsed] = useState({});
@@ -670,6 +668,9 @@ export default function RecepcaoPage() {
   const [payValor, setPayValor]                     = useState('');
   const [payTipo, setPayTipo]                       = useState('');
   const [payOnConfirm, setPayOnConfirm]             = useState(null); // callback(pagamento)
+  const [payGroupCtx, setPayGroupCtx]               = useState(null); // { total, pago } quando o pagamento é do grupo (visão "Por grupo")
+  const [precoGrupoCtx, setPrecoGrupoCtx]           = useState(null); // { gid, memberBases, groupBase } ajuste de preço do grupo
+  const [precoGrupoSaving, setPrecoGrupoSaving]     = useState(false);
 
   // Add payment (old pagModal - kept for backward compat)
   const [pagModal, setPagModal]         = useState(false);
@@ -912,7 +913,7 @@ export default function RecepcaoPage() {
   const categoriasFull = useMemo(() => {
     const m = new Map();
     quartos.forEach((q) => {
-      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, quartos: [] });
+      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, checkin: q.categoriaCheckin ?? null, checkout: q.categoriaCheckout ?? null, quartos: [] });
       m.get(q.categoriaId).quartos.push(q.id);
     });
     return [...m.values()];
@@ -944,37 +945,10 @@ export default function RecepcaoPage() {
     });
     const sections = [...withGroup.entries()]
       .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .map(([gid, rooms]) => ({ key: `g-${gid}`, title: `Grupo #${gid}`, rooms }));
-    if (noGroup.length) sections.push({ key: 'no-group', title: 'Sem grupo', rooms: noGroup });
+      .map(([gid, rooms]) => ({ key: `g-${gid}`, gid, title: `Grupo #${gid}`, rooms }));
+    if (noGroup.length) sections.push({ key: 'no-group', gid: null, title: 'Sem grupo', rooms: noGroup });
     return sections;
   }, [filteredQuartos]);
-
-  // Pernoites selecionados (para o pagamento múltiplo) e seus totais.
-  const selectedRoomsList = useMemo(
-    () => quartos.filter((q) => q.servico?.tipo === 'pernoite' && selectedOvernights.has(q.servico.id)),
-    [quartos, selectedOvernights],
-  );
-  const pagMultiTotal = selectedRoomsList.reduce((s, q) => s + (q.servico?.valorTotal ?? 0), 0);
-  const pagMultiPago  = selectedRoomsList.reduce((s, q) => s + (q.servico?.totalPago ?? 0), 0);
-
-  const handlePagamentoMultiplo = async (payment) => {
-    setPagMultiSaving(true);
-    try {
-      const ids = [...selectedOvernights];
-      const grupos = new Set(selectedRoomsList.map((q) => q.servico?.grupoId).filter((g) => g != null));
-      const grupoUnico = grupos.size === 1 && selectedRoomsList.every((q) => q.servico?.grupoId != null)
-        ? [...grupos][0] : null;
-      if (grupoUnico != null) await hospedagemApi.adicionarPagamentoGrupo(grupoUnico, payment);
-      else                    await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
-      await load();
-      notify(`Pagamento adicionado a ${ids.length} pernoite${ids.length !== 1 ? 's' : ''}!`);
-      exitPagModo();
-    } catch (e) {
-      notify(e?.message ?? 'Erro ao adicionar pagamento.', 'error');
-    } finally {
-      setPagMultiSaving(false);
-    }
-  };
 
   const isDateFilterActive = !!(filterDateStart);
 
@@ -1114,22 +1088,6 @@ export default function RecepcaoPage() {
   const closeDetail = () => { setSelectedRoom(null); setOvAcoesOpen(false); setVoucherPicking(false); setDiariaComboOpen(false); setShowAlterarPessoas(false); setApComboOpen(false); setApSearch(''); };
   const closeAcoes  = () => { setOvAcoesOpen(false); setVoucherPicking(false); };
 
-  // ── Seleção para pagamento múltiplo (vários pernoites / por grupo) ──────────────
-  const toggleOvernight = useCallback((room) => {
-    const id = room.servico?.id;
-    if (room.servico?.tipo !== 'pernoite' || id == null) return;
-    setSelectedOvernights((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-  const exitPagModo = useCallback(() => {
-    setPagModoAtivo(false);
-    setSelectedOvernights(new Set());
-    setShowPagMulti(false);
-  }, []);
-
   // Adapta um quarto (servico de pernoite/reserva) ao formato que o ReservaModal espera.
   const buildStayReserva = (room, status) => {
     const sv = room.servico;
@@ -1199,7 +1157,10 @@ export default function RecepcaoPage() {
       })
       .catch(() => { if (!cancelled) setGroupResumo(null); });
     return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.grupoId]); // eslint-disable-line
+    // Inclui valorTotal/totalPago: após salvar (recálculo por pessoas/pagamentos) o quarto é
+    // recarregado com novos valores e o resumo do grupo precisa ser rebuscado, senão o modal
+    // mostraria o total antigo até dar refresh na página.
+  }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.grupoId, selectedRoom?.servico?.valorTotal, selectedRoom?.servico?.totalPago]); // eslint-disable-line
 
   const stayDiarias = (sv) => {
     const { adultos, criancas } = svOccupancy(sv.hospedes || []);
@@ -1222,20 +1183,142 @@ export default function RecepcaoPage() {
 
   // Info do grupo — total/pago/pendente somados (como no modal de grupo das reservas).
   // Pagamentos de grupo aparecem em vários quartos com o mesmo id → deduplicados.
-  const buildGroupInfo = (room) => {
-    const gid = room.servico?.grupoId ?? null;
-    if (gid == null) return null;
-    const members = quartos.filter((q) => q.servico?.grupoId === gid);
-    if (members.length <= 1) return null;
-    const total = members.reduce((s, q) => s + (q.servico?.valorTotal ?? 0), 0);
+  // Totais financeiros de um conjunto de quartos (pagamentos contados uma única vez por id).
+  const groupFinFromRooms = (rooms) => {
+    const total = rooms.reduce((s, q) => s + (q.servico?.valorTotal ?? 0), 0);
     const seen = new Map();
-    members.forEach((q) => (q.servico?.pagamentos ?? []).forEach((p) => {
+    rooms.forEach((q) => (q.servico?.pagamentos ?? []).forEach((p) => {
       if (!p.cancelado && !seen.has(p.id)) seen.set(p.id, p);
     }));
     const pago = [...seen.values()]
       .filter((p) => String(p.forma ?? p.formaPagamento ?? '').toUpperCase() !== 'PENDENTE')
       .reduce((s, p) => s + (p.valor ?? 0), 0);
-    return { id: gid, count: members.length, total, pago, pendente: Math.max(0, total - pago) };
+    return { total, pago, pendente: Math.max(0, total - pago) };
+  };
+
+  // Pagamentos do grupo (deduplicados por id, não cancelados) — para listar no card de preço.
+  const groupPaymentsFromRooms = (rooms) => {
+    const seen = new Map();
+    rooms.forEach((q) => (q.servico?.pagamentos ?? []).forEach((p) => {
+      if (!p.cancelado && !seen.has(p.id)) seen.set(p.id, p);
+    }));
+    return [...seen.values()];
+  };
+
+  const buildGroupInfo = (room) => {
+    const gid = room.servico?.grupoId ?? null;
+    if (gid == null) return null;
+    const members = quartos.filter((q) => q.servico?.grupoId === gid);
+    if (members.length <= 1) return null;
+    return { id: gid, count: members.length, ...groupFinFromRooms(members) };
+  };
+
+  // Lança um único pagamento vinculado a todo o grupo (visão "Por grupo").
+  const handleAddPagamentoGrupo = (gid, fin) => {
+    setPayGroupCtx({ total: fin.total, pago: fin.pago });
+    openPayModal(async (pag) => {
+      try {
+        await hospedagemApi.adicionarPagamentoGrupo(gid, {
+          tipo_pagamento: { id: pag.tipoPagamentoId },
+          nome_pagador:   pag.nomePagador || '',
+          descricao:      pag.descricao   || undefined,
+          valor:          pag.valor,
+        });
+        await load();
+        notify(`Pagamento de ${fmtBRL(pag.valor)} adicionado ao Grupo #${gid}.`);
+      } catch (e) {
+        notify('Erro: ' + (e?.message ?? 'falha ao adicionar pagamento.'), 'error');
+      }
+    });
+  };
+
+  // Abre o ajuste de preço do grupo (apenas total: valor ou porcentagem, sem "por diária").
+  const openGerenciarPrecoGrupo = (gid, members) => {
+    const memberBases = members.map((m) => ({
+      id: m.id,
+      base: (m.servico?.diarias || []).reduce((s, d) => s + (d.valor || 0), 0),
+    }));
+    const groupBase = memberBases.reduce((s, mb) => s + mb.base, 0);
+    setPrecoGrupoCtx({ gid, memberBases, groupBase });
+  };
+
+  // Aplica o ajuste a cada hospedagem do grupo: porcentagem por membro; valor fixo rateado
+  // proporcionalmente à base de cada um. Reusa o endpoint individual (overviewApi.gerenciarPreco).
+  const aplicarPrecoGrupo = async (raw) => {
+    if (!precoGrupoCtx) return;
+    const { gid, memberBases, groupBase } = precoGrupoCtx;
+    setPrecoGrupoSaving(true);
+    try {
+      for (const mb of memberBases) {
+        let r;
+        if (raw.mode === 'porcentagem') {
+          r = computeAdjustedTotal({ baseTotal: mb.base, baseDiarias: [], mode: 'porcentagem', sign: raw.sign, value: raw.value });
+        } else {
+          const memberValue = groupBase > 0 ? (raw.value * mb.base) / groupBase : raw.value / memberBases.length;
+          r = computeAdjustedTotal({ baseTotal: mb.base, baseDiarias: [], mode: 'desconto', sign: raw.sign, value: memberValue });
+        }
+        await overviewApi.gerenciarPreco(mb.id, { ...r.requestFields, valor_total: r.valorTotal });
+      }
+      await load();
+      notify(`Preço do Grupo #${gid} atualizado.`);
+      setPrecoGrupoCtx(null);
+    } catch (e) {
+      notify('Erro ao atualizar preço do grupo: ' + (e?.message ?? ''), 'error');
+    } finally {
+      setPrecoGrupoSaving(false);
+    }
+  };
+
+  // Voucher consolidado de todo o grupo. Aceita um quarto (modal de reserva) ou o id do grupo
+  // (botão na visão "Por grupo"). Inclui reservas e pernoites do grupo.
+  const gerarVoucherGrupoReserva = (roomOrGid) => {
+    const gid = typeof roomOrGid === 'object' ? roomOrGid?.servico?.grupoId : roomOrGid;
+    if (gid == null) return;
+    const members = quartos.filter((q) => q.servico?.grupoId === gid && (q.servico?.tipo === 'reserva' || q.servico?.tipo === 'pernoite'));
+    if (members.length === 0) { notify('Nenhuma hospedagem no grupo para gerar voucher.', 'error'); return; }
+    const toIso = (s) => { const d = (s || '').split(' ')[0]; const [dd, mm, yy] = d.split('/'); return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : ''; };
+    const periodMap = new Map();
+    members.forEach((q) => {
+      const sv = q.servico;
+      const ci = toIso(sv.chegadaPrevista);
+      const co = toIso(sv.saidaPrevista);
+      const key = `${ci}_${co}`;
+      if (!periodMap.has(key)) periodMap.set(key, { checkin: ci, checkout: co, rooms: [], roomHospedes: {} });
+      const p = periodMap.get(key);
+      const rid = String(q.id);
+      p.rooms.push(rid);
+      p.roomHospedes[rid] = (sv.hospedes ?? []).map((h) => ({ nome: h.nome, cpf: h.cpf }));
+    });
+    const displayPeriodos = [...periodMap.values()];
+    const periodoMode = displayPeriodos.length > 1 ? 'multiplos' : 'unico';
+    const precosCalc = {};
+    const quartosObs = {};
+    displayPeriodos.forEach((p, pi) => {
+      p.rooms.forEach((rid) => {
+        const q = members.find((m) => String(m.id) === rid);
+        precosCalc[`${rid}_${pi}`] = { valor_total: q?.servico?.valorTotal ?? 0, detalhes: [], sazonalidades_aplicadas: [] };
+        if (q?.servico?.observacao) quartosObs[`${rid}_${pi}`] = q.servico.observacao;
+      });
+    });
+    const titular = members[0]?.servico?.hospedes?.[0] ?? null;
+    // Se há ao menos uma hospedagem ativa (PERNOITE_ATIVO) no grupo, é "Voucher de Hospedagem".
+    const temPernoiteAtivo = members.some((m) => m.servico?.statusBackend === 'PERNOITE_ATIVO');
+    gerarVoucherReserva({
+      tipo: 'grupo',
+      periodoMode,
+      displayPeriodos,
+      precosCalc,
+      quartosObs,
+      roomDescMap: roomDescMapFull,
+      userName: '',
+      titulo: temPernoiteAtivo ? 'Voucher de Hospedagem' : 'Voucher de Reserva',
+      solicitante: {
+        nome:     titular?.nome ?? members[0]?.servico?.titularNome ?? '',
+        cpf:      titular?.cpf ?? '',
+        telefone: titular?.telefone ?? '',
+        email:    titular?.email ?? '',
+      },
+    });
   };
 
   const openNovoServico = (tipo, room) => {
@@ -1957,6 +2040,7 @@ export default function RecepcaoPage() {
     const pag = pagamentoFromPaymentModal(payment);
     if (payOnConfirm) await payOnConfirm(pag);
     setPayModal(false);
+    setPayGroupCtx(null);
   };
 
 
@@ -2368,7 +2452,11 @@ export default function RecepcaoPage() {
       const sv = s.servico;
       const diarias = sv.diarias || [];
       const curDiaria = diarias[detailDiariaIdx];
-      const progressPercent = sv.valorTotal > 0 ? Math.min(100, (sv.totalPago / sv.valorTotal) * 100) : 0;
+      // Em grupo, a barra de progresso reflete o total do GRUPO (todas as hospedagens).
+      const groupFin = groupResumo ?? buildGroupInfo(s);
+      const barTotal = groupFin ? groupFin.total : sv.valorTotal;
+      const barPago  = groupFin ? groupFin.pago  : (sv.totalPago || 0);
+      const progressPercent = barTotal > 0 ? Math.min(100, (barPago / barTotal) * 100) : 0;
       const allPagamentos = sv.pagamentos || [];
       return (
         <>
@@ -2388,15 +2476,15 @@ export default function RecepcaoPage() {
           {/* ── Tab bar ── */}
           <div className={styles.detailTabs}>
             {[
-              ['detalhes',   'Detalhes'],
-              ['pessoas',    `Pessoas (${svGuests.length})`],
-              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
-              ['dados',      'Dados'],
-              ['itens',      'Itens'],
-              ['consumos',   `Consumos (${(sv.consumos || []).length})`],
-            ].map(([t, label]) => (
+              ['detalhes',   'Detalhes',   FileText],
+              ['pessoas',    'Pessoas',    Users],
+              ['pagamentos', 'Pagamentos', CreditCard],
+              ['dados',      'Dados',      BedDouble],
+              ['itens',      'Itens',      Package],
+              ['consumos',   'Consumos',   ShoppingCart],
+            ].map(([t, label, Icon]) => (
               <button key={t} className={[styles.detailTab, diariaTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
-                {label}
+                <Icon size={13} /> {label}
               </button>
             ))}
           </div>
@@ -2445,10 +2533,10 @@ export default function RecepcaoPage() {
                       </span>
                     </div>
                   </div>
-                  {sv.valorTotal > 0 && (
+                  {barTotal > 0 && (
                     <div className={styles.ovFinProgress}>
                       <div className={styles.ovFinProgressMeta}>
-                        <span>Progresso de pagamento</span>
+                        <span>Progresso de pagamento{groupFin ? ' · grupo' : ''}</span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
                       <div className={styles.ovFinBar}>
@@ -3109,12 +3197,11 @@ export default function RecepcaoPage() {
   // useCallback dá ao componente uma identidade estável entre renders; sem isso,
   // por ser definido dentro do componente, todos os cards REMONTAM (recriam o DOM)
   // a cada ação/render da página, causando o "piscar"/atualização constante.
-  const RoomCard = useCallback(({ room, selectMode = false, selected = false, onToggle }) => {
+  const RoomCard = useCallback(({ room }) => {
     const sk        = roomStatusKey(room.status);
     const sv        = room.servico;
-    const selectable = sv?.tipo === 'pernoite';
-    // Pernoite com limpeza acionada: card mostra as cores divididas (ocupado + limpeza).
-    const splitClean = sv?.tipo === 'pernoite' && !!room.limpeza;
+    // Pernoite/Reserva com limpeza acionada: card mostra as cores divididas (status + limpeza).
+    const splitClean = (sv?.tipo === 'pernoite' || sv?.tipo === 'reserva') && !!room.limpeza;
     const isDuAtivo = sv?.tipo === 'dayuse' && sv.status === DAYUSE_STATUS.ATIVO;
     const elapsed   = isDuAtivo ? calcElapsedMinutes(sv.dataUso, sv.horaEntrada, null) : 0;
     const guestCount  = sv?.hospedes?.length ?? 0;
@@ -3135,22 +3222,16 @@ export default function RecepcaoPage() {
           styles.roomCard,
           styles[`roomCard_${sk}`],
           splitClean ? styles.roomCardSplitClean : '',
-          selectMode && selected ? styles.roomCardSelected : '',
-          selectMode && !selectable ? styles.roomCardDimmed : '',
+          splitClean && sk === 'reservado' ? styles.roomCardSplitClean_reservado : '',
         ].join(' ')}
-        onClick={() => { if (selectMode) { onToggle?.(room); } else { openDetail(room); } }}
+        onClick={() => openDetail(room)}
       >
-        {selectMode && selectable && (
-          <span className={[styles.roomCardCheck, selected ? styles.roomCardCheckOn : ''].join(' ')}>
-            {selected && <CheckCircle size={16} />}
-          </span>
-        )}
         {/* Top row: number + status badge */}
         <div className={styles.roomCardTop}>
           <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
           {splitClean ? (
             <span className={styles.statusBadgeSplit}>
-              <span className={[styles.statusSeg, styles.statusSegOcupado].join(' ')}>{room.status}</span>
+              <span className={[styles.statusSeg, sk === 'reservado' ? styles.statusSegReservado : styles.statusSegOcupado].join(' ')}>{room.status}</span>
               <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>Em Limpeza</span>
             </span>
           ) : (
@@ -3255,6 +3336,9 @@ export default function RecepcaoPage() {
                   {nPessoas > 0 && <span className={styles.guestCountBadge}><Users size={10} /> {nPessoas}</span>}
                   {noites > 0   && <span className={styles.guestCountBadge}><Calendar size={10} /> {noites}</span>}
                 </div>
+                {splitClean && room.limpeza?.responsavel && (
+                  <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> Limpeza: {room.limpeza.responsavel}</span>
+                )}
               </>
             );
           })()}
@@ -3316,6 +3400,9 @@ export default function RecepcaoPage() {
             </div>
             <Button variant="primary" className={styles.headerControlBtn} onClick={openAddQuarto}>
               <Plus size={14} /> Adicionar Quarto
+            </Button>
+            <Button variant="primary" className={[styles.headerControlBtn, styles.btnPurple].join(' ')} onClick={() => setShowNovoPernoite(true)}>
+              <BedDouble size={14} /> Novo Pernoite
             </Button>
           </div>
         </div>
@@ -3388,14 +3475,6 @@ export default function RecepcaoPage() {
           >
             <Users size={14} /> Por grupo
           </button>
-          <button
-            type="button"
-            className={[styles.filterToggleBtn, pagModoAtivo ? styles.filterToggleBtnActive : ''].join(' ')}
-            onClick={() => { if (pagModoAtivo) exitPagModo(); else setPagModoAtivo(true); }}
-            title="Selecionar vários pernoites e lançar um pagamento (por grupo)"
-          >
-            <DollarSign size={14} /> Pagamento múltiplo
-          </button>
         </div>
 
         {/* ── Category / Date groups ── */}
@@ -3418,7 +3497,7 @@ export default function RecepcaoPage() {
                 {!isDateGroupCollapsed(group.date) && (
                   <div className={styles.catBody}>
                     <div className={styles.roomGrid}>
-                      {group.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}
+                      {group.rooms.map((room) => <RoomCard key={room.id} room={room} />)}
                     </div>
                   </div>
                 )}
@@ -3428,20 +3507,89 @@ export default function RecepcaoPage() {
           /* ── Group view (Por grupo) ── */
           groupSections.length === 0
             ? <div className={styles.emptyState}>Nenhum quarto com os filtros aplicados.</div>
-            : groupSections.map((g) => (
+            : groupSections.map((g) => {
+              const fin = g.gid != null ? groupFinFromRooms(g.rooms) : null;
+              const grpPagamentos = fin ? groupPaymentsFromRooms(g.rooms) : [];
+              const grpPct = fin && fin.total > 0 ? Math.min(100, Math.round((fin.pago / fin.total) * 100)) : 0;
+              return (
               <div key={g.key} className={styles.catSection}>
-                <div className={styles.catHeader} style={{ cursor: 'default' }}>
-                  <div className={styles.catHeaderLeft}>
-                    <Users size={14} style={{ color: 'var(--text-2)' }} />
-                    <span className={styles.catName}>{g.title}</span>
+                <div className={styles.catHeader} style={{ cursor: 'default', alignItems: 'flex-start', gap: 16 }}>
+                  <div className={styles.catHeaderLeft} style={{ flex: 1, minWidth: 0 }}>
+                    {fin ? (
+                      <div className={styles.groupPriceCard}>
+                        <div className={styles.groupPriceHead}>
+                          <Users size={14} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+                          <span className={styles.catName} style={{ marginRight: 0 }}>{g.title}</span>
+                          <span className={styles.groupRoomChip}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        <div className={styles.groupPriceBody}>
+                          <div className={styles.groupPriceStats}>
+                            <div className={styles.groupPriceStat}>
+                              <span className={styles.groupPriceLabel}>Total</span>
+                              <span className={styles.groupPriceVal}>{fmtBRL(fin.total)}</span>
+                            </div>
+                            <div className={styles.groupPriceStat}>
+                              <span className={styles.groupPriceLabel}>Pago</span>
+                              <span className={[styles.groupPriceVal, styles.groupPricePaid].join(' ')}>{fmtBRL(fin.pago)}</span>
+                            </div>
+                            <div className={styles.groupPriceStat}>
+                              <span className={styles.groupPriceLabel}>Pendente</span>
+                              <span className={[styles.groupPriceVal, fin.pendente > 0 ? styles.groupPricePending : styles.groupPricePaid].join(' ')}>{fmtBRL(fin.pendente)}</span>
+                            </div>
+                          </div>
+                          <div className={styles.groupPriceBar}>
+                            <div className={styles.groupPriceBarFill} style={{ width: `${grpPct}%` }} />
+                          </div>
+                          {grpPagamentos.length > 0 && (
+                            <div className={styles.groupPricePayments}>
+                              <div className={styles.groupPricePayHead}>
+                                <CreditCard size={11} />
+                                <span>Pagamentos ({grpPagamentos.length})</span>
+                              </div>
+                              {grpPagamentos.map((p) => (
+                                <div key={p.id} className={styles.groupPricePayRow}>
+                                  <div className={styles.groupPricePayMain}>
+                                    <span className={styles.groupPricePayDesc}>{p.descricaoOrig || 'Pagamento'}</span>
+                                    {p.nomePagador && <span className={styles.groupPricePayName}>{p.nomePagador}</span>}
+                                    <span className={styles.groupPricePaySub}>
+                                      {[p.formaPagamento, p.data].filter(Boolean).join(' · ') || '—'}
+                                    </span>
+                                  </div>
+                                  <span className={styles.groupPricePayVal}>{fmtBRL(p.valor)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={styles.groupHeaderTitleRow}>
+                        <Users size={14} style={{ color: 'var(--text-2)' }} />
+                        <span className={styles.catName} style={{ marginRight: 0 }}>{g.title}</span>
+                        <span className={styles.groupRoomChip}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                      </div>
+                    )}
                   </div>
-                  <span className={styles.dateGroupCount}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                  {fin && (
+                    <div className={styles.groupHeaderActions}>
+                      <Button variant="primary" size="sm" onClick={() => handleAddPagamentoGrupo(g.gid, fin)}>
+                        <DollarSign size={13} /> Adicionar Pagamento
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => openGerenciarPrecoGrupo(g.gid, g.rooms)}>
+                        <Tag size={13} /> Gerenciar Preços
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => gerarVoucherGrupoReserva(g.gid)}>
+                        <FileText size={13} /> Voucher
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className={styles.catBody}>
-                  <div className={styles.roomGrid}>{g.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}</div>
+                  <div className={styles.roomGrid}>{g.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
                 </div>
               </div>
-            ))
+              );
+            })
         ) : (
           /* ── Normal category view ── */
           byCategory.map((cat) => (
@@ -3463,7 +3611,7 @@ export default function RecepcaoPage() {
                 <div className={styles.catBody}>
                   {cat.rooms.length === 0
                     ? <div className={styles.catEmpty}>Nenhum quarto com os filtros aplicados.</div>
-                    : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} selectMode={pagModoAtivo} selected={!!room.servico?.id && selectedOvernights.has(room.servico.id)} onToggle={toggleOvernight} />)}</div>
+                    : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
                   }
                 </div>
               )}
@@ -3517,6 +3665,8 @@ export default function RecepcaoPage() {
             reserva={reservaFull}
             groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
             allowHospedarAnytime
+            onVoucherGrupo={() => gerarVoucherGrupoReserva(selectedRoom)}
+            limpeza={selectedRoom.limpeza ? { responsavel: selectedRoom.limpeza.responsavel, onFinalizar: () => handleFinalizarLimpeza(selectedRoom) } : null}
             onClose={() => { setReservaFull(null); closeDetail(); }}
             onNotify={notify}
             categorias={categoriasFull}
@@ -3570,40 +3720,6 @@ export default function RecepcaoPage() {
         </Modal>
       )}
 
-      {/* ── Barra de seleção — pagamento múltiplo (vários pernoites / por grupo) ── */}
-      {pagModoAtivo && (
-        <div className={styles.selectionPanel}>
-          <span className={styles.selectionCount}>
-            <b>{selectedOvernights.size}</b>
-            <span className={styles.selectionCountSub}>
-              {' '}pernoite{selectedOvernights.size !== 1 ? 's' : ''} selecionado{selectedOvernights.size !== 1 ? 's' : ''}
-            </span>
-          </span>
-          <button
-            className={styles.selectionBtnPrimary}
-            disabled={selectedOvernights.size === 0 || pagMultiSaving}
-            onClick={() => setShowPagMulti(true)}
-          >
-            <DollarSign size={13} /> Adicionar Pagamento
-          </button>
-          <button className={styles.selectionBtnCancel} onClick={exitPagModo}>
-            <X size={13} /> Cancelar
-          </button>
-        </div>
-      )}
-
-      <PaymentModal
-        open={showPagMulti}
-        onClose={() => setShowPagMulti(false)}
-        onConfirm={handlePagamentoMultiplo}
-        tiposPagamento={tiposPagamentoReais}
-        isSubmitting={pagMultiSaving}
-        canAplicarDesconto={false}
-        canDespesaPessoal={false}
-        valorTotal={pagMultiTotal}
-        valorPago={pagMultiPago}
-      />
-
       <NovoServicoModal
         novoModal={novoModal} setNovoModal={setNovoModal} novoRoom={novoRoom}
         nhHospedes={nhHospedes} setNhHospedes={setNhHospedes}
@@ -3626,6 +3742,20 @@ export default function RecepcaoPage() {
         onGerenciarPreco={() => setShowNhPreco(true)}
         priceAdjDesc={nhPriceAdj ? describeAdjustment(nhPriceAdj) : null}
       />
+
+      {/* Novo Pernoite — fluxo multi-quarto (reusa o modal de reserva, check-in travado em hoje) */}
+      {showNovoPernoite && (
+        <CreateModal
+          forcePernoite
+          reservas={[]}
+          categorias={categoriasFull}
+          tiposPagamento={tiposPagamentoReais}
+          roomDescMap={roomDescMapFull}
+          onClose={() => setShowNovoPernoite(false)}
+          onNotify={notify}
+          onSave={async () => { setShowNovoPernoite(false); await load(); notify('Pernoite(s) criado(s)!'); }}
+        />
+      )}
 
       {/* Gerenciar Preços — novo pernoite (espelha a reserva) */}
       {showNhPreco && (
@@ -3759,13 +3889,15 @@ export default function RecepcaoPage() {
       ═══════════════════════════════════════════════════════ */}
       <PaymentModal
         open={!!payModal}
-        onClose={() => setPayModal(false)}
+        onClose={() => { setPayModal(false); setPayGroupCtx(null); }}
         onConfirm={handlePayConfirmNew}
         tiposPagamento={tiposPagamentoOv}
         isSubmitting={saving}
-        titularNome={selectedRoom?.servico?.titularNome ?? null}
-        valorTotal={selectedRoom?.servico?.valorTotal ?? null}
-        valorPago={selectedRoom?.servico?.totalPago ?? null}
+        titularNome={payGroupCtx ? null : (selectedRoom?.servico?.titularNome ?? null)}
+        valorTotal={payGroupCtx ? payGroupCtx.total : (selectedRoom?.servico?.valorTotal ?? null)}
+        valorPago={payGroupCtx ? payGroupCtx.pago : (selectedRoom?.servico?.totalPago ?? null)}
+        grupoTotal={payGroupCtx ? null : (selectedRoom ? (buildGroupInfo(selectedRoom)?.total ?? null) : null)}
+        grupoPago={payGroupCtx ? null : (selectedRoom ? (buildGroupInfo(selectedRoom)?.pago ?? null) : null)}
         canAplicarDesconto={false}
       />
 
@@ -4148,6 +4280,8 @@ export default function RecepcaoPage() {
         const sv = selectedRoom.servico;
         const pags = (sv.pagamentos || []).filter(p => !p.cancelado);
         const total = pags.reduce((s, p) => s + (p.valor ?? 0), 0);
+        // Em grupo o rodapé mostra os totais do grupo (todos os apartamentos), não só deste quarto.
+        const gi = buildGroupInfo(selectedRoom);
         return (
           <Modal
             open
@@ -4156,7 +4290,14 @@ export default function RecepcaoPage() {
             title={<><CreditCard size={15} /> Gerenciar Pagamentos</>}
             footer={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                {pags.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>}
+                {gi ? (
+                  <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                    Pago (Grupo · {gi.count} apt{gi.count !== 1 ? 's' : ''}): <b style={{ color: 'var(--text)' }}>{fmtBRL(gi.pago)}</b>
+                    {gi.pendente > 0 && <> · Pendente <b style={{ color: '#f97316' }}>{fmtBRL(gi.pendente)}</b></>}
+                  </span>
+                ) : (
+                  pags.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>
+                )}
                 <div style={{ marginLeft: 'auto' }}>
                   <Button variant="primary" size="sm" onClick={() => {
                     setShowGerenciarPag(false);
@@ -4335,6 +4476,19 @@ export default function RecepcaoPage() {
           />
         );
       })()}
+
+      {/* Gerenciar Preços do GRUPO — só total (valor ou porcentagem), sem "por diária". */}
+      {precoGrupoCtx && (
+        <PriceAdjustmentModal
+          open
+          title="Gerenciar Preços — Grupo"
+          allowDiaria={false}
+          baseTotal={precoGrupoCtx.groupBase}
+          baseDiarias={[]}
+          onClose={() => { if (!precoGrupoSaving) setPrecoGrupoCtx(null); }}
+          onApply={(_result, raw) => aplicarPrecoGrupo(raw)}
+        />
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Gerenciar Diárias

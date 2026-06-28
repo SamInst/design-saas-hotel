@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  DoorOpen, CalendarCheck2, Tag, Clock,
+  DoorOpen, CalendarCheck2, Tag, Clock, Mail, MessageCircle, Crown,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -85,9 +85,12 @@ const isPagamentoPendente = (forma) =>
 // API response: pessoas[i] = { id, pessoa: {id, nome, cpf, ...}, representante }
 //               pagamentos[i] = { id, pagamento: {uuid, tipo_pagamento, nome_pagador, valor, ...} }
 export const normalizeReserva = (r) => {
-  // Unwrap nested pessoa objects
+  // Unwrap nested pessoa objects. O titular (representante) vem sempre primeiro — ordena
+  // defensivamente pela flag `titular` para não depender da ordem do backend.
   const pessoasRaw = r.pessoas ?? [];
-  const pessoas    = pessoasRaw.map((p) => p.pessoa ?? p);
+  const pessoas    = pessoasRaw
+    .map((p) => p.pessoa ?? p)
+    .sort((a, b) => (b.titular === true ? 1 : 0) - (a.titular === true ? 1 : 0));
   const titular    = pessoas[0];
 
   // Unwrap nested pagamento objects
@@ -128,6 +131,7 @@ export const normalizeReserva = (r) => {
       telefone:      p.celular ?? p.telefone ?? '',
       email:         p.email ?? '',
       dataNascimento: p.data_nascimento ?? '',
+      titular:       p.titular === true,
     })),
     pagamentos: pagsRaw.map((entry) => {
       const p = entry.pagamento ?? entry;
@@ -273,8 +277,13 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
 //   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
 //     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
 //     onVoucher, onCancelar }
-export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, allowHospedarAnytime = false, groupInfo = null }) {
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null }) {
   const isOvernight = !!overnight;
+  // Botão "Finalizar Limpeza" — compartilhado entre pernoite (overnight) e reserva.
+  // Em pernoite vem de overnight.hasLimpeza; em reserva vem da prop `limpeza`.
+  const limpezaBtnInfo = (overnight?.hasLimpeza && overnight.onFinalizarLimpeza)
+    ? { responsavel: overnight.limpezaResponsavel, onFinalizar: overnight.onFinalizarLimpeza }
+    : (limpeza?.onFinalizar ? limpeza : null);
   // ── Edit mode ──────────────────────────────────────────────────────────────
   // dragValues: { quarto, checkin (yyyy-MM-dd), checkout (yyyy-MM-dd) } — set when opened from drag/resize
   const [editing,      setEditing]      = useState(dragValues !== null);
@@ -329,6 +338,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const [cancelMotivRes,     setCancelMotivRes]     = useState('');
   const [confirmRemovePessoa, setConfirmRemovePessoa] = useState(null); // { id, nome }
   const [showVoucherChoice,  setShowVoucherChoice]  = useState(false);
+  const [showVoucherScope,   setShowVoucherScope]   = useState(false); // escolha: voucher individual ou do grupo
   const [acoesOpen,          setAcoesOpen]          = useState(false);
   const [showAdjPreco,       setShowAdjPreco]       = useState(false);
   const [adjCalc,            setAdjCalc]            = useState(null);   // { valor_total, detalhes }
@@ -408,6 +418,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     if (temConsumos) setShowVoucherChoice(true);
     else handleDownloadVoucher(false);
   };
+  // Em grupo, pergunta antes se o voucher é só desta reserva ou do grupo inteiro.
+  const emGrupo = !!(groupInfo && onVoucherGrupo);
+  const handleVoucherClick = () => {
+    if (emGrupo) setShowVoucherScope(true);
+    else requestVoucher();
+  };
 
   // ── Gerenciar Preços (ajuste manual) ───────────────────────────────────────
   // Calcula as diárias atuais (base, sem ajuste) e abre o mesmo modal usado na
@@ -480,6 +496,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 id: a.id, nome: a.nome, cpf: a.cpf ?? '',
                 bloqueado: a.status === 'BLOQUEADO',
                 idade: a.idade ?? null,
+                data_nascimento: a.data_nascimento ?? '',
               })),
             };
           }));
@@ -495,6 +512,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setPessoas((prev) => [...prev, {
       id: p.id, nome: p.nome, cpf: p.cpf ?? '',
       telefone: p.celular ?? p.telefone ?? '', email: p.email ?? '',
+      // Aniversário real do hóspede — usado no /calcular-preco (preview). Sem isto o
+      // buildGuestCalcParams enviava uma data mock (adulto de 18 anos).
+      dataNascimento: p.data_nascimento ?? p.dataNascimento ?? '',
     }]);
     addOp({ type: 'addPessoa', pessoaId: p.id });
   };
@@ -524,6 +544,21 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     }
     toAdd.forEach((p) => handleAddPessoa(p));
     setPendingPessoa(null); setShowAddPessoa(false); setPessoaQuery(''); setPessoaResults([]);
+  };
+
+  // Torna outra pessoa o titular: reordena (titular sempre no topo) e enfileira a operação.
+  const handleSetTitular = (pessoaId) => {
+    setPessoas((prev) => {
+      const target = prev.find((h) => h.id === pessoaId);
+      if (!target) return prev;
+      const rest = prev.filter((h) => h.id !== pessoaId).map((h) => ({ ...h, titular: false }));
+      return [{ ...target, titular: true }, ...rest];
+    });
+    setPendingOps((prev) => [
+      ...prev.filter((o) => o.type !== 'setTitular'),
+      { type: 'setTitular', pessoaId },
+    ]);
+    setHasChanges(true);
   };
 
   const handleRemovePessoa = (pessoaId) => {
@@ -576,13 +611,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // ── Save all pending ops ────────────────────────────────────────────────────
   const handleSaveChanges = async () => {
     setSaving(true);
-    const hasPessoaOps = pendingOps.some((o) => o.type === 'addPessoa' || o.type === 'removePessoa');
+    const hasPessoaOps = pendingOps.some((o) => o.type === 'addPessoa' || o.type === 'removePessoa' || o.type === 'setTitular');
     try {
       // Batch pessoa additions and removals into single calls each
       const addIds    = pendingOps.filter((o) => o.type === 'addPessoa').map((o) => o.pessoaId);
       const removeIds = pendingOps.filter((o) => o.type === 'removePessoa').map((o) => o.pessoaId);
       if (addIds.length)    await hospedagemApi.adicionarPessoas(reserva.id, addIds);
       if (removeIds.length) await hospedagemApi.removerPessoas(reserva.id, removeIds);
+      // Troca de titular (após add/remove, para a pessoa já existir). Mantém só a última escolha.
+      const titularOp = [...pendingOps].reverse().find((o) => o.type === 'setTitular');
+      if (titularOp) await hospedagemApi.definirTitular(reserva.id, titularOp.pessoaId);
 
       // Payment ops (one at a time)
       const statusBackend = reserva.status === 'hospedado' ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA';
@@ -601,11 +639,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       setHasChanges(false);
 
       if (hasPessoaOps) {
-        // O valor total depende dos hóspedes: recalcula (editCalc) e persiste.
-        // A resposta de /reserva/{id}/editar já traz a reserva com detalhes — sem GET extra.
-        const novoTotal = editCalc?.valor_total;
+        // Os endpoints de pessoas já recalculam diárias/valor_total no backend (e removem o
+        // desconto vigente). Apenas re-buscamos a reserva atualizada para sincronizar a UI.
         try {
-          const upd = await reservaApi.editar(reserva.id, novoTotal != null ? { valor_total: novoTotal } : {});
+          const upd = await hospedagemApi.buscarPorId(reserva.id);
           const normalized = normalizeReserva(upd);
           onSync?.(normalized);
           setPessoas(normalized.hospedes ?? []);
@@ -1130,7 +1167,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 </div>
                 <span className={i === 0 ? styles.titularBadge : styles.acompanhanteBadge}>{i === 0 ? 'Titular' : 'Acompanhante'}</span>
                 {i > 0 && editavel && (
-                  <button className={styles.removeIconBtn} title="Remover" onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}><X size={12} /></button>
+                  <>
+                    <button className={styles.makeTitularBtn} title="Tornar titular" onClick={() => handleSetTitular(h.id)}><Crown size={12} /></button>
+                    <button className={styles.removeIconBtn} title="Remover" onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}><X size={12} /></button>
+                  </>
                 )}
               </div>
             ))}
@@ -1290,12 +1330,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         {/* ── Tab bar ── */}
         <div className={styles.detailTabs}>
           {[
-            ['informacoes', 'Informações'],
-            ['pessoas',     `Pessoas (${guestList.length})`],
-            ['pagamentos',  `Pagamentos (${pagamentos.filter((p) => !p.cancelado).length})`],
-          ].map(([t, label]) => (
+            ['informacoes', 'Informações', <FileText size={14} />],
+            ['pessoas',     `Pessoas (${guestList.length})`, <Users size={14} />],
+            ['pagamentos',  `Pagamentos (${pagamentos.filter((p) => !p.cancelado).length})`, <DollarSign size={14} />],
+          ].map(([t, label, icon]) => (
             <button key={t} className={[styles.detailTab, viewTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setViewTab(t)}>
-              {label}
+              {icon} {label}
             </button>
           ))}
         </div>
@@ -1414,12 +1454,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     </>
                   )}
                 </div>
-                {displayTotal > 0 && (() => {
-                  const pct = Math.min(100, Math.round(totalPago / displayTotal * 100));
+                {(() => {
+                  // Em grupo a barra reflete o pagamento do grupo inteiro; senão, do pernoite atual.
+                  const barPago  = groupInfo ? groupInfo.pago  : totalPago;
+                  const barTotal = groupInfo ? groupInfo.total : displayTotal;
+                  if (barTotal <= 0) return null;
+                  const pct = Math.min(100, Math.round(barPago / barTotal * 100));
                   return (
                     <div className={styles.ovFinProgress}>
                       <div className={styles.ovFinProgressMeta}>
-                        <span>Progresso de pagamento</span>
+                        <span>Progresso de pagamento{groupInfo ? ' (Grupo)' : ''}</span>
                         <span>{pct}%</span>
                       </div>
                       <div className={styles.ovFinBar}>
@@ -1507,7 +1551,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
           {/* ─── Pessoas ─── */}
           {viewTab === 'pessoas' && (() => {
-            const renderRow = (h) => (
+            const renderRow = (h, isTitular = false) => {
+              const telDigits = String(h.telefone ?? '').replace(/\D/g, '');
+              const waNumber  = isTitular && telDigits ? (telDigits.length <= 11 ? `55${telDigits}` : telDigits) : '';
+              const showEmail = isTitular && !!h.email;
+              return (
               <div key={h.id ?? h.nome} className={styles.rvGuestRow}>
                 <div className={styles.rvGuestAvatar}>{initials(h.nome)}</div>
                 <div className={styles.rvGuestInfo}>
@@ -1517,15 +1565,33 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   )}
                   {h.email && <div className={styles.rvGuestMeta}>{h.email}</div>}
                 </div>
+                {(waNumber || showEmail) && (
+                  <div className={styles.rvGuestContacts}>
+                    {waNumber && (
+                      <a className={[styles.rvContactBtn, styles.rvContactBtnWa].join(' ')}
+                        href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
+                        title={`WhatsApp ${fmtPhone(h.telefone)}`} onClick={(e) => e.stopPropagation()}>
+                        <MessageCircle size={15} />
+                      </a>
+                    )}
+                    {showEmail && (
+                      <a className={[styles.rvContactBtn, styles.rvContactBtnMail].join(' ')}
+                        href={`mailto:${h.email}`} title={`E-mail: ${h.email}`} onClick={(e) => e.stopPropagation()}>
+                        <Mail size={15} />
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
-            );
+              );
+            };
             if (guestList.length === 0) return <div className={styles.rvEmptyState}>Nenhuma pessoa vinculada.</div>;
             const titular = guestList[0];
             const acomps = guestList.slice(1);
             return (
               <div className={styles.rvGuestTable}>
                 <div className={styles.rvGuestSectionHeader}>Titular</div>
-                {renderRow(titular)}
+                {renderRow(titular, true)}
                 {acomps.length > 0 && (
                   <>
                     <div className={styles.rvGuestSectionHeader}>Acompanhantes</div>
@@ -1557,6 +1623,13 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
         {/* ── Footer actions ── */}
         <div className={styles.rvFooter}>
+          {limpezaBtnInfo && (
+            <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
+              onClick={() => limpezaBtnInfo.onFinalizar()}
+              title={limpezaBtnInfo.responsavel ? `Limpeza: ${limpezaBtnInfo.responsavel}` : undefined}>
+              <Check size={14} /> Finalizar Limpeza{limpezaBtnInfo.responsavel ? ` · ${limpezaBtnInfo.responsavel}` : ''}
+            </button>
+          )}
           {isOvernight ? (() => {
             // Menu Ações dirigido por lista — único botão, itens conforme o contexto
             // (pernoite usa os callbacks padrão; reservado/etc. passam overnight.acoes).
@@ -1573,13 +1646,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             ]).filter(Boolean);
             return (
             <>
-            {overnight.hasLimpeza && overnight.onFinalizarLimpeza && (
-              <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
-                onClick={() => overnight.onFinalizarLimpeza()}
-                title={overnight.limpezaResponsavel ? `Limpeza: ${overnight.limpezaResponsavel}` : undefined}>
-                <Check size={14} /> Finalizar Limpeza{overnight.limpezaResponsavel ? ` · ${overnight.limpezaResponsavel}` : ''}
-              </button>
-            )}
             <div className={styles.rvAcoesWrap}>
               {acoesOpen && (
                 <>
@@ -1630,7 +1696,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
                       Hospedar
                     </button>
-                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); requestVoucher(); }}>
+                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); handleVoucherClick(); }}>
                       <FileDown size={15}/> Voucher
                     </button>
                     <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
@@ -1664,11 +1730,29 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               </button>
             </div>
           ) : (
-            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={requestVoucher}>
+            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} onClick={handleVoucherClick}>
               <FileDown size={14}/> Voucher
             </button>
           )}
         </div>
+      </Modal>
+
+      <Modal open={showVoucherScope} onClose={() => setShowVoucherScope(false)} size="sm"
+        title={<><FileDown size={14} /> Gerar Voucher</>}
+        footer={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button style={{ flex: 1 }} onClick={() => { setShowVoucherScope(false); requestVoucher(); }}>
+              Apenas esta reserva
+            </Button>
+            <Button variant="primary" style={{ flex: 1 }} onClick={() => { setShowVoucherScope(false); onVoucherGrupo?.(); }}>
+              <Users size={14} /> Grupo{groupInfo?.count ? ` (${groupInfo.count} apt${groupInfo.count !== 1 ? 's' : ''})` : ''}
+            </Button>
+          </div>
+        }
+      >
+        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
+          Esta reserva faz parte de um grupo. Deseja gerar o voucher apenas desta reserva ou do grupo inteiro?
+        </p>
       </Modal>
 
       <Modal open={showVoucherChoice} onClose={() => setShowVoucherChoice(false)} size="sm"
@@ -3327,6 +3411,42 @@ function RoomHospedesPicker({ value = [], onChange }) {
   const inputRef = useRef(null);
   const wrapRef  = useRef(null);
 
+  const mapPessoa = (p) => ({
+    id: p.id, nome: p.nome, cpf: p.cpf ?? '',
+    dataNascimento: p.data_nascimento ?? '',
+    bloqueado: p.status === 'BLOQUEADO',
+    acompanhantes: (p.acompanhantes ?? []).map((a) => ({
+      id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+      dataNascimento: a.data_nascimento ?? '',
+      bloqueado: a.status === 'BLOQUEADO',
+      idade: a.idade ?? null,
+    })),
+  });
+  const mapEmpresa = (e) => ({
+    id: e.id,
+    nome: e.razao_social ?? e.razaoSocial ?? e.nome_fantasia ?? e.nomeFantasia ?? '',
+    nomeFantasia: e.nome_fantasia ?? e.nomeFantasia ?? '',
+    isEmpresa: true,
+  });
+
+  // Ao focar o campo (sem busca digitada), mostra os 10 cadastros mais recentes.
+  const loadRecent = async () => {
+    if (search.trim().length >= 2 || pending) return;
+    setSearching(true);
+    try {
+      if (isEmpresaMode) {
+        const res  = await cadastroApi.listarEmpresas({ size: 10, page: 0 });
+        const list = Array.isArray(res) ? res : (res.content ?? []);
+        setResults(list.map(mapEmpresa));
+      } else {
+        const res  = await cadastroApi.listarPessoas({ ordenacao: 'DATA_CADASTRO', direcao: 'DESC', size: 10 });
+        const list = Array.isArray(res) ? res : (res.content ?? []);
+        setResults(list.map(mapPessoa));
+      }
+    } catch { setResults([]); }
+    finally  { setSearching(false); }
+  };
+
   useEffect(() => {
     if (search.trim().length < 2) { setResults([]); setPending(null); return; }
     setSearching(true);
@@ -3335,26 +3455,10 @@ function RoomHospedesPicker({ value = [], onChange }) {
         if (isEmpresaMode) {
           const res  = await cadastroApi.listarEmpresas({ termo: search.trim(), size: 15, page: 0 });
           const list = Array.isArray(res) ? res : (res.content ?? []);
-          setResults(list.map((e) => ({
-            id: e.id,
-            nome: e.razao_social ?? e.razaoSocial ?? e.nome_fantasia ?? e.nomeFantasia ?? '',
-            nomeFantasia: e.nome_fantasia ?? e.nomeFantasia ?? '',
-            isEmpresa: true,
-          })));
+          setResults(list.map(mapEmpresa));
         } else {
           const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 6 });
           const list = Array.isArray(res) ? res : (res.content ?? []);
-          const mapPessoa = (p) => ({
-            id: p.id, nome: p.nome, cpf: p.cpf ?? '',
-            dataNascimento: p.data_nascimento ?? '',
-            bloqueado: p.status === 'BLOQUEADO',
-            acompanhantes: (p.acompanhantes ?? []).map((a) => ({
-              id: a.id, nome: a.nome, cpf: a.cpf ?? '',
-              dataNascimento: a.data_nascimento ?? '',
-              bloqueado: a.status === 'BLOQUEADO',
-              idade: a.idade ?? null,
-            })),
-          });
           setResults(list.map(mapPessoa));
         }
       } catch { setResults([]); }
@@ -3549,6 +3653,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
             ))}
             <input ref={inputRef} className={styles.hospInlineInput} value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onFocus={loadRecent}
               placeholder={value.length === 0 ? (isEmpresaMode ? 'Buscar empresa...' : 'Buscar hóspede...') : ''} />
           </div>
         </div>
@@ -3563,7 +3668,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false }) {
+export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false }) {
   const isSolicitacao = forceSolicitacao;
   const STEPS = isSolicitacao
     ? ['Tipo', 'Período & Hóspedes', 'Resumo']
@@ -3574,9 +3679,9 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
   const isOrcamento = forceOrcamento; // orçamento é sempre sem cadastro quando forceOrcamento
   const [nomeSolicitante,  setNomeSolicitante]  = useState(''); // nome do solicitante para orçamentos
 
-  // Step 2: período único
+  // Step 2: período único. No modo pernoite o check-in é sempre hoje (travado).
   const [quartos,        setQuartos]        = useState(initialRoom ? [String(initialRoom)] : []);
-  const [checkin,        setCheckin]        = useState(initialStart ? new Date(initialStart + 'T00:00:00') : null);
+  const [checkin,        setCheckin]        = useState(forcePernoite ? new Date() : (initialStart ? new Date(initialStart + 'T00:00:00') : null));
   const [checkout,       setCheckout]       = useState(initialEnd   ? new Date(initialEnd   + 'T00:00:00') : null);
   const [quartoHospedes,    setQuartoHospedes]    = useState({}); // { [quartoId]: [hospede] } — registered
   const [quartoHospedesOrc, setQuartoHospedesOrc] = useState({}); // { [quartoId]: [{ nome, dataNascimento }] } — sem cadastro
@@ -4026,7 +4131,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
         const ciHora = (periodoMode === 'unico' && halfDailyMinCheckin && checkinHour) ? checkinHour : ct.checkin;
         return {
           quarto_id:          parseInt(quartoId),
-          status:             'RESERVA_ATIVA',
+          status:             forcePernoite ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA',
           data_hora_checkin:  `${toBrDate(dataEntrada)} ${ciHora}`,
           data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
@@ -4059,9 +4164,11 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
           allBodies.push(buildReservaBody(q, checkinStr, checkoutStr, quartoHospedes[q] || [], 0, pagModo !== 'unico' || qi === 0));
         }
       }
-      const res = await reservaApi.criarAtiva(allBodies, pagModo === 'unico' ? true : null);
+      const res = forcePernoite
+        ? await hospedagemApi.criarPernoite(allBodies, pagModo === 'unico' ? true : null)
+        : await reservaApi.criarAtiva(allBodies, pagModo === 'unico' ? true : null);
       const allResults = Array.isArray(res) ? res : (res ? [res] : []);
-      await onSave({ _isReserva: true, results: allResults.filter(Boolean) });
+      await onSave(forcePernoite ? { _isPernoite: true, results: allResults.filter(Boolean) } : { _isReserva: true, results: allResults.filter(Boolean) });
     } catch (e) {
       onNotify?.(e?.message || 'Erro ao salvar reserva.', 'error');
     } finally { setSaving(false); }
@@ -4069,7 +4176,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
   return (
     <Modal open onClose={onClose} size="lg"
-      title={<><Plus size={15} /> {isSolicitacao ? 'Nova Solicitação' : forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
+      title={<><Plus size={15} /> {forcePernoite ? 'Novo Pernoite' : isSolicitacao ? 'Nova Solicitação' : forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
       footer={
         <div className={styles.footerSpread}>
           <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>Voltar</Button>}</div>
@@ -4086,7 +4193,7 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
             ) : (
               <Button variant="primary" disabled={saving || calcLoading || (!isSolicitacao && !canNext2)} onClick={handleSave}>
                 {saving && <Loader2 size={13} className={styles.spin} />}
-                {isSolicitacao ? 'Criar Solicitação' : forceOrcamento ? 'Gerar Orçamento' : 'Criar Reserva'}
+                {forcePernoite ? 'Criar Pernoite' : isSolicitacao ? 'Criar Solicitação' : forceOrcamento ? 'Gerar Orçamento' : 'Criar Reserva'}
               </Button>
             )}
           </div>
@@ -4310,8 +4417,8 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
       {/* ── Step 2: Quarto & Período ───────────────────────────────────────── */}
       {step === 2 && !isSolicitacao && (
         <div className={styles.formStack}>
-          {/* Período mode tabs — só para "Vários Apartamentos"; ocultos com quarto pré-selecionado */}
-          {!initialRoom && tipo === 'grupo' && (
+          {/* Período mode tabs — só para "Vários Apartamentos"; ocultos com quarto pré-selecionado ou no modo pernoite */}
+          {!initialRoom && tipo === 'grupo' && !forcePernoite && (
             <div className={styles.periodoTabs}>
               {[['unico', 'Período Único'], ['multiplos', 'Múltiplos Períodos']].map(([v, l]) => (
                 <button key={v} type="button"
@@ -4324,13 +4431,23 @@ function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, 
 
           {periodoMode === 'unico' && (
             <>
-              <div className={styles.step2Grid}>
+              <div className={styles.step2Grid} style={forcePernoite ? { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch' } : undefined}>
                 <FormField label={<>Período de estadia{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
-                  <div className={styles.dateCompact}>
-                    <DatePicker mode="range" startDate={checkin} endDate={checkout}
-                      onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
-                      placeholder="Check-in → Check-out" minDate={new Date()} />
-                  </div>
+                  {forcePernoite ? (
+                    // Pernoite: check-in travado em hoje (mesmo campo do check-out, só leitura).
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <DatePicker mode="single" value={checkin} readOnly placeholder="Check-in" />
+                      <DatePicker mode="single" value={checkout}
+                        onChange={(d) => { setCheckin(new Date()); setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
+                        placeholder="Check-out" minDate={new Date(Date.now() + 86400000)} />
+                    </div>
+                  ) : (
+                    <div className={styles.dateCompact}>
+                      <DatePicker mode="range" startDate={checkin} endDate={checkout}
+                        onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
+                        placeholder="Check-in → Check-out" minDate={new Date()} />
+                    </div>
+                  )}
                 </FormField>
                 <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
                   <RoomCombobox value={quartos}

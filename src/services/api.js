@@ -603,6 +603,11 @@ export const hospedagemApi = {
     return request(`/hospedagem/${hospedagemId}/pessoas`, { method: 'DELETE', body: pessoasIds });
   },
 
+  /** PUT /hospedagem/{hospedagemId}/titular/{pessoaId} — define outra pessoa como titular */
+  definirTitular(hospedagemId, pessoaId) {
+    return request(`/hospedagem/${hospedagemId}/titular/${pessoaId}`, { method: 'PUT' });
+  },
+
   /**
    * POST /hospedagem/{hospedagemId}/pagamentos?quartoId=&status= — adiciona pagamentos à hospedagem.
    * @param {number} hospedagemId

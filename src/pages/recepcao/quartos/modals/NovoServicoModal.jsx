@@ -62,12 +62,30 @@ export default function NovoServicoModal({
 
             <div className={styles.formStack} style={{ gap: 8 }}>
               <div className={styles.nhDividerBlue}>Período</div>
-              <DatePicker
-                mode="range"
-                startDate={nhCheckinDate}
-                endDate={nhCheckoutDate}
-                onRangeChange={({ start, end }) => { setNhCheckinDate(start); setNhCheckoutDate(end); }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <FormField label="Check-in">
+                  <DatePicker
+                    mode="single"
+                    value={nhCheckinDate}
+                    minDate={new Date()}
+                    onChange={(d) => {
+                      setNhCheckinDate(d);
+                      // Se o check-out passou a ser anterior/igual ao novo check-in, limpa.
+                      if (nhCheckoutDate && d && nhCheckoutDate <= d) setNhCheckoutDate(null);
+                    }}
+                    placeholder="Check-in"
+                  />
+                </FormField>
+                <FormField label="Check-out">
+                  <DatePicker
+                    mode="single"
+                    value={nhCheckoutDate}
+                    minDate={nhCheckinDate || new Date()}
+                    onChange={(d) => setNhCheckoutDate(d)}
+                    placeholder="Check-out"
+                  />
+                </FormField>
+              </div>
               {nhCheckinDate && nhCheckoutDate && (
                 <div className={styles.nhPriceCard}>
                   <div style={{ display: 'flex', alignItems: 'stretch' }}>

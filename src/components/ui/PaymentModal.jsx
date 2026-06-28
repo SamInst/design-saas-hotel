@@ -131,9 +131,12 @@ export function PaymentModal({
   canDespesaPessoal  = false,
   valorTotal         = null,
   valorPago          = null,
+  grupoTotal         = null,
+  grupoPago          = null,
   containerStyle     = undefined,
   backdropStyle      = undefined,
 }) {
+  const emGrupo = grupoTotal !== null && grupoPago !== null;
   const [tipoPagId,   setTipoPagId]   = useState('');
   const [nomePagador, setNomePagador] = useState('');
   const [descricao,   setDescricao]   = useState('');
@@ -252,10 +255,29 @@ export function PaymentModal({
           </div>
         }>
 
+        {emGrupo && (
+          <div className={styles.pagSummaryStrip}>
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Total Grupo</span>
+              <span className={styles.pagSummaryVal}>{fmtBRL(grupoTotal)}</span>
+            </div>
+            <div className={styles.pagSummaryDivider} />
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Pago Grupo</span>
+              <span className={[styles.pagSummaryVal, styles.pagSummaryPago].join(' ')}>{fmtBRL(grupoPago)}</span>
+            </div>
+            <div className={styles.pagSummaryDivider} />
+            <div className={styles.pagSummaryItem}>
+              <span className={styles.pagSummaryLabel}>Pendente Grupo</span>
+              <span className={[styles.pagSummaryVal, grupoTotal - grupoPago > 0 ? styles.pagSummaryPendente : styles.pagSummaryPago].join(' ')}>{fmtBRL(Math.max(0, grupoTotal - grupoPago))}</span>
+            </div>
+          </div>
+        )}
+
         {valorTotal !== null && valorPago !== null && (
           <div className={styles.pagSummaryStrip}>
             <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Total</span>
+              <span className={styles.pagSummaryLabel}>{emGrupo ? 'Total Pernoite' : 'Total'}</span>
               <span className={styles.pagSummaryVal}>{fmtBRL(valorTotal)}</span>
             </div>
             <div className={styles.pagSummaryDivider} />

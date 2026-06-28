@@ -15,6 +15,35 @@ export default function NhHospedesPicker({ value = [], onChange }) {
   const inputRef = useRef(null);
   const wrapRef  = useRef(null);
 
+  const mapPessoa = (p) => ({
+    id: p.id,
+    nome: p.nome,
+    cpf: p.cpf ?? '',
+    telefone: p.telefone ?? '',
+    email: p.email ?? '',
+    dataNascimento: p.data_nascimento ?? '',
+    bloqueado: p.status === 'BLOQUEADO',
+    acompanhantes: (p.acompanhantes ?? []).map((a) => ({
+      id: a.id, nome: a.nome, cpf: a.cpf ?? '',
+      telefone: a.telefone ?? '',
+      email: a.email ?? '',
+      dataNascimento: a.data_nascimento ?? '',
+      bloqueado: a.status === 'BLOQUEADO',
+    })),
+  });
+
+  // Ao focar o campo (sem busca digitada), mostra os 10 cadastros mais recentes.
+  const loadRecent = async () => {
+    if (search.trim().length >= 2 || pending) return;
+    setSearching(true);
+    try {
+      const res  = await cadastroApi.listarPessoas({ ordenacao: 'DATA_CADASTRO', direcao: 'DESC', size: 10 });
+      const list = Array.isArray(res) ? res : (res.content ?? []);
+      setResults(list.map(mapPessoa));
+    } catch { setResults([]); }
+    finally  { setSearching(false); }
+  };
+
   useEffect(() => {
     if (search.trim().length < 2) { setResults([]); setPending(null); return; }
     setSearching(true);
@@ -22,22 +51,7 @@ export default function NhHospedesPicker({ value = [], onChange }) {
       try {
         const res  = await cadastroApi.listarPessoas({ termo: search.trim(), size: 8 });
         const list = Array.isArray(res) ? res : (res.content ?? []);
-        setResults(list.map((p) => ({
-          id: p.id,
-          nome: p.nome,
-          cpf: p.cpf ?? '',
-          telefone: p.telefone ?? '',
-          email: p.email ?? '',
-          dataNascimento: p.data_nascimento ?? '',
-          bloqueado: p.status === 'BLOQUEADO',
-          acompanhantes: (p.acompanhantes ?? []).map((a) => ({
-            id: a.id, nome: a.nome, cpf: a.cpf ?? '',
-            telefone: a.telefone ?? '',
-            email: a.email ?? '',
-            dataNascimento: a.data_nascimento ?? '',
-            bloqueado: a.status === 'BLOQUEADO',
-          })),
-        })));
+        setResults(list.map(mapPessoa));
       } catch { setResults([]); }
       finally  { setSearching(false); }
     }, 300);
@@ -155,6 +169,7 @@ export default function NhHospedesPicker({ value = [], onChange }) {
         ))}
         <input ref={inputRef} className={styles.nhPickerInput} value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onFocus={loadRecent}
           placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
       </div>
       {dropdown}
