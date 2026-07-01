@@ -573,6 +573,16 @@ export const hospedagemApi = {
     return request(`/hospedagem/grupo/${grupoId}/resumo`);
   },
 
+  /** GET /hospedagem/grupos — lista todos os grupos existentes ({ grupo_id, count, titulares }). */
+  listarGrupos() {
+    return request('/hospedagem/grupos');
+  },
+
+  /** GET /hospedagem/grupo/{grupoId} — todas as hospedagens do grupo (qualquer mês). */
+  buscarGrupo(grupoId) {
+    return request(`/hospedagem/grupo/${grupoId}`);
+  },
+
   /**
    * POST /hospedagem/pernoite — cria um ou mais pernoites diretamente (status PERNOITE_ATIVO),
    * sem passar por reserva. Mesmo corpo do criarAtiva de reserva.

@@ -170,6 +170,21 @@
   flex-shrink: 0; border-right: 1px solid var(--border); padding: 3px 2px;
   background: #fff; cursor: pointer; transition: background 0.12s; user-select: none;
 }
+
+/* Lateral day-step buttons, pinned to the visible left/right edges of the scroll area */
+.gridScrollWrap { position: relative; }
+.dayNavBtn {
+  position: absolute; top: calc(56px / 2); transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; z-index: 30;
+  background: #fff; border: 1px solid var(--border); border-radius: 50%;
+  color: var(--text-2); cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.dayNavBtn:hover { background: var(--violet); color: #fff; border-color: var(--violet); }
+/* Left button sits just right of the sticky 80px room-label column */
+.dayNavBtnLeft  { left: calc(80px + 6px); }
+.dayNavBtnRight { right: 24px; }
 .dayHeader:hover { background: color-mix(in srgb, var(--violet) 8%, #fff); }
 .dayHeaderWeekend { background: color-mix(in srgb, #ef4444 7%, #fff); }
 .dayHeaderWeekend:hover { background: color-mix(in srgb, #ef4444 13%, transparent); }
@@ -1219,6 +1234,7 @@
   display: flex; align-items: center; gap: 12px;
   padding: 8px 16px;
   background: #1e293b;
+  margin-top: 12px;
 }
 .step3PeriodoBandLabel {
   font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -1235,11 +1251,10 @@
 /* Room block in step 3 */
 .step3RoomBlock {
   display: flex; flex-direction: column;
-  border-bottom: 1px solid var(--border);
   padding-bottom: 4px;
   margin-bottom: 4px;
 }
-.step3RoomBlock:last-child { border-bottom: none; margin-bottom: 0; }
+.step3RoomBlock:last-child { margin-bottom: 0; }
 
 /* Generic section inside room block */
 .step3RoomSection {
@@ -1265,25 +1280,22 @@
 .step3PagMeta { font-size: 11px; color: var(--text-2); }
 
 /* Payment mode toggle */
-.pagModoToggle {
-  display: flex; gap: 8px; margin-bottom: 14px;
+/* Payment-mode checklist (right of the "Modo" field) */
+.pagModoChecklist {
+  display: flex; flex-direction: column; gap: 6px; flex-shrink: 0;
 }
-.pagModoOption {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 14px; border-radius: 20px; cursor: pointer;
+.pagModoCheckItem {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
   font-size: 12px; font-weight: 500; color: var(--text-2);
-  border: 1px solid var(--border);
-  background: transparent;
+  user-select: none; transition: color .15s;
+}
+.pagModoCheckItem:hover { color: #f97316; }
+.pagModoCheckBox {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
   transition: all .15s;
-  user-select: none;
 }
-.pagModoOption input[type="radio"] { display: none; }
-.pagModoOption:hover { border-color: #f97316; color: #f97316; }
-.pagModoOptionActive {
-  border-color: #f97316; color: #f97316;
-  background: color-mix(in srgb, #f97316 10%, transparent);
-  font-weight: 600;
-}
+.pagModoCheckBoxOn { background: #f97316; border-color: #f97316; color: #fff; }
 
 /* Payment label inside step 3 */
 .step3PagLabel {
