@@ -15,7 +15,16 @@
       "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\overviewMocks.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\overviewApi.js\")",
       "Bash(Copy-Item \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\overview\\\\gerarVoucherHospedagem.js\" \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\shared\\\\gerarVoucherHospedagem.js\")",
       "PowerShell(\\(Get-Content \"c:\\\\Users\\\\sanhe\\\\Downloads\\\\meu-hotel-project\\\\meu-hotel-project\\\\src\\\\pages\\\\recepcao\\\\RecepcaoPage.jsx\" | Measure-Object -Line\\).Lines)",
-      "Bash(node --input-type=module)"
+      "Bash(node --input-type=module)",
+      "Bash(mkdir -p assets)",
+      "Bash(mv public/convite.jpg assets/convite.jpg)",
+      "Bash(rmdir public *)",
+      "Bash(./gradlew compileJava -q --console=plain)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\sanhe\\\\Downloads\\\\cha-de-bebe-vicente\"; Start-Process -FilePath \"node\" -ArgumentList \"serve.js\" -WindowStyle Hidden; Start-Sleep -Seconds 2; \\(Invoke-WebRequest -UseBasicParsing http://localhost:5500/ -TimeoutSec 5\\).StatusCode)",
+      "PowerShell(gh auth *)",
+      "Bash(/c/Users/sanhe/Downloads/istoepousada/istoepousada/gradlew.bat -p \"C:/Users/sanhe/Downloads/istoepousada/istoepousada\" compileJava)",
+      "Bash(/c/Users/sanhe/Downloads/istoepousada/istoepousada/gradlew.bat -p \"C:/Users/sanhe/Downloads/istoepousada/istoepousada\" compileJava --rerun-tasks)",
+      "Bash(./gradlew spotlessApply -q)"
     ]
   }
 }

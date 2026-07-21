@@ -247,6 +247,11 @@ export const relatorioApi = {
     if (arquivo) fd.append('arquivo', arquivo);
     return request('/relatorio', { method: 'PUT', formData: fd });
   },
+
+  /** GET /relatorio/{id}/historico — histórico de alterações (quem alterou e o que mudou) */
+  historico(id) {
+    return request(`/relatorio/${id}/historico`);
+  },
 };
 
 // ─────────────────────────────────────────────────────────────

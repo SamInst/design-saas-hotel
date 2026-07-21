@@ -129,6 +129,10 @@ export function PaymentModal({
   quartoNumero       = null,
   canAplicarDesconto = true,
   canDespesaPessoal  = false,
+  quartos               = [],
+  initialQuarto         = '',
+  despesaInternaEnabled = false,
+  initialDespesaInterna = false,
   valorTotal         = null,
   valorPago          = null,
   grupoTotal         = null,
@@ -148,12 +152,16 @@ export function PaymentModal({
   const [showDesc,      setShowDesc]      = useState(false);
   const [descontoOrigUuid, setDescontoOrigUuid] = useState(null);
   const [despesaPessoal,   setDespesaPessoal]   = useState(false);
+  const [quartoSel,        setQuartoSel]        = useState('');
+  const [despesaInterna,   setDespesaInterna]   = useState(false);
   const [localSubmitting,  setLocalSubmitting]  = useState(false);
 
   // Inicializa ao abrir
   useEffect(() => {
     if (!open) { setLocalSubmitting(false); return; }
     setDespesaPessoal(false);
+    setQuartoSel(initialQuarto ? String(initialQuarto) : '');
+    setDespesaInterna(!!initialDespesaInterna);
     if (initialPayment) {
       setTipoPagId(String(initialPayment.tipo_pagamento?.id ?? ''));
       setNomePagador((initialPayment.nome_pagador ?? '').toUpperCase());
@@ -236,6 +244,8 @@ export function PaymentModal({
     };
     if (arquivo)      payment._arquivo       = arquivo;
     if (arquivoRemov) payment._arquivoRemov  = true;
+    if (quartos.length && quartoSel) payment._quarto = Number(quartoSel);
+    if (despesaInternaEnabled && despesaInterna) payment._despesaInterna = true;
     onConfirm(payment);
   };
 
@@ -313,6 +323,24 @@ export function PaymentModal({
           <label className={styles.despesaPessoalRow}>
             <input type="checkbox" checked={despesaPessoal} onChange={e => setDespesaPessoal(e.target.checked)} />
             <span>Despesa pessoal <span className={styles.despesaPessoalHint}>(sem cobrança)</span></span>
+          </label>
+        )}
+
+        {quartos.length > 0 && (
+          <FormField label="Quarto">
+            <Select value={quartoSel} onChange={e => setQuartoSel(e.target.value)}>
+              <option value="">Nenhum</option>
+              {quartos.map(q => (
+                <option key={q.id} value={q.id}>{`Quarto ${q.id} - ${q.descricao}`}</option>
+              ))}
+            </Select>
+          </FormField>
+        )}
+
+        {despesaInternaEnabled && (
+          <label className={styles.checkRow}>
+            <input type="checkbox" checked={despesaInterna} onChange={e => setDespesaInterna(e.target.checked)} />
+            <span>Despesa interna do Hotel</span>
           </label>
         )}
 

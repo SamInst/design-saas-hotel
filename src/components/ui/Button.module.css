@@ -67,6 +67,15 @@
 }
 .danger:hover { background: #dc2626; }
 
+/* ── SUCCESS ── */
+.success {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
+}
+.success:hover { background: #059669; border-color: #059669; }
+
 /* ── GHOST ── */
 .ghost {
   background: transparent;

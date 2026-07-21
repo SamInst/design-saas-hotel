@@ -1,6 +1,6 @@
 import styles from './Button.module.css';
 
-export function Button({ children, variant = 'secondary', onClick, className = '', type = 'button', disabled = false }) {
+export function Button({ children, variant = 'secondary', onClick, className = '', type = 'button', disabled = false, ...rest }) {
   return (
     <button
       type={type}
@@ -11,6 +11,7 @@ export function Button({ children, variant = 'secondary', onClick, className = '
         styles[variant] || styles.secondary,
         className
       ].join(' ')}
+      {...rest}
     >
       {children}
     </button>
