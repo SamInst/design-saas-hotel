@@ -72,17 +72,12 @@
 /* Meta empilhada sob o nome — só aparece quando colunas são ocultadas no mobile */
 .cellMetaMobile { display: none; }
 .metaReg {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: 8px; line-height: 1;
-  background: var(--surface-2); border: 1px solid var(--border);
-  color: var(--text-2); font-size: 11px; font-weight: 500; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--text-2); font-size: 11px; white-space: nowrap;
 }
 .metaReg svg { flex-shrink: 0; opacity: .8; }
-.metaRegHora {
-  font-weight: 600; color: var(--text);
-  padding-left: 6px; margin-left: 1px;
-  border-left: 1px solid var(--border);
-}
+.metaRegHora { color: var(--text-2); margin-left: 5px; }
+.metaRegHora::before { content: '·'; margin-right: 5px; opacity: .6; }
 
 /* WhatsApp na célula de telefone (desktop) */
 .phoneCell { display: inline-flex; align-items: center; gap: 7px; }
@@ -95,17 +90,17 @@
 }
 .waBtn:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
-/* WhatsApp na meta empilhada (mobile) */
+/* WhatsApp na meta empilhada (mobile) — texto simples com linha sob o número */
 .waMeta {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 9px; border-radius: 8px; line-height: 1;
-  background: rgba(37,211,102,.1); border: 1px solid rgba(37,211,102,.25);
-  color: #1da851; font-size: 11px; font-weight: 600;
-  font-family: var(--font-mono); text-decoration: none; white-space: nowrap;
-  transition: background .12s, color .12s, border-color .12s;
+  display: inline-flex; align-items: center; gap: 4px;
+  color: #1da851; font-size: 11px; font-weight: 500;
+  font-family: var(--font-mono); white-space: nowrap;
+  text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: rgba(37,211,102,.4);
+  transition: color .12s;
 }
 .waMeta svg { flex-shrink: 0; }
-.waMeta:hover { background: #25d366; color: #fff; border-color: #25d366; }
+.waMeta:hover { color: #128c3e; }
 .btnEye   {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border);
@@ -695,8 +690,8 @@
   /* colapsa colunas secundárias para a meta empilhada */
   .colDoc, .colPhone, .colDate { display: none; }
   .cellMetaMobile {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 5px;
-    margin-top: 3px; font-size: 11px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+    margin-top: 4px; font-size: 11px;
   }
   .cellMetaMobile .mono { font-size: 11px; }
   .table th, .table td { padding-left: 12px; padding-right: 12px; }

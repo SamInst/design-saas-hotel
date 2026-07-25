@@ -794,13 +794,17 @@ export default function RegistersPage() {
     const raw = unmask(cep);
     if (raw.length !== 8) return;
     const d = await cadastroApi.buscarCEP(raw);
+    // O back-end pode devolver estado/municipio/pais como string ("MARANHÃO")
+    // ou como objeto ({ descricao: "MARANHÃO" }). Normaliza os dois formatos.
+    const desc = v => (v && typeof v === 'object' ? v.descricao : v) || '';
     setter(prev => ({
       ...prev,
-      endereco:  d.endereco  || prev.endereco,
-      bairro:    d.bairro    || prev.bairro,
-      pais:      d.pais?.descricao      || prev.pais,
-      estado:    d.estado?.descricao    || prev.estado,
-      municipio: d.municipio?.descricao || prev.municipio,
+      endereco:    d.endereco    || prev.endereco,
+      bairro:      d.bairro      || prev.bairro,
+      complemento: d.complemento || prev.complemento,
+      pais:        desc(d.pais)      || prev.pais,
+      estado:      desc(d.estado)    || prev.estado,
+      municipio:   desc(d.municipio) || prev.municipio,
     }));
   };
 
@@ -2075,12 +2079,14 @@ export default function RegistersPage() {
             <div className={styles.regFormArea}>
               {activeRegIdx === -1 ? (
                 <PessoaForm
+                  key="reg-titular"
                   data={titular} onChange={setTitular}
                   onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
                   showErrors={showErrors}
                 />
               ) : (
                 <PessoaForm
+                  key={`reg-dep-${activeRegIdx}`}
                   data={dependentes[activeRegIdx]}
                   onChange={val => setDepData(activeRegIdx, val)}
                   onFetchCEP={fetchCEP}
