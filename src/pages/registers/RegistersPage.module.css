@@ -34,6 +34,7 @@
 
 /* ── Filtros ── */
 .filterRow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.filterTabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-width: 0; }
 .filterTab {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
@@ -62,14 +63,26 @@
 .typePessoa  { background: rgba(124,58,237,.12); color: var(--violet); }
 .typeEmpresa { background: rgba(14,165,233,.12);  color: #0ea5e9; }
 
-.nome     { font-size: 13px; font-weight: 600; color: var(--text); }
+.nome     { font-size: 13px; font-weight: 600; color: var(--text); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub      { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 .mono     { font-size: 12px; font-family: var(--font-mono); color: var(--text-2); white-space: nowrap; }
 .dateCell { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+.dateHora { font-size: 11px; color: var(--text-3, var(--text-2)); opacity: .8; margin-top: 1px; }
 
 /* Meta empilhada sob o nome — só aparece quando colunas são ocultadas no mobile */
 .cellMetaMobile { display: none; }
-.metaReg { display: inline-flex; align-items: center; gap: 3px; color: var(--text-2); }
+.metaReg {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 8px; line-height: 1;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-2); font-size: 11px; font-weight: 500; white-space: nowrap;
+}
+.metaReg svg { flex-shrink: 0; opacity: .8; }
+.metaRegHora {
+  font-weight: 600; color: var(--text);
+  padding-left: 6px; margin-left: 1px;
+  border-left: 1px solid var(--border);
+}
 
 /* WhatsApp na célula de telefone (desktop) */
 .phoneCell { display: inline-flex; align-items: center; gap: 7px; }
@@ -84,12 +97,14 @@
 
 /* WhatsApp na meta empilhada (mobile) */
 .waMeta {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 2px 8px; border-radius: 999px;
-  background: rgba(37,211,102,.1); border: 1px solid rgba(37,211,102,.28);
-  color: #1da851; font-size: 11px; font-weight: 400;
-  font-family: var(--font-mono); text-decoration: none;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: 8px; line-height: 1;
+  background: rgba(37,211,102,.1); border: 1px solid rgba(37,211,102,.25);
+  color: #1da851; font-size: 11px; font-weight: 600;
+  font-family: var(--font-mono); text-decoration: none; white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
 }
+.waMeta svg { flex-shrink: 0; }
 .waMeta:hover { background: #25d366; color: #fff; border-color: #25d366; }
 .btnEye   {
   display: inline-flex; align-items: center; justify-content: center;
@@ -311,6 +326,7 @@
 }
 .photoRightCol {
   flex:1; display:flex; flex-direction:column; gap:10px; min-width:0;
+  container: regFields / inline-size;
 }
 .photoFields {
   display:grid; grid-template-columns:1fr 1fr;
@@ -320,6 +336,19 @@
 .photoFields > *:nth-child(1) { grid-column:1; grid-row:1; }                       /* CPF */
 .photoFields > *:nth-child(3) { grid-column:2; grid-row:1; width:auto !important; } /* Nascimento */
 .photoFields > *:nth-child(2) { grid-column:1 / -1; grid-row:2; }                  /* Nome (isolado) */
+
+/* Quando a coluna de campos fica estreita demais para caber o placeholder
+   ("000.000.000-00", "(00) 00000-0000", "dd/mm/aaaa"), empilha os campos
+   um abaixo do outro, todos com a mesma largura. */
+@container regFields (max-width: 400px) {
+  .photoFields { grid-template-columns:1fr; }
+  .photoFields > *:nth-child(1),
+  .photoFields > *:nth-child(2),
+  .photoFields > *:nth-child(3) {
+    grid-column:1; grid-row:auto; width:auto !important;
+  }
+  .grid3 { grid-template-columns:1fr; }
+}
 .photoBig {
   position:relative; width:88px; height:88px; border-radius:50%;
   border:2px dashed var(--border); background:var(--surface-2);
@@ -652,12 +681,16 @@
   .tableHeader { padding: 12px 12px 10px; }
   .tableTools  { width: 100%; }
   .searchWrap  { flex: 1 1 100%; min-width: 0; order: -1; }
-  .filterRow   { padding: 10px 12px; gap: 5px; }
-  /* rolagem horizontal das abas de filtro em telas estreitas */
-  .filterRow   { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .filterRow::-webkit-scrollbar { display: none; }
+  /* abas de status rolam numa faixa; ordenação vai para a própria linha */
+  .filterRow   { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .filterTabs  {
+    display: flex; gap: 6px; flex: 1 1 100%;
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+  }
+  .filterTabs::-webkit-scrollbar { display: none; }
   .filterTab   { flex-shrink: 0; }
-  .sortGroup   { margin-left: auto; flex-shrink: 0; }
+  .sortGroup   { margin-left: 0; flex: 1 1 100%; }
+  .sortSelect  { width: 100%; }
 
   /* colapsa colunas secundárias para a meta empilhada */
   .colDoc, .colPhone, .colDate { display: none; }
@@ -685,12 +718,19 @@
   /* layout de campos (CPF+Nascimento / Nome) já é o padrão em .photoFields */
   .modalTwoCol { flex-direction:column; }
   .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--border); }
+}
 
+/* Registro de hóspede: em telas < 727px o painel "Cadastrando" (pessoas + botões)
+   vai para o topo e fica fixo acima dos campos enquanto o formulário rola. */
+@media (max-width:727px) {
   .regLayout { flex-direction: column; }
   .regSidebar {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--border);
     padding: 10px;
+    position: sticky; top: 0; z-index: 2;
+    background: var(--surface-2);
+    box-shadow: 0 6px 12px -8px rgba(0,0,0,.28);
   }
   .regPersonList { flex-direction: row; flex-wrap: wrap; gap: 6px; }
   .regPersonCard { width: auto; flex: 1 1 140px; }
@@ -698,8 +738,14 @@
   .regEmpresaBar { padding: 12px 16px; }
 }
 
+/* Foto no topo e campos abaixo também na faixa 694–825px */
+@media (min-width:694px) and (max-width:825px) {
+  .photoHeaderRow { flex-direction:column; align-items:center; }
+  .photoRightCol  { width:100%; }
+}
+
 /* ── Novo badge ── */
-.nomeRow { display: flex; align-items: center; gap: 6px; }
+.nomeRow { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .badgeNovo {
   display: inline-flex; align-items: center;
   font-size: 9px; font-weight: 800;

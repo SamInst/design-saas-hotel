@@ -1415,13 +1415,15 @@ export default function RegistersPage() {
 
           {/* Filtros + Ordenação */}
           <div className={styles.filterRow}>
-            {filterTabs.map(({ id, label, Icon }) => (
-              <button key={id}
-                className={[styles.filterTab, filterMode === id ? styles.filterTabActive : ''].join(' ')}
-                onClick={() => changeFilter(id)}>
-                <Icon size={12} /> {label}
-              </button>
-            ))}
+            <div className={styles.filterTabs}>
+              {filterTabs.map(({ id, label, Icon }) => (
+                <button key={id}
+                  className={[styles.filterTab, filterMode === id ? styles.filterTabActive : ''].join(' ')}
+                  onClick={() => changeFilter(id)}>
+                  <Icon size={12} /> {label}
+                </button>
+              ))}
+            </div>
             {filterMode !== 'empresas' && (
               <div className={styles.sortGroup}>
                 <select
@@ -1470,6 +1472,11 @@ export default function RegistersPage() {
                       const [y, m, d] = iso.split('-');
                       return `${d}/${m}/${y}`;
                     };
+                    const fmtHora = reg => {
+                      if (!reg) return '';
+                      const m = String(reg).match(/\d{2}:\d{2}/);
+                      return m ? m[0] : '';
+                    };
                     const waLink = tel => {
                       const d = unmask(tel);
                       if (!d) return null;
@@ -1481,7 +1488,8 @@ export default function RegistersPage() {
                     const isNew = toISO(item.data_hora_registro) === todayISO;
                     const docFmt = item._type === 'empresa' ? maskCNPJ(item.cnpj ?? '') : maskCPF(item.cpf ?? '');
                     const telFmt = item.telefone ? maskPhone(item.telefone) : '';
-                    const regFmt = fmtReg(item.data_hora_registro);
+                    const regFmt  = fmtReg(item.data_hora_registro);
+                    const regHora = fmtHora(item.data_hora_registro);
                     return (
                       <tr key={`${item._type}-${item.id}`} className={styles.row} onClick={() => openDetail(item)}>
                         <td>
@@ -1522,7 +1530,9 @@ export default function RegistersPage() {
                                 <MessageCircle size={11} /> {telFmt}
                               </a>
                             )}
-                            <span className={styles.metaReg}><Calendar size={9} /> {regFmt}</span>
+                            <span className={styles.metaReg}>
+                              <Calendar size={10} /> {regFmt}{regHora && <span className={styles.metaRegHora}>{regHora}</span>}
+                            </span>
                           </div>
                         </td>
                         <td className={[styles.mono, styles.colDoc].join(' ')}>{docFmt}</td>
@@ -1537,7 +1547,10 @@ export default function RegistersPage() {
                             </span>
                           ) : <span className={styles.mono}>—</span>}
                         </td>
-                        <td className={[styles.dateCell, styles.colDate].join(' ')}>{regFmt}</td>
+                        <td className={[styles.dateCell, styles.colDate].join(' ')}>
+                          <div>{regFmt}</div>
+                          {regHora && <div className={styles.dateHora}>{regHora}</div>}
+                        </td>
                         <td><StatusBadge status={item.status} /></td>
                       </tr>
                     );
