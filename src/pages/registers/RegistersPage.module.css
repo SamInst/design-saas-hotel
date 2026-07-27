@@ -34,7 +34,10 @@
 
 /* ── Filtros ── */
 .filterRow { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+.filterTabsWrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .filterTabs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; min-width: 0; }
+/* setas só aparecem quando a faixa de abas passa a rolar (telas pequenas) */
+.filterNavBtn { display: none; }
 .filterTab {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border);
@@ -172,11 +175,12 @@
   color:#ef4444; font-size:12px; font-weight:500;
 }
 
-/* ── Tabs (pill track) ── */
+/* ── Tabs (sublinhado, sem trilho) ── */
 .tabs {
-  display:flex; gap:4px; padding:4px;
-  background:var(--surface-2); border:1px solid var(--border);
-  border-radius:12px; margin:0 0 4px;
+  display:flex; gap:2px; padding:0; margin:0;
+  background:none; border:none; border-radius:0;
+  /* hairline sob toda a faixa; o sublinhado da aba ativa pinta por cima */
+  box-shadow:inset 0 -1px 0 var(--border);
   /* permite o scroll horizontal funcionar mesmo dentro de um container flex */
   min-width:0; max-width:100%;
   overflow-x:auto; overflow-y:hidden;
@@ -185,37 +189,62 @@
 }
 .tabs::-webkit-scrollbar { display:none; }
 .tab {
-  padding:8px 15px; font-size:12.5px; font-weight:600;
-  color:var(--text-2); background:none; border:none; border-radius:9px;
+  padding:7px 12px 11px; font-size:12.5px; font-weight:600;
+  color:var(--text-2); background:none;
+  border:none; border-bottom:2px solid transparent; border-radius:0;
   cursor:pointer; white-space:nowrap; flex:0 0 auto;
-  transition:background .15s, color .15s;
+  transition:color .15s, border-color .15s;
 }
-.tab:hover   { color:var(--text); background:var(--surface); }
-.tabActive   { color:#fff; background:var(--violet); }
-.tabActive:hover { color:#fff; background:var(--violet); }
-.tabBody     { padding-top:16px; min-height:340px; }
+.tab:hover   { color:var(--text); background:none; }
+.tabActive   { color:var(--violet); border-bottom-color:var(--violet); background:none; }
+.tabActive:hover { color:var(--violet); background:none; }
+.tabBody     { padding-top:24px; padding-bottom:28px; min-height:340px; }
 
 @media (max-width: 600px) {
-  .tab { padding:8px 13px; font-size:12px; }
+  .tab { padding:7px 10px 11px; font-size:12px; }
   .tabBody { min-height:0; }
 }
 
-/* ── Detail info cards ── */
-.detailGrid  { display:flex; flex-direction:column; gap:12px; }
+/* Telas pequenas: abas fixas no topo do corpo do modal enquanto o conteúdo rola.
+   As margens negativas cobrem o padding (16px) do .body do Modal. */
+@media (max-width: 700px) {
+  .tabs {
+    position:sticky; top:0; z-index:3;
+    margin:-16px -16px 0; padding:10px 16px 0;
+    background:var(--surface);
+  }
+}
+
+/* ── Detail info (sem card: apenas título + lista) ── */
+.detailGrid  { display:flex; flex-direction:column; gap:0; }
 .infoCard {
-  background:var(--surface-2);
-  border:1px solid var(--border);
-  border-radius:14px;
-  padding:15px 16px 13px;
+  background:none; border:none; border-radius:0; padding:0;
+}
+/* telas pequenas: seções empilhadas, separadas por uma linha */
+.detailGrid > .infoCard + .infoCard {
+  margin-top:14px; padding-top:14px; border-top:1px solid var(--border);
 }
 .infoCardTitle {
   display:flex; align-items:center; gap:8px;
-  font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
-  color:var(--violet); margin-bottom:13px;
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-2); margin-bottom:10px;
 }
-.infoCardTitle::before {
-  content:''; width:7px; height:7px; border-radius:50%; flex-shrink:0;
-  background:var(--violet); box-shadow:0 0 0 3px color-mix(in srgb, var(--violet) 16%, transparent);
+
+/* telas grandes: 3 colunas separadas por uma linha vertical */
+@media (min-width: 980px) {
+  .detailGrid {
+    display:grid; grid-template-columns:repeat(3, 1fr);
+    gap:0; align-items:stretch; /* estica para a linha vertical ir de ponta a ponta */
+  }
+  .detailGrid > .infoCard { padding:0 18px; }
+  .detailGrid > .infoCard:first-child { padding-left:0; }
+  .detailGrid > .infoCard:last-child  { padding-right:0; }
+  .detailGrid > .infoCard + .infoCard {
+    margin-top:0; padding-top:0;
+    border-top:none; border-left:1px solid var(--border);
+  }
+  /* coluna estreita: um dado por linha */
+  .detailGrid .kvList { grid-template-columns:1fr; gap:11px; }
 }
 
 .sectionLabel { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:7px; }
@@ -305,27 +334,44 @@
 .comboInput::placeholder { text-transform: none; }
 
 /* ── Form layout ── */
-.formBody    { display:flex; flex-direction:column; gap:10px; }
+.formBody    { display:flex; flex-direction:column; gap:7px; }
 .formDivider { height:1px; background:var(--border); margin:4px 0; }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 8px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px 8px; }
 .spanTwo { grid-column:span 2; }
+
+/* ── Campos compactos e sem adornos (só dentro dos formulários desta página) ── */
+.formBody input:not([type="checkbox"]),
+.formBody select,
+.formBody .comboInput,
+.compactTrigger {
+  padding:7px 10px;
+  border-radius:7px;
+  box-shadow:none;
+}
+.formBody select { padding-right:28px; background-position:right 9px center; }
+.compactTrigger  { border-width:1px; }
+/* rótulos mais leves e colados no campo */
+.formBody label:not(.useTitularRow):not(.fieldLabel) {
+  font-size:10.5px; font-weight:600; letter-spacing:.03em;
+  margin-bottom:-2px;
+}
 
 /* ── Foto + campos principais (header do form) ── */
 .photoHeaderRow {
-  display:flex; gap:16px; align-items:flex-start;
+  display:flex; gap:12px; align-items:flex-start;
 }
 .photoSide {
   display:flex; flex-direction:column; align-items:center;
   gap:6px; flex-shrink:0; padding-top:2px;
 }
 .photoRightCol {
-  flex:1; display:flex; flex-direction:column; gap:10px; min-width:0;
+  flex:1; display:flex; flex-direction:column; gap:7px; min-width:0;
   container: regFields / inline-size;
 }
 .photoFields {
   display:grid; grid-template-columns:1fr 1fr;
-  gap:10px; align-items:start;
+  gap:7px 8px; align-items:start;
 }
 /* CPF + Nascimento na linha de cima, Nome isolado embaixo (todas as larguras) */
 .photoFields > *:nth-child(1) { grid-column:1; grid-row:1; }                       /* CPF */
@@ -345,23 +391,23 @@
   .grid3 { grid-template-columns:1fr; }
 }
 .photoBig {
-  position:relative; width:88px; height:88px; border-radius:50%;
-  border:2px dashed var(--border); background:var(--surface-2);
+  position:relative; width:104px; height:104px; border-radius:50%;
+  border:1px dashed var(--border); background:var(--surface-2);
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; transition:border-color .15s;
 }
 .photoBig:hover { border-color:var(--violet); }
 .photoIconBig   { opacity:.35; color:var(--text-2); }
 .photoUploadBtn {
-  position:absolute; bottom:0; right:0;
-  width:24px; height:24px; border-radius:50%;
+  position:absolute; bottom:2px; right:2px;
+  width:26px; height:26px; border-radius:50%;
   background:var(--violet); color:#fff;
   display:flex; align-items:center; justify-content:center;
 }
 .photoBadgeTop {
   font-size:10px; color:var(--text-2);
-  background:var(--surface-2); border:1px solid var(--border);
-  padding:1px 8px; border-radius:10px; white-space:nowrap;
+  background:transparent; border:1px solid var(--border);
+  padding:1px 7px; border-radius:5px; white-space:nowrap;
 }
 
 /* ── Required field highlight ── */
@@ -386,7 +432,7 @@
 .iconErr   { color:#ef4444; }
 
 /* ── CEP / CNPJ loading ── */
-.fieldLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:5px; }
+.fieldLabel { font-size:10.5px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:3px; }
 .inputWithSpinner { position:relative; display:flex; align-items:center; }
 .inputWithSpinner input { width:100%; padding-right:30px !important; }
 .inputSpinner { position:absolute; right:10px; color:var(--violet); pointer-events:none; }
@@ -407,8 +453,8 @@
 /* ── Sub form blocks ── */
 .subHead      { display:flex; align-items:center; justify-content:space-between; }
 .subHeadTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-2); }
-.subFormBlock { border:1px solid var(--border); border-radius:10px; padding:12px; background:var(--surface-2); margin-top:6px; }
-.subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:12px; font-weight:600; color:var(--text-2); margin-bottom:10px; }
+.subFormBlock { border:1px solid var(--border); border-radius:8px; padding:9px 10px; background:transparent; margin-top:4px; }
+.subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
 
 /* ── Searchable Combobox ── */
 .comboInput {
@@ -501,18 +547,14 @@
 }
 .sectionDividerRow .sectionDivider { flex: 1; margin: 0; }
 .sectionDivider {
-  display: flex; align-items: center; gap: 8px;
-  color: #1d4ed8;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-  margin: 18px 0 6px;
-}
-.sectionDivider::before {
-  content: ''; width: 3px; height: 14px;
-  background: #1d4ed8; border-radius: 2px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 7px;
+  color: var(--text-2);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  margin: 12px 0 2px;
 }
 .sectionDivider::after {
   content: ''; flex: 1; height: 1px;
-  background: rgba(29, 78, 216, 0.2);
+  background: var(--border);
 }
 
 /* ── Radio group ── */
@@ -676,18 +718,32 @@
   .tableHeader { padding: 12px 12px 10px; }
   .tableTools  { width: 100%; }
   .searchWrap  { flex: 1 1 100%; min-width: 0; order: -1; }
-  /* abas de status rolam numa faixa; ordenação vai para a própria linha */
-  .filterRow   { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  /* abas de status rolam numa faixa com setas laterais; ordenação vai para a própria linha */
+  .filterRow      { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .filterTabsWrap { flex: 1 1 100%; }
   .filterTabs  {
-    display: flex; gap: 6px; flex: 1 1 100%;
+    display: flex; gap: 6px; flex: 1 1 auto;
     flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    scroll-behavior: smooth;
   }
   .filterTabs::-webkit-scrollbar { display: none; }
   .filterTab   { flex-shrink: 0; }
+  .filterNavBtn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 7px;
+    background: var(--surface); color: var(--text-2);
+    cursor: pointer; transition: opacity .12s, color .12s, border-color .12s;
+  }
+  .filterNavBtn:hover:not(:disabled) { color: var(--violet); border-color: var(--violet); }
+  .filterNavBtn:disabled { opacity: .3; cursor: default; }
   .sortGroup   { margin-left: 0; flex: 1 1 100%; }
   .sortSelect  { width: 100%; }
+}
 
-  /* colapsa colunas secundárias para a meta empilhada */
+/* Abaixo de 990px as colunas Documento/Telefone/Cadastrado em já não cabem
+   (ficavam cortadas até 860px), então colapsam para a meta empilhada sob o nome. */
+@media (max-width: 990px) {
   .colDoc, .colPhone, .colDate { display: none; }
   .cellMetaMobile {
     display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
@@ -695,12 +751,24 @@
   }
   .cellMetaMobile .mono { font-size: 11px; }
   .table th, .table td { padding-left: 12px; padding-right: 12px; }
+
+  /* "Novo" sai de junto do nome e passa a ficar abaixo do status.
+     Seletor com .statusStack para vencer o `.badgeNovoMobile { display:none }`
+     declarado mais abaixo no arquivo (mesma especificidade perderia). */
+  .nomeRow .badgeNovo { display: none; }
+  .statusStack .badgeNovoMobile { display: inline-flex; }
 }
 
 @media (max-width: 420px) {
   .tableTools button { flex: 1 1 auto; justify-content: center; }
   .pagination { flex-wrap: wrap; }
   .pageInfo { width: 100%; margin: 4px 0 0; text-align: center; }
+
+  /* sem espaço para o nome numa linha só: quebra em vez de cortar com "..." */
+  .row .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
 }
 
 @media (max-width:700px) {
@@ -745,10 +813,26 @@
   display: inline-flex; align-items: center;
   font-size: 9px; font-weight: 800;
   text-transform: uppercase; letter-spacing: .07em;
-  padding: 1px 6px; border-radius: 999px;
+  padding: 1px 6px; border-radius: 5px;
   background: rgba(16,185,129,.12); color: #10b981;
   border: 1px solid rgba(16,185,129,.25);
   white-space: nowrap; flex-shrink: 0;
+}
+/* No desktop o "Novo" fica ao lado do nome; no mobile vai abaixo do status */
+.statusStack { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.badgeNovoMobile { display: none; }
+/* Status abaixo da foto — só abaixo de 475px, quando a coluna Status é removida */
+.avatarStatusMobile { display: none; }
+
+@media (max-width: 475px) {
+  .colStatus { display: none; }
+  /* foto e status centralizados um sob o outro */
+  .listAvatar { margin: 0 auto; }
+  .avatarStatusMobile {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 3px; margin-top: 5px;
+  }
+  .avatarStatusMobile .badgeNovoMobile { display: inline-flex; }
 }
 
 /* ── Sort select ── */

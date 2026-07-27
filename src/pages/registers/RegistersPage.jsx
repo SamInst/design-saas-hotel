@@ -409,7 +409,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       <div className={styles.photoHeaderRow}>
         <div className={styles.photoSide}>
           <div className={styles.photoBig}>
-            <Camera size={28} className={styles.photoIconBig} />
+            <Camera size={32} className={styles.photoIconBig} />
             <div className={styles.photoUploadBtn}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="12" height="12">
                 <polyline points="16 16 12 12 8 16"/>
@@ -457,6 +457,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                   maxDate={new Date()}
                   placeholder="dd/mm/aaaa"
                   error={hasErr('dataNascimento')}
+                  triggerClassName={styles.compactTrigger}
                 />
               </FormField>
             </div>
@@ -1271,6 +1272,35 @@ export default function RegistersPage() {
     { id: 'empresas',   label: 'Empresas',   Icon: Building2 },
   ];
 
+  // ── Setas de navegação das abas de status (telas pequenas) ──
+  const filterTabsRef = useRef(null);
+  const [tabNav, setTabNav] = useState({ left: false, right: false });
+
+  const updateTabNav = useCallback(() => {
+    const el = filterTabsRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setTabNav({ left: el.scrollLeft > 1, right: el.scrollLeft < max - 1 });
+  }, []);
+
+  useEffect(() => {
+    const el = filterTabsRef.current;
+    if (!el) return;
+    updateTabNav();
+    el.addEventListener('scroll', updateTabNav, { passive: true });
+    window.addEventListener('resize', updateTabNav);
+    return () => {
+      el.removeEventListener('scroll', updateTabNav);
+      window.removeEventListener('resize', updateTabNav);
+    };
+  }, [updateTabNav]);
+
+  const scrollTabs = dir => {
+    const el = filterTabsRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.7), behavior: 'smooth' });
+  };
+
   const vinculadosList = detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? [];
 
   const nomeListing = item =>
@@ -1419,14 +1449,24 @@ export default function RegistersPage() {
 
           {/* Filtros + Ordenação */}
           <div className={styles.filterRow}>
-            <div className={styles.filterTabs}>
-              {filterTabs.map(({ id, label, Icon }) => (
-                <button key={id}
-                  className={[styles.filterTab, filterMode === id ? styles.filterTabActive : ''].join(' ')}
-                  onClick={() => changeFilter(id)}>
-                  <Icon size={12} /> {label}
-                </button>
-              ))}
+            <div className={styles.filterTabsWrap}>
+              <button type="button" className={styles.filterNavBtn} disabled={!tabNav.left}
+                onClick={() => scrollTabs(-1)} aria-label="Filtros anteriores">
+                <ChevronLeft size={14} />
+              </button>
+              <div className={styles.filterTabs} ref={filterTabsRef}>
+                {filterTabs.map(({ id, label, Icon }) => (
+                  <button key={id}
+                    className={[styles.filterTab, filterMode === id ? styles.filterTabActive : ''].join(' ')}
+                    onClick={() => changeFilter(id)}>
+                    <Icon size={12} /> {label}
+                  </button>
+                ))}
+              </div>
+              <button type="button" className={styles.filterNavBtn} disabled={!tabNav.right}
+                onClick={() => scrollTabs(1)} aria-label="Próximos filtros">
+                <ChevRight size={14} />
+              </button>
             </div>
             {filterMode !== 'empresas' && (
               <div className={styles.sortGroup}>
@@ -1458,7 +1498,7 @@ export default function RegistersPage() {
                   <th className={styles.colDoc} style={{ width: 148 }}>CPF / CNPJ</th>
                   <th className={styles.colPhone} style={{ width: 148 }}>Telefone</th>
                   <th className={styles.colDate} style={{ width: 124 }}>Cadastrado em</th>
-                  <th style={{ width: 100 }}>Status</th>
+                  <th className={styles.colStatus} style={{ width: 100 }}>Status</th>
                 </tr></thead>
                 <tbody>
                   {(() => {
@@ -1499,6 +1539,11 @@ export default function RegistersPage() {
                         <td>
                           <div className={styles.listAvatar} style={{ background: bg, color: fg }}>
                             {getInitials(name)}
+                          </div>
+                          {/* abaixo de 475px a coluna Status some e o badge vem para cá */}
+                          <div className={styles.avatarStatusMobile}>
+                            <StatusBadge status={item.status} />
+                            {isNew && <span className={[styles.badgeNovo, styles.badgeNovoMobile].join(' ')}>Novo</span>}
                           </div>
                         </td>
                         <td>
@@ -1555,7 +1600,12 @@ export default function RegistersPage() {
                           <div>{regFmt}</div>
                           {regHora && <div className={styles.dateHora}>{regHora}</div>}
                         </td>
-                        <td><StatusBadge status={item.status} /></td>
+                        <td className={styles.colStatus}>
+                          <div className={styles.statusStack}>
+                            <StatusBadge status={item.status} />
+                            {isNew && <span className={[styles.badgeNovo, styles.badgeNovoMobile].join(' ')}>Novo</span>}
+                          </div>
+                        </td>
                       </tr>
                     );
                   });
