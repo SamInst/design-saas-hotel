@@ -343,14 +343,12 @@
 /* ── Campos compactos e sem adornos (só dentro dos formulários desta página) ── */
 .formBody input:not([type="checkbox"]),
 .formBody select,
-.formBody .comboInput,
-.compactTrigger {
+.formBody .comboInput {
   padding:7px 10px;
   border-radius:7px;
   box-shadow:none;
 }
 .formBody select { padding-right:28px; background-position:right 9px center; }
-.compactTrigger  { border-width:1px; }
 /* rótulos mais leves e colados no campo */
 .formBody label:not(.useTitularRow):not(.fieldLabel) {
   font-size:10.5px; font-weight:600; letter-spacing:.03em;
@@ -786,7 +784,10 @@
 /* Registro de hóspede: em telas < 727px o painel "Cadastrando" (pessoas + botões)
    vai para o topo e fica fixo acima dos campos enquanto o formulário rola. */
 @media (max-width:727px) {
-  .regLayout { flex-direction: column; }
+  /* o .regLayout é flex item do corpo do modal (que é quem rola). Sem isto o
+     flexbox o encolhe abaixo da altura do conteúdo e a sidebar sticky "solta"
+     no meio, pois o sticky é limitado pelo bloco que o contém. */
+  .regLayout { flex-direction: column; flex-shrink: 0; min-height: auto; }
   .regSidebar {
     width: 100%; border-right: none;
     border-bottom: 1px solid var(--border);

@@ -12,7 +12,6 @@ import { Button }                   from '../../components/ui/Button';
 import { Modal }                    from '../../components/ui/Modal';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }             from '../../components/ui/Notification';
-import { DatePicker }               from '../../components/ui/DatePicker';
 import { cadastroApi, userStorage } from '../../services/api';
 import { usePermissions }           from '../../hooks/usePermissions';
 
@@ -144,6 +143,25 @@ const maskPhone = v => {
 };
 
 const maskCEP   = v => v.replace(/\D/g,'').slice(0,8).replace(/(\d{5})(\d{1,3})$/,'$1-$2');
+const maskDate  = v => {
+  const n = v.replace(/\D/g,'').slice(0,8);
+  if (n.length <= 2) return n;
+  if (n.length <= 4) return `${n.slice(0,2)}/${n.slice(2)}`;
+  return `${n.slice(0,2)}/${n.slice(2,4)}/${n.slice(4)}`;
+};
+// "dd/mm/aaaa" → Date (00:00) ou null quando incompleta/inexistente/no futuro
+const parseDateBR = v => {
+  const m = (v ?? '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const [dd, mm, yyyy] = [+m[1], +m[2], +m[3]];
+  if (mm < 1 || mm > 12 || dd < 1 || yyyy < 1900) return null;
+  const d = new Date(yyyy, mm - 1, dd);
+  if (d.getDate() !== dd || d.getMonth() !== mm - 1) return null;   // 31/02 e afins
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if (d > hoje) return null;
+  return d;
+};
+const fmtDateBR = d => (d instanceof Date && !isNaN(d) ? d.toLocaleDateString('pt-BR') : '');
 const maskPlaca = v => v.replace(/[^A-Za-z0-9]/g,'').slice(0,7).toUpperCase();
 const unmask    = v => (v ?? '').replace(/\D/g,'');
 
@@ -319,6 +337,39 @@ function KV({ label, value }) {
   );
 }
 
+// ── Campo de data só com máscara (dd/mm/aaaa), sem calendário ──
+function DateMaskInput({ value, onChange, className = '' }) {
+  const [text, setText] = useState(() => fmtDateBR(value));
+
+  // Sincroniza quando o valor vem de fora (troca de pessoa, carregar cadastro…)
+  useEffect(() => {
+    const fromValue = fmtDateBR(value);
+    if (value ? fromValue !== text : parseDateBR(text)) setText(fromValue);
+  }, [value]); // eslint-disable-line
+
+  const handle = e => {
+    const masked = maskDate(e.target.value);
+    setText(masked);
+    onChange(parseDateBR(masked));
+  };
+
+  const invalida = text.length === 10 && !parseDateBR(text);
+
+  return (
+    <>
+      <Input
+        value={text}
+        onChange={handle}
+        placeholder="dd/mm/aaaa"
+        inputMode="numeric"
+        maxLength={10}
+        className={className}
+      />
+      {invalida && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>Data inválida</span>}
+    </>
+  );
+}
+
 // ── Formulário de pessoa ──────────────────────────────────────
 function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null }) {
   const [cepLoading, setCepLoading] = useState(false);
@@ -450,14 +501,9 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
 
             <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')} style={{ width: 150 }}>
               <FormField label="Data de Nascimento *">
-                <DatePicker
-                  mode="single"
+                <DateMaskInput
                   value={data.dataNascimento}
-                  onChange={d => set('dataNascimento', d ?? null)}
-                  maxDate={new Date()}
-                  placeholder="dd/mm/aaaa"
-                  error={hasErr('dataNascimento')}
-                  triggerClassName={styles.compactTrigger}
+                  onChange={d => set('dataNascimento', d)}
                 />
               </FormField>
             </div>

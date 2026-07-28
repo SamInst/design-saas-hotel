@@ -325,9 +325,6 @@ export default function FinancialDashboard() {
     }
     return parts;
   };
-  const filtrosDescricao = () =>
-    filtrosResumo().map(p => `${p.label}: ${p.value}`).join(' · ');
-
   // Remove um único filtro (mantém os demais) e recarrega
   const removeFiltro = (type) => {
     const f = { ...activeFilters };
@@ -344,10 +341,29 @@ export default function FinancialDashboard() {
     fetchData(f);
   };
 
-  const baixarRelatorioFiltro = () =>
-    relatorioFiltroPdf({ grupos, total, pagamentos, filtros: filtrosDescricao() });
+  // O PDF reproduz a tela: mesmos grupos visíveis (busca aplicada) e as mesmas
+  // seções que a permissão do usuário libera.
+  const permissoesRelatorio = {
+    saldo:     canHistoricoSaldo,
+    totaisDia: canValorTotalDia,
+    dashboard: canDashboard,
+    caixa:     canDashboard || canValorParcial,
+  };
+  const usuarioRelatorio = loggedUser?.pessoa?.nome ?? '';
 
-  const baixarRelatorioDia = (grupo) => relatorioDiaPdf(grupo);
+  const baixarRelatorioFiltro = () =>
+    relatorioFiltroPdf({
+      grupos: visibleGrupos,
+      total,
+      pagamentos,
+      filtros: filtrosResumo(),
+      periodo: periodoLabel,
+      permissoes: permissoesRelatorio,
+      usuario: usuarioRelatorio,
+    });
+
+  const baixarRelatorioDia = (grupo) =>
+    relatorioDiaPdf(grupo, { permissoes: permissoesRelatorio, usuario: usuarioRelatorio });
 
   // Helpers para exibir pagamento chips nos formulários
   const descPag = (pag) => {
@@ -428,11 +444,11 @@ export default function FinancialDashboard() {
                       {methodEntries.map(([m, v]) => (
                         <div key={m} className={styles.distChip}>
                           <span className={styles.distDot} style={{ background: methodColor(m) }} />
-                          <PayMethodIcon descricao={m} size={12} className={styles.distIcon} />
-                          <span className={styles.distName}>{m}</span>
                           <span className={styles.distCount} title={`${v.amount ?? 0} ${(v.amount ?? 0) === 1 ? 'lançamento' : 'lançamentos'}`}>
                             {v.amount ?? 0}
                           </span>
+                          <PayMethodIcon descricao={m} size={12} className={styles.distIcon} />
+                          <span className={styles.distName}>{m}</span>
                           <b className={styles.distVal}>{fmt(v.receitas)}</b>
                         </div>
                       ))}
