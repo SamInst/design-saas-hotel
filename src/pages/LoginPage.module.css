@@ -26,7 +26,9 @@
   font-family: 'Hanken Grotesk', system-ui, sans-serif;
   background: var(--cream);
   color: var(--ink);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ── STAGE (left) ───────────────────────────────────────────── */
@@ -95,34 +97,6 @@
   opacity: 0.06;
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-.stageTop { position: relative; z-index: 1; }
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 7px 14px 7px 11px;
-  border: 1px solid rgba(244,236,224,0.22);
-  border-radius: 999px;
-  color: rgba(244,236,224,0.86);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  backdrop-filter: blur(3px);
-  animation: rise 0.7s cubic-bezier(0.2,0.8,0.2,1) both;
-}
-.badgeDot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 0 0 rgba(227,172,107,0.6);
-  animation: pulse 2.6s ease-out infinite;
-}
-@keyframes pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(227,172,107,0.55); }
-  70%  { box-shadow: 0 0 0 9px rgba(227,172,107,0); }
-  100% { box-shadow: 0 0 0 0 rgba(227,172,107,0); }
 }
 
 .stageBody {
@@ -445,14 +419,21 @@
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 860px) {
-  .page { grid-template-columns: 1fr; }
+  .page {
+    grid-template-columns: 1fr;
+    /* stage keeps its own height; panel takes the rest and grows past it */
+    grid-template-rows: auto 1fr;
+  }
   .stage { min-height: 248px; padding: 28px; }
   .stageBody { margin-bottom: 18px; }
   .wordmark { font-size: clamp(38px, 12vw, 60px); }
   .lede { display: none; }
   .features { display: none; }
-  .panel { padding: 36px 26px 44px; }
-  .brand { margin-bottom: 30px; }
+  /* start the form right under the stage instead of centering it in the row */
+  .panel { align-items: flex-start; padding: 26px 26px 40px; }
+  /* the wordmark on the stage already carries the branding here */
+  .brand { display: none; }
+  .legal { text-align: center; }
 }
 
 @media (prefers-reduced-motion: reduce) {

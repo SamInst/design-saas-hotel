@@ -9,6 +9,15 @@
   box-shadow:none;
 }
 .trigger:hover { border-color:rgba(124,58,237,.32); }
+
+/* Inactive field (ex.: check-out antes de escolher o check-in) */
+.triggerDisabled,
+.triggerDisabled:hover {
+  cursor:not-allowed; opacity:.55;
+  background:var(--surface-2, var(--surface));
+  border-color:var(--card-border);
+}
+.triggerDisabled .textInput { cursor:not-allowed; }
 .open { border-color:rgba(124,58,237,.42) !important; box-shadow:none !important; }
 .ico  { width:15px; height:15px; flex-shrink:0; color:var(--text-2); }
 .val  { flex:1; color:var(--text); }

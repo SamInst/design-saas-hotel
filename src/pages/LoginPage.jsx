@@ -57,13 +57,6 @@ export default function LoginPage({ onLogin }) {
         <div className={styles.sun} />
         <div className={styles.grain} />
 
-        <div className={styles.stageTop}>
-          <span className={styles.badge}>
-            <span className={styles.badgeDot} />
-            Estabelecido · Litoral
-          </span>
-        </div>
-
         <div className={styles.stageBody}>
           <span className={styles.kicker}>Sistema de Gestão Hoteleira</span>
           <h2 className={styles.wordmark}>

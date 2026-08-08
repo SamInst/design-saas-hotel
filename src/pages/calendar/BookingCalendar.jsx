@@ -19,14 +19,6 @@ import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userSto
 import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import styles from './BookingCalendar.module.css';
 
-// Botão "Gerenciar Preços" anexado ao card de preço (à direita do botão de ocultar).
-const priceAdjBtnStyle = (active) => ({
-  display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px',
-  border: 'none', borderLeft: '1px solid var(--border, #2a2a35)',
-  background: active ? 'color-mix(in srgb, var(--accent, #6366f1) 18%, transparent)' : 'transparent',
-  color: active ? 'var(--accent, #6366f1)' : 'var(--text-2, #9aa)', cursor: 'pointer',
-});
-
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
 const parseBrDate = (s) => {
   if (!s) return '';
@@ -3734,8 +3726,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const [saving,      setSaving]      = useState(false);
   const [precosCalc,       setPrecosCalc]       = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
   const [calcLoading,      setCalcLoading]      = useState(false);
-  const [showPriceDetails, setShowPriceDetails] = useState(true);
-  const [roomPriceOpen,    setRoomPriceOpen]    = useState({}); // { [`${q}_${pi}`]: bool }
+  const [obsOpen,          setObsOpen]          = useState({}); // { [`${q}_${pi}`]: bool } — textarea de observação revelado
   const [priceAdj,         setPriceAdj]         = useState({}); // { [rKey]: { mode, sign, value, qtdPessoas } }
   const [adjModalKey,      setAdjModalKey]      = useState(null); // rKey do modal de ajuste aberto
   const [apiAvailability,      setApiAvailability]      = useState(null); // Set<roomId> | null
@@ -3913,8 +3904,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const runCalcPrecos = async () => {
     setCalcLoading(true);
     setPrecosCalc({});
-    setShowPriceDetails(false);
-    setRoomPriceOpen({});
+    setObsOpen({});
     setPriceAdj({});
     try {
       const displayPeriodos = periodoMode === 'unico'
@@ -3975,61 +3965,41 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     return { ...requestFields, valor_total: valorTotal };
   };
 
-  // Renderiza as diárias de um cálculo + o ajuste de preço. No modo "Por diária" o
-  // desconto/adicional é mostrado em cada diária; nos demais modos, em uma linha única.
-  const renderPriceDetalhes = (calc, adjKey) => {
+  // Uma linha por diária: "Diária 1 · 2 adultos ······ R$ 120,00".
+  // No modo "Por diária" o valor ajustado substitui o original (que fica riscado);
+  // nos demais modos o ajuste vira uma linha única antes do total.
+  const renderRoomDiarias = (calc, adjKey, guestLabel) => {
     const adj = priceAdj[adjKey];
     const isDiariaAdj = adj?.mode === 'diaria';
     const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
+    const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
+    const diff = (calc.valor_total ?? 0) - base;
     return (
       <>
-        {calc.detalhes?.map((d, di) => {
-          const dd = isDiariaAdj ? novoValor - (d.valor_final ?? 0) : 0;
-          return (
-            <div key={di} className={styles.priceDetailItem}>
-              <div className={styles.priceCardRow}>
-                <span className={styles.step3PriceDesc}>{d.descricao}</span>
-                {isDiariaAdj ? (
-                  <span className={styles.step3PriceVal} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ textDecoration: 'line-through', color: 'var(--text-2)', fontWeight: 400 }}>{fmtBRL(d.valor_final)}</span>
-                    {fmtBRL(novoValor)}
-                  </span>
-                ) : (
-                  <span className={styles.step3PriceVal}>{fmtBRL(d.valor_final)}</span>
-                )}
-              </div>
-              {isDiariaAdj
-                ? (dd !== 0 && (
-                    <div className={styles.priceDetailSub}>
-                      <span style={{ color: dd < 0 ? '#10b981' : '#f97316' }}>
-                        {dd < 0 ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(dd))}
-                      </span>
-                    </div>
-                  ))
-                : ((d.acrescimo_sazonalidade > 0 || d.valor_criancas > 0) && (
-                    <div className={styles.priceDetailSub}>
-                      <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
-                      {d.sazonalidade?.descricao && <span className={styles.step3SazChipInline}>{d.sazonalidade.descricao}</span>}
-                      {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
-                    </div>
-                  ))}
-            </div>
-          );
-        })}
-        {adj && !isDiariaAdj && (() => {
-          const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
-          const diff = (calc.valor_total ?? 0) - base;
-          return (
-            <div className={styles.priceDetailItem}>
-              <div className={styles.priceCardRow}>
-                <span className={styles.step3PriceDesc}>{describeAdjustment(adj)}</span>
-                <span className={styles.step3PriceVal} style={{ color: diff < 0 ? '#10b981' : '#f97316' }}>
-                  {diff > 0 ? '+' : ''}{fmtBRL(diff)}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
+        {(calc.detalhes || []).map((d, di) => (
+          <div key={di} className={styles.rcDiariaRow}>
+            <span>
+              Diária {di + 1}
+              {guestLabel && <span className={styles.rcDiariaSub}> · {guestLabel}</span>}
+            </span>
+            <span className={styles.rcDiariaVal}>
+              {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(d.valor_final)}</span>}
+              {fmtBRL(isDiariaAdj ? novoValor : d.valor_final)}
+            </span>
+          </div>
+        ))}
+        {adj && !isDiariaAdj && Math.abs(diff) >= 0.005 && (
+          <div className={styles.rcDiariaRow}>
+            <span className={styles.rcDiariaSub}>{describeAdjustment(adj)}</span>
+            <span className={styles.rcDiariaVal} style={{ color: diff < 0 ? 'var(--emerald)' : '#f97316' }}>
+              {diff > 0 ? '+' : ''}{fmtBRL(diff)}
+            </span>
+          </div>
+        )}
+        <div className={styles.rcTotalRow}>
+          <span>Total</span>
+          <span>{fmtBRL(calc.valor_total ?? 0)}</span>
+        </div>
       </>
     );
   };
@@ -4207,7 +4177,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       title={<><Plus size={15} /> {forcePernoite ? 'Novo Pernoite' : isSolicitacao ? 'Nova Solicitação' : forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
       footer={
         <div className={styles.footerSpread}>
-          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setShowPriceDetails(false); setRoomPriceOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>Voltar</Button>}</div>
+          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === 3) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>Voltar</Button>}</div>
           <div className={styles.footerRight}>
             {step < STEPS.length ? (
               <Button variant="primary"
@@ -4503,34 +4473,44 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
           {periodoMode === 'unico' && (
             <>
-              <div className={styles.step2Grid} style={forcePernoite ? { display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'stretch' } : undefined}>
-                <FormField label={<>Período de estadia{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
-                  {forcePernoite ? (
-                    // Pernoite: check-in travado em hoje (mesmo campo do check-out, só leitura).
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <DatePicker mode="single" value={checkin} readOnly placeholder="Check-in" />
-                      <DatePicker mode="single" value={checkout}
-                        onChange={(d) => { setCheckin(new Date()); setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
-                        placeholder="Check-out" minDate={new Date(Date.now() + 86400000)} />
-                    </div>
-                  ) : (
-                    <div className={styles.dateCompact}>
-                      <DatePicker mode="range" startDate={checkin} endDate={checkout}
-                        onRangeChange={({ start, end }) => { setCheckin(start); setCheckout(end); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
-                        placeholder="Check-in → Check-out" minDate={new Date()} />
-                    </div>
-                  )}
+              <div className={styles.step2Grid}>
+                {/* Pernoite: check-in travado em hoje (só leitura). */}
+                <FormField label="Check-in">
+                  <div className={styles.dateCompact}>
+                    <DatePicker mode="single" value={checkin}
+                      readOnly={forcePernoite}
+                      onChange={forcePernoite ? undefined : (d) => {
+                        setCheckin(d);
+                        setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
+                        // check-out anterior/igual ao novo check-in deixa de ser válido
+                        if (checkout && d && checkout <= d) setCheckout(null);
+                      }}
+                      placeholder="Data de check-in" minDate={new Date()} />
+                  </div>
                 </FormField>
-                <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
-                  <RoomCombobox value={quartos}
-                    onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
-                    availableRooms={availableRooms}
-                    categorias={categorias} roomDescMap={roomDescMap}
-                    singleSelect={tipo !== 'grupo'}
-                    disabled={!checkinStr || !checkoutStr}
-                    loading={availLoading} />
+                <FormField label={<>Check-out{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
+                  <div className={styles.dateCompact}>
+                    <DatePicker mode="single" value={checkout}
+                      onChange={(d) => {
+                        if (forcePernoite) setCheckin(new Date());
+                        setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
+                      }}
+                      placeholder={checkin ? 'Data de check-out' : 'Defina o check-in primeiro'}
+                      disabled={!checkin}
+                      minDate={checkin ? new Date(checkin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
+                      markedDate={checkin} />
+                  </div>
                 </FormField>
               </div>
+              <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
+                <RoomCombobox value={quartos}
+                  onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
+                  availableRooms={availableRooms}
+                  categorias={categorias} roomDescMap={roomDescMap}
+                  singleSelect={tipo !== 'grupo'}
+                  disabled={!checkinStr || !checkoutStr}
+                  loading={availLoading} />
+              </FormField>
               {/* Per-room hospedes */}
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
@@ -4663,16 +4643,16 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
         // Financial totals
         const grandTotal   = Object.values(precosCalc).reduce((s, c) => s + (c?.valor_total ?? 0), 0);
-        const isMultiRoom  = tipo === 'grupo' || quartos.length > 1;
-        // Ajuste de preço por hospedagem: no card principal só quando há uma única hospedagem.
-        const singleHosp   = !isMultiRoom && periodoMode === 'unico';
-        const mainKey      = `${quartos[0]}_0`;
         const formaDoPag   = (p) => p.formaPagamento ?? p.tipo_pagamento?.descricao
           ?? tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao;
         const totalPago    = (pagModo === 'unico' ? pagUnico : Object.values(quartosPag).flat())
           .filter((p) => !isPagamentoPendente(formaDoPag(p)))
           .reduce((s, p) => s + (p.valor ?? 0), 0);
         const pendente     = Math.max(0, grandTotal - totalPago);
+        // Pagamento por quarto → valores e pagamentos vivem no card de cada apartamento.
+        // Pagamento único / orçamento / solicitação → um card de totais no topo.
+        const perRoomPag = !isOrcamento && !isSolicitacao && pagModo === 'por_quarto';
+        const totalAptos = displayPeriodos.reduce((s, p) => s + (p.rooms?.length ?? 0), 0);
 
         return (
           <div className={styles.step3Root}>
@@ -4711,79 +4691,60 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               );
             })()}
 
-            {/* ── Collapsible price card ── */}
-            <div className={styles.priceCard} style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'stretch' }}>
-              <button
-                className={styles.priceCardHeader}
-                style={{ flex: 1, minWidth: 0 }}
-                onClick={() => !calcLoading && setShowPriceDetails((v) => !v)}
-              >
-                <span className={styles.priceCardSummary}>
-                  <span className={styles.finStripItem}>
-                    Valor Total{' '}
-                    {calcLoading
-                      ? <b><Loader2 size={11} className={styles.spin} /></b>
-                      : <b>{fmtBRL(grandTotal)}</b>
-                    }
-                  </span>
-                  {!isSolicitacao && <>
-                    <span className={styles.finStripDivider} />
-                    <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / grandTotal * 100)}%)</span>}</span>
-                    <span className={styles.finStripDivider} />
-                    <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(pendente / grandTotal * 100)}%)</span>}</span>
-                  </>}
-                </span>
-                {!calcLoading && (
-                  <ChevronDown size={14} className={showPriceDetails ? styles.priceCardChevronOpen : styles.priceCardChevron} />
+            {/* ── Card de totais da reserva — some quando os valores são por apartamento ── */}
+            {!perRoomPag && (
+              <div className={styles.rcCard} style={{ marginBottom: 14 }}>
+                <div className={styles.rcHead}>
+                  <div className={styles.rcHeadLeft}>
+                    <span className={styles.rcTitle}>
+                      {isOrcamento ? 'Orçamento' : isSolicitacao ? 'Solicitação' : 'Pagamento único'}
+                    </span>
+                    {totalAptos > 0 && (
+                      <span className={styles.rcChip}>{totalAptos} apartamento{totalAptos !== 1 ? 's' : ''}</span>
+                    )}
+                  </div>
+                  {periodoMode === 'unico' && dias > 0 && (
+                    <span className={styles.rcHeadMeta}>{diariasTxt(dias)}</span>
+                  )}
+                </div>
+
+                <div className={styles.rcStats} style={isSolicitacao ? { gridTemplateColumns: '1fr' } : undefined}>
+                  <div className={styles.rcStat}>
+                    <div className={styles.rcStatLabel}>Total</div>
+                    <div className={styles.rcStatVal}>
+                      {calcLoading ? <Loader2 size={17} className={styles.spin} /> : fmtBRL(grandTotal)}
+                    </div>
+                  </div>
+                  {!isSolicitacao && (
+                    <>
+                      <div className={[styles.rcStat, totalPago > 0 ? styles.rcStatOk : styles.rcStatMuted].join(' ')}>
+                        <div className={styles.rcStatLabel}>Pago</div>
+                        <div className={styles.rcStatVal}>{fmtBRL(totalPago)}</div>
+                      </div>
+                      <div className={[styles.rcStat, pendente > 0 ? styles.rcStatWarn : styles.rcStatOk].join(' ')}>
+                        <div className={styles.rcStatLabel}>Pendente</div>
+                        <div className={styles.rcStatVal}>{fmtBRL(pendente)}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {!isOrcamento && !isSolicitacao && (
+                  <div className={styles.rcActions}>
+                    <button type="button" className={[styles.rcBtn, styles.rcBtnPrimary].join(' ')}
+                      disabled={calcLoading}
+                      onClick={() => setShowPagModal(true)}>
+                      <DollarSign size={15} /> Registrar pagamento
+                    </button>
+                  </div>
                 )}
-              </button>
-              {singleHosp && !calcLoading && precosCalc[mainKey] && (
-                <button
-                  type="button"
-                  title="Gerenciar Preços"
-                  onClick={() => setAdjModalKey(mainKey)}
-                  style={priceAdjBtnStyle(!!priceAdj[mainKey])}
-                >
-                  <Tag size={15} />
-                </button>
-              )}
-              </div>
 
-              {showPriceDetails && !calcLoading && (
-                <div className={styles.priceCardBody}>
-                  {displayPeriodos.map((p, pi) => (
-                    p.rooms.map((q) => {
-                      const calc = precosCalc[`${q}_${pi}`];
-                      if (!calc) return null;
-                      return (
-                        <div key={`${q}_${pi}`} className={styles.priceCardRoom}>
-                          <div className={styles.priceCardRoomLabel}>Apartamento {fmtRoom(parseInt(q))}</div>
-                          {renderPriceDetalhes(calc, `${q}_${pi}`)}
-                          <div className={styles.step3PriceTotal}>
-                            <span>Total</span>
-                            <span>{fmtBRL(calc.valor_total)}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* ── Pagamento único section (logo abaixo do seletor) ── */}
-            {!isOrcamento && !isSolicitacao && isMultiRoom && pagModo === 'unico' && (
-              <div className={styles.step3PayArea} style={{ marginTop: 8, marginBottom: 8 }}>
-                <div className={styles.step3PagLabel}>Pagamento</div>
-                <div className={styles.step3PayHeader}>
-                  <button className={styles.step3AddPagBtn} onClick={() => setShowPagModal(true)}>
-                    <Plus size={11} /> Adicionar pagamento
-                  </button>
-                </div>
-                {pagUnico.length === 0
-                  ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
-                  : pagUnico.map((p) => {
+                {!isOrcamento && !isSolicitacao && pagUnico.length > 0 && (
+                  <div className={styles.rcSection}>
+                    <div className={styles.rcSectionHead}>
+                      <span className={styles.rcSectionLabel}>Pagamentos · {pagUnico.length}</span>
+                    </div>
+                    {pagUnico.map((p) => {
                       const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
                       return (
                         <div key={p._localId} className={styles.step3PagRow}>
@@ -4801,8 +4762,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
                         </div>
                       );
-                    })
-                }
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -4825,58 +4787,102 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     const qHospOrc = (p.roomHospedesOrc || {})[q] || [];
                     const rKey   = `${q}_${pi}`;
                     const rCalc  = precosCalc[rKey];
-                    const multiRoom = periodoMode === 'multiplos' || quartos.length > 1;
+                    const rPags  = quartosPag[rKey] || [];
+                    // Pago/Pendente deste apartamento (só existem no pagamento por quarto).
+                    const rPago = rPags
+                      .filter((pg) => !isPagamentoPendente(formaDoPag(pg)))
+                      .reduce((s, pg) => s + (pg.valor ?? 0), 0);
+                    const rPend = Math.max(0, (rCalc?.valor_total ?? 0) - rPago);
+                    // "2 adultos · 1 criança" — repetido em cada linha de diária.
+                    const rHosp     = isOrcSemCadastro ? qHospOrc : qHosp;
+                    const nAdultos  = rHosp.filter((h) => { const a = calcAge(h.dataNascimento); return a === null || a >= 18; }).length;
+                    const nCriancas = rHosp.length - nAdultos;
+                    const guestLabel = [
+                      nAdultos  ? `${nAdultos} ${nAdultos === 1 ? 'adulto' : 'adultos'}`       : '',
+                      nCriancas ? `${nCriancas} ${nCriancas === 1 ? 'criança' : 'crianças'}`   : '',
+                    ].filter(Boolean).join(' · ');
                     return (
-                      <div key={q} className={styles.step3RoomBlock}>
-                        <div className={styles.step3RoomLabel}>Hóspedes{multiRoom ? ` — Apartamento ${fmtRoom(parseInt(q))}` : ''}</div>
+                      <div key={q} className={styles.rcCard}>
 
-                        {/* Per-room price card (multi-room only) */}
-                        {multiRoom && (rCalc || calcLoading) && (
-                          <div className={styles.priceCard} style={{ marginBottom: 10 }}>
-                            <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                            <button
-                              className={styles.priceCardHeader}
-                              style={{ flex: 1, minWidth: 0 }}
-                              onClick={() => !calcLoading && setRoomPriceOpen((prev) => ({ ...prev, [rKey]: !prev[rKey] }))}
-                            >
-                              <span className={styles.priceCardSummary}>
-                                <span className={styles.finStripItem}>
-                                  Valor Total{' '}
-                                  {calcLoading && !rCalc
-                                    ? <b><Loader2 size={11} className={styles.spin} /></b>
-                                    : <b>{fmtBRL(rCalc?.valor_total ?? 0)}</b>
-                                  }
-                                </span>
-                              </span>
-                              {!calcLoading && rCalc && (
-                                <ChevronDown size={14} className={roomPriceOpen[rKey] ? styles.priceCardChevronOpen : styles.priceCardChevron} />
-                              )}
-                            </button>
-                            {!calcLoading && rCalc && (
-                              <button
-                                type="button"
-                                title="Gerenciar Preços"
-                                onClick={() => setAdjModalKey(rKey)}
-                                style={priceAdjBtnStyle(!!priceAdj[rKey])}
-                              >
-                                <Tag size={15} />
-                              </button>
-                            )}
-                            </div>
-                            {roomPriceOpen[rKey] && !calcLoading && rCalc && (
-                              <div className={`${styles.priceCardBody} ${styles.priceCardBodyInner}`}>
-                                {renderPriceDetalhes(rCalc, rKey)}
-                                <div className={styles.step3PriceTotal}>
-                                  <span>Total do apartamento {fmtRoom(parseInt(q))}</span>
-                                  <span>{fmtBRL(rCalc.valor_total)}</span>
-                                </div>
+                        {/* Cabeçalho */}
+                        <div className={styles.rcHead}>
+                          <div className={styles.rcHeadLeft}>
+                            <span className={styles.rcTitle}>Apartamento {fmtRoom(parseInt(q))}</span>
+                            {roomDescMap[q] && <span className={styles.rcChip}>{roomDescMap[q]}</span>}
+                          </div>
+                          <span className={styles.rcHeadMeta}>{fmtDateBR(ci)} → {fmtDateBR(co)}</span>
+                        </div>
+
+                        {/* Total · Pago · Pendente */}
+                        {perRoomPag && (
+                          <div className={styles.rcStats}>
+                            <div className={styles.rcStat}>
+                              <div className={styles.rcStatLabel}>Total</div>
+                              <div className={styles.rcStatVal}>
+                                {calcLoading && !rCalc ? <Loader2 size={17} className={styles.spin} /> : fmtBRL(rCalc?.valor_total ?? 0)}
                               </div>
-                            )}
+                            </div>
+                            <div className={[styles.rcStat, rPago > 0 ? styles.rcStatOk : styles.rcStatMuted].join(' ')}>
+                              <div className={styles.rcStatLabel}>Pago</div>
+                              <div className={styles.rcStatVal}>{fmtBRL(rPago)}</div>
+                            </div>
+                            <div className={[styles.rcStat, rPend > 0 ? styles.rcStatWarn : styles.rcStatOk].join(' ')}>
+                              <div className={styles.rcStatLabel}>Pendente</div>
+                              <div className={styles.rcStatVal}>{fmtBRL(rPend)}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Ações */}
+                        <div className={styles.rcActions}>
+                          {perRoomPag && (
+                            <button type="button" className={[styles.rcBtn, styles.rcBtnPrimary].join(' ')}
+                              disabled={calcLoading}
+                              onClick={() => { setShowPagModalRoom(rKey); setShowPagModal(true); }}>
+                              <DollarSign size={15} /> Registrar pagamento
+                            </button>
+                          )}
+                          <button type="button"
+                            className={[styles.rcBtn, styles.rcBtnWarn, priceAdj[rKey] ? styles.rcBtnWarnActive : ''].join(' ')}
+                            disabled={!rCalc}
+                            onClick={() => setAdjModalKey(rKey)}>
+                            <Tag size={15} /> Aplicar desconto
+                          </button>
+                        </div>
+
+                        {/* Pagamentos lançados neste apartamento */}
+                        {perRoomPag && rPags.length > 0 && (
+                          <div className={styles.rcSection}>
+                            <div className={styles.rcSectionHead}>
+                              <span className={styles.rcSectionLabel}>Pagamentos · {rPags.length}</span>
+                            </div>
+                            {rPags.map((pg) => {
+                              const tipDesc = tiposPagamento.find((t) => t.id === pg.tipo_pagamento?.id)?.descricao ?? pg.tipo_pagamento?.descricao ?? '—';
+                              return (
+                                <div key={pg._localId} className={styles.step3PagRow}>
+                                  <div className={styles.step3PagRowTop}>
+                                    <span className={styles.step3PagDesc}>{pg.descricao || tipDesc}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                                      <span className={styles.step3PagVal}>{fmtBRL(pg.valor)}</span>
+                                      <button type="button" className={styles.removeIconBtn}
+                                        onClick={() => setQuartosPag((prev) => ({ ...prev, [rKey]: (prev[rKey] || []).filter((x) => x._localId !== pg._localId) }))}>
+                                        <Trash2 size={11} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div className={styles.step3PagMeta}>{pg._criadoEm} · {tipDesc}</div>
+                                  {pg.nome_pagador && <div className={styles.step3PagMeta}>{pg.nome_pagador}</div>}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
 
                         {/* Hóspedes */}
-                        <div className={styles.step3RoomSection}>
+                        <div className={styles.rcSection}>
+                          <div className={styles.rcSectionHead}>
+                            <span className={styles.rcSectionLabel}>Hóspedes · {rHosp.length}</span>
+                          </div>
                           {isOrcSemCadastro ? (
                             qHospOrc.length > 0 ? (
                               <div className={styles.hospedeList}>
@@ -4918,48 +4924,33 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           )}
                         </div>
 
-                        {/* Pagamento */}
-                        {!isOrcamento && !isSolicitacao && pagModo === 'por_quarto' && (
-                          <div className={styles.step3PayArea}>
-                            <div className={styles.step3PagLabel}>Pagamentos</div>
-                            <div className={styles.step3PayHeader}>
-                              <button className={styles.step3AddPagBtn}
-                                onClick={() => { setShowPagModalRoom(rKey); setShowPagModal(true); }}>
-                                <Plus size={11} /> Adicionar pagamento
-                              </button>
+                        {/* Diárias — uma linha por diária, sem repetir o detalhamento */}
+                        {(rCalc || calcLoading) && (
+                          <div className={styles.rcSection}>
+                            <div className={styles.rcSectionHead}>
+                              <span className={styles.rcSectionLabel}>Diárias · {rCalc?.detalhes?.length ?? d2}</span>
+                              <span className={styles.rcSectionLabel}>{fmtDateBR(ci)} → {fmtDateBR(co)}</span>
                             </div>
-                            {(quartosPag[rKey] || []).length === 0
-                              ? <div className={styles.pagEmpty}>Nenhum pagamento adicionado</div>
-                              : (quartosPag[rKey] || []).map((p) => {
-                                  const tipDesc = tiposPagamento.find((t) => t.id === p.tipo_pagamento?.id)?.descricao ?? p.tipo_pagamento?.descricao ?? '—';
-                                  return (
-                                    <div key={p._localId} className={styles.step3PagRow}>
-                                      <div className={styles.step3PagRowTop}>
-                                        <span className={styles.step3PagDesc}>{p.descricao || tipDesc}</span>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-                                          <span className={styles.step3PagVal}>{fmtBRL(p.valor)}</span>
-                                          <button type="button" className={styles.removeIconBtn}
-                                            onClick={() => setQuartosPag((prev) => ({ ...prev, [rKey]: (prev[rKey] || []).filter((x) => x._localId !== p._localId) }))}>
-                                            <Trash2 size={11} />
-                                          </button>
-                                        </div>
-                                      </div>
-                                      <div className={styles.step3PagMeta}>{p._criadoEm} · {tipDesc}</div>
-                                      {p.nome_pagador && <div className={styles.step3PagMeta}>{p.nome_pagador}</div>}
-                                    </div>
-                                  );
-                                })
-                            }
+                            {calcLoading && !rCalc
+                              ? <div className={styles.rcSectionLabel}>Calculando…</div>
+                              : renderRoomDiarias(rCalc, rKey, guestLabel)}
                           </div>
                         )}
 
                         {/* Observação */}
-                        <div className={styles.step3RoomSection} style={{ marginTop: 14 }}>
-                          <textarea className={styles.obsTextarea} rows={2}
-                            placeholder="Observação para este apartamento (opcional)..."
-                            value={quartosObs[rKey] || ''}
-                            onChange={(e) => setQuartosObs((prev) => ({ ...prev, [rKey]: e.target.value }))} />
-                        </div>
+                        {obsOpen[rKey] || quartosObs[rKey] ? (
+                          <div className={styles.rcSection}>
+                            <textarea className={styles.obsTextarea} rows={2}
+                              placeholder="Observação para este apartamento (opcional)..."
+                              value={quartosObs[rKey] || ''}
+                              onChange={(e) => setQuartosObs((prev) => ({ ...prev, [rKey]: e.target.value }))} />
+                          </div>
+                        ) : (
+                          <button type="button" className={styles.rcObsToggle}
+                            onClick={() => setObsOpen((prev) => ({ ...prev, [rKey]: true }))}>
+                            <FileText size={15} /> Adicionar observação
+                          </button>
+                        )}
                       </div>
                     );
                   })}

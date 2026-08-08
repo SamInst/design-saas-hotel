@@ -2640,6 +2640,11 @@
 
   /* Step 3 */
   .step3Root  { padding: 10px 12px 14px; }
+  .rcHead, .rcActions, .rcSection, .rcObsToggle { padding-left: 12px; padding-right: 12px; }
+  .rcStat     { padding: 10px 12px; }
+  .rcStatVal  { font-size: 16px; }
+  .rcBtn      { min-width: 0; flex-basis: 100%; }
+  .rcHeadMeta { display: none; }
 }
 
 /* ── ReservaModal mobile responsive ─────────────────────────────────────────── */
@@ -2707,3 +2712,110 @@
   transition: border-color 0.15s;
 }
 .statusFilterSearchInput:focus { border-color: var(--violet); }
+
+/* ── Step 3 — card por apartamento ───────────────────────────────────────── */
+.rcCard {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.rcCard:last-child { margin-bottom: 0; }
+
+.rcHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.rcHeadLeft { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rcTitle { font-size: 15px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.rcChip {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: color-mix(in srgb, var(--violet) 12%, transparent);
+  color: var(--violet);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rcHeadMeta { font-size: 12px; color: var(--text-2); white-space: nowrap; }
+
+/* Total · Pago · Pendente */
+.rcStats {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.rcStat { background: var(--surface); padding: 12px 16px; min-width: 0; }
+.rcStatLabel { font-size: 12px; color: var(--text-2); margin-bottom: 3px; }
+.rcStatVal { font-size: 19px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.rcStatMuted .rcStatVal { color: var(--text-2); }
+.rcStatOk   .rcStatVal { color: var(--emerald); }
+.rcStatWarn { background: color-mix(in srgb, #f59e0b 24%, var(--surface)); }
+.rcStatWarn .rcStatLabel,
+.rcStatWarn .rcStatVal { color: #b45309; }
+:root[data-theme="dark"] .rcStatWarn { background: color-mix(in srgb, #f59e0b 16%, var(--surface)); }
+:root[data-theme="dark"] .rcStatWarn .rcStatLabel,
+:root[data-theme="dark"] .rcStatWarn .rcStatVal { color: #fbbf24; }
+
+/* Ações */
+.rcActions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.rcBtn {
+  flex: 1; min-width: 150px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.rcBtn:hover:not(:disabled) { border-color: var(--violet); color: var(--violet); }
+.rcBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.rcBtnPrimary { background: var(--violet); border-color: var(--violet); color: #fff; }
+.rcBtnPrimary:hover { background: var(--violet-2); border-color: var(--violet-2); color: #fff; }
+/* Desconto — laranja */
+.rcBtnWarn { border-color: color-mix(in srgb, #f97316 45%, var(--border)); color: #f97316; }
+.rcBtnWarn:hover:not(:disabled) {
+  border-color: #f97316; color: #f97316;
+  background: color-mix(in srgb, #f97316 10%, transparent);
+}
+.rcBtnWarnActive {
+  border-color: #f97316; color: #f97316;
+  background: color-mix(in srgb, #f97316 15%, transparent);
+}
+
+/* Seções internas */
+.rcSection { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.rcSection:last-child { border-bottom: none; }
+.rcSectionHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.rcSectionLabel { font-size: 12px; color: var(--text-2); }
+
+/* Diárias — uma linha por diária */
+.rcDiariaRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 0; font-size: 14px; color: var(--text);
+}
+.rcDiariaRow + .rcDiariaRow { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.rcDiariaSub { color: var(--text-2); font-size: 13px; font-weight: 400; }
+.rcDiariaVal { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rcDiariaOld { text-decoration: line-through; color: var(--text-2); font-weight: 400; margin-right: 6px; }
+.rcTotalRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 6px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 14px; font-weight: 700; color: var(--text);
+}
+
+/* Observação — rodapé do card */
+.rcObsToggle {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 12px 16px;
+  background: none; border: none; font-family: inherit; font-size: 13px;
+  color: var(--text-2); cursor: pointer; text-align: left;
+  transition: color 0.12s;
+}
+.rcObsToggle:hover { color: var(--violet); }

@@ -50,6 +50,7 @@ export function DatePicker({
   occupancy = null,       // Map<'yyyy-MM-dd', {am,pm}> — midday half-day occupancy (range mode)
   inline = false,         // render the calendar statically (embedded), no trigger/portal
   readOnly = false,       // somente visualização: dias não selecionáveis (mantém navegação de mês)
+  disabled = false,       // campo inativo: não abre, não aceita digitação, não limpa
   lockMonth = false,      // trava o mês exibido: esconde as setas e desativa o seletor de mês/ano
   placeholder = 'Selecione a data',
   label,
@@ -107,6 +108,11 @@ export function DatePicker({
       window.removeEventListener('resize', updatePopPos);
     };
   }, [inline, open, updatePopPos]);
+
+  // Never leave the popup hanging open when the field turns inactive
+  useEffect(() => {
+    if (disabled && !inline) { setOpen(false); setViewMode('days'); }
+  }, [disabled, inline]);
 
   // Keep displayed text in sync when not editing
   useEffect(() => {
@@ -310,8 +316,9 @@ export function DatePicker({
   const triggerCls = [
     styles.trigger,
     triggerClassName,
-    open   ? styles.open        : '',
-    error  ? styles.triggerError : '',
+    open     ? styles.open         : '',
+    error    ? styles.triggerError : '',
+    disabled ? styles.triggerDisabled : '',
   ].join(' ');
 
   const calendarInner = (
@@ -429,7 +436,8 @@ export function DatePicker({
 
       <div
         className={triggerCls}
-        onClick={() => { if (!open) { setOpen(true); setViewMode('days'); } }}
+        aria-disabled={disabled || undefined}
+        onClick={() => { if (!disabled && !open) { setOpen(true); setViewMode('days'); } }}
       >
         <svg className={styles.ico} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="4" width="18" height="18" rx="2"/>
@@ -447,12 +455,13 @@ export function DatePicker({
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             placeholder={placeholder}
+            disabled={disabled}
           />
         ) : (
           <span className={display ? styles.val : styles.ph}>{display || placeholder}</span>
         )}
 
-        {(mode === 'single' ? value : startDate) && (
+        {!disabled && (mode === 'single' ? value : startDate) && (
           <button type="button" className={styles.clear}
             onClick={e => {
               e.stopPropagation();
