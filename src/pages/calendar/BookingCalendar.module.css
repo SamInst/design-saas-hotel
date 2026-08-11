@@ -2524,7 +2524,8 @@
   color: #fff; background: #0f172a;
   transition: background 0.12s;
 }
-.rvAcoesBtn:hover { background: #1e293b; }
+.rvAcoesBtn:hover:not(:disabled) { background: #1e293b; }
+.rvAcoesBtn:disabled { opacity: 0.45; cursor: default; }
 .rvAcoesBtnChevron { transition: transform 0.2s; }
 .rvAcoesBtnChevronOpen { transform: rotate(180deg); transition: transform 0.2s; }
 .rvAcoesBackdrop { position: fixed; inset: 0; z-index: 9; }
@@ -2563,6 +2564,13 @@
   border-color: #0f172a;
 }
 .rvBtnPrimary:hover:not(:disabled) { background: #1e293b; }
+.rvBtnGreen {
+  background: rgba(16,185,129,0.12);
+  color: #047857;
+  border-color: rgba(16,185,129,0.32);
+}
+.rvBtnGreen:hover:not(:disabled) { background: rgba(16,185,129,0.2); }
+:root[data-theme="dark"] .rvBtnGreen { color: #34d399; }
 .rvBtnGold {
   background: rgba(245,158,11,0.12);
   color: #b45309;
@@ -2809,6 +2817,53 @@
   border-top: 1px solid var(--border);
   font-size: 14px; font-weight: 700; color: var(--text);
 }
+
+/* ── View da reserva reaproveitando o card do passo 3 ────────────────────── */
+/* Período — check-in / check-out / diárias no mesmo box */
+.rcPeriodBox {
+  border-radius: 10px; overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.10), 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+:root[data-theme="dark"] .rcPeriodBox {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.26);
+}
+.rcPeriodRow { display: flex; align-items: stretch; gap: 0; padding: 12px 14px; }
+.rcPeriodDiarias { padding: 4px 14px 10px; border-top: 1px solid var(--border); }
+.rcPeriodDiarias .rcTotalRow { margin-top: 4px; }
+/* Sem divisórias entre as diárias — só o traço antes do total */
+.rcPeriodDiarias .rcDiariaRow + .rcDiariaRow { border-top: none; }
+
+/* Pago — mesmo tratamento do "Pendente", em verde */
+.rcStatGreen { background: color-mix(in srgb, #10b981 20%, var(--surface)); }
+.rcStatGreen .rcStatLabel,
+.rcStatGreen .rcStatVal { color: #047857; }
+:root[data-theme="dark"] .rcStatGreen { background: color-mix(in srgb, #10b981 14%, var(--surface)); }
+:root[data-theme="dark"] .rcStatGreen .rcStatLabel,
+:root[data-theme="dark"] .rcStatGreen .rcStatVal { color: #34d399; }
+
+/* Ações centralizadas fora do card — botões maiores, sem bordas de seção */
+.rcActionsCenter {
+  justify-content: center;
+  padding: 2px 0 0; border-bottom: none;
+}
+.rcActionsCenter .rvAcoesWrap { margin-left: 0; }
+.rcActionsCenter .rvAcoesBtn { min-width: 200px; justify-content: center; padding: 11px 24px; }
+.rcActionsCenter .rvBtn { min-width: 150px; padding: 11px 20px; }
+/* Sozinho na linha, o menu ocupa a largura confortável de antes */
+.rcActionsCenter .rvAcoesWrap:only-child .rvAcoesBtn { min-width: 260px; }
+/* Menu ancorado no centro do botão, já que ele não fica mais à direita */
+.rcActionsCenter .rvAcoesMenu {
+  left: 50%; right: auto; transform: translateX(-50%);
+  animation: rvAcoesFadeIn 0.15s ease-out;
+}
+@keyframes rvAcoesFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Pagamentos clicáveis dentro do card */
+.step3PagRow.pagCardClickable:hover .step3PagDesc { color: var(--violet); }
 
 /* Observação — rodapé do card */
 .rcObsToggle {
