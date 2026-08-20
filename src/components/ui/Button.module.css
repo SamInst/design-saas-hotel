@@ -76,6 +76,15 @@
 }
 .success:hover { background: #059669; border-color: #059669; }
 
+/* ── ORANGE ── */
+.orange {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.28);
+}
+.orange:hover { background: #ea580c; border-color: #ea580c; box-shadow: 0 6px 20px rgba(249, 115, 22, 0.36); }
+
 /* ── GHOST ── */
 .ghost {
   background: transparent;

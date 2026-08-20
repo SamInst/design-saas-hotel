@@ -28,7 +28,12 @@
       "Bash(node preview.mjs)",
       "Bash(node -e ' *)",
       "PowerShell($s = New-Object -ComObject WScript.Shell; foreach \\($f in @\\('cv-pt.lnk','cv-dados.lnk','cvd-pt.lnk','cv-en.lnk'\\)\\) { $l = $s.CreateShortcut\\(\"C:\\\\Users\\\\sanhe\\\\OneDrive\\\\Desktop\\\\$f\"\\); \"$f -> $\\($l.TargetPath\\)\" })",
-      "Bash(curl -s \"https://api.github.com/users/SamInst/repos?per_page=100&sort=updated\")"
+      "Bash(curl -s \"https://api.github.com/users/SamInst/repos?per_page=100&sort=updated\")",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 15)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 4)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 3)",
+      "PowerShell(npx vite build 2>&1 | Select-Object -Last 2)",
+      "PowerShell(Copy-Item *)"
     ]
   }
 }

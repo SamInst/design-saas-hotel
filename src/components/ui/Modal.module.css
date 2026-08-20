@@ -104,10 +104,16 @@
   min-height: 0;
   padding: 16px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
+
+/* Sem isto os filhos (itens flex) encolhem abaixo da própria altura quando o
+   conteúdo não cabe — com zoom alto o conteúdo era cortado em vez de rolar. */
+.body > * { flex-shrink: 0; }
 
 .footer {
   padding: 12px 16px;

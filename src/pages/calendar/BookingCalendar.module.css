@@ -486,7 +486,8 @@
 /* ── Hóspede list ──────────────────────────────────────────────────────────── */
 .hospedeList { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 .hospedeRow  { display: flex; align-items: center; gap: 8px; }
-.hospedeAvatar { width: 30px; height: 30px; border-radius: 50%; background: color-mix(in srgb, var(--violet) 20%, transparent); color: var(--violet); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.hospedeAvatar { width: 30px; height: 30px; border-radius: 50%; background: color-mix(in srgb, #10b981 20%, transparent); color: #047857; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+:root[data-theme="dark"] .hospedeAvatar { color: #34d399; }
 .hospedeName { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 6px; }
 .hospedeCpf  { font-size: 11px; color: var(--text-2); }
 
@@ -645,6 +646,15 @@
 .kvRowDates { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 6px 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); }
 .kvDateCell { display: flex; flex-direction: column; gap: 2px; }
 .kvDateArrow { color: var(--text-2); font-size: 13px; flex-shrink: 0; }
+/* Resumo (último passo): Tipo · Modo · Pagamento na mesma linha em telas grandes */
+.summaryKv {
+  /* Recuo igual ao do conteúdo dos cards, para as colunas ficarem alinhadas */
+  flex: 1; min-width: 0; padding: 0 16px 10px;
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px 16px;
+}
+@media (max-width: 600px) {
+  .summaryKv { grid-auto-flow: row; grid-template-columns: 1fr 1fr; }
+}
 .kvLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .kvVal { font-size: 13px; color: var(--text); font-weight: 500; }
 .pagStatusAtivo { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--emerald) 15%, transparent); color: var(--emerald); width: fit-content; }
@@ -961,16 +971,16 @@
 
 /* ── Create Modal — step bar ───────────────────────────────────────────────── */
 .stepBar { display: flex; margin-bottom: 16px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); flex-shrink: 0; }
-.stepItem { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 9px 12px; font-size: 12px; font-weight: 500; color: var(--text-2); border-right: 1px solid var(--border); transition: background 0.15s, color 0.15s; }
-.stepItem:first-child { flex: 0.9; }
-.stepItem:nth-child(2) { flex: 2; }
+/* Só a aba ativa mostra o texto; as demais ficam só com o número. */
+.stepItem { flex: 0 0 auto; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 12px; font-size: 12px; font-weight: 500; color: var(--text-2); border-right: 1px solid var(--border); transition: background 0.15s, color 0.15s; }
 .stepItem:last-child { border-right: none; }
-.stepActive { background: color-mix(in srgb, var(--violet) 10%, transparent); color: var(--violet); font-weight: 700; }
+.stepActive { flex: 1; justify-content: flex-start; background: color-mix(in srgb, var(--violet) 10%, transparent); color: var(--violet); font-weight: 700; }
 .stepDone   { color: var(--emerald); }
 .stepDot { width: 20px; height: 20px; border-radius: 50%; background: var(--border); color: var(--text-2); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.15s, color 0.15s; }
 .stepActive .stepDot { background: var(--violet); color: #fff; }
 .stepDone   .stepDot { background: var(--emerald); color: #fff; }
-.stepLabel  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.stepLabel  { display: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.stepActive .stepLabel { display: block; }
 
 /* ── Summary bar ───────────────────────────────────────────────────────────── */
 .summaryBar {
@@ -1149,10 +1159,11 @@
   border-radius: 999px; font-size: 12px; color: var(--text);
 }
 /* Rectangular chip — no avatar circle */
+/* Chips de apartamento e de hóspede — laranja, o mesmo acento das escolhas */
 .hospedeChipRect {
   display: flex; align-items: center; gap: 6px; padding: 4px 8px;
-  background: color-mix(in srgb, var(--violet) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--violet) 25%, transparent);
+  background: color-mix(in srgb, #f97316 10%, transparent);
+  border: 1px solid color-mix(in srgb, #f97316 25%, transparent);
   border-radius: 5px; font-size: 12px; color: var(--text); font-weight: 500;
 }
 .chipRemove { background: none; border: none; cursor: pointer; color: var(--text-2); display: flex; align-items: center; padding: 1px; border-radius: 50%; transition: color 0.12s; }
@@ -1204,7 +1215,8 @@
 .finSummaryValue { font-size: 16px; font-weight: 800; color: var(--text); }
 
 /* ── Step 3 minimalist layout ───────────────────────────────────────────────── */
-.step3Root { display: flex; flex-direction: column; padding: 14px 16px 16px; }
+/* Sem recuo lateral: os cards ficam alinhados com as abas e o resumo Tipo/Modo */
+.step3Root { display: flex; flex-direction: column; padding: 14px 0 16px; }
 .step3Section {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
@@ -1247,6 +1259,43 @@
 .step3PeriodoContent {
   display: flex; flex-direction: column; gap: 0;
 }
+
+/* Período no resumo — o período e seus apartamentos vivem no mesmo card,
+   separados apenas por linhas. O cabeçalho fica fixo no topo ao rolar. */
+.step3PeriodoCard {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+.step3PeriodoHead {
+  position: sticky; top: 0; z-index: 3;
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--violet) 8%, var(--surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--violet) 30%, var(--border));
+  border-radius: 12px 12px 0 0;
+}
+.step3PeriodoHead .step3PeriodoBandLabel { color: var(--text-2); }
+/* Datas à esquerda; contadores (diárias · apartamentos) encostados na direita */
+.step3PeriodoHead .rcPeriodRow  { flex: 1; min-width: 0; }
+.step3PeriodoHead .ovDateCellRight + .ovNightsCell { margin-left: auto; }
+.step3PeriodoHead .ovNightsCell + .ovNightsCell { margin-left: 14px; }
+
+/* Apartamentos dentro do card do período — divididos só por uma linha */
+.step3PeriodoRooms { display: flex; flex-direction: column; }
+.step3RoomRow + .step3RoomRow { border-top: 1px solid var(--border); }
+.step3RoomRow .rcHead { border-bottom: none; }
+.step3RoomRowOpen .rcHead { border-bottom: 1px solid var(--border); }
+/* Conteúdo do apartamento recuado (como um "tab") e com as linhas sem encostar
+   nas bordas laterais do card do período. */
+.step3RoomRow .rcSection,
+.step3RoomRow .rcObsToggle {
+  margin: 0 16px 0 34px;
+  padding-left: 0; padding-right: 0;
+  width: auto;
+}
+.step3RoomRowOpen .rcHead { margin: 0 16px; padding-left: 0; padding-right: 0; }
 
 /* Room block in step 3 */
 .step3RoomBlock {
@@ -1296,6 +1345,25 @@
   transition: all .15s;
 }
 .pagModoCheckBoxOn { background: #f97316; border-color: #f97316; color: #fff; }
+
+/* Escolha em cards — uma opção por card, com descrição (passos "Tipo" e
+   "Modo de Pagamento" do assistente de nova reserva) */
+.choiceCards { display: flex; flex-direction: column; gap: 10px; }
+.choiceCard {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  user-select: none; transition: border-color .15s, background .15s;
+}
+.choiceCard:hover { border-color: color-mix(in srgb, #f97316 45%, var(--border)); }
+.choiceCardOn {
+  border-color: #f97316;
+  background: color-mix(in srgb, #f97316 7%, var(--surface));
+}
+.choiceCard .pagModoCheckBox { margin-top: 1px; }
+.choiceCardText { min-width: 0; }
+.choiceCardTitle { font-size: 13px; font-weight: 600; color: var(--text); }
+.choiceCardDesc { font-size: 12px; line-height: 1.45; color: var(--text-2); margin-top: 3px; }
 
 /* Payment label inside step 3 */
 .step3PagLabel {
@@ -1756,14 +1824,14 @@
   cursor: pointer; transition: background 0.1s; margin-bottom: 2px;
 }
 .comboItem:hover:not(.comboItemUnavail) { background: color-mix(in srgb, var(--violet) 8%, transparent); }
-.comboItemSel    { background: color-mix(in srgb, var(--violet) 10%, transparent); }
+.comboItemSel    { background: color-mix(in srgb, #f97316 10%, transparent); }
 .comboItemUnavail { opacity: 0.45; cursor: not-allowed; }
 .comboCheck {
   width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
   display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
   flex-shrink: 0; color: transparent; transition: all 0.12s; background: var(--surface);
 }
-.comboCheckSel { background: var(--violet); border-color: var(--violet); color: #fff; }
+.comboCheckSel { background: #f97316; border-color: #f97316; color: #fff; }
 .comboItemNum   { font-size: 13px; font-weight: 400; color: var(--text); font-family: var(--font-mono), monospace; min-width: 72px; }
 .comboItemTipo  { font-size: 10px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
 .comboItemPreco { font-size: 11px; color: var(--text-2); margin-left: auto; }
@@ -2216,6 +2284,8 @@
 }
 .rvContactBtnWa   { color: #16a34a; }
 .rvContactBtnWa:hover   { background: rgba(22,163,74,0.12); border-color: rgba(22,163,74,0.4); }
+/* Ícone em PNG (WhatsApp) dentro do botão de contato */
+.rvContactIcon { width: 17px; height: 17px; object-fit: contain; display: block; }
 .rvContactBtnMail { color: #2563eb; }
 .rvContactBtnMail:hover { background: rgba(37,99,235,0.12); border-color: rgba(37,99,235,0.4); }
 
@@ -2383,13 +2453,15 @@
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: 12px; padding: 14px 16px; flex-shrink: 0;
 }
-.ovDateCell { display: flex; flex-direction: column; gap: 3px; flex: 1; }
-.ovDateCellRight { text-align: right; }
+/* Check-in e check-out ficam juntos; as diárias é que vão para a direita. */
+.ovDateCell { display: flex; flex-direction: column; gap: 3px; flex: 0 0 auto; min-width: 0; }
+.ovDateCellRight { text-align: left; }
 .ovDateLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); }
 .ovDateValue { font-size: 14px; font-weight: 700; color: var(--text); }
 .ovDateTime  { font-size: 11px; color: var(--text-2); }
-.ovDateArrow { display: flex; align-items: center; color: var(--text-2); padding: 0 12px; flex-shrink: 0; }
-.ovNightsCell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 0 0 16px; border-left: 1px solid var(--border); margin-left: 4px; min-width: 56px; }
+.ovDateArrow { display: flex; align-items: center; color: var(--text-2); padding: 0 10px; flex-shrink: 0; }
+/* Contador de diárias à direita do período. */
+.ovNightsCell { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0 0 0 14px; border-left: 1px solid var(--border); margin-left: 14px; min-width: 56px; }
 .ovNightsNum   { font-size: 18px; font-weight: 800; color: var(--text); line-height: 1; }
 .ovNightsLabel { font-size: 10px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
 
@@ -2647,12 +2719,23 @@
   .summaryBar { font-size: 11px; padding: 6px 10px; }
 
   /* Step 3 */
-  .step3Root  { padding: 10px 12px 14px; }
+  .step3Root  { padding: 10px 0 14px; }
   .rcHead, .rcActions, .rcSection, .rcObsToggle { padding-left: 12px; padding-right: 12px; }
   .rcStat     { padding: 10px 12px; }
   .rcStatVal  { font-size: 16px; }
   .rcBtn      { min-width: 0; flex-basis: 100%; }
   .rcHeadMeta { display: none; }
+  /* No cabeçalho os botões continuam compactos, lado a lado */
+  .rcHead     { flex-wrap: wrap; }
+  .rcHeadActions .rcBtn { flex-basis: auto; }
+  /* Mantém o recuo do conteúdo do apartamento (linhas sem encostar nas bordas) */
+  .step3RoomRow .rcSection,
+  .step3RoomRow .rcObsToggle { margin: 0 12px 0 26px; padding-left: 0; padding-right: 0; }
+  .step3RoomRowOpen .rcHead  { margin: 0 12px; padding-left: 0; padding-right: 0; }
+  /* Empilhado: o período em cima e a lista ocupa a largura toda */
+  .rcPeriodBox     { flex-direction: column; }
+  .rcPeriodRow     { order: 0; align-self: stretch; }
+  .rcPeriodDiarias { order: 1; max-width: none; margin-left: 0; align-self: stretch; }
 }
 
 /* ── ReservaModal mobile responsive ─────────────────────────────────────────── */
@@ -2736,7 +2819,18 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
-.rcHeadLeft { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rcHeadLeft { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+.rcHeadTop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rcHeadRight { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* Fechar — sem fundo, ao lado do número da reserva */
+.rcCloseBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: none; background: none; border-radius: 6px;
+  color: var(--text-2); cursor: pointer;
+  transition: color 0.12s ease;
+}
+.rcCloseBtn:hover { color: #ef4444; }
 .rcTitle { font-size: 15px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .rcChip {
   font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
@@ -2744,6 +2838,12 @@
   color: var(--violet);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* "Titular" — mesmo verde do avatar do hóspede */
+.rcChipGreen {
+  background: color-mix(in srgb, #10b981 16%, transparent);
+  color: #047857;
+}
+:root[data-theme="dark"] .rcChipGreen { color: #34d399; }
 .rcHeadMeta { font-size: 12px; color: var(--text-2); white-space: nowrap; }
 
 /* Total · Pago · Pendente */
@@ -2792,10 +2892,41 @@
   border-color: #f97316; color: #f97316;
   background: color-mix(in srgb, #f97316 15%, transparent);
 }
+/* Totais do apartamento em lista, logo abaixo das diárias */
+.rcResumoList {
+  display: flex; flex-direction: column; gap: 3px;
+  margin-top: 4px;
+}
+.rcResumoRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.rcResumoGreen  { color: #047857; }
+.rcResumoDanger { color: #b91c1c; }
+:root[data-theme="dark"] .rcResumoGreen  { color: #34d399; }
+:root[data-theme="dark"] .rcResumoDanger { color: #f87171; }
+
+/* Ações compactas no cabeçalho do card (à direita do título do apartamento) */
+.rcHeadActions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.rcHeadActions .rcBtn { flex: 0 0 auto; min-width: 0; padding: 6px 10px; font-size: 12px; }
+/* Total do apartamento, à direita do cabeçalho quando o card está recolhido */
+.rcHeadTotal { margin-left: auto; flex-shrink: 0; font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+/* Mostrar/ocultar os detalhes do apartamento */
+.rcToggleBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: none; background: none; border-radius: 6px;
+  color: var(--text-2); cursor: pointer;
+  transition: color 0.12s ease;
+}
+.rcToggleBtn:hover { color: var(--text); }
+.rcToggleOpen { transform: rotate(180deg); transition: transform 0.15s ease; }
 
 /* Seções internas */
 .rcSection { padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .rcSection:last-child { border-bottom: none; }
+.rcSectionNoLine { border-bottom: none; padding-bottom: 0; }
 .rcSectionHead {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-bottom: 8px;
@@ -2811,6 +2942,8 @@
 .rcDiariaSub { color: var(--text-2); font-size: 13px; font-weight: 400; }
 .rcDiariaVal { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rcDiariaOld { text-decoration: line-through; color: var(--text-2); font-weight: 400; margin-right: 6px; }
+/* "3x" antes do valor quando várias diárias têm o mesmo preço */
+.rcDiariaMult { color: var(--text-2); font-weight: 400; }
 .rcTotalRow {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   margin-top: 6px; padding-top: 8px;
@@ -2820,16 +2953,12 @@
 
 /* ── View da reserva reaproveitando o card do passo 3 ────────────────────── */
 /* Período — check-in / check-out / diárias no mesmo box */
-.rcPeriodBox {
-  border-radius: 10px; overflow: hidden;
-  background: var(--surface);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.10), 0 1px 2px rgba(15, 23, 42, 0.06);
-}
-:root[data-theme="dark"] .rcPeriodBox {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.26);
-}
-.rcPeriodRow { display: flex; align-items: stretch; gap: 0; padding: 12px 14px; }
-.rcPeriodDiarias { padding: 4px 14px 10px; border-top: 1px solid var(--border); }
+/* Sem fundo nem sombra — o período fica direto sobre o card */
+/* Duas colunas: o período fixo à esquerda, alinhado ao topo, e a lista de
+   diárias à direita (cresce para baixo). */
+.rcPeriodBox { min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px; }
+.rcPeriodRow { order: 1; flex: 0 0 auto; display: flex; align-items: stretch; gap: 0; padding: 0; }
+.rcPeriodDiarias { order: 2; flex: 0 1 auto; min-width: 0; max-width: 320px; margin: 0 0 0 auto; padding: 0; }
 .rcPeriodDiarias .rcTotalRow { margin-top: 4px; }
 /* Sem divisórias entre as diárias — só o traço antes do total */
 .rcPeriodDiarias .rcDiariaRow + .rcDiariaRow { border-top: none; }
@@ -2842,6 +2971,24 @@
 :root[data-theme="dark"] .rcStatGreen .rcStatLabel,
 :root[data-theme="dark"] .rcStatGreen .rcStatVal { color: #34d399; }
 
+/* Total — mesmo fundo/borda do botão "Voucher" (.rvBtnGold) */
+.rcStatGold {
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.32);
+}
+.rcStatGold .rcStatLabel,
+.rcStatGold .rcStatVal { color: #b45309; }
+:root[data-theme="dark"] .rcStatGold .rcStatLabel,
+:root[data-theme="dark"] .rcStatGold .rcStatVal { color: #fbbf24; }
+
+/* Pendente — saldo em aberto, em vermelho */
+.rcStatDanger { background: color-mix(in srgb, #ef4444 18%, var(--surface)); }
+.rcStatDanger .rcStatLabel,
+.rcStatDanger .rcStatVal { color: #b91c1c; }
+:root[data-theme="dark"] .rcStatDanger { background: color-mix(in srgb, #ef4444 14%, var(--surface)); }
+:root[data-theme="dark"] .rcStatDanger .rcStatLabel,
+:root[data-theme="dark"] .rcStatDanger .rcStatVal { color: #f87171; }
+
 /* Ações centralizadas fora do card — botões maiores, sem bordas de seção */
 .rcActionsCenter {
   justify-content: center;
@@ -2850,6 +2997,8 @@
 .rcActionsCenter .rvAcoesWrap { margin-left: 0; }
 .rcActionsCenter .rvAcoesBtn { min-width: 200px; justify-content: center; padding: 11px 24px; }
 .rcActionsCenter .rvBtn { min-width: 150px; padding: 11px 20px; }
+/* Centralizado: o menu não empurra mais os botões para a direita */
+.rcActionsCenter .rvAcoesWrap { margin-left: 0; }
 /* Sozinho na linha, o menu ocupa a largura confortável de antes */
 .rcActionsCenter .rvAcoesWrap:only-child .rvAcoesBtn { min-width: 260px; }
 /* Menu ancorado no centro do botão, já que ele não fica mais à direita */

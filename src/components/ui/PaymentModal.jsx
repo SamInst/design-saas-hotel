@@ -194,7 +194,7 @@ export function PaymentModal({
   const aplicar50 = (checked) => {
     if (checked && metade != null) {
       setValor(maskBRL(String(Math.round(metade * 100))));
-      setDescricao(quartoNumero ? `PAGAMENTO DE 50% PARA O QUARTO ${quartoNumero}` : 'PAGAMENTO DE 50%');
+      setDescricao(`PAGO 50%`);
       if (titularNome) setNomePagador(titularNome.toUpperCase());
     } else {
       setValor('');
@@ -208,7 +208,7 @@ export function PaymentModal({
   const aplicar100 = (checked) => {
     if (checked && total100 != null) {
       setValor(maskBRL(String(Math.round(total100 * 100))));
-      setDescricao(quartoNumero ? `PAGAMENTO DE 100% PARA O QUARTO ${quartoNumero}` : 'PAGAMENTO DE 100%');
+      setDescricao(`PAGO 100%`);
       if (titularNome) setNomePagador(titularNome.toUpperCase());
     } else {
       setValor('');
@@ -384,13 +384,13 @@ export function PaymentModal({
                 {metade != null && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
-                    <span>Pagamento de 50% <b>({fmtBRL(metade)})</b></span>
+                    <span>Pago 50% <b>({fmtBRL(metade)})</b></span>
                   </label>
                 )}
                 {total100 != null && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is100} onChange={e => aplicar100(e.target.checked)} />
-                    <span>Pagamento de 100% <b>({fmtBRL(total100)})</b></span>
+                    <span>Pago 100% <b>({fmtBRL(total100)})</b></span>
                   </label>
                 )}
               </div>
