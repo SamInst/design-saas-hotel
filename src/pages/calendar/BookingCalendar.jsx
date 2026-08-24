@@ -213,6 +213,36 @@ const calcAge = (dob) => {
 };
 const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
 
+/** Agrupa as diárias de /calcular-preco em linhas únicas.
+ *  Diárias com o mesmo valor, a mesma sazonalidade e o mesmo acréscimo de crianças
+ *  viram uma linha "3x R$ 120,00" — inclusive quando não são consecutivas, senão o
+ *  mesmo valor se repete espalhado pela lista. A ordem é a da primeira ocorrência.
+ *  valorDe: opcional, sobrescreve o valor exibido (modo "Por diária" do ajuste). */
+const groupDiarias = (detalhes, valorDe) => {
+  const grupos = [];
+  const porChave = new Map();
+  (detalhes || []).forEach((d) => {
+    const valor    = valorDe ? valorDe(d) : (d.valor_final ?? 0);
+    const original = d.valor_final ?? 0;
+    const saz      = d.sazonalidade?.descricao ?? '';
+    const criancas = d.valor_criancas > 0 ? d.valor_criancas : 0;
+    const key      = [valor, original, saz, criancas].join('|');
+    const atual    = porChave.get(key);
+    if (atual) { atual.qtd += 1; return; }
+    const g = { key, qtd: 1, valor, valorOriginal: original, saz, criancas };
+    porChave.set(key, g);
+    grupos.push(g);
+  });
+  return grupos;
+};
+
+/** Sublinha da diária: "1 adulto · PREÇO ALTO NO DOMINGO · + Crianças R$ 30,00". */
+const diariaSubs = (g, guestLabel) => [
+  guestLabel,
+  g.saz,
+  g.criancas > 0 ? `+ Crianças ${fmtBRL(g.criancas)}` : '',
+].filter(Boolean).join(' · ');
+
 /** Converts a guest list to { datas_nascimento } for /calcular-preco.
  *  One birth date per guest in dd/MM/yyyy — guests without a stored date get a default adult date (18 years ago). */
 const buildGuestCalcParams = (guests) => {
@@ -588,6 +618,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       descricao:      payment.descricao ?? '',
       valor:          payment.valor ?? 0,
       cancelado:      false,
+      // Mesmo formato de data_hora_registro do backend, para a linha já mostrar
+      // data e hora antes de salvar. O GET depois substitui pelo valor real.
+      dataRegistro:   new Date().toLocaleString('pt-BR'),
     }]);
     addOp({ type: 'addPagamento', localId, payment });
     setShowPayModal(false);
@@ -612,10 +645,20 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setCancelMotivo('');
   };
 
+  // Descartar alterações: além de limpar a fila, as listas locais voltam ao que
+  // veio da reserva — senão um pagamento não salvo continua aparecendo na view.
+  const discardPendingOps = () => {
+    setPendingOps([]);
+    setHasChanges(false);
+    setPessoas(reserva.hospedes ?? []);
+    setPagamentos(reserva.pagamentos ?? []);
+  };
+
   // ── Save all pending ops ────────────────────────────────────────────────────
   const handleSaveChanges = async () => {
     setSaving(true);
     const hasPessoaOps = pendingOps.some((o) => o.type === 'addPessoa' || o.type === 'removePessoa' || o.type === 'setTitular');
+    const hasPagOps    = pendingOps.some((o) => o.type === 'addPagamento' || o.type === 'cancelPagamento');
     try {
       // Batch pessoa additions and removals into single calls each
       const addIds    = pendingOps.filter((o) => o.type === 'addPessoa').map((o) => o.pessoaId);
@@ -642,19 +685,20 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       setPendingOps([]);
       setHasChanges(false);
 
-      if (hasPessoaOps) {
-        // Os endpoints de pessoas já recalculam diárias/valor_total no backend (e removem o
-        // desconto vigente). Apenas re-buscamos a reserva atualizada para sincronizar a UI.
+      if (hasPessoaOps || hasPagOps) {
+        // Os endpoints de pessoas recalculam diárias/valor_total no backend (e removem o
+        // desconto vigente); os de pagamento devolvem id real, data/hora e funcionário.
+        // Nos dois casos re-buscamos a reserva para a view refletir o que foi gravado.
         try {
           const upd = await hospedagemApi.buscarPorId(reserva.id);
           const normalized = normalizeReserva(upd);
           onSync?.(normalized);
           setPessoas(normalized.hospedes ?? []);
           setPagamentos(normalized.pagamentos ?? []);
-        } catch { /* ignore sync failure */ }
-      } else if (onSync) {
-        // Só pagamentos mudaram (não altera o total): atualiza o pai localmente, sem GET.
-        onSync({ ...reserva, pagamentos });
+        } catch {
+          // Sem o GET, ao menos o pai fica com o que temos localmente.
+          onSync?.({ ...reserva, pagamentos });
+        }
       }
       onNotify?.('Alterações salvas!');
     } catch (e) {
@@ -1011,14 +1055,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           </div>
         }
       >
-        {/* ── Price card — on top for pessoas/pagamentos, left column for dados ── */}
-        {editActiveTab !== 'dados' && (
+        {/* ── Price card — on top for pessoas, left column for dados ── */}
+        {editActiveTab === 'pessoas' && (
           <div className={styles.editPriceTop}>
             {renderEditPriceCard()}
           </div>
         )}
 
-        <div className={styles.detailTabContent}>
+        <div className={[styles.detailTabContent, editActiveTab === 'pagamentos' ? styles.detailTabContentAuto : ''].join(' ')}>
         {editActiveTab === 'dados' && <div className={styles.editDados}>
           <div className={styles.editDadosFin}>
             <FormField label="Observação">
@@ -1183,30 +1227,132 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         })()}
 
         {/* ── Pagamentos tab ── */}
-        {editActiveTab === 'pagamentos' && (
-          <div className={styles.detailBody}>
-            {reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-              <button className={styles.addLinkBtn} onClick={() => setShowPayModal(true)}><Plus size={13} /> Adicionar pagamento</button>
-            )}
-            {pagamentos.length === 0 && <div className={styles.emptyState}>Nenhum pagamento registrado.</div>}
-            {pagamentos.map((p) => (
-              <div key={p.id} className={[styles.pagRow, p.cancelado ? styles.pagRowCancelado : '', styles.pagCardClickable].join(' ')} onClick={() => setViewPagamento(p)}>
-                <div className={styles.pagRowTop}>
-                  <span className={styles.pagRowDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
-                    <span className={p.cancelado ? styles.pagCardValorCancelado : styles.pagRowVal}>{fmtBRL(p.valor)}</span>
-                    {!p.cancelado && reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && (
-                      <button className={styles.removeIconBtn} title="Cancelar pagamento" onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}><Trash2 size={12} /></button>
+        {/* ── Pagamentos — mesmo desenho do card da view e do passo "Resumo & Pagamento" ── */}
+        {editActiveTab === 'pagamentos' && (() => {
+          const editavel = reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado';
+          const pagDetalhes = editCalc?.detalhes ?? [];
+          // Ajuste manual persistido ("Gerenciar Preços"): o cálculo devolve o preço de
+          // tabela, então o desconto/adicional é reaplicado aqui igual à view.
+          const pagAdj       = reserva.novoPreco ? novoPrecoToState(reserva.novoPreco) : null;
+          const pagBaseDiarias = pagDetalhes.map((d) => ({ valor: d.valor_final ?? 0 }));
+          const pagBaseTotal   = pagBaseDiarias.reduce((acc, d) => acc + d.valor, 0);
+          const pagAdjResult   = pagAdj
+            ? computeAdjustedTotal({ baseTotal: pagBaseTotal, baseDiarias: pagBaseDiarias, ...pagAdj })
+            : null;
+          const pagIsDiariaAdj = pagAdj?.mode === 'diaria';
+          const pagDiariaValor = pagIsDiariaAdj ? (pagAdjResult?.diarias?.[0]?.valor ?? 0) : null;
+          const pagTotal    = pagDetalhes.length > 0
+            ? (pagAdjResult ? pagAdjResult.valorTotal : pagBaseTotal)
+            : (reserva.valorTotal ?? 0);
+          const pagDiff     = pagTotal - pagBaseTotal;
+          const pagPendente = Math.max(0, pagTotal - totalPago);
+          const pagQuitado  = pagTotal > 0 && totalPago >= pagTotal - 0.005;
+          // Uma diária só que já vale o total: a linha da diária repete o valor e o "Total" some.
+          const valorUnico  = pagDetalhes.length === 1
+            ? (pagIsDiariaAdj ? pagDiariaValor : (pagDetalhes[0].valor_final ?? 0))
+            : null;
+          const totalRedundante = valorUnico !== null && Math.abs(pagTotal - valorUnico) < 0.005;
+          const showQuitado = pagQuitado && !totalRedundante;
+          const showTotal   = !pagQuitado && !totalRedundante;
+          const showPend    = !pagQuitado && pagPendente > 0.005;
+          const grupos = groupDiarias(pagDetalhes, pagIsDiariaAdj ? () => pagDiariaValor : null);
+          return (
+            <div className={styles.rcCard}>
+              <div className={[styles.rcSection, styles.rcSectionNoLine].join(' ')}>
+                <div className={styles.rcSectionHead}>
+                  <span className={styles.rcSectionLabel}>Pagamentos</span>
+                </div>
+                {pagamentos.length === 0 && <div className={styles.pagEmpty}>Nenhum pagamento registrado.</div>}
+                {pagamentos.map((p) => (
+                  <div key={p.id}
+                    className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
+                    onClick={() => setViewPagamento(p)}>
+                    <div className={styles.step3PagRowTop}>
+                      <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
+                        <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
+                        {!p.cancelado && editavel && (
+                          <button className={styles.removeIconBtn} title="Cancelar pagamento"
+                            onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    {(p.dataRegistro || p.formaPagamento) && (
+                      <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
+                    )}
+                    {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
+                    {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
+                    {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                  </div>
+                ))}
+
+                {/* ── Diárias ── */}
+                {editCalcLoading && grupos.length === 0 && (
+                  <div className={styles.rcSectionLabel}>Calculando…</div>
+                )}
+                {grupos.map((g, gi) => (
+                  <div key={g.key} className={[styles.rcDiariaRow, pagQuitado ? styles.rcDiariaPago : ''].join(' ')}>
+                    <span>
+                      {g.qtd > 1 ? 'Diárias' : 'Diária'}
+                      {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
+                    </span>
+                    <span className={styles.rcDiariaVal}>
+                      {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
+                      {pagQuitado && gi === grupos.length - 1 && (
+                        <span className={styles.rcDiariaTag}>(pago 100%)</span>
+                      )}
+                      {pagIsDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
+                      {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
+                      {fmtBRL(g.valor)}
+                    </span>
+                  </div>
+                ))}
+
+                {/* Ajuste sobre o total (desconto/adicional em reais ou %) — uma linha só */}
+                {pagAdj && !pagIsDiariaAdj && Math.abs(pagDiff) >= 0.005 && (
+                  <div className={styles.rcDiariaRow}>
+                    <span className={styles.rcDiariaSub}>{describeAdjustment(pagAdj)}</span>
+                    <span className={styles.rcDiariaVal} style={{ color: pagDiff < 0 ? 'var(--emerald)' : '#f97316' }}>
+                      {pagDiff > 0 ? '+' : ''}{fmtBRL(pagDiff)}
+                    </span>
+                  </div>
+                )}
+
+                {/* ── Totais — o Total some quando a única diária já repete o valor ── */}
+                {(showQuitado || showTotal || showPend) && (
+                  <div className={styles.rcResumoList}>
+                    {showQuitado && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                        <span>Total pago</span><span>{fmtBRL(totalPago)}</span>
+                      </div>
+                    )}
+                    {showTotal && (
+                      <div className={styles.rcResumoRow}>
+                        <span>Total</span><span>{fmtBRL(pagTotal)}</span>
+                      </div>
+                    )}
+                    {showPend && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
+                        <span>Pendente</span><span>{fmtBRL(pagPendente)}</span>
+                      </div>
                     )}
                   </div>
-                </div>
-                <div className={styles.pagRowMeta}>{p.dataRegistro && <span>{p.dataRegistro}</span>}{p.dataRegistro && <span className={styles.pagCard2Sep}>·</span>}<span>{p.formaPagamento || '—'}</span></div>
-                {p.nomePagador && <div className={styles.pagRowPagador}>{p.nomePagador}</div>}
-                {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                )}
               </div>
-            ))}
-          </div>
-        )}
+
+              {editavel && (
+                <div className={styles.rcActions}>
+                  <button type="button" className={[styles.rcBtn, styles.rcBtnPrimary].join(' ')}
+                    onClick={() => setShowPayModal(true)}>
+                    <DollarSign size={15} /> Registrar pagamento
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         </div>
       </Modal>
 
@@ -1224,7 +1370,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title="Descartar alterações?"
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setShowDiscard(false); setPendingOps([]); setHasChanges(false); setEditing(false); setEditActiveTab('dados'); }}>Descartar</Button></div>}
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setShowDiscard(false); discardPendingOps(); setEditing(false); setEditActiveTab('dados'); }}>Descartar</Button></div>}
       ><p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>Há alterações não salvas. Deseja descartá-las?</p></Modal>
 
       <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm" title="Detalhes do Pagamento"
@@ -1301,7 +1447,19 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // Sem saldo em aberto o bloco "Pendente" some e as colunas se reajustam.
   const temPendente = displayPendente > 0.005;
   const twoColStats = { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' };
-  const statsCols   = temPendente ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : twoColStats;
+
+  // ── Valores no mesmo desenho do passo "Resumo & Pagamento" ────────────────
+  // Valor da diária no modo "Por diária" (o ajuste substitui o valor original).
+  const diariaAdjValor = isDiariaAdj
+    ? (adjResult?.diarias?.[0]?.valor ?? Math.max(0, Math.round((Number(priceAdj.value) || 0) * 100) / 100))
+    : null;
+  // Uma diária só que já vale o total: a linha da diária repete o valor e o "Total" some.
+  const valorUnicoDiaria = effectiveDetalhes.length === 1
+    ? (isDiariaAdj ? diariaAdjValor : (effectiveDetalhes[0].valor_final ?? 0))
+    : null;
+  const totalRedundante = valorUnicoDiaria !== null && Math.abs(cardTotal - valorUnicoDiaria) < 0.005;
+  // Quitado: as diárias ficam verdes e ganham o selo "(pago 100%)".
+  const pagoIntegral = cardTotal > 0 && totalPago >= cardTotal - 0.005;
 
   return (
     <>
@@ -1339,6 +1497,37 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               <button type="button" className={styles.rcCloseBtn} onClick={handleClose} aria-label="Fechar">
                 <X size={17} />
               </button>
+            </div>
+          </div>
+
+          {/* ── Período — acima dos hóspedes, em linha cheia ── */}
+          <div className={styles.rcSection}>
+            <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
+              <div className={styles.ovDateCell}>
+                <div className={styles.ovDateLabel}>Check-in</div>
+                <div className={styles.ovDateValue}>{toBrDate(reserva.dataInicio)}</div>
+                <div className={styles.ovDateTime}>{checkinTime}h</div>
+              </div>
+              <div className={styles.ovDateArrow}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+                </svg>
+              </div>
+              <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+                <div className={styles.ovDateLabel}>Check-out</div>
+                <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
+                <div className={styles.ovDateTime}>{checkoutTime}h</div>
+              </div>
+              <div className={styles.ovNightsCell}>
+                <div className={styles.ovNightsNum}>{dias}</div>
+                <div className={styles.ovNightsLabel}>{dias === 1 ? 'Diária' : 'Diárias'}</div>
+              </div>
+              {guestList.length > 0 && (
+                <div className={styles.ovNightsCell}>
+                  <div className={styles.ovNightsNum}>{guestList.length}</div>
+                  <div className={styles.ovNightsLabel}>{guestList.length === 1 ? 'Pessoa' : 'Pessoas'}</div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1392,66 +1581,57 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             )}
           </div>
 
-          {/* ── Período + diárias no mesmo box ── */}
-          <div className={styles.rcSection}>
-            <div className={styles.rcPeriodBox}>
-              <div className={styles.rcPeriodRow}>
-                <div className={styles.ovDateCell}>
-                  <div className={styles.ovDateLabel}>Check-in</div>
-                  <div className={styles.ovDateValue}>{toBrDate(reserva.dataInicio)}</div>
-                  <div className={styles.ovDateTime}>{checkinTime}h</div>
+          {/* ── Valores — pagamentos, diárias e totais na mesma lista do passo
+                 "Resumo & Pagamento" da criação ── */}
+          {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0) && (
+            <div className={styles.rcSection}>
+              {pagamentos.length > 0 && (
+                <div className={styles.rcSectionHead}>
+                  <span className={styles.rcSectionLabel}>Pagamentos</span>
                 </div>
-                <div className={styles.ovDateArrow}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                  </svg>
+              )}
+              {pagamentos.map((p) => (
+                <div key={p.id}
+                  className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
+                  onClick={() => setViewPagamento(p)}>
+                  <div className={styles.step3PagRowTop}>
+                    <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                    <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
+                  </div>
+                  {(p.dataRegistro || p.formaPagamento) && (
+                    <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
+                  )}
+                  {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
+                  {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
+                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
                 </div>
-                <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                  <div className={styles.ovDateLabel}>Check-out</div>
-                  <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
-                  <div className={styles.ovDateTime}>{checkoutTime}h</div>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{dias}</div>
-                  <div className={styles.ovNightsLabel}>{dias === 1 ? 'Diária' : 'Diárias'}</div>
-                </div>
-              </div>
+              ))}
 
               {/* ── Diárias — uma linha por diária ── */}
               {effectiveDetalhes.length > 0 && (() => {
                 const adj        = priceAdj;
-                const novoValor  = isDiariaAdj ? (adjResult?.diarias?.[0]?.valor ?? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100)) : null;
+                const novoValor  = diariaAdjValor;
                 const aggDiff    = cardTotal - baseTotal;
                 const funcAjuste = reserva.novoPreco?.funcionario?.nome;
-                // Diárias consecutivas com o mesmo valor e o mesmo detalhamento viram
-                // uma linha só: "Diárias 1–3 … 3x R$ 120,00".
-                const grupos = [];
-                effectiveDetalhes.forEach((d, di) => {
-                  const dd   = isDiariaAdj ? novoValor - (d.valor_final ?? 0) : 0;
-                  const subs = [
-                    d.sazonalidade?.descricao,
-                    d.valor_criancas > 0 ? `+ Crianças ${fmtBRL(d.valor_criancas)}` : '',
-                  ].filter(Boolean).join(' · ');
-                  const valor = isDiariaAdj ? novoValor : (d.valor_final ?? 0);
-                  const key   = [valor, subs, dd, d.valor_final ?? 0].join('|');
-                  const last  = grupos[grupos.length - 1];
-                  if (last && last.key === key) { last.qtd += 1; last.fim = di + 1; }
-                  else grupos.push({ key, qtd: 1, ini: di + 1, fim: di + 1, valor, valorOriginal: d.valor_final, subs, dd });
-                });
+                const grupos = groupDiarias(effectiveDetalhes, isDiariaAdj ? () => novoValor : null);
                 return (
-                  <div className={styles.rcPeriodDiarias}>
-                    {grupos.map((g) => (
-                      <div key={g.key + g.ini} className={styles.rcDiariaRow}>
+                  <>
+                    {grupos.map((g, gi) => (
+                      <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
                         <span>
                           {g.qtd > 1 ? 'Diárias' : 'Diária'}
-                          {g.subs && <span className={styles.rcDiariaSub}> · {g.subs}</span>}
-                          {isDiariaAdj && g.dd !== 0 && (
-                            <span className={styles.rcDiariaSub} style={{ color: g.dd < 0 ? 'var(--emerald)' : '#f97316' }}>
-                              {' · '}{g.dd < 0 ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(g.dd))}
+                          {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
+                          {isDiariaAdj && g.valor - g.valorOriginal !== 0 && (
+                            <span className={styles.rcDiariaSub} style={{ color: g.valor < g.valorOriginal ? 'var(--emerald)' : '#f97316' }}>
+                              {' · '}{g.valor < g.valorOriginal ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(g.valor - g.valorOriginal))}
                             </span>
                           )}
                         </span>
                         <span className={styles.rcDiariaVal}>
+                          {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
+                          {pagoIntegral && gi === grupos.length - 1 && (
+                            <span className={styles.rcDiariaTag}>(pago 100%)</span>
+                          )}
                           {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
                           {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
                           {fmtBRL(g.valor)}
@@ -1468,11 +1648,39 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         </span>
                       </div>
                     )}
+                  </>
+                );
+              })()}
+
+              {/* ── Totais — mesma regra do passo "Resumo & Pagamento": o Total some
+                     quando a única diária já repete o valor. ── */}
+              {(() => {
+                const showQuitado = pagoIntegral && !totalRedundante;
+                const showTotal   = !pagoIntegral && !totalRedundante;
+                const showPend    = !pagoIntegral && temPendente;
+                if (!showQuitado && !showTotal && !showPend) return null;
+                return (
+                  <div className={styles.rcResumoList}>
+                    {showQuitado && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                        <span>Total pago</span><span>{fmtBRL(totalPago)}</span>
+                      </div>
+                    )}
+                    {showTotal && (
+                      <div className={styles.rcResumoRow}>
+                        <span>Total</span><span>{fmtBRL(cardTotal)}</span>
+                      </div>
+                    )}
+                    {showPend && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
+                        <span>Pendente</span><span>{fmtBRL(displayPendente)}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
             </div>
-          </div>
+          )}
 
           {/* ── Valores do grupo (quando a reserva faz parte de um) ── */}
           {groupInfo && (
@@ -1491,49 +1699,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={styles.rcStatVal}>{fmtBRL(groupInfo.pendente)}</div>
                 </div>
               )}
-            </div>
-          )}
-
-          {/* ── Total · Pago · Pendente ── */}
-          <div className={styles.rcStats} style={statsCols}>
-            <div className={[styles.rcStat, styles.rcStatGold].join(' ')}>
-              <div className={styles.rcStatLabel}>Total</div>
-              <div className={styles.rcStatVal}>{fmtBRL(cardTotal)}</div>
-            </div>
-            <div className={[styles.rcStat, totalPago > 0 ? styles.rcStatGreen : styles.rcStatMuted].join(' ')}>
-              <div className={styles.rcStatLabel}>Pago</div>
-              <div className={styles.rcStatVal}>{fmtBRL(totalPago)}</div>
-            </div>
-            {temPendente && (
-              <div className={[styles.rcStat, styles.rcStatDanger].join(' ')}>
-                <div className={styles.rcStatLabel}>Pendente</div>
-                <div className={styles.rcStatVal}>{fmtBRL(displayPendente)}</div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Pagamentos ── */}
-          {pagamentos.length > 0 && (
-            <div className={styles.rcSection}>
-              <div className={styles.rcSectionHead}>
-                <span className={styles.rcSectionLabel}>Pagamentos</span>
-              </div>
-              {pagamentos.map((p) => (
-                <div key={p.id}
-                  className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
-                  onClick={() => setViewPagamento(p)}>
-                  <div className={styles.step3PagRowTop}>
-                    <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
-                    <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
-                  </div>
-                  {(p.dataRegistro || p.formaPagamento) && (
-                    <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
-                  )}
-                  {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
-                  {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
-                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
-                </div>
-              ))}
             </div>
           )}
 
@@ -3231,12 +3396,13 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
           <span className={styles.comboPlaceholder} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Loader2 size={13} className={styles.spin} /> Verificando disponibilidade...
           </span>
-        ) : !singleSelect && value.length > 0 ? (
+        ) : value.length > 0 ? (
           <div className={styles.comboChipsInline}>
             {value.map((q) => (
               <div key={q} className={styles.hospedeChipRect}>
                 <span>Apartamento {fmtRoom(parseInt(q))}</span>
-                <button type="button" className={styles.chipRemove} onClick={(e) => { e.stopPropagation(); handleSelect(parseInt(q)); }}><X size={10} /></button>
+                <button type="button" className={styles.chipRemove}
+                  onClick={(e) => { e.stopPropagation(); if (singleSelect) onChange([]); else handleSelect(parseInt(q)); }}><X size={10} /></button>
               </div>
             ))}
           </div>
@@ -3927,29 +4093,28 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   // Diárias com o mesmo valor viram uma linha só: "Diárias · 2 adultos ··· 3x R$ 120,00".
   // No modo "Por diária" o valor ajustado substitui o original (que fica riscado);
   // nos demais modos o ajuste vira uma linha única no fim. O total fica no box "Total".
-  const renderRoomDiarias = (calc, adjKey, guestLabel) => {
+  const renderRoomDiarias = (calc, adjKey, guestLabel, pagoIntegral = false) => {
     const adj = priceAdj[adjKey];
     const isDiariaAdj = adj?.mode === 'diaria';
     const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
     const base = (calc.detalhes || []).reduce((s, d) => s + (d.valor_final ?? 0), 0);
     const diff = (calc.valor_total ?? 0) - base;
-    const grupos = [];
-    (calc.detalhes || []).forEach((d) => {
-      const valor = isDiariaAdj ? novoValor : (d.valor_final ?? 0);
-      const key   = `${valor}|${d.valor_final ?? 0}`;
-      const last  = grupos[grupos.length - 1];
-      if (last && last.key === key) last.qtd += 1;
-      else grupos.push({ key, qtd: 1, valor, valorOriginal: d.valor_final });
-    });
+    const grupos = groupDiarias(calc.detalhes, isDiariaAdj ? () => novoValor : null);
     return (
       <>
         {grupos.map((g, gi) => (
-          <div key={gi} className={styles.rcDiariaRow}>
+          <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
             <span>
               {g.qtd > 1 ? 'Diárias' : 'Diária'}
-              {guestLabel && <span className={styles.rcDiariaSub}> · {guestLabel}</span>}
+              {diariaSubs(g, guestLabel) && (
+                <span className={styles.rcDiariaSub}> · {diariaSubs(g, guestLabel)}</span>
+              )}
             </span>
             <span className={styles.rcDiariaVal}>
+              {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
+              {pagoIntegral && gi === grupos.length - 1 && (
+                <span className={styles.rcDiariaTag}>(Pago 100%)</span>
+              )}
               {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
               {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
               {fmtBRL(g.valor)}
@@ -4484,7 +4649,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               {/* Per-room hospedes */}
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}</div>
+                  {tipo === 'grupo' && (
+                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}</div>
+                  )}
                   {isOrcSemCadastro ? (
                     <SemCadastroHospedesPicker
                       value={quartoHospedesOrc[q] || []}
@@ -4794,6 +4961,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               const ci = p.checkin ? formatDate(p.checkin) : checkinStr;
               const co = p.checkout ? formatDate(p.checkout) : checkoutStr;
               const d2 = ci && co ? diffDays(ci, co) : 0;
+              const pPessoas = p.rooms.reduce((acc, q) => acc + (
+                ((isOrcSemCadastro ? p.roomHospedesOrc : p.roomHospedes) || {})[q]?.length ?? 0
+              ), 0);
               return (
                 <div key={pi} className={styles.step3PeriodoBlock}>
                   {/* Período + seus apartamentos no mesmo card; o cabeçalho fica fixo no topo */}
@@ -4824,6 +4994,14 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         <div className={styles.ovNightsNum}>{p.rooms.length}</div>
                         <div className={styles.ovNightsLabel}>{p.rooms.length === 1 ? 'Apto' : 'Aptos'}</div>
                       </div>
+                      {/* Reserva de um único apartamento: os hóspedes do quarto são os da reserva,
+                          então cabe mostrar quantas pessoas ficam nele ao lado do total de aptos. */}
+                      {totalAptos === 1 && pPessoas > 0 && (
+                        <div className={styles.ovNightsCell}>
+                          <div className={styles.ovNightsNum}>{pPessoas}</div>
+                          <div className={styles.ovNightsLabel}>{pPessoas === 1 ? 'Pessoa' : 'Pessoas'}</div>
+                        </div>
+                      )}
                     </div>
                     </div>
                     <div className={styles.step3PeriodoRooms}>
@@ -4846,9 +5024,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       nAdultos  ? `${nAdultos} ${nAdultos === 1 ? 'adulto' : 'adultos'}`       : '',
                       nCriancas ? `${nCriancas} ${nCriancas === 1 ? 'criança' : 'crianças'}`   : '',
                     ].filter(Boolean).join(' · ');
-                    // Uma única diária que vale o total e já está quitada: o pagamento acima
-                    // e a linha da diária já dizem tudo, então "Total pago" vira repetição.
-                    // Sem pagamento (ou com pagamento parcial) o Pendente continua aparecendo.
+                    // Uma única diária que já vale o total: a linha da diária ("Diária ··· R$ 120,00")
+                    // repete o valor, então o "Total" é omitido. Com desconto que muda o total,
+                    // mais de uma diária ou qualquer outro valor, o Total volta a aparecer.
                     const detalhesR   = rCalc?.detalhes || [];
                     const adjR        = priceAdj[rKey];
                     const valorUnicoR = detalhesR.length === 1
@@ -4856,9 +5034,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           ? Math.max(0, Math.round((Number(adjR.value) || 0) * 100) / 100)
                           : (detalhesR[0].valor_final ?? 0))
                       : null;
-                    const totaisRedundantes = valorUnicoR !== null
-                      && Math.abs((rCalc?.valor_total ?? 0) - valorUnicoR) < 0.005
-                      && rPago > 0.005 && rPend < 0.005;
+                    const rTotalCalc    = rCalc?.valor_total ?? 0;
+                    const quartoQuitado = rTotalCalc > 0 && (perRoomPag
+                      ? rPago >= rTotalCalc - 0.005
+                      : grandTotal > 0 && totalPago >= grandTotal - 0.005);
+                    const totalRedundante = valorUnicoR !== null
+                      && Math.abs((rCalc?.valor_total ?? 0) - valorUnicoR) < 0.005;
                     const aberto = !!roomOpen[rKey];
                     return (
                       <div key={q} className={[styles.step3RoomRow, aberto ? styles.step3RoomRowOpen : ''].join(' ')}>
@@ -4974,30 +5155,34 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                             })}
 
                             {/* Diárias logo acima dos totais */}
-                            {rCalc && renderRoomDiarias(rCalc, rKey, guestLabel)}
+                            {rCalc && renderRoomDiarias(rCalc, rKey, guestLabel, quartoQuitado)}
 
                             {/* Totais. O valor já pago aparece na lista de pagamentos acima,
                                 então aqui só Total + Pendente (ou "Total pago" se quitado). */}
-                            {rCalc && !totaisRedundantes && (() => {
+                            {rCalc && (() => {
                               const rTotal  = rCalc.valor_total ?? 0;
                               const quitado = perRoomPag && rPago > 0 && rPend < 0.005;
+                              // Quitado com diária única que vale o total: pagamento + diária já contam tudo.
+                              const showQuitado = quitado && !totalRedundante;
+                              const showTotal   = !quitado && !totalRedundante;
+                              const showPend    = !quitado && perRoomPag;
+                              if (!showQuitado && !showTotal && !showPend) return null;
                               return (
                                 <div className={styles.rcResumoList}>
-                                  {quitado ? (
+                                  {showQuitado && (
                                     <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
                                       <span>Total pago</span><span>{fmtBRL(rPago)}</span>
                                     </div>
-                                  ) : (
-                                    <>
-                                      <div className={styles.rcResumoRow}>
-                                        <span>Total</span><span>{fmtBRL(rTotal)}</span>
-                                      </div>
-                                      {perRoomPag && (
-                                        <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                                          <span>Pendente</span><span>{fmtBRL(rPend)}</span>
-                                        </div>
-                                      )}
-                                    </>
+                                  )}
+                                  {showTotal && (
+                                    <div className={styles.rcResumoRow}>
+                                      <span>Total</span><span>{fmtBRL(rTotal)}</span>
+                                    </div>
+                                  )}
+                                  {showPend && (
+                                    <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
+                                      <span>Pendente</span><span>{fmtBRL(rPend)}</span>
+                                    </div>
                                   )}
                                 </div>
                               );

@@ -155,10 +155,12 @@ export function PaymentModal({
   const [quartoSel,        setQuartoSel]        = useState('');
   const [despesaInterna,   setDespesaInterna]   = useState(false);
   const [localSubmitting,  setLocalSubmitting]  = useState(false);
+  const [limiteAtingido,   setLimiteAtingido]   = useState(false);
 
   // Inicializa ao abrir
   useEffect(() => {
     if (!open) { setLocalSubmitting(false); return; }
+    setLimiteAtingido(false);
     setDespesaPessoal(false);
     setQuartoSel(initialQuarto ? String(initialQuarto) : '');
     setDespesaInterna(!!initialDespesaInterna);
@@ -187,6 +189,28 @@ export function PaymentModal({
   }, [open]);
 
   const valorNum   = parseBRL(valor);
+
+  // ── Teto do pagamento ────────────────────────────────────────
+  // Nunca lançar mais do que ainda falta pagar. Em grupo o teto é o pendente do
+  // grupo (um pagador pode cobrir os outros pernoites); fora dele, o pendente do
+  // próprio total. Editando um pagamento, o valor dele volta para o teto porque
+  // já está somado em "pago". Sem total e pago informados (carrinho de consumo,
+  // lançamento avulso) não há teto.
+  const limite = emGrupo
+    ? { total: grupoTotal, pago: grupoPago }
+    : (valorTotal !== null && valorPago !== null ? { total: valorTotal, pago: valorPago } : null);
+  const maxPagavel = limite
+    ? Math.max(0, Math.round((limite.total - limite.pago + (initialPayment?.valor ?? 0)) * 100) / 100)
+    : null;
+  const excedeTeto = (v) => maxPagavel !== null && v > maxPagavel + 0.005;
+
+  // Digitar acima do teto trava no teto em vez de engolir a tecla.
+  const handleValorChange = (raw) => {
+    const masked = maskBRL(raw);
+    if (!excedeTeto(parseBRL(masked))) { setLimiteAtingido(false); setValor(masked); return; }
+    setLimiteAtingido(true);
+    setValor(maxPagavel > 0 ? maskBRL(String(Math.round(maxPagavel * 100))) : '');
+  };
 
   // ── 50% quick-fill ───────────────────────────────────────────
   const metade = valorTotal != null && valorTotal > 0 ? Math.round(valorTotal * 0.5 * 100) / 100 : null;
@@ -222,7 +246,8 @@ export function PaymentModal({
       : Math.max(0, valorNum - (desconto.valor ?? 0))
     : valorNum;
 
-  const canConfirm = despesaPessoal || (!!tipoPagId && !!nomePagador && !!valor);
+  const canConfirm = despesaPessoal
+    || (!!tipoPagId && !!nomePagador && !!valor && !excedeTeto(valorNum));
 
   const handleConfirm = () => {
     if (!canConfirm || localSubmitting || isSubmitting) return;
@@ -379,15 +404,15 @@ export function PaymentModal({
               )}
             </FormField>
 
-            {(metade != null || total100 != null) && (
+            {((metade != null && !excedeTeto(metade)) || (total100 != null && !excedeTeto(total100))) && (
               <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-                {metade != null && (
+                {metade != null && !excedeTeto(metade) && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
                     <span>Pago 50% <b>({fmtBRL(metade)})</b></span>
                   </label>
                 )}
-                {total100 != null && (
+                {total100 != null && !excedeTeto(total100) && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is100} onChange={e => aplicar100(e.target.checked)} />
                     <span>Pago 100% <b>({fmtBRL(total100)})</b></span>
@@ -406,15 +431,24 @@ export function PaymentModal({
                 </Select>
               </FormField>
 
-              <FormField label="Valor *">
+              <FormField label={<>Valor *{maxPagavel !== null && (
+                <span className={styles.despesaPessoalHint}> · máx. {fmtBRL(maxPagavel)}</span>
+              )}</>}>
                 <Input type="text" placeholder="R$ 0,00"
-                  value={valor} onChange={e => setValor(maskBRL(e.target.value))}
+                  value={valor} onChange={e => handleValorChange(e.target.value)}
                   style={tipoRegistro === 'SAIDA'
                     ? { borderColor: '#f43f5e', color: '#f43f5e' }
                     : tipoRegistro === 'ENTRADA'
                       ? { borderColor: '#10b981', color: '#10b981' }
                       : undefined}
                 />
+                {limiteAtingido && (
+                  <div className={styles.limiteAviso}>
+                    {maxPagavel > 0
+                      ? `O valor não pode passar do pendente (${fmtBRL(maxPagavel)}).`
+                      : 'Não há valor pendente para este pagamento.'}
+                  </div>
+                )}
               </FormField>
             </div>
           </>

@@ -448,6 +448,7 @@
 .detailTabActive { color: var(--violet) !important; border-bottom-color: var(--violet) !important; font-weight: 600; }
 
 .detailTabContent { height: 500px; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.detailTabContentAuto { height: auto; max-height: min(500px, 62vh); }
 .detailTabContent::-webkit-scrollbar { width: 5px; }
 .detailTabContent::-webkit-scrollbar-track { background: transparent; }
 .detailTabContent::-webkit-scrollbar-thumb { background: rgba(107,114,128,0.28); border-radius: 999px; }
@@ -527,8 +528,6 @@
 .inlineDropdownItemBlocked { opacity: 0.55; cursor: not-allowed; }
 
 /* ── Add link button ───────────────────────────────────────────────────────── */
-.addLinkBtn { display: inline-flex; align-items: center; gap: 6px; background: none; border: 1px dashed var(--border); border-radius: var(--radius); cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text-2); padding: 8px 12px; width: 100%; justify-content: center; transition: border-color 0.15s, color 0.15s; }
-.addLinkBtn:hover { border-color: var(--violet); color: var(--violet); }
 
 /* ── Motivo cancelamento ───────────────────────────────────────────────────── */
 .motivoTextarea { width: 100%; resize: vertical; padding: 8px 10px; font-size: 13px; font-family: var(--font); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); outline: none; box-sizing: border-box; transition: border-color 0.15s; }
@@ -549,7 +548,6 @@
 .pagCard { display: flex; flex-direction: column; gap: 6px; padding: 12px; background: var(--surface-2); border-radius: var(--radius); border: 1px solid var(--border); }
 .pagCardClickable { cursor: pointer; transition: background 0.12s, border-color 0.12s, opacity 0.12s; }
 .pagCard.pagCardClickable:not(.pagCardCancelado):hover { background: color-mix(in srgb, var(--violet) 5%, var(--surface-2)); border-color: color-mix(in srgb, var(--violet) 30%, var(--border)); }
-.pagRow.pagCardClickable:not(.pagRowCancelado):hover .pagRowDesc { color: var(--violet); }
 .pagCardCancelado { opacity: 0.45; filter: grayscale(1); }
 .pagCardCancelado.pagCardClickable { pointer-events: auto; cursor: pointer; }
 .pagCardTop { display: flex; align-items: center; justify-content: space-between; }
@@ -564,15 +562,6 @@
 .pessoaRow:last-child { border-bottom: none; }
 
 /* Flat payment row (no background) */
-.pagRow { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-.pagRow:last-child { border-bottom: none; }
-.pagRowCancelado { opacity: 0.45; filter: grayscale(1); }
-.pagCardClickable.pagRow { cursor: pointer; }
-.pagRowTop { display: flex; align-items: center; gap: 8px; }
-.pagRowDesc { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
-.pagRowVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
-.pagRowMeta { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
-.pagRowPagador { font-size: 12px; color: var(--text-2); }
 /* ── Payment detail view ───────────────────────────────────────────────────── */
 .kvDetailRoot { display: flex; flex-direction: column; gap: 0; }
 
@@ -1321,8 +1310,7 @@
   font-family: inherit; transition: background 0.12s;
 }
 .step3AddPagBtn:hover { background: color-mix(in srgb, #f97316 18%, transparent); }
-.step3PagRow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.step3PagRow:last-child { border-bottom: none; }
+.step3PagRow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; }
 .step3PagRowTop { display: flex; align-items: center; gap: 8px; }
 .step3PagDesc { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
 .step3PagVal { font-size: 13px; font-weight: 700; color: var(--emerald); }
@@ -1632,7 +1620,6 @@
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; color: var(--text-2);
 }
-.pagCard2Sep { opacity: 0.4; }
 .pagCard2Pagador {
   font-size: 12px; color: var(--text-2); margin-top: 1px;
 }
@@ -2732,10 +2719,7 @@
   .step3RoomRow .rcSection,
   .step3RoomRow .rcObsToggle { margin: 0 12px 0 26px; padding-left: 0; padding-right: 0; }
   .step3RoomRowOpen .rcHead  { margin: 0 12px; padding-left: 0; padding-right: 0; }
-  /* Empilhado: o período em cima e a lista ocupa a largura toda */
-  .rcPeriodBox     { flex-direction: column; }
-  .rcPeriodRow     { order: 0; align-self: stretch; }
-  .rcPeriodDiarias { order: 1; max-width: none; margin-left: 0; align-self: stretch; }
+  .rcPeriodRow     { align-self: stretch; }
 }
 
 /* ── ReservaModal mobile responsive ─────────────────────────────────────────── */
@@ -2870,6 +2854,7 @@
   padding: 10px 16px;
   border-bottom: 1px solid var(--border);
 }
+.rcCard > .rcActions:last-child { border-bottom: none; }
 .rcBtn {
   flex: 1; min-width: 150px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -2894,11 +2879,15 @@
 }
 /* Totais do apartamento em lista, logo abaixo das diárias */
 .rcResumoList {
-  display: flex; flex-direction: column; gap: 3px;
-  margin-top: 4px;
+  display: flex; flex-direction: column;
+}
+/* Vindo logo depois das diárias, só o traço separa — sem espaço morto no meio */
+.rcDiariaRow + .rcResumoList {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
 }
 .rcResumoRow {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 3px 0;
   font-size: 14px; font-weight: 700; color: var(--text);
   font-variant-numeric: tabular-nums;
 }
@@ -2936,32 +2925,29 @@
 /* Diárias — uma linha por diária */
 .rcDiariaRow {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 6px 0; font-size: 14px; color: var(--text);
+  padding: 3px 0; font-size: 14px; color: var(--text);
 }
-.rcDiariaRow + .rcDiariaRow { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .rcDiariaSub { color: var(--text-2); font-size: 13px; font-weight: 400; }
 .rcDiariaVal { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rcDiariaOld { text-decoration: line-through; color: var(--text-2); font-weight: 400; margin-right: 6px; }
 /* "3x" antes do valor quando várias diárias têm o mesmo preço */
 .rcDiariaMult { color: var(--text-2); font-weight: 400; }
-.rcTotalRow {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin-top: 6px; padding-top: 8px;
-  border-top: 1px solid var(--border);
-  font-size: 14px; font-weight: 700; color: var(--text);
-}
+/* Diária já quitada — a linha inteira fica verde e recebe o selo "(pago 100%)" */
+.rcDiariaPago,
+.rcDiariaPago .rcDiariaSub,
+.rcDiariaPago .rcDiariaMult { color: #047857; }
+.rcDiariaTag { font-size: 12px; font-weight: 600; color: #047857; white-space: nowrap; margin-right: 8px; }
+:root[data-theme="dark"] .rcDiariaPago,
+:root[data-theme="dark"] .rcDiariaPago .rcDiariaSub,
+:root[data-theme="dark"] .rcDiariaPago .rcDiariaMult,
+:root[data-theme="dark"] .rcDiariaTag { color: #34d399; }
 
 /* ── View da reserva reaproveitando o card do passo 3 ────────────────────── */
-/* Período — check-in / check-out / diárias no mesmo box */
-/* Sem fundo nem sombra — o período fica direto sobre o card */
-/* Duas colunas: o período fixo à esquerda, alinhado ao topo, e a lista de
-   diárias à direita (cresce para baixo). */
-.rcPeriodBox { min-width: 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px; }
-.rcPeriodRow { order: 1; flex: 0 0 auto; display: flex; align-items: stretch; gap: 0; padding: 0; }
-.rcPeriodDiarias { order: 2; flex: 0 1 auto; min-width: 0; max-width: 320px; margin: 0 0 0 auto; padding: 0; }
-.rcPeriodDiarias .rcTotalRow { margin-top: 4px; }
-/* Sem divisórias entre as diárias — só o traço antes do total */
-.rcPeriodDiarias .rcDiariaRow + .rcDiariaRow { border-top: none; }
+/* Período — check-in / check-out / diárias, sem fundo nem sombra */
+.rcPeriodRow { display: flex; align-items: stretch; gap: 0; padding: 0; }
+/* Período sozinho na seção: datas à esquerda, contadores empurrados p/ direita */
+.rvPeriodRowFull { width: 100%; }
+.rvPeriodRowFull .ovDateCellRight + .ovNightsCell { margin-left: auto; }
 
 /* Pago — mesmo tratamento do "Pendente", em verde */
 .rcStatGreen { background: color-mix(in srgb, #10b981 20%, var(--surface)); }

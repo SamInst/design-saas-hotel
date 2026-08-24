@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Tag, Percent, CalendarDays } from 'lucide-react';
+import { Tag, Percent, CalendarDays, Check } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input, FormField } from './Input';
+import styles from './PriceAdjustmentModal.module.css';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const fmtBRL = (v) =>
@@ -118,12 +119,6 @@ const modeHint = (key) => {
   return 'Ajuste percentual sobre o total.';
 };
 
-const card = (active) => ({
-  display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', cursor: 'pointer',
-  border: `1px solid ${active ? 'var(--accent, #6366f1)' : 'var(--border, #2a2a35)'}`,
-  borderRadius: 8, background: active ? 'color-mix(in srgb, var(--accent, #6366f1) 12%, transparent)' : 'transparent',
-});
-
 /**
  * Modal de ajuste manual de preço por hospedagem. Apenas um modo por vez.
  *
@@ -176,36 +171,49 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
         </>
       }
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className={styles.stack}>
         {/* Sinal: desconto / adicional (não se aplica ao modo diária) */}
         {showSign && (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className={[styles.choiceCards, styles.choiceCardsRow].join(' ')}>
             {[
-              { k: 'desconto',  t: 'Desconto (−)' },
-              { k: 'adicional', t: 'Adicional (+)' },
-            ].map(({ k, t }) => (
+              { k: 'desconto',  t: 'Desconto (−)', d: 'Diminui o total.' },
+              { k: 'adicional', t: 'Adicional (+)', d: 'Aumenta o total.' },
+            ].map(({ k, t, d }) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setSign(k)}
-                style={{ ...card(sign === k), flex: 1, justifyContent: 'center', fontWeight: 600 }}
+                className={[styles.choiceCard, sign === k ? styles.choiceCardOn : ''].join(' ')}
               >
-                {t}
+                <span className={[styles.checkBox, sign === k ? styles.checkBoxOn : ''].join(' ')}>
+                  {sign === k && <Check size={11} />}
+                </span>
+                <span className={styles.choiceCardText}>
+                  <span className={styles.choiceCardTitle}>{t}</span>
+                  <span className={styles.choiceCardDesc}>{d}</span>
+                </span>
               </button>
             ))}
           </div>
         )}
 
         {/* Modo: apenas um por vez */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className={styles.choiceCards}>
           {modeKeys.map((key) => {
             const Icon = MODE_ICONS[key];
             return (
-              <button key={key} type="button" onClick={() => { setMode(key); setValue(''); }} style={card(mode === key)}>
-                <Icon size={16} />
-                <span style={{ display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
-                  <b style={{ fontSize: 13 }}>{modeLabel(key, sign)}</b>
-                  <span style={{ fontSize: 11, color: 'var(--text-2, #9aa)' }}>{modeHint(key)}</span>
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setMode(key); setValue(''); }}
+                className={[styles.choiceCard, mode === key ? styles.choiceCardOn : ''].join(' ')}
+              >
+                <span className={[styles.checkBox, mode === key ? styles.checkBoxOn : ''].join(' ')}>
+                  {mode === key && <Check size={11} />}
+                </span>
+                <span className={styles.choiceCardText}>
+                  <span className={styles.choiceCardTitle}><Icon size={14} /> {modeLabel(key, sign)}</span>
+                  <span className={styles.choiceCardDesc}>{modeHint(key)}</span>
                 </span>
               </button>
             );
@@ -236,17 +244,17 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
 
         {/* Prévia por diária — desconto/adicional aplicado a cada diária (modo "Por diária") */}
         {mode === 'diaria' && numericValue > 0 && baseDiarias.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, borderTop: '1px solid var(--border, #2a2a35)', paddingTop: 10 }}>
+          <div className={styles.preview}>
             {baseDiarias.map((d, i) => {
               const novo = result.diarias?.[i]?.valor ?? 0;
               const dd = novo - (d.valor || 0);
               return (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: 'var(--text-2, #9aa)' }}>Diária {i + 1}</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ textDecoration: 'line-through', color: 'var(--text-2, #9aa)' }}>{fmtBRL(d.valor)}</span>
+                <div key={i} className={styles.diariaRow}>
+                  <span className={styles.diariaLabel}>Diária {i + 1}</span>
+                  <span className={styles.diariaVals}>
+                    <span className={styles.diariaOld}>{fmtBRL(d.valor)}</span>
                     <span>{fmtBRL(novo)}</span>
-                    <span style={{ color: dd < 0 ? '#10b981' : dd > 0 ? '#f97316' : 'inherit', minWidth: 72, textAlign: 'right' }}>
+                    <span className={[styles.diariaDiff, dd < 0 ? styles.previewDown : dd > 0 ? styles.previewUp : ''].join(' ')}>
                       {dd > 0 ? '+' : ''}{fmtBRL(dd)}
                     </span>
                   </span>
@@ -257,17 +265,18 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
         )}
 
         {/* Prévia — mostra a diferença em relação ao valor original */}
-        <div style={{ borderTop: '1px solid var(--border, #2a2a35)', paddingTop: 10, fontSize: 13 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2, #9aa)' }}>
-            <span>{mode === 'diaria' ? 'Total atual (diárias)' : 'Total atual'}</span><span>{fmtBRL(baseTotal)}</span>
+        <div className={styles.preview}>
+          <div className={styles.previewRow}>
+            <span>{mode === 'diaria' ? 'Total atual (diárias)' : 'Total atual'}</span>
+            <span>{fmtBRL(baseTotal)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-2, #9aa)' }}>
+          <div className={styles.previewRow}>
             <span>Diferença</span>
-            <span style={{ color: diff < 0 ? '#10b981' : diff > 0 ? '#f97316' : 'inherit' }}>
+            <span className={diff < 0 ? styles.previewDown : diff > 0 ? styles.previewUp : ''}>
               {diff > 0 ? '+' : ''}{fmtBRL(diff)}
             </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, marginTop: 4 }}>
+          <div className={[styles.previewRow, styles.previewTotal].join(' ')}>
             <span>Novo total</span><span>{fmtBRL(result.valorTotal)}</span>
           </div>
         </div>

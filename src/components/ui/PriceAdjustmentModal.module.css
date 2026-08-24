@@ -1,0 +1,60 @@
+/* Escolha em cards — mesmo desenho do passo "Tipo" do assistente de nova reserva */
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+.choiceCards { display: flex; flex-direction: column; gap: 10px; }
+/* Duas opções lado a lado (desconto / adicional) */
+.choiceCardsRow { flex-direction: row; }
+.choiceCardsRow .choiceCard { flex: 1; min-width: 0; }
+
+.choiceCard {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  width: 100%; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-family: inherit; text-align: left;
+  user-select: none; transition: border-color .15s, background .15s;
+}
+.choiceCard:hover { border-color: color-mix(in srgb, #f97316 45%, var(--border)); }
+.choiceCardOn {
+  border-color: #f97316;
+  background: color-mix(in srgb, #f97316 7%, var(--surface));
+}
+
+.checkBox {
+  width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--border);
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  margin-top: 1px; transition: all .15s;
+}
+.checkBoxOn { background: #f97316; border-color: #f97316; color: #fff; }
+
+.choiceCardText { display: block; min-width: 0; }
+.choiceCardTitle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+.choiceCardDesc { display: block; font-size: 12px; line-height: 1.45; color: var(--text-2); margin-top: 3px; }
+
+/* ── Prévias ─────────────────────────────────────────────────────────────── */
+.preview {
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+.previewRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 3px 0; font-size: 13px; color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.previewTotal { font-size: 14px; font-weight: 700; color: var(--text); }
+.previewDown { color: #10b981; }
+.previewUp   { color: #f97316; }
+
+/* Diária a diária, no modo "Por diária" */
+.diariaRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 3px 0; font-size: 12px; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.diariaLabel { color: var(--text-2); }
+.diariaVals { display: flex; align-items: center; gap: 6px; }
+.diariaOld { text-decoration: line-through; color: var(--text-2); }
+.diariaDiff { min-width: 72px; text-align: right; }
