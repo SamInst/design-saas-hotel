@@ -504,7 +504,6 @@
 .pessoaCardInfo { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .pessoaCardActions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 .titularBadge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--violet) 15%, transparent); color: var(--violet); white-space: nowrap; }
-.acompanhanteBadge { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, var(--text-2) 12%, transparent); color: var(--text-2); white-space: nowrap; }
 .pessoaCardDetails { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--border); }
 .pessoaDetailRow { display: flex; align-items: baseline; gap: 8px; }
 .pessoaDetailVal { font-size: 12px; color: var(--text); }
@@ -521,11 +520,6 @@
 .addInlineRow { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: var(--surface-2); border: 1px solid var(--violet); border-radius: var(--radius); }
 .addInlineInput { flex: 1; background: none; border: none; outline: none; font-size: 13px; color: var(--text); }
 .addInlineInput::placeholder { color: var(--text-2); }
-.inlineDropdown { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
-.inlineDropdownItem { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: none; border: none; border-bottom: 1px solid var(--border); cursor: pointer; text-align: left; transition: background 0.1s; width: 100%; }
-.inlineDropdownItem:last-child { border-bottom: none; }
-.inlineDropdownItem:hover:not(:disabled) { background: var(--surface-2); }
-.inlineDropdownItemBlocked { opacity: 0.55; cursor: not-allowed; }
 
 /* ── Add link button ───────────────────────────────────────────────────────── */
 
@@ -655,26 +649,12 @@
 /* ── Gerenciar Pessoas — busca flutuante + lista estilo Cadastros ── */
 .gpSearchSticky {
   position: sticky;
-  top: -14px;                     /* cancela o padding-top do container de scroll */
+  top: 0;
   z-index: 5;
-  margin: -14px -16px 6px;        /* expande até as bordas do container (padding 16px) */
-  padding: 14px 16px 8px;
+  margin: 0 -16px;                /* expande até as bordas do container (padding 16px) */
+  padding: 8px 16px;
   background: var(--surface);
-  border-bottom: 1px solid var(--border);
 }
-.gpSearchBar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 12px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface-2);
-  transition: border-color 0.15s;
-}
-.gpSearchBar:focus-within { border-color: var(--violet); }
-.gpSearchIcon { color: var(--text-2); flex-shrink: 0; }
-.gpSearchInput {
-  flex: 1; min-width: 0; border: none; background: none; outline: none;
-  font-family: inherit; font-size: 13px; color: var(--text);
-}
-.gpSearchInput::placeholder { color: var(--text-2); }
 .gpSearchClear {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
@@ -682,15 +662,6 @@
   transition: background 0.12s, color 0.12s;
 }
 .gpSearchClear:hover { background: var(--surface); color: var(--text); }
-
-.gpPersonRow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 11px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface);
-}
-.gpPersonInfo { flex: 1; min-width: 0; }
-.gpPersonName { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gpPersonMeta { font-size: 11px; font-family: var(--font-mono); color: var(--text-2); margin-top: 1px; }
 
 /* ── Financial values ──────────────────────────────────────────────────────── */
 .finRow      { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); padding: 2px 0; }
@@ -708,25 +679,26 @@
 
 /* ── Day Modal ──────────────────────────────────────────────────────────────── */
 .dayRoomList { display: flex; flex-direction: column; }
-.dayRoomRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; transition: background 0.1s; cursor: pointer; }
-.dayRoomRow:last-child { border-bottom: none; }
+.dayRoomRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; transition: background 0.1s; cursor: pointer; }
+/* Traço só quando existe um resumo logo abaixo, separando a lista dos totais.
+   No painel de grupo os pagamentos entram entre a lista e os totais, então o
+   traço acompanha quem estiver imediatamente acima do resumo. */
+.dayRoomList + .rcResumoList,
+.step3PagRow + .rcResumoList { border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); padding-top: 6px; margin-top: 4px; }
+/* Separa a lista de apartamentos do bloco de pagamentos que vem abaixo */
+.dayRoomList + .rcSectionHead { margin-top: 10px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
 .dayRoomRow:hover { background: var(--surface-2); }
-.dayRoom_confirmada { border-left-color: #10b981; }
-.dayRoom_solicitada { border-left-color: #f59e0b; }
-.dayRoom_hospedado  { border-left-color: #8b5cf6; }
-.dayRoom_finalizado { border-left-color: #0f766e; }
-.dayRoom_cancelado  { border-left-color: #ef4444; }
 /* PERNOITE_FINALIZADO: mesmo cinza do ATIVO, porém mais esmaecido (concluído) */
-.dayRoomDone { border-left-color: #6b7280; opacity: .6; }
+.dayRoomDone { opacity: .6; }
 .dayRoomDone:hover { opacity: .82; }
 .dayRoomDone .dayRoomBadge { background: rgba(55, 65, 81, 0.12); color: #374151; }
-.dayRoomBadge { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; font-family: var(--font-mono), monospace; }
-.dayRoomBadge_confirmada { background: rgba(16,185,129,0.12); color: #10b981; }
-.dayRoomBadge_solicitada { background: rgba(245,158,11,0.12); color: #f59e0b; }
-.dayRoomBadge_hospedado  { background: rgba(55,65,81,0.12); color: #374151; }
-.dayRoomBadge_finalizado { background: rgba(156,163,175,0.15); color: #9ca3af; }
-.dayRoomBadge_cancelado  { background: rgba(239,68,68,0.1); color: #ef4444; }
-.dayRoomBadge_orcamento  { background: rgba(99,102,241,0.12); color: #6366f1; }
+.dayRoomBadge { min-width: 32px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; flex-shrink: 0; font-family: var(--font-mono), monospace; }
+.dayRoomBadge_confirmada { color: #10b981; }
+.dayRoomBadge_solicitada { color: #f59e0b; }
+.dayRoomBadge_hospedado  { color: #374151; }
+.dayRoomBadge_finalizado { color: #9ca3af; }
+.dayRoomBadge_cancelado  { color: #ef4444; }
+.dayRoomBadge_orcamento  { color: #6366f1; }
 .dayRoomInfo     { flex: 1; min-width: 0; }
 .dayRoomTitular  { font-size: 14px; font-weight: 600; color: var(--text); }
 .dayRoomDates    { font-size: 11px; color: var(--text-2); margin-top: 1px; }
@@ -999,6 +971,8 @@
   box-sizing: border-box;
   transition: border-color 0.15s;
 }
+/* Campo travado (ex.: grupo já definido pelo painel de grupos) */
+.formInput:disabled { opacity: .6; cursor: not-allowed; background: var(--surface-2); }
 .formInput:focus { border-color: var(--violet); }
 
 /* Standard select */
@@ -1481,16 +1455,6 @@
 .editCompareDiffDown { color: #10b981; }
 .editCompareLoading { font-size: 11px; color: var(--text-2); display: flex; align-items: center; gap: 4px; padding: 4px 0; }
 
-/* ── Edit price card top (above tabs in edit modal) ─────────────────────────── */
-.editPriceTop {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-  flex-shrink: 0;
-}
-.editPriceTop .priceCard { margin-bottom: 0; }
-.editPriceTop .editCompareGrid { margin-bottom: 0; }
-
 /* ── Edit: inline date-range calendar ───────────────────────────────────────── */
 .editCal { display: flex; flex-direction: column; gap: 10px; }
 
@@ -1530,8 +1494,13 @@
 }
 
 /* legend under the calendar */
+/* Duas colunas preenchidas de cima para baixo: 3 itens à esquerda, 2 à direita */
 .editCalLegend {
-  display: flex; flex-wrap: wrap; gap: 6px 16px; justify-content: center;
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 5px 14px;
   padding-top: 2px;
 }
 .editCalLegendItem {
@@ -1539,12 +1508,14 @@
   font-size: 11px; font-weight: 500; color: var(--text-2);
 }
 .editCalLegendItem i { width: 11px; height: 11px; border-radius: 4px; flex-shrink: 0; }
-.lgSel  { background: var(--violet); box-shadow: 0 1px 3px rgba(124,58,237,0.4); }
+.lgSel  { background: rgba(16,185,129,0.22); border: 1.5px solid rgba(16,185,129,0.55); }
 .lgBlk  {
   background:
     repeating-linear-gradient(-45deg, rgba(220,38,38,0.85) 0 2px, rgba(220,38,38,0.18) 2px 4px);
 }
 .lgFree { background: var(--surface); border: 1.5px solid var(--card-border); }
+/* Mesmo destaque do dia de hoje no calendário (.tod do DatePicker) */
+.lgTod  { background: rgba(124,58,237,0.13); box-shadow: inset 0 0 0 1.5px rgba(124,58,237,0.45); }
 .lgHalf {
   border: 1.5px solid var(--card-border);
   background:
@@ -1552,21 +1523,34 @@
 }
 
 /* ── Edit: two-column layout (financial left, room+calendar right) ──────────── */
+/* Aba "Editar": valores no topo, formulário à esquerda e calendário à direita */
+.editDadosRoot { display: flex; flex-direction: column; gap: 14px; }
 .editDados { display: flex; flex-direction: column; gap: 14px; }
 .editDadosForm { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.editDadosFin { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
-.editDadosFin .rvFinCard,
-.editPriceTop .rvFinCard { margin: 0; }
+.editDadosCal  { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+/* O calendário embutido é o primeiro filho — o DatePicker tem CSS module próprio,
+   então o aperto vem por seletor estrutural. */
+.editDadosCal > div:first-child { padding: 10px 12px 12px; border-radius: 12px; }
 
 @media (min-width: 760px) {
   .editDados {
     display: grid;
-    grid-template-columns: minmax(240px, 300px) 1fr;
+    /* O calendário é a coluna estreita: o formulário fica com a folga */
+    grid-template-columns: 1fr minmax(230px, 280px);
     gap: 18px;
     align-items: start;
   }
-  .editDadosFin { position: sticky; top: 0; }
   .detailTabContent { height: 600px; }
+  /* Declarada aqui também: senão a linha acima, por vir depois, anula o auto */
+  .detailTabContentAuto { height: auto; max-height: min(600px, 70vh); }
+  /* A observação cresce para a base das duas colunas terminar junto */
+  .editDados { align-items: stretch; }
+  /* Legenda na coluna do calendário, em linha própria: alinha pela esquerda dele
+     sem entrar na altura da linha do formulário. */
+  .editCalLegend { grid-column: 2; }
+  .editObsGrow { flex: 1; display: flex; }
+  .editObsGrow > div { flex: 1; display: flex; flex-direction: column; }
+  .editObsGrow textarea { flex: 1; min-height: 64px; resize: none; }
 }
 
 /* price breakdown inside the Resumo Financeiro card */
@@ -1785,6 +1769,23 @@
   gap: 14px;
   align-items: start;
 }
+/* Sem isto os campos crescem até o min-content e estouram a coluna */
+.step2Grid > * { min-width: 0; }
+
+/* Aba "Editar": campos de data no tamanho do conteúdo. O input do DatePicker é
+   flex:1 e empurrava o "×" para a borda — aqui ele fica do tamanho de dd/mm/aaaa,
+   com o botão logo ao lado. O apartamento acompanha a mesma largura. */
+.editDatesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 150px));
+  gap: 10px;
+  align-items: start;
+}
+.editDatesGrid > * { min-width: 0; }
+.editDatesGrid .dateCompact > div > div { gap: 6px !important; }
+.editDatesGrid .dateCompact > div > div > input { flex: 0 0 auto; width: 76px; }
+/* Apartamento e observação na mesma largura dos dois campos de data (150+10+150) */
+.editFieldCap { max-width: 310px; }
 
 /* ── DatePicker compact override (inside modal) ──────────────────────────── */
 .dateCompact > div > div {
@@ -2520,30 +2521,30 @@
 }
 .rvObsText { font-size: 12px; color: var(--text); line-height: 1.5; }
 
-/* Cancellation block */
-.rvCancelBlock {
-  background: rgba(239,68,68,0.06);
-  border: 1px solid rgba(239,68,68,0.2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+/* Reserva cancelada — o card inteiro perde destaque, menos o motivo. A opacidade
+   fica em cada seção (e não no card) para o motivo poder voltar ao normal: opacidade
+   no pai criaria um contexto que o filho não consegue desfazer. */
+.rvCancelado > .rcSection,
+.rvCancelado > .rcStats,
+.rvCancelado > .rcActions { opacity: .5; filter: grayscale(0.8); }
+.rvCancelado > .rvCancelSection { opacity: 1; filter: none; }
+/* No cabeçalho o apagado vai item a item: a etiqueta "Cancelada" precisa manter o
+   vermelho, e opacidade/filtro no cabeçalho inteiro apagariam ela junto. */
+.rvCancelado > .rcHead .rcTitle,
+.rvCancelado > .rcHead .rcHeadMeta,
+.rvCancelado > .rcHead .rcChip:not(.rcChipRed),
+.rvCancelado > .rcHead .rcHeadTotal { opacity: .5; filter: grayscale(0.8); }
+.rvCancelado .rcTitle {
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--text-2) 60%, transparent);
 }
-.rvCancelHeader {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #ef4444;
-  text-transform: uppercase;
-  letter-spacing: .05em;
+/* Cancelamento — ocupa a seção da observação quando a reserva foi cancelada */
+.rvCancelLabel {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: #ef4444; font-weight: 700;
 }
-:root[data-theme="dark"] .rvCancelHeader { color: #f87171; }
-.rvCancelText { font-size: 12px; color: var(--text); line-height: 1.4; }
-.rvCancelMeta { font-size: 11px; color: var(--text-2); }
+:root[data-theme="dark"] .rvCancelLabel { color: #f87171; }
+.rvCancelMeta { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
 /* Footer actions */
 .rvFooter {
@@ -2822,6 +2823,12 @@
   color: var(--violet);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* "Cancelada" — vermelho; precisa vir depois de .rcChip para não ser sobrescrito */
+.rcChipRed {
+  background: color-mix(in srgb, #ef4444 15%, transparent);
+  color: #dc2626;
+}
+:root[data-theme="dark"] .rcChipRed { color: #f87171; }
 /* "Titular" — mesmo verde do avatar do hóspede */
 .rcChipGreen {
   background: color-mix(in srgb, #10b981 16%, transparent);
@@ -2867,6 +2874,12 @@
 .rcBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .rcBtnPrimary { background: var(--violet); border-color: var(--violet); color: #fff; }
 .rcBtnPrimary:hover { background: var(--violet-2); border-color: var(--violet-2); color: #fff; }
+/* Pagamento — mesmo tratamento do "Desconto", sem fundo, no violeta */
+.rcBtnPay { border-color: color-mix(in srgb, var(--violet) 45%, var(--border)); color: var(--violet); }
+.rcBtnPay:hover:not(:disabled) {
+  border-color: var(--violet); color: var(--violet);
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+}
 /* Desconto — laranja */
 .rcBtnWarn { border-color: color-mix(in srgb, #f97316 45%, var(--border)); color: #f97316; }
 .rcBtnWarn:hover:not(:disabled) {
@@ -2884,6 +2897,11 @@
 /* Vindo logo depois das diárias, só o traço separa — sem espaço morto no meio */
 .rcDiariaRow + .rcResumoList {
   border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+/* Diária(s) + Total e mais nada: o traço vira ruído, já que são duas linhas do
+   mesmo assunto. Com Pago/Pendente/Total pago (verde ou vermelho) ele volta. */
+.rcDiariaRow + .rcResumoList:has(> .rcResumoRow:only-child:not(.rcResumoGreen):not(.rcResumoDanger)) {
+  border-top: none;
 }
 .rcResumoRow {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -2947,7 +2965,7 @@
 .rcPeriodRow { display: flex; align-items: stretch; gap: 0; padding: 0; }
 /* Período sozinho na seção: datas à esquerda, contadores empurrados p/ direita */
 .rvPeriodRowFull { width: 100%; }
-.rvPeriodRowFull .ovDateCellRight + .ovNightsCell { margin-left: auto; }
+.rvPeriodRowFull .ovDateCell + .ovNightsCell { margin-left: auto; }
 
 /* Pago — mesmo tratamento do "Pendente", em verde */
 .rcStatGreen { background: color-mix(in srgb, #10b981 20%, var(--surface)); }

@@ -1,15 +1,20 @@
-/* ── Payment summary strip ─────────────────────────────────── */
-.pagSummaryStrip {
-  display: flex; align-items: center; gap: 0;
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
+/* ── Valores em lista — mesmo desenho dos cards de reserva ──── */
+.resumoList { display: flex; flex-direction: column; margin-bottom: 14px; }
+.resumoRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 3px 0;
+  font-size: 14px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
-.pagSummaryItem { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 8px; }
-.pagSummaryLabel { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; color: var(--text-2); }
-.pagSummaryVal { font-size: 14px; font-weight: 700; color: var(--text); }
-.pagSummaryPago { color: var(--emerald); }
-.pagSummaryPendente { color: #f97316; }
-.pagSummaryDivider { width: 1px; align-self: stretch; background: var(--border); }
+/* Segunda lista (pernoite depois do grupo) separada por um traço */
+.resumoListDivided {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  margin-top: -8px; padding-top: 6px;
+}
+.resumoGreen  { color: #047857; }
+.resumoDanger { color: #b91c1c; }
+:root[data-theme="dark"] .resumoGreen  { color: #34d399; }
+:root[data-theme="dark"] .resumoDanger { color: #f87171; }
 
 /* ── Discount type toggle ──────────────────────────────────── */
 .tipoRow {
@@ -114,8 +119,8 @@
 .addDesconto:hover { border-color: var(--violet); color: var(--violet); }
 
 /* ── Two-column row ────────────────────────────────────────── */
-.rowGrid { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
-.rowGrid > :last-child { width: 110px; }
+.rowGrid { display: grid; grid-template-columns: calc(80% - 96px) 1fr; gap: 10px; align-items: start; }
+.rowGrid > :last-child { min-width: 0; }
 
 /* ── Despesa pessoal ───────────────────────────────────────── */
 .despesaPessoalRow {

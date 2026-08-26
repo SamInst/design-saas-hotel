@@ -578,7 +578,7 @@ export const hospedagemApi = {
     return request(`/hospedagem/grupo/${grupoId}/resumo`);
   },
 
-  /** GET /hospedagem/grupos — lista todos os grupos existentes ({ grupo_id, count, titulares }). */
+  /** GET /hospedagem/grupos — grupos em aberto ({ grupo_id, count, titulares, descricao }); descricao = responsável principal. */
   listarGrupos() {
     return request('/hospedagem/grupos');
   },
@@ -586,6 +586,11 @@ export const hospedagemApi = {
   /** GET /hospedagem/grupo/{grupoId} — todas as hospedagens do grupo (qualquer mês). */
   buscarGrupo(grupoId) {
     return request(`/hospedagem/grupo/${grupoId}`);
+  },
+
+  /** PATCH /hospedagem/grupo/{grupoId} — renomeia o responsável principal do grupo. */
+  renomearGrupo(grupoId, descricao) {
+    return request(`/hospedagem/grupo/${grupoId}`, { method: 'PATCH', body: { descricao } });
   },
 
   /**

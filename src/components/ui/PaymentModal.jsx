@@ -291,55 +291,40 @@ export function PaymentModal({
         }>
 
         {emGrupo && (
-          <div className={styles.pagSummaryStrip}>
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Total Grupo</span>
-              <span className={styles.pagSummaryVal}>{fmtBRL(grupoTotal)}</span>
+          <div className={styles.resumoList}>
+            <div className={styles.resumoRow}>
+              <span>Total · grupo</span><span>{fmtBRL(grupoTotal)}</span>
             </div>
-            <div className={styles.pagSummaryDivider} />
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Pago Grupo</span>
-              <span className={[styles.pagSummaryVal, styles.pagSummaryPago].join(' ')}>{fmtBRL(grupoPago)}</span>
+            <div className={[styles.resumoRow, styles.resumoGreen].join(' ')}>
+              <span>Pago · grupo</span><span>{fmtBRL(grupoPago)}</span>
             </div>
-            <div className={styles.pagSummaryDivider} />
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Pendente Grupo</span>
-              <span className={[styles.pagSummaryVal, grupoTotal - grupoPago > 0 ? styles.pagSummaryPendente : styles.pagSummaryPago].join(' ')}>{fmtBRL(Math.max(0, grupoTotal - grupoPago))}</span>
+            <div className={[styles.resumoRow, grupoTotal - grupoPago > 0.005 ? styles.resumoDanger : styles.resumoGreen].join(' ')}>
+              <span>Pendente · grupo</span><span>{fmtBRL(Math.max(0, grupoTotal - grupoPago))}</span>
             </div>
           </div>
         )}
 
         {valorTotal !== null && valorPago !== null && (
-          <div className={styles.pagSummaryStrip}>
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>{emGrupo ? 'Total Pernoite' : 'Total'}</span>
-              <span className={styles.pagSummaryVal}>{fmtBRL(valorTotal)}</span>
+          <div className={[styles.resumoList, emGrupo ? styles.resumoListDivided : ''].join(' ')}>
+            <div className={styles.resumoRow}>
+              <span>{emGrupo ? 'Total do pernoite' : 'Total'}</span><span>{fmtBRL(valorTotal)}</span>
             </div>
-            <div className={styles.pagSummaryDivider} />
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Pago</span>
-              <span className={[styles.pagSummaryVal, styles.pagSummaryPago].join(' ')}>{fmtBRL(valorPago)}</span>
+            <div className={[styles.resumoRow, styles.resumoGreen].join(' ')}>
+              <span>Pago</span><span>{fmtBRL(valorPago)}</span>
             </div>
-            <div className={styles.pagSummaryDivider} />
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Pendente</span>
-              <span className={[styles.pagSummaryVal, valorTotal - valorPago > 0 ? styles.pagSummaryPendente : styles.pagSummaryPago].join(' ')}>{fmtBRL(Math.max(0, valorTotal - valorPago))}</span>
+            <div className={[styles.resumoRow, valorTotal - valorPago > 0.005 ? styles.resumoDanger : styles.resumoGreen].join(' ')}>
+              <span>Pendente</span><span>{fmtBRL(Math.max(0, valorTotal - valorPago))}</span>
             </div>
           </div>
         )}
 
         {valorTotal !== null && valorPago === null && (
-          <div className={styles.pagSummaryStrip}>
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>Total dos itens</span>
-              <span className={styles.pagSummaryVal}>{fmtBRL(valorTotal)}</span>
+          <div className={styles.resumoList}>
+            <div className={styles.resumoRow}>
+              <span>Total dos itens</span><span>{fmtBRL(valorTotal)}</span>
             </div>
-            <div className={styles.pagSummaryDivider} />
-            <div className={styles.pagSummaryItem}>
-              <span className={styles.pagSummaryLabel}>A pagar</span>
-              <span className={[styles.pagSummaryVal, valorNum > 0 ? styles.pagSummaryPago : styles.pagSummaryPendente].join(' ')}>
-                {valorNum > 0 ? fmtBRL(valorNum) : '—'}
-              </span>
+            <div className={[styles.resumoRow, valorNum > 0 ? styles.resumoGreen : styles.resumoDanger].join(' ')}>
+              <span>A pagar</span><span>{valorNum > 0 ? fmtBRL(valorNum) : '—'}</span>
             </div>
           </div>
         )}

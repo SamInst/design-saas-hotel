@@ -48,6 +48,11 @@ export function DatePicker({
   markedDate = null,
   disabledDates = null,   // Set<'yyyy-MM-dd'> — occupied nights (range mode aware)
   occupancy = null,       // Map<'yyyy-MM-dd', {am,pm}> — midday half-day occupancy (range mode)
+  placement = 'auto',     // 'auto' | 'top' | 'bottom' — de que lado do campo o popup
+                          // abre. 'top' cai para baixo se não couber acima.
+  align = 'start',        // 'start' | 'end' — lado do campo pelo qual o popup se alinha.
+                          // 'end' faz o popup abrir para a esquerda, útil quando há
+                          // conteúdo à direita que ele não deve cobrir.
   inline = false,         // render the calendar statically (embedded), no trigger/portal
   readOnly = false,       // somente visualização: dias não selecionáveis (mantém navegação de mês)
   disabled = false,       // campo inativo: não abre, não aceita digitação, não limpa
@@ -75,15 +80,20 @@ export function DatePicker({
     if (!ref.current) return;
     const rect = ref.current.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openAbove  = spaceBelow < POP_HEIGHT && rect.top > POP_HEIGHT;
+    const cabeAcima  = rect.top > POP_HEIGHT;
+    const openAbove  = placement === 'top'    ? cabeAcima
+                     : placement === 'bottom' ? false
+                     : (spaceBelow < POP_HEIGHT && cabeAcima);
+    const popW    = Math.max(rect.width, 278);
+    const rawLeft = align === 'end' ? rect.right - popW : rect.left;
     setPopStyle({
       position: 'fixed',
       zIndex: 9999,
-      width: Math.max(rect.width, 278),
-      left: Math.min(rect.left, window.innerWidth - Math.max(rect.width, 278) - 8),
+      width: popW,
+      left: Math.max(8, Math.min(rawLeft, window.innerWidth - popW - 8)),
       top: openAbove ? rect.top - POP_HEIGHT - 6 : rect.bottom + 6,
     });
-  }, []);
+  }, [align, placement]);
 
   // Close on outside click (covers both wrap and portal popup) — skipped when inline
   useEffect(() => {
@@ -120,6 +130,16 @@ export function DatePicker({
       setInputText(value ? fmtD(value) : '');
     }
   }, [value, inputFocused, mode]); // eslint-disable-line
+
+  // Embutido e só de leitura: o mês visível acompanha a data selecionada, já que
+  // a seleção acontece fora do calendário.
+  useEffect(() => {
+    if (!inline || !readOnly) return;
+    const d = value || startDate;
+    if (!d) return;
+    setViewYear(d.getFullYear());
+    setViewMonth(d.getMonth());
+  }, [inline, readOnly, value, startDate]);
 
   // Notify parent of the currently-visible month so it can load occupancy on demand.
   useEffect(() => {
@@ -352,6 +372,10 @@ export function DatePicker({
               const halfAM = useHalf && amB && !fullB;       // check-out morning  → left half
               const halfPM = useHalf && pmB && !fullB;       // check-in afternoon → right half
               const tod  = sameDay(d, today);
+              // Dia que já passou — fica apagado, a menos que faça parte da seleção.
+              // Só no calendário de leitura: num campo de seleção o dia apagado
+              // parece desabilitado, e datas passadas continuam escolhíveis.
+              const pst  = readOnly && sod(d) < today;
               const sel  = mode==='single' ? sameDay(d,value) : sameDay(d,startDate)||sameDay(d,endDate);
               const iS   = mode==='range' && sameDay(d,startDate);
               const iE   = mode==='range' && sameDay(d,rangeEnd);
@@ -376,7 +400,7 @@ export function DatePicker({
               }
               return (
                 <button key={d.toISOString()} type="button" disabled={cellDisabled || readOnly} tabIndex={readOnly ? -1 : undefined}
-                  className={[styles.day, tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', halfAM?styles.hAM:'', halfPM?styles.hPM:'', mkd?styles.mkd:''].join(' ')}
+                  className={[styles.day, pst&&!sel&&!inR?styles.past:'', tod?styles.tod:'', sel?styles.sel:'', iS?styles.rS:'', iE?styles.rE:'', inR?styles.inR:'', hovE?styles.hovE:'', oob?styles.dis:'', blk?styles.blk:'', halfAM?styles.hAM:'', halfPM?styles.hPM:'', mkd?styles.mkd:''].join(' ')}
                   onClick={readOnly ? undefined : () => handleDayClick(sod(d))}
                   onMouseEnter={() => { if (!readOnly && mode==='range' && startDate && !endDate) setHoverDate(sod(d)); }}>
                   {d.getDate()}

@@ -73,6 +73,12 @@
 .grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
 
 .day {
+  --occ-stripe: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, #dc2626 16%, transparent) 0 4px,
+    transparent 4px 7px
+  );
+  --sel-fill: linear-gradient(rgba(16,185,129,.22), rgba(16,185,129,.22));
   width:100%; aspect-ratio:1; border-radius:8px; border:none; background:transparent;
   color:var(--text); font-size:12px; font-family:inherit; font-weight:500;
   cursor:pointer; display:flex; align-items:center; justify-content:center;
@@ -87,20 +93,50 @@
   box-shadow: inset 0 0 0 1.5px rgba(124,58,237,.45);
 }
 
-.sel, .rS, .rE {
-  background:var(--violet) !important; color:#fff !important;
-  font-weight:700; box-shadow:0 2px 8px rgba(124,58,237,.35); border-radius:8px;
+/* Seleção — um verde claro só, para check-in, check-out e o miolo do período. */
+.sel, .rS, .rE, .inR {
+  background-color:rgba(16,185,129,.22) !important; color:#047857 !important;
+  font-weight:700; box-shadow:none;
 }
-.inR { background:rgba(124,58,237,.12) !important; color:var(--violet) !important; border-radius:0; }
-.rS  { border-radius:8px 0 0 8px !important; }
-.rE  { border-radius:0 8px 8px 0 !important; }
-.rS.rE { border-radius:8px !important; }
+.sel { border-radius:8px; }
+.inR { border-radius:0; }
+/* Extremos em meia célula: a estadia vai do meio-dia do check-in ao meio-dia do
+   check-out, então a outra metade do dia continua livre para a reserva vizinha —
+   mesma convenção da ocupação parcial (.hAM/.hPM). */
+.rS, .rE {
+  background-color:transparent !important;
+  background-image:var(--sel-fill) !important;
+  background-repeat:no-repeat !important;
+  background-size:50% 100% !important;
+  border-radius:0 !important;
+}
+.rS { background-position:right center !important; }  /* entra ao meio-dia → tarde */
+.rE { background-position:left  center !important; }  /* sai ao meio-dia   → manhã */
+/* check-in ainda sem check-out: só a tarde */
+.rS.rE { background-position:right center !important; }
 
+/* Hoje dentro da seleção: o preenchimento verde apagava o anel roxo do dia atual,
+   que volta aqui por cima — as duas informações convivem na mesma célula. */
+.tod.sel, .tod.rS, .tod.rE, .tod.inR {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 70%, transparent) !important;
+  border-radius: 8px !important;
+  color: var(--violet) !important;
+  font-weight: 800 !important;
+}
+
+/* Prévia do check-out ao passar o mouse — mesma meia célula da manhã */
 .hovE {
-  background:rgba(124,58,237,.22) !important; color:var(--violet) !important;
-  box-shadow:0 0 0 2px rgba(124,58,237,.30); border-radius:8px !important;
+  background-color:transparent !important; color:#047857 !important;
+  background-image:linear-gradient(rgba(16,185,129,.32), rgba(16,185,129,.32)) !important;
+  background-repeat:no-repeat !important;
+  background-size:50% 100% !important;
+  background-position:left center !important;
+  border-radius:0 !important;
 }
 .dis { opacity:.3; cursor:not-allowed; }
+/* Dias já passados — sem destaque. Dias da seleção não recebem esta classe, para a
+   faixa continuar visível em reservas que começaram antes de hoje. */
+.past { color:var(--text-2); opacity:.45; }
 
 /* ── Somente visualização: dias não interativos (mantém navegação de mês) ── */
 .readOnly .day { cursor:default; }
@@ -120,24 +156,22 @@
   opacity:.85;
 }
 .blk:hover:not(:disabled) { background:rgba(220,38,38,.16) !important; }
-/* a checkout that lands on the next occupied night stays readable */
-.blk.rE {
-  background:var(--violet) !important; color:#fff !important;
-  box-shadow:0 2px 8px rgba(124,58,237,.35);
+/* Ocupado que já passou: .blk repõe opacity:.85 e a cor forte do número, então o
+   apagado do passado precisa ser reafirmado aqui. A tarja continua visível. */
+.past.blk, .past.hAM, .past.hPM {
+  opacity:.4 !important;
+  color: color-mix(in srgb, #dc2626 60%, var(--text-2)) !important;
 }
-.blk.hovE { background:rgba(124,58,237,.22) !important; color:var(--violet) !important; }
+/* a checkout that lands on the next occupied night stays readable */
+/* Check-out numa noite já ocupada: a manhã ainda é de quem sai, a tarde do próximo */
+.blk.rE, .blk.hovE { color:#047857 !important; box-shadow:none; opacity:1; }
 
 /* ── Half-day occupancy (midday check-in / check-out) ──
    The stay runs from midday(check-in) to midday(check-out), so a boundary day is only
    half-occupied: check-out mornings paint the LEFT half, check-in afternoons the RIGHT half.
    These days stay selectable (the free half can host a back-to-back reservation). */
 .hAM, .hPM {
-  background-image:
-    repeating-linear-gradient(
-      -45deg,
-      color-mix(in srgb, #dc2626 16%, transparent) 0 4px,
-      transparent 4px 7px
-    );
+  background-image: var(--occ-stripe);
   background-repeat: no-repeat;
   background-size: 50% 100%;
 }
@@ -145,9 +179,23 @@
 .hPM { background-position: right center; }  /* check-in afternoon → right half */
 /* both halves busy from different reservations → behave like a full day */
 .hAM.hPM { background-size: 100% 100%; }
-/* selection / hover overlays win over the half tint */
-.hAM.sel, .hPM.sel, .hAM.rS, .hPM.rS, .hAM.rE, .hPM.rE,
-.hAM.inR, .hPM.inR, .hAM.hovE, .hPM.hovE { background-image: none; }
+/* Preenchimento de dia inteiro cobre a meia tarja de ocupação */
+.hAM.sel, .hPM.sel, .hAM.inR, .hPM.inR { background-image: none; }
+
+/* Dia dividido entre duas reservas: cada metade fica com a sua cor.
+   Manhã ocupada + nosso check-in à tarde, e o espelho no check-out. */
+.hAM.rS {
+  background-image: var(--sel-fill), var(--occ-stripe) !important;
+  background-position: right center, left center !important;
+  background-size: 50% 100%, 50% 100% !important;
+  background-repeat: no-repeat, no-repeat !important;
+}
+.hPM.rE, .hPM.hovE {
+  background-image: var(--sel-fill), var(--occ-stripe) !important;
+  background-position: left center, right center !important;
+  background-size: 50% 100%, 50% 100% !important;
+  background-repeat: no-repeat, no-repeat !important;
+}
 
 /* ── Inline (embedded, real-time) variant ── */
 .inline {
