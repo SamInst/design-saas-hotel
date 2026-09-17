@@ -1456,10 +1456,6 @@ export default function RegistersPage() {
         <div className={styles.card}>
           {/* Header do card */}
           <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Cadastro</h2>
-              <p className={styles.subtitle}>Hóspedes, empresas e veículos cadastrados</p>
-            </div>
             <div className={styles.tableTools}>
               <div className={styles.searchWrap}>
                 <Search size={13} className={styles.searchIcon} />

@@ -1,0 +1,256 @@
+/* ─────────────────────────────────────────────────────────────
+   TOPBAR — logo + nome da tela · menu de telas + perfil
+   ───────────────────────────────────────────────────────────── */
+.topbar {
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Marca ── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;  min-width: 0;
+}
+
+.logo {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: block;
+  object-fit: contain;
+}
+/* O símbolo é azul-marinho e sumiria no fundo escuro: pastilha clara atrás. */
+:root[data-theme="dark"] .logo {
+  background: #fff;
+  border-radius: 9px;
+  padding: 3px;
+}
+
+.brandDivider {
+  width: 1px;
+  height: 26px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.pageName {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Lado direito ── */
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+.iconBtn:hover { background: var(--surface-2); color: var(--text); }
+.iconBtnActive {
+  background: color-mix(in srgb, var(--violet) 12%, transparent);
+  color: var(--violet);
+}
+
+/* ── Perfil (gatilho) ── */
+.menuWrap { position: relative; }
+
+.profileBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.14s;
+  max-width: 220px;
+}
+.profileBtn:hover,
+.profileBtnActive { background: var(--surface-2); }
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--violet) 14%, transparent);
+  color: var(--violet);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .02em;
+}
+.avatarLg { width: 40px; height: 40px; font-size: 14px; }
+
+.profileText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+.profileName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+.profileRole {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.chevron { color: var(--text-2); flex-shrink: 0; transition: transform 0.18s ease; }
+.chevronOpen { transform: rotate(180deg); }
+
+/* ── Dropdown ── */
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes itemIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 300;
+  min-width: 232px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 4px 6px rgba(15,23,42,0.06), 0 12px 32px rgba(15,23,42,0.14);
+  animation: dropIn 0.16s ease both;
+}
+:root[data-theme="dark"] .dropdown { box-shadow: 0 12px 32px rgba(0,0,0,0.55); }
+.dropdownRight { min-width: 226px; }
+
+.dropdownLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--text-2);
+  padding: 8px 10px 6px;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+  animation: itemIn 0.18s ease both;
+}
+.menuItem:hover { background: var(--surface-2); color: var(--text); }
+
+.menuItemActive {
+  background: color-mix(in srgb, var(--violet) 10%, transparent);
+  color: var(--violet);
+  font-weight: 600;
+}
+.menuItemActive:hover { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+
+.menuItemDanger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+
+.menuIcon {
+  width: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.menuLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.menuPip {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--violet);
+  flex-shrink: 0;
+}
+
+.profileHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+.divider { height: 1px; background: var(--border); margin: 4px 6px; }
+
+/* ── Mobile ── */
+@media (max-width: 600px) {
+  .topbar { height: 56px; padding: 0 12px; gap: 10px; }
+  .logo { height: 24px; }
+  .brandDivider { display: none; }
+  .pageName { font-size: 15px; }
+  .profileText { display: none; }
+  .chevron { display: none; }
+  .profileBtn { padding: 0; width: 40px; justify-content: center; }
+  .dropdown { min-width: 210px; }
+}

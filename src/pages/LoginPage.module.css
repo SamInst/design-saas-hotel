@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 
 /* ─────────────────────────────────────────────────────────────
-   Isto é Pousada — Login
+   maishospedagem — Login
    Direction: coastal Brazilian pousada at golden hour.
    Photographic stage · pine-ocean tint · warm sun · sand form.
    ───────────────────────────────────────────────────────────── */
@@ -214,14 +214,11 @@
   place-items: center;
   width: 40px; height: 40px;
   border-radius: 11px;
-  background: linear-gradient(150deg, var(--pine-2), var(--pine));
-  color: var(--gold);
-  font-family: 'Fraunces', serif;
-  font-style: italic;
-  font-weight: 600;
-  font-size: 19px;
+  background: #fff;
+  padding: 4px;
   box-shadow: 0 6px 18px -6px rgba(12,50,43,0.5);
 }
+.monogramImg { width: 100%; height: 100%; object-fit: contain; display: block; }
 .brandText {
   font-family: 'Fraunces', serif;
   font-weight: 600;

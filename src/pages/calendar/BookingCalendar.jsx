@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown,
+  CalendarCheck2, Tag, Clock, Crown, AlertTriangle,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -117,6 +117,22 @@ export const normalizeReserva = (r) => {
     saidaPrevista:           dataSaida,
     // Há meia diária (saída tardia na última diária)? Usado para o "meio ticket" no calendário.
     meiaDiaria:              (r.diarias ?? []).some((d) => d?.meia_diaria),
+    // Diárias como estão gravadas: valor persistido (é o que foi cobrado) e a sazonalidade
+    // que valeu naquela noite. É a fonte dos valores no card — não o /calcular-preco, que
+    // devolveria o preço de hoje e não o da reserva.
+    diarias: (r.diarias ?? []).map((d) => ({
+      id:            d.id,
+      numero:        d.numero ?? null,
+      quartoId:      d.quarto?.id ?? null,
+      checkin:       d.checkin  ?? '',
+      checkout:      d.checkout ?? '',
+      valor:         d.valor ?? 0,
+      meiaDiaria:    !!d.meia_diaria,
+      sazonalidade:  d.sazonalidade?.descricao ?? null,
+      // "1 Adulto(s) + Criança de 5 anos (gratuidade)" e quanto do valor saiu das crianças
+      ocupacao:      d.ocupacao?.descricao ?? null,
+      valorCriancas: d.ocupacao?.valor_criancas ?? null,
+    })),
     status:                  mapStatus(r),
     hospedes: pessoas.map((p) => ({
       id:            p.id,
@@ -173,10 +189,13 @@ export const normalizeReserva = (r) => {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_CELL_W   = 168;
-const ROOM_H       = 60;
+const ROOM_H       = 72;
 const CAT_H        = 30;
-const HDR_H        = 56;
-const LEFT_W       = 80;
+const HDR_H        = 64;
+const LEFT_W       = 210;
+const LEFT_W_NARROW = 140;
+const LEFT_W_MOBILE = 96;  // celular: só "Apt. 11" e a lotação
+const BAR_INSET    = 3; // folga lateral da faixa flutuante
 const VISIBLE_DAYS = 31;
 const HALF         = DAY_CELL_W / 2;
 
@@ -214,6 +233,56 @@ const calcAge = (dob) => {
 };
 const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
 
+/** Idade em uma data de referência (não hoje). Aceita yyyy-MM-dd ou dd/MM/yyyy. */
+const idadeEm = (dob, ref) => {
+  if (!dob || !ref) return null;
+  let y, m, d;
+  if (dob.includes('/')) { [d, m, y] = dob.split('/'); } else { [y, m, d] = dob.split('-'); }
+  const birth = new Date(+y, +m - 1, +d);
+  if (isNaN(birth)) return null;
+  let age = ref.getFullYear() - birth.getFullYear();
+  if (ref.getMonth() < birth.getMonth() || (ref.getMonth() === birth.getMonth() && ref.getDate() < birth.getDate())) age--;
+  return age;
+};
+
+/** Texto da ocupação no formato do /calcular-preco ("2 Adulto(s) + Criança de 5 anos"),
+ *  montado a partir dos hóspedes. Só entra como reserva: a hospedagem já traz esse texto
+ *  pronto por diária, inclusive marcando quais crianças são gratuidade — o que aqui não dá
+ *  para saber, porque depende das regras de menores da categoria/sazonalidade. */
+const ocupacaoTexto = (hospedes, dataInicioIso) => {
+  const ref = dataInicioIso ? new Date(`${dataInicioIso}T00:00:00`) : new Date();
+  let adultos = 0;
+  const criancas = [];
+  (hospedes ?? []).forEach((h) => {
+    const idade = idadeEm(h.dataNascimento, ref);
+    if (idade == null || idade >= 18) adultos += 1;
+    else criancas.push(idade);
+  });
+  if (adultos === 0 && criancas.length === 0) return '';
+  const sufixo =
+    criancas.length === 0 ? ''
+    : criancas.length === 1 ? ` + Criança de ${criancas[0]} anos`
+    : ` + Crianças de ${criancas.join(', ')} anos`;
+  return `${adultos} Adulto(s)${sufixo}`;
+};
+
+/** Monta os `detalhes` do card a partir das diárias gravadas, no mesmo formato que o
+ *  /calcular-preco devolve — descrição, sazonalidade e a parte das crianças vêm prontas do
+ *  back-end, então o agrupamento e a sublinha funcionam iguais, sem requisição nenhuma. */
+const detalhesDasDiarias = (diarias, hospedes, dataInicioIso) => {
+  if (!diarias?.length) return [];
+  const fallback = ocupacaoTexto(hospedes, dataInicioIso);
+  const soData = (s) => (s || '').split(' ')[0];
+  return diarias.map((d, i) => ({
+    descricao: `Diaria ${d.numero ?? i + 1} - (${soData(d.checkin)} -> ${soData(d.checkout)}) `
+      + (d.ocupacao ?? fallback),
+    sazonalidade: d.sazonalidade ? { descricao: d.sazonalidade } : null,
+    valor_final: d.valor ?? 0,
+    valor_criancas: d.valorCriancas ?? null,
+    meia_diaria: !!d.meiaDiaria,
+  }));
+};
+
 /** Parte de hóspedes da descrição vinda de /calcular-preco, sem o trecho de datas:
  *  "Diaria 1 - (29/08/2026 -> 30/08/2026) 2 Adulto(s) + Criança de 10 anos"
  *  →  "2 Adulto(s) + Criança de 10 anos". */
@@ -246,10 +315,12 @@ const groupDiarias = (detalhes, valorDe) => {
     const criancas = d.valor_criancas > 0 ? d.valor_criancas : 0;
     const anterior = d._valorAnterior ?? null;
     const hosp     = descricaoHospedes(d.descricao);
-    const key      = [valor, original, saz, criancas, anterior ?? '', hosp].join('|');
+    // Meia diária (saída tardia) nunca se junta a uma diária inteira, nem que o valor coincida.
+    const meia     = d.meia_diaria === true;
+    const key      = [valor, original, saz, criancas, anterior ?? '', hosp, meia ? 'M' : 'F'].join('|');
     const atual    = porChave.get(key);
     if (atual) { atual.qtd += 1; return; }
-    const g = { key, qtd: 1, valor, valorOriginal: original, saz, criancas, anterior, hosp,
+    const g = { key, qtd: 1, valor, valorOriginal: original, saz, criancas, anterior, hosp, meia,
       valorAdultos: original - criancas };
     porChave.set(key, g);
     grupos.push(g);
@@ -311,8 +382,8 @@ const STATUS_LABEL = {
 };
 
 const GRUPO_PALETTE = [
-  '#b45309', '#1d4ed8', '#be185d', '#047857',
-  '#6d28d9', '#c2410c', '#0e7490', '#4d7c0f',
+  'oklch(0.64 0.12 232)', 'oklch(0.63 0.2 26)',  'oklch(0.5 0.21 274)',  'oklch(0.66 0.14 162)',
+  'oklch(0.7 0.15 72)',   'oklch(0.52 0.18 305)', 'oklch(0.58 0.18 350)', 'oklch(0.55 0.1 200)',
 ];
 const grupoColor = (grupoId) => GRUPO_PALETTE[Number(grupoId) % GRUPO_PALETTE.length];
 
@@ -520,14 +591,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     }
   };
 
-  // Carrega as diárias (detalhes) para a aba "Informações". Só quando há quarto e período.
-  // No modo pernoite as diárias já vêm prontas em overnight.diariasDetalhes — não busca.
-  // Durante a edição quem calcula é o editCalc; este ficaria repetindo a mesma
-  // requisição a cada pessoa adicionada/removida, para uma tela que nem está à vista.
-  // Ao sair da edição o efeito roda de novo e sincroniza a view.
+  // Fallback das diárias do card. A reserva já traz as diárias gravadas (valor e
+  // sazonalidade de cada noite), então o normal é não bater no /calcular-preco: ele
+  // devolveria o preço de hoje, não o que foi cobrado. Só entra em cena quando a
+  // hospedagem não tem diárias (registro antigo) — aí é a única fonte de detalhes.
+  // No modo pernoite elas vêm prontas em overnight.diariasDetalhes.
+  // Durante a edição quem calcula é o editCalc.
   useEffect(() => {
     if (editing) return;
     if (isOvernight) { setInfoCalc(null); return; }
+    if ((reserva.diarias?.length ?? 0) > 0) { setInfoCalc(null); return; }
     if (reserva.quarto == null || !reserva.dataInicio || !reserva.dataFim) { setInfoCalc(null); return; }
     let cancelled = false;
     reservaApi.calcularPreco([{
@@ -538,7 +611,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     }]).then((res) => { if (!cancelled) setInfoCalc(Array.isArray(res) ? res[0] : res); })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [editing, reserva.id, reserva.quarto, reserva.dataInicio, reserva.dataFim, pessoas.length]); // eslint-disable-line
+  }, [editing, reserva.id, reserva.quarto, reserva.dataInicio, reserva.dataFim, reserva.diarias?.length, pessoas.length]); // eslint-disable-line
 
   // Em modo pernoite os dados vêm via props e mudam após cada ação na Recepção.
   // Re-sincroniza as listas internas sem remontar o modal (preserva aba e rolagem).
@@ -1069,7 +1142,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           {valGrupos.map((g, gi) => (
             <div key={g.key} className={[styles.rcDiariaRow, valQuitado ? styles.rcDiariaPago : ''].join(' ')}>
               <span>
-                {g.qtd > 1 ? 'Diárias' : 'Diária'}
+                {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
                 {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
               </span>
               <span className={styles.rcDiariaVal}>
@@ -1501,16 +1574,27 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const checkinTime = reserva.chegadaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
   const checkoutTime = reserva.saidaPrevista?.split(' ')[1]?.slice(0, 5) || '12:00';
 
-  // Diárias do card de preço: no modo pernoite vêm prontas; senão, do cálculo.
-  const effectiveDetalhes = isOvernight ? (overnight.diariasDetalhes ?? []) : (infoCalc?.detalhes ?? []);
+  // Diárias do card de preço: no pernoite vêm prontas da Recepção; na reserva, das diárias
+  // gravadas. O /calcular-preco só aparece aqui como fallback de registro sem diárias.
+  const diariasDaReserva = detalhesDasDiarias(reserva.diarias, pessoas, reserva.dataInicio);
+  const effectiveDetalhes = isOvernight
+    ? (overnight.diariasDetalhes ?? [])
+    : (diariasDaReserva.length > 0 ? diariasDaReserva : (infoCalc?.detalhes ?? []));
+
+  // Diárias vindas do banco já trazem o ajuste "por diária" embutido — nesse modo o back-end
+  // sobrescreve diaria.valor. Aplicá-lo de novo aqui cobraria o desconto duas vezes. Só quando
+  // os valores vêm do /calcular-preco (preço base, sem ajuste) é que ele precisa ser somado.
+  const detalhesPersistidos = isOvernight || diariasDaReserva.length > 0;
 
   // Ajuste manual persistido ("Gerenciar Preços"). No modo "Por diária" o desconto/adicional
   // aparece em cada diária; nos demais, em uma linha única. O total resultante vai para o box "Total".
   const priceAdj    = reserva.novoPreco ? novoPrecoToState(reserva.novoPreco) : null;
   const baseDiarias = effectiveDetalhes.map((d) => ({ valor: d.valor_final ?? 0 }));
   const baseTotal   = baseDiarias.reduce((s, d) => s + d.valor, 0);
-  const isDiariaAdj = priceAdj?.mode === 'diaria';
-  const adjResult   = priceAdj ? computeAdjustedTotal({ baseTotal, baseDiarias, ...priceAdj }) : null;
+  const isDiariaAdj = priceAdj?.mode === 'diaria' && !detalhesPersistidos;
+  const adjResult   = (priceAdj && !(priceAdj.mode === 'diaria' && detalhesPersistidos))
+    ? computeAdjustedTotal({ baseTotal, baseDiarias, ...priceAdj })
+    : null;
   const cardTotal   = effectiveDetalhes.length > 0
     ? (adjResult ? adjResult.valorTotal : baseTotal)
     : displayTotal;
@@ -1527,7 +1611,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const headChip   = roomDesc || catNome;
   // Sem saldo em aberto o bloco "Pendente" some e as colunas se reajustam.
   const temPendente = displayPendente > 0.005;
-  const twoColStats = { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' };
 
   // ── Valores no mesmo desenho do passo "Resumo & Pagamento" ────────────────
   // Valor da diária no modo "Por diária" (o ajuste substitui o valor original).
@@ -1543,7 +1626,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // Pagamento único do grupo: o lançamento cobre todas as reservas e pertence ao
   // grupo, não a este apartamento. Aqui ficam só as diárias — lista de pagamentos,
   // pago/pendente e o selo de quitado saem de cena, e o acerto é feito em
-  // "Reservas em Grupo", único lugar que lança pagamento do grupo.
+  // "Grupos", único lugar que lança pagamento do grupo.
   const pagamentoDeGrupo = pagamentos.some((p) => !p.cancelado && p.grupoId != null);
   const pagoIntegral = !pagamentoDeGrupo && cardTotal > 0 && totalPago >= cardTotal - 0.005;
 
@@ -1663,7 +1746,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
           {/* ── Valores — pagamentos, diárias e totais na mesma lista do passo
                  "Resumo & Pagamento" da criação ── */}
-          {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0) && (
+          {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0 || groupInfo) && (
             <div className={styles.rcSection}>
               {!pagamentoDeGrupo && pagamentos.length > 0 && (
                 <div className={styles.rcSectionHead}>
@@ -1699,7 +1782,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     {grupos.map((g, gi) => (
                       <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
                         <span>
-                          {g.qtd > 1 ? 'Diárias' : 'Diária'}
+                          {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
                           {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
                           {isDiariaAdj && g.valor - g.valorOriginal !== 0 && (
                             <span className={styles.rcDiariaSub} style={{ color: g.valor < g.valorOriginal ? 'var(--emerald)' : '#f97316' }}>
@@ -1759,26 +1842,40 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   </div>
                 );
               })()}
-            </div>
-          )}
 
-          {/* ── Valores do grupo (quando a reserva faz parte de um) ── */}
-          {groupInfo && (
-            <div className={styles.rcStats} style={groupInfo.pendente > 0.005 ? undefined : twoColStats}>
-              <div className={[styles.rcStat, styles.rcStatGold].join(' ')}>
-                <div className={styles.rcStatLabel}>Total · grupo ({groupInfo.count} apt{groupInfo.count !== 1 ? 's' : ''})</div>
-                <div className={styles.rcStatVal}>{fmtBRL(groupInfo.total)}</div>
-              </div>
-              <div className={[styles.rcStat, groupInfo.pago > 0 ? styles.rcStatGreen : styles.rcStatMuted].join(' ')}>
-                <div className={styles.rcStatLabel}>Pago · grupo</div>
-                <div className={styles.rcStatVal}>{fmtBRL(groupInfo.pago)}</div>
-              </div>
-              {groupInfo.pendente > 0.005 && (
-                <div className={[styles.rcStat, styles.rcStatDanger].join(' ')}>
-                  <div className={styles.rcStatLabel}>Pendente · grupo</div>
-                  <div className={styles.rcStatVal}>{fmtBRL(groupInfo.pendente)}</div>
-                </div>
-              )}
+              {/* ── Valores do grupo — mesma lista, logo abaixo dos totais do
+                     apartamento. Segue a regra dos totais individuais: quitado
+                     vira uma linha verde só; senão Total + Pago (se houve) +
+                     Pendente (se sobrou). ── */}
+              {groupInfo && (() => {
+                const grpQuitado = groupInfo.total > 0 && groupInfo.pago >= groupInfo.total - 0.005;
+                const aptsLabel  = `${groupInfo.count} apt${groupInfo.count !== 1 ? 's' : ''}`;
+                return (
+                  <div className={[styles.rcResumoList, styles.rcResumoGrupo].join(' ')}>
+                    {grpQuitado ? (
+                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                        <span>Total pago · grupo ({aptsLabel})</span><span>{fmtBRL(groupInfo.pago)}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className={styles.rcResumoRow}>
+                          <span>Total · grupo ({aptsLabel})</span><span>{fmtBRL(groupInfo.total)}</span>
+                        </div>
+                        {groupInfo.pago > 0.005 && (
+                          <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                            <span>Pago · grupo</span><span>{fmtBRL(groupInfo.pago)}</span>
+                          </div>
+                        )}
+                        {groupInfo.pendente > 0.005 && (
+                          <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
+                            <span>Pendente · grupo</span><span>{fmtBRL(groupInfo.pendente)}</span>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -1889,7 +1986,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     </button>
                     <button className={styles.rvAcoesItem}
                       disabled={pagamentoDeGrupo}
-                      title={pagamentoDeGrupo ? 'Pagamento único do grupo — acerte por "Reservas em Grupo"' : undefined}
+                      title={pagamentoDeGrupo ? 'Pagamento único do grupo — acerte por "Grupos"' : undefined}
                       onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
                       <DollarSign size={15}/> Gerenciar Pagamentos
                     </button>
@@ -4295,6 +4392,18 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     if (halfDailyMinCheckin) setCheckinHour((h) => (h && h >= halfDailyMinCheckin ? h : halfDailyMinCheckin));
   }, [halfDailyMinCheckin]);
 
+  // Meia diária: o hóspede sai depois da hora de checkout da categoria e paga meio valor por
+  // isso. A reserva guarda só a hora de saída; a diária extra quem monta é o back-end.
+  // Com vários apartamentos o horário exibido é o checkout mais tarde entre eles; na hora de
+  // montar o corpo, cada apartamento é comparado com o checkout da própria categoria.
+  const [meiaDiaria, setMeiaDiaria] = useState(false);
+  const [horaSaidaMeia, setHoraSaidaMeia] = useState('');
+  const checkoutCatHora = quartos.length
+    ? quartos.reduce((max, q) => { const h = roomCatTimes(q).checkout; return h > max ? h : max; }, '00:00')
+    : '12:00';
+  // Só vale como meia diária quando a saída é de fato depois do checkout da categoria.
+  const temMeiaDiaria = meiaDiaria && !!horaSaidaMeia && horaSaidaMeia > checkoutCatHora;
+
   // Fetch availability from API whenever unico-mode dates change
   useEffect(() => {
     if (!checkin || !checkout || !allRoomIds.length) { setApiAvailability(null); setAvailLoading(false); return; }
@@ -4450,6 +4559,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             : (p.roomHospedes?.[quartoId]    || []);
           indexed.push({
             key:  `${quartoId}_${pi}`,
+            quartoId,
             item: {
               fk_quarto:    parseInt(quartoId),
               data_entrada: toBrDate(p.checkin),
@@ -4457,6 +4567,22 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               ...buildGuestCalcParams(guests),
             },
           });
+          // Saída tardia: o back-end precifica a meia diária pela noite do dia do check-out
+          // (checkout → checkout+1) e divide por 2. O resumo pede exatamente essa noite, senão
+          // os dois divergem sempre que a sazonalidade dela for diferente da noite anterior.
+          if (meiaDiaria && horaSaidaMeia && horaSaidaMeia > roomCatTimes(quartoId).checkout) {
+            indexed.push({
+              key:  `${quartoId}_${pi}`,
+              quartoId,
+              meia: true,
+              item: {
+                fk_quarto:    parseInt(quartoId),
+                data_entrada: toBrDate(p.checkout),
+                data_saida:   toBrDate(addDays(p.checkout, 1)),
+                ...buildGuestCalcParams(guests),
+              },
+            });
+          }
         });
       });
 
@@ -4465,8 +4591,15 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       const calcFn = isOrcamento ? orcamentoApi.calcularPreco : reservaApi.calcularPreco;
       const resArray = await calcFn(indexed.map((x) => x.item));
       const results = {};
+      const meias = {};
       (Array.isArray(resArray) ? resArray : []).forEach((r, i) => {
-        if (indexed[i]) results[indexed[i].key] = r;
+        const ix = indexed[i];
+        if (!ix) return;
+        if (ix.meia) meias[ix.key] = r;
+        else results[ix.key] = r;
+      });
+      Object.entries(meias).forEach(([key, meiaCalc]) => {
+        results[key] = comMeiaDiaria(results[key], meiaCalc);
       });
       setPrecosCalc(results);
     } finally {
@@ -4476,6 +4609,26 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
   // Entra no resumo já com os preços calculados.
   const handleGoToResumo = async () => { setStep(SUMMARY_STEP); await runCalcPrecos(); };
+
+  // Junta a meia diária da saída tardia ao resultado do apartamento. O /calcular-preco não
+  // conhece o conceito: ele devolve a noite cheia do dia do check-out e aqui ela vira metade,
+  // que é exatamente o que o back-end grava — o total enviado bate com o que ele recalcula.
+  const comMeiaDiaria = (calc, meiaCalc) => {
+    if (!calc || !meiaCalc) return calc;
+    const noite = meiaCalc.detalhes?.[0] ?? {};
+    const meiaValor = Math.round(((meiaCalc.valor_total ?? 0) / 2) * 100) / 100;
+    if (meiaValor <= 0) return calc;
+    return {
+      ...calc,
+      valor_total: (calc.valor_total ?? 0) + meiaValor,
+      detalhes: [...(calc.detalhes ?? []), {
+        ...noite,
+        valor_final: meiaValor,
+        valor_criancas: noite.valor_criancas != null ? noite.valor_criancas / 2 : null,
+        meia_diaria: true,
+      }],
+    };
+  };
 
   // Base original (sem ajuste) de uma hospedagem a partir dos detalhes calculados.
   const baseForKey = (rKey) => {
@@ -4511,7 +4664,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
         {grupos.map((g, gi) => (
           <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
             <span>
-              {g.qtd > 1 ? 'Diárias' : 'Diária'}
+              {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
               {diariaSubs(g, guestLabel) && (
                 <span className={styles.rcDiariaSub}> · {diariaSubs(g, guestLabel)}</span>
               )}
@@ -4661,11 +4814,17 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
         const ct = roomCatTimes(quartoId);
         // Quando há meia diária encerrando no dia do check-in, usa a hora definida pelo funcionário.
         const ciHora = (periodoMode === 'unico' && halfDailyMinCheckin && checkinHour) ? checkinHour : ct.checkin;
+        // Meia diária: vai só a hora de saída. O checkout da hospedagem segue com a hora da
+        // categoria — é o back-end que monta a diária extra e reajusta o período depois.
+        const horaMeia = (periodoMode === 'unico' && meiaDiaria && horaSaidaMeia > ct.checkout)
+          ? horaSaidaMeia
+          : null;
         return {
           quarto_id:          parseInt(quartoId),
           status:             forcePernoite ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA',
           data_hora_checkin:  `${toBrDate(dataEntrada)} ${ciHora}`,
           data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
+          ...(horaMeia ? { hora_saida_meia_diaria: horaMeia } : {}),
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
           ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
           ...(roomPags.length   ? { pagamentos: roomPags } : {}),
@@ -5039,12 +5198,40 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       onChange={(d) => {
                         if (forcePernoite) setCheckin(new Date());
                         setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
+                        setMeiaDiaria(false); setHoraSaidaMeia('');
                       }}
                       placeholder={checkin ? 'Data de check-out' : 'Defina o check-in primeiro'}
                       disabled={!checkin}
                       minDate={checkin ? new Date(checkin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
                       markedDate={checkin} />
                   </div>
+                  {/* Meia diária: marcar abre a hora de saída. Só aparece com apartamento
+                      escolhido, que é de onde vem o checkout da categoria a comparar. */}
+                  {checkout && quartos.length > 0 && !isOrcamento && (
+                    <div className={styles.meiaDiariaBox}>
+                      <label className={styles.empresaModeToggle}>
+                        <input type="checkbox" checked={meiaDiaria}
+                          onChange={(e) => {
+                            setMeiaDiaria(e.target.checked);
+                            if (!e.target.checked) setHoraSaidaMeia('');
+                          }} />
+                        <span>Meia diária</span>
+                      </label>
+                      {meiaDiaria && (
+                        <div className={styles.meiaDiariaRow}>
+                          <span className={styles.meiaDiariaLabel}>Hora de saída</span>
+                          <div className={styles.meiaDiariaInput}>
+                            <TimeInput value={horaSaidaMeia} onChange={setHoraSaidaMeia} />
+                          </div>
+                          <span className={temMeiaDiaria ? styles.meiaDiariaAviso : styles.meiaDiariaHint}>
+                            {temMeiaDiaria
+                              ? `Meio valor da diária de ${fmtDateBR(checkoutStr)}`
+                              : `Informe uma hora após o checkout da categoria (${checkoutCatHora})`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </FormField>
               </div>
               <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
@@ -5076,15 +5263,20 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               ))}
               {halfDailyMinCheckin && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-                  <div className={styles.kvSectionDivider} style={{ margin: 0 }}>
-                    <Clock size={13} /> Hora de check-in (meia diária anterior)
-                  </div>
-                  <p style={{ fontSize: 12, color: 'var(--text-2)', margin: 0, lineHeight: 1.5 }}>
-                    Há uma meia diária encerrando às <b>{halfDailyMinCheckin}</b> no dia do check-in.
-                    Defina a hora de entrada — não pode ser anterior a esse horário.
-                  </p>
-                  <div style={{ maxWidth: 150 }}>
-                    <TimeInput value={checkinHour} onChange={setCheckinHour} />
+                  <div className={styles.avisoBox}>
+                    <span className={styles.avisoBoxIcon}><AlertTriangle size={16} /></span>
+                    <div className={styles.avisoBoxBody}>
+                      <span className={styles.avisoBoxTitle}>
+                        Hora de check-in (meia diária anterior)
+                      </span>
+                      <p className={styles.avisoBoxText}>
+                        Há uma meia diária encerrando às <b>{halfDailyMinCheckin}</b> no dia do check-in.
+                        Defina a hora de entrada — não pode ser anterior a esse horário.
+                      </p>
+                      <div style={{ maxWidth: 150 }}>
+                        <TimeInput value={checkinHour} onChange={setCheckinHour} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -5714,6 +5906,7 @@ export default function BookingCalendar() {
   const [reservas,       setReservas]       = useState([]);
   const [categorias,     setCategorias]     = useState([]);
   const [roomDescMap,    setRoomDescMap]    = useState({}); // { [roomId]: descricao }
+  const [roomPaxMap,     setRoomPaxMap]     = useState({}); // { [roomId]: quantidade_pessoas }
   const [loading,        setLoading]        = useState(true);
   const [tiposPagamento, setTiposPagamento] = useState([]);
   const [viewDate,    setViewDate]    = useState(() => { const d = new Date(today); d.setDate(d.getDate() - 1); return d; });
@@ -5737,6 +5930,7 @@ export default function BookingCalendar() {
   const [showPagQuartoPicker,  setShowPagQuartoPicker]  = useState(false);
   const [pagQuartoAlvo,        setPagQuartoAlvo]        = useState(null); // reserva escolhida (por quarto)
   const [winWide,              setWinWide]              = useState(typeof window !== 'undefined' ? window.innerWidth >= 1080 : true);
+  const [winMobile,            setWinMobile]            = useState(typeof window !== 'undefined' ? window.innerWidth <= 600 : false);
   const [groupPanel,           setGroupPanel]           = useState(null);
   const [groupMembersCache,    setGroupMembersCache]    = useState({}); // { [grupoId]: reservas normalizadas (todos os meses) }
   const [solicitacoes,       setSolicitacoes]       = useState([]);
@@ -5778,8 +5972,14 @@ export default function BookingCalendar() {
       const roomList = Array.isArray(roomRes) ? roomRes : (roomRes?.content ?? []);
 
       const descMap = {};
-      roomList.forEach((r) => { if (r.id) descMap[r.id] = r.descricao ?? ''; });
+      const paxMap  = {};
+      roomList.forEach((r) => {
+        if (!r.id) return;
+        descMap[r.id] = r.descricao ?? '';
+        paxMap[r.id]  = r.quantidade_pessoas ?? r.quantidadePessoas ?? null;
+      });
       setRoomDescMap(descMap);
+      setRoomPaxMap(paxMap);
 
       setCategorias(
         catList
@@ -6269,7 +6469,10 @@ export default function BookingCalendar() {
   }, []);
 
   useEffect(() => {
-    const onResize = () => setWinWide(window.innerWidth >= 1080);
+    const onResize = () => {
+      setWinWide(window.innerWidth >= 1080);
+      setWinMobile(window.innerWidth <= 600);
+    };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -6385,8 +6588,13 @@ export default function BookingCalendar() {
     const width = right - left;
     if (width <= 4) return null;
 
-    const rLeft        = startInView ? 5 : 0;
-    const rRight       = endInView   ? 5 : 0;
+    // Faixa flutuante: pontas arredondadas e afastadas da linha quando visíveis;
+    // retas e coladas na borda quando a reserva continua fora da janela.
+    const insetL       = startInView ? BAR_INSET : 0;
+    const insetR       = endInView   ? BAR_INSET : 0;
+    const temMeia      = !isGhost && orig.meiaDiaria && endInView;
+    const rLeft        = startInView ? 999 : 0;
+    const rRight       = endInView && !temMeia ? 999 : 0;
     const borderRadius = `${rLeft}px ${rRight}px ${rRight}px ${rLeft}px`;
     const dias         = diffDays(orig.dataInicio, orig.dataFim);
     const totalPeople  = 1 + (orig.quantidadeAcompanhantes || 0);
@@ -6412,7 +6620,7 @@ export default function BookingCalendar() {
       <div key={key}
         className={[styles.bar, styles[`bar_${orig.status}`], isGhost ? styles.barGhost : '', isDragging ? styles.barDragging : ''].join(' ')}
         style={{
-          left, width, borderRadius,
+          left: left + insetL, width: width - insetL - insetR, borderRadius,
           opacity: barOpacity,
           cursor: pagamentoModoAtivo ? 'pointer' : undefined,
           ...(gColor ? { background: gColor } : {}),
@@ -6486,24 +6694,27 @@ export default function BookingCalendar() {
           <div className={styles.resizeHandle} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-l')} />
         )}
         <div className={styles.barContent}>
-          <span className={styles.barName}>{orig.titularNome}</span>
-          {isGhost ? (
-            <div className={styles.barDateLabel}>{display.dataInicio} → {display.dataFim} · {diariasTxt(diffDays(display.dataInicio, display.dataFim))}</div>
-          ) : (
-            <div className={styles.barMeta}>
-              <span className={styles.barMetaItem}><Users size={12} /> {totalPeople} pessoa{totalPeople !== 1 ? 's' : ''}</span>
-              <span className={styles.barMetaItem}>
-                <CalendarDays size={12} />
-                {currentDiaria !== null ? `${currentDiaria}/${dias}` : diariasTxt(dias)}
-              </span>
-            </div>
-          )}
+          <span className={styles.barAvatar}>{initials(orig.titularNome)}</span>
+          <div className={styles.barText}>
+            <span className={styles.barName}>{orig.titularNome}</span>
+            {isGhost ? (
+              <span className={styles.barDateLabel}>{fmtDateBR(display.dataInicio)} → {fmtDateBR(display.dataFim)} · {diariasTxt(diffDays(display.dataInicio, display.dataFim))}</span>
+            ) : (
+              <div className={styles.barMeta}>
+                <span className={styles.barMetaItem}><Users size={12} /> {totalPeople}</span>
+                <span className={styles.barMetaItem}>
+                  <CalendarDays size={12} />
+                  {currentDiaria !== null ? `${currentDiaria}/${dias}` : diariasTxt(dias)}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         {endInView && !isGhost && !pagamentoModoAtivo && (
           <div className={[styles.resizeHandle, styles.resizeHandleRight].join(' ')} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-r')} />
         )}
         {/* Meio ticket (meia diária) — estende metade de célula até a borda, cor do ticket a 70%. */}
-        {!isGhost && orig.meiaDiaria && endInView && (
+        {temMeia && (
           <div
             className={styles.barHalf}
             style={{ width: HALF, ...(gColor ? { background: gColor } : {}) }}
@@ -6516,7 +6727,8 @@ export default function BookingCalendar() {
     );
   };
 
-  const gridTotalW = LEFT_W + VISIBLE_DAYS * DAY_CELL_W;
+  const leftW      = winMobile ? LEFT_W_MOBILE : winWide ? LEFT_W : LEFT_W_NARROW;
+  const gridTotalW = leftW + VISIBLE_DAYS * DAY_CELL_W;
 
   return (
     <div className={styles.page}>
@@ -6525,10 +6737,6 @@ export default function BookingCalendar() {
 
         {/* Header */}
         <div className={styles.tableHeader}>
-          <div>
-            <h2 className={styles.h2}>Calendário de Reservas</h2>
-            <p className={styles.subtitle}>Visualize e gerencie reservas por quarto e período</p>
-          </div>
           <div className={styles.tableTools}>
             <div className={styles.navGroup} style={{ position: 'relative' }} ref={monthPickerRef}>
               <button className={styles.navBtn} onClick={() => shiftMonth(-1)}><ChevronLeft size={14} /></button>
@@ -6563,6 +6771,9 @@ export default function BookingCalendar() {
               )}
             </div>
             <button className={styles.todayBtn} onClick={goToToday}>Hoje</button>
+            <button className={[styles.todayBtn, styles.groupsBtn].join(' ')} onClick={() => setShowGrupos(true)}>
+              <Users size={14} /> Grupos
+            </button>
 
             {/* Search combobox */}
             <div className={styles.searchWrap} ref={searchRef}>
@@ -6630,7 +6841,7 @@ export default function BookingCalendar() {
         )}
 
         {/* Grid */}
-        <div className={styles.gridScrollWrap}>
+        <div className={styles.gridScrollWrap} style={{ '--left-w': `${leftW}px` }}>
           {!loading && (
             <>
               <button type="button"
@@ -6655,13 +6866,14 @@ export default function BookingCalendar() {
           ) : (
             <>
               <div className={styles.dayHeaderRow} style={{ width: gridTotalW }}>
-                <div className={styles.cornerCell} style={{ width: LEFT_W, height: HDR_H }}>
-                  <BedDouble size={11} /><span>Quarto</span>
+                <div className={styles.cornerCell} style={{ width: leftW, height: HDR_H }}>
+                  Quarto
                 </div>
                 {days.map((day, idx) => {
                   const dStr      = daysStr[idx];
                   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                   const isToday   = dStr === todayStr;
+                  const weekday   = day.toLocaleDateString('pt-BR', { weekday: 'long' });
                   return (
                     <div key={idx}
                       className={[styles.dayHeader, isWeekend ? styles.dayHeaderWeekend : '', isToday ? styles.dayHeaderToday : ''].join(' ')}
@@ -6669,11 +6881,11 @@ export default function BookingCalendar() {
                       onClick={() => setDayModal({ dateStr: dStr })}
                       title={`Ver reservas — ${fmtDateBR(dStr)}`}
                     >
-                      <span className={[styles.dayWeekday, isWeekend ? styles.dayWeekdayRed : '', isToday ? styles.dayWeekdayToday : ''].join(' ')}>
-                        {isToday ? `${day.toLocaleDateString('pt-BR', { weekday: 'long' })} · Hoje` : day.toLocaleDateString('pt-BR', { weekday: 'long' })}
+                      <span className={[styles.dayWeekday, isToday ? styles.dayWeekdayToday : ''].join(' ')}>
+                        {weekday.charAt(0).toUpperCase() + weekday.slice(1)}
                       </span>
                       <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
-                        {day.getDate()}
+                        {day.getDate()}{isToday ? ' · Hoje' : ''}
                       </span>
                     </div>
                   );
@@ -6686,7 +6898,7 @@ export default function BookingCalendar() {
                   <div key={cat.id}>
                     <div className={styles.catRow} style={{ width: gridTotalW, height: CAT_H }}
                       onClick={() => setCollapsedCats((p) => ({ ...p, [cat.id]: !p[cat.id] }))}>
-                      <div className={styles.catLabel} style={{ width: LEFT_W }}>
+                      <div className={styles.catLabel} style={{ width: leftW }}>
                         <ChevronDown size={11} className={`${styles.chevronIcon}${isCollapsed ? ' ' + styles.collapsed : ''}`} />
                         <BedDouble size={11} />{cat.nome}
                       </div>
@@ -6695,9 +6907,16 @@ export default function BookingCalendar() {
 
                     {!isCollapsed && cat.quartos.map((room) => (
                       <div key={room} className={styles.roomRow} style={{ width: gridTotalW, height: ROOM_H }}>
-                        <button className={styles.roomLabel} style={{ width: LEFT_W, height: ROOM_H }}
-                          onClick={() => setRoomModal({ room })} title={`Histórico quarto ${fmtRoom(room)}`}>
-                          <span className={styles.roomNum}>{fmtRoom(room)}</span>
+                        <button className={styles.roomLabel} style={{ width: leftW, height: ROOM_H }}
+                          onClick={() => setRoomModal({ room })}
+                          title={`Histórico quarto ${fmtRoom(room)}${roomDescMap[room] ? ` – ${roomDescMap[room]}` : ''}`}>
+                          <span className={styles.roomTitle}>
+                            <span className={styles.roomNum}>Apt. {fmtRoom(room)}</span>
+                            {roomDescMap[room] && <span className={styles.roomDesc}> – {roomDescMap[room]}</span>}
+                          </span>
+                          {roomPaxMap[room] != null && (
+                            <span className={styles.roomPax}><Users size={14} /> {roomPaxMap[room]}</span>
+                          )}
                         </button>
                         <div className={styles.roomCells} onMouseMove={(e) => handleRoomMouseMove(e, room)}>
                           {days.map((day, idx) => {
@@ -7069,13 +7288,6 @@ export default function BookingCalendar() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className={styles.floatBtnWrap}>
-            <button className={styles.floatBtn} onClick={() => setShowGrupos(true)}>
-              <Users size={15} />
-              <span>Reservas em Grupo</span>
-            </button>
           </div>
 
           <div className={styles.floatDivider} />

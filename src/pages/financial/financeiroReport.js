@@ -497,7 +497,7 @@ function documento({ titulo, subtitulo, usuario, corpoHtml }) {
     <body>
       <header class="head">
         <div>
-          <div class="brand">Isto é Pousada</div>
+          <div class="brand">maishospedagem</div>
           <h1>${escapeHtml(titulo)}</h1>
           ${subtitulo ? `<div class="sub">${escapeHtml(subtitulo)}</div>` : ''}
         </div>
@@ -508,7 +508,7 @@ function documento({ titulo, subtitulo, usuario, corpoHtml }) {
       </header>
       ${corpoHtml}
       <footer class="foot">
-        <span>Isto é Pousada · Relatório financeiro</span>
+        <span>maishospedagem · Relatório financeiro</span>
         <span>${escapeHtml(agora.toLocaleDateString('pt-BR'))}</span>
       </footer>
     </body></html>`;

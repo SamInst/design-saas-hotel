@@ -480,10 +480,6 @@ export default function FinancialDashboard() {
         {/* ══ LANÇAMENTOS ════════════════════════════════════ */}
         <section className={styles.card}>
             <div className={styles.tableHeader}>
-              <div>
-                <h2 className={styles.h2}>Financeiro</h2>
-                <p className={styles.subtitle}>Resumo financeiro e histórico de transações do hotel</p>
-              </div>
               <div className={styles.tableTools}>
                 <div className={styles.searchWrap}>
                   <Search size={13} className={styles.searchIcon} />

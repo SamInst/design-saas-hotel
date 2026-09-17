@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Building2, Plus, Search, BedDouble, BedSingle, Layers, Waves,
+  Plus, Search, BedDouble, BedSingle, Layers, Waves,
   Clock, User, CreditCard, ChevronDown, Wrench, Sparkles,
   CheckCircle, XCircle, DollarSign, Calendar, Square, Loader2,
   AlertTriangle, ShoppingCart, Package, Trash2, Phone, Mail,
@@ -710,7 +710,6 @@ export default function RecepcaoPage() {
   const [consumoSaving, setConsumoSaving]             = useState(false);
 
   // Sazonalidade por diária (modal do pernoite/hospedado) — calculada via calcularPreco
-  const [stayCalcSaz, setStayCalcSaz] = useState({ id: null, list: [] });
   // Resumo consolidado do grupo (todas as hospedagens, mesmo finalizadas) — backend.
   const [groupResumo, setGroupResumo] = useState(null);
 
@@ -1111,38 +1110,13 @@ export default function RecepcaoPage() {
       pagamentos: (sv.pagamentos || []).map((p) => ({
         id: p.id, descricao: p.descricao ?? '', formaPagamento: p.formaPagamento ?? '', nomePagador: p.nomePagador ?? '',
         valor: p.valor ?? 0, cancelado: p.cancelado ?? false, dataRegistro: p.data ?? p.dataRegistro ?? '', funcionario: p.funcionario?.nome ?? p.funcionario ?? '',
+        grupoId: p.grupoId ?? null,
       })),
       valorTotal: sv.valorTotal ?? 0,
       novoPreco: sv.novoPreco ?? null,
       pessoasOrcamento: [],
     };
   };
-  // Calcula a sazonalidade de cada diária do pernoite selecionado (mesma info da Gerenciar Diárias).
-  useEffect(() => {
-    const sv = selectedRoom?.servico;
-    if (!selectedRoom || sv?.tipo !== 'pernoite' || !sv?.diarias?.length) {
-      setStayCalcSaz({ id: null, list: [] });
-      return;
-    }
-    // calcularPreco espera datas no formato dd/MM/yyyy; converte ISO (yyyy-MM-dd) quando necessário.
-    const datas_nascimento = (sv.hospedes || [])
-      .map((h) => h.dataNascimento)
-      .filter(Boolean)
-      .map((dn) => (/^\d{4}-\d{2}-\d{2}$/.test(dn) ? dn.split('-').reverse().join('/') : dn));
-    if (datas_nascimento.length === 0) { setStayCalcSaz({ id: sv.id, list: [] }); return; }
-    let cancelled = false;
-    const items = sv.diarias.map((d) => ({
-      fk_quarto: d.quartoId ?? selectedRoom.id,
-      data_entrada: (d.dataInicio || '').split(' ')[0],
-      data_saida: (d.dataFim || '').split(' ')[0],
-      datas_nascimento,
-    }));
-    reservaApi.calcularPreco(items)
-      .then((res) => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: Array.isArray(res) ? res : [res] }); })
-      .catch(() => { if (!cancelled) setStayCalcSaz({ id: sv.id, list: [] }); });
-    return () => { cancelled = true; };
-  }, [selectedRoom?.id, selectedRoom?.servico?.id]); // eslint-disable-line
-
   // Busca o total do grupo (todas as hospedagens do grupo) quando o quarto selecionado está em grupo.
   useEffect(() => {
     const gid = selectedRoom?.servico?.grupoId ?? null;
@@ -1162,23 +1136,22 @@ export default function RecepcaoPage() {
     // mostraria o total antigo até dar refresh na página.
   }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.grupoId, selectedRoom?.servico?.valorTotal, selectedRoom?.servico?.totalPago]); // eslint-disable-line
 
+  // Detalhes das diárias no mesmo formato do /calcular-preco, que é o que o ReservaModal lê:
+  // "Diaria N - (entrada -> saída) ocupação". Composição e sazonalidade vêm gravadas na diária.
   const stayDiarias = (sv) => {
     const { adultos, criancas } = svOccupancy(sv.hospedes || []);
-    const sazList = stayCalcSaz.id === sv.id ? stayCalcSaz.list : [];
-    return (sv.diarias || []).map((d, i) => {
-      const calc = sazList[i];
-      const saz =
-        calc?.sazonalidades_aplicadas?.[0]?.descricao
-        ?? calc?.detalhes?.[0]?.sazonalidade?.descricao
-        ?? null;
-      const partes = [`Diária ${d.num}`, `${adultos} adulto(s)${criancas > 0 ? ` + ${criancas} criança(s)` : ''}`];
-      if (d.meiaDiaria) partes.push('meia diária');
-      return {
-        descricao: partes.join(' · '),
-        valor_final: d.valor ?? 0,
-        ...(saz ? { sazonalidade: { descricao: saz } } : {}),
-      };
-    });
+    const soData = (s) => (s || '').split(' ')[0];
+    const fallback = (adultos > 0 || criancas > 0)
+      ? `${adultos} Adulto(s)${criancas > 0 ? ` + ${criancas} criança(s)` : ''}`
+      : '';
+    return (sv.diarias || []).map((d) => ({
+      descricao: `Diaria ${d.num} - (${soData(d.dataInicio)} -> ${soData(d.dataFim)}) `
+        + (d.ocupacao ?? fallback),
+      sazonalidade: d.sazonalidade ? { descricao: d.sazonalidade } : null,
+      valor_final: d.valor ?? 0,
+      valor_criancas: d.valorCriancas ?? null,
+      meia_diaria: !!d.meiaDiaria,
+    }));
   };
 
   // Info do grupo — total/pago/pendente somados (como no modal de grupo das reservas).
@@ -3368,10 +3341,6 @@ export default function RecepcaoPage() {
       <div className={styles.card}>
         {/* ── Header ── */}
         <div className={styles.tableHeader}>
-          <div className={styles.tableHeaderLeft}>
-            <h2 className={styles.h2}>Recepção</h2>
-            <p className={styles.subtitle}><Building2 size={13} /> Visão geral de quartos, hóspedes e day use</p>
-          </div>
           <div className={styles.tableHeaderActions}>
             <div className={[styles.searchWrap, styles.headerControl].join(' ')}>
               <Search size={13} className={styles.searchIcon} />

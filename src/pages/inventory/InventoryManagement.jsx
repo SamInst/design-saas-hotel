@@ -441,10 +441,6 @@ export default function InventoryManagement() {
         {/* ── Toolbar card ── */}
         <div className={styles.card}>
           <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Itens e Almoxarifado</h2>
-              <p className={styles.subtitle}>Gestão de estoque e inventário por categoria</p>
-            </div>
             <div className={styles.tableTools}>
               <div className={styles.searchWrap}>
                 <Search size={14} className={styles.searchIcon} />

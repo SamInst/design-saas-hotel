@@ -200,7 +200,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; Voucher de Hospedagem${incluirConsumo ? ' + Consumo' : ''}</div>
+    <div class="doc-title">maishospedagem &nbsp;|&nbsp; Voucher de Hospedagem${incluirConsumo ? ' + Consumo' : ''}</div>
     <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
     <div class="info-grid">
       <div class="info-item"><label>Apartamento</label><span>${quarto.numero}</span></div>

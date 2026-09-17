@@ -256,7 +256,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">Isto é Pousada &nbsp;|&nbsp; ${headerTitle}</div>
+    <div class="doc-title">maishospedagem &nbsp;|&nbsp; ${headerTitle}</div>
     <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
     <div class="info-grid">
       <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>

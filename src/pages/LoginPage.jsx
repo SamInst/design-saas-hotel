@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { authApi } from '../services/api';
 import styles from './LoginPage.module.css';
+import logo from '../assets/logo-hospedagem-simbolo.png';
 
 export default function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -60,7 +61,7 @@ export default function LoginPage({ onLogin }) {
         <div className={styles.stageBody}>
           <span className={styles.kicker}>Sistema de Gestão Hoteleira</span>
           <h2 className={styles.wordmark}>
-            Isto é<br /><em>Pousada</em>.
+            mais<em>hospedagem</em>.
           </h2>
           <p className={styles.lede}>
             Onde cada reserva vira uma estadia, e cada estadia, uma história
@@ -80,13 +81,15 @@ export default function LoginPage({ onLogin }) {
         <div className={styles.panelInner}>
 
           <header className={styles.brand}>
-            <span className={styles.monogram}>ip</span>
-            <span className={styles.brandText}>Isto é Pousada</span>
+            <span className={styles.monogram}>
+              <img className={styles.monogramImg} src={logo} alt="" />
+            </span>
+            <span className={styles.brandText}>maishospedagem</span>
           </header>
 
           <div className={styles.intro}>
             <h1 className={styles.title}>Bem-vindo de volta</h1>
-            <p className={styles.sub}>Entre para gerenciar a operação da pousada.</p>
+            <p className={styles.sub}>Entre para gerenciar a operação da hospedagem.</p>
           </div>
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
@@ -154,7 +157,7 @@ export default function LoginPage({ onLogin }) {
           </form>
 
           <footer className={styles.legal}>
-            Isto é Pousada © {new Date().getFullYear()} · Painel interno
+            maishospedagem © {new Date().getFullYear()} · Painel interno
           </footer>
         </div>
       </main>

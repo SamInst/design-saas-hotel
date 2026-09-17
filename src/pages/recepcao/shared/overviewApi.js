@@ -188,6 +188,8 @@ function _normalizePagamento(p) {
     valor:           p.valor ?? 0,
     data:            p.data_hora_registro ?? p.data ?? '',
     cancelado:       p.cancelado ?? false,
+    funcionario:     p.funcionario?.nome ?? '',
+    grupoId:         p.grupo_id ?? null,
   };
 }
 
@@ -202,6 +204,9 @@ function _normalizeDiaria(d) {
     dataInicio: d.checkin ?? d.data_hora_inicio ?? '',
     dataFim:    d.checkout ?? d.data_hora_fim ?? '',
     valor: d.valor ?? 0,
+    sazonalidade: d.sazonalidade?.descricao ?? null,
+    ocupacao: d.ocupacao?.descricao ?? null,
+    valorCriancas: d.ocupacao?.valor_criancas ?? null,
     hospedes: (d.pessoas ?? []).map(_normalizePessoa),
     consumos: (d.consumos ?? []).map(c => ({ ..._normalizeConsumo(c), diariaId: d.id })),
     pagamentos: [],

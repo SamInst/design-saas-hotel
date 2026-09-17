@@ -888,10 +888,6 @@ export default function EmployeeManagement() {
         <div className={styles.card}>
           {/* Header */}
           <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Funcionários</h2>
-              <p className={styles.subtitle}>Gestão de equipe e acesso</p>
-            </div>
             <div className={styles.tableTools}>
               <div className={styles.searchWrap}>
                 <Search size={13} className={styles.searchIcon} />

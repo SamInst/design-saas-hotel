@@ -324,10 +324,6 @@ export default function RolePermissions() {
 
           {/* toolbar inside card */}
           <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Cargos e Permissões</h2>
-              <p className={styles.subtitle}>Gestão de cargos e controle de acesso</p>
-            </div>
             <div className={styles.tableTools}>
               <div className={styles.searchWrap}>
                 <Search size={14} className={styles.searchIcon} />
