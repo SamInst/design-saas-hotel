@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   BedDouble, Calendar, DollarSign, Tag, Users, Clock,
   Plus, Edit2, Trash2, Loader2,
+  Search, X, ChevronLeft, ChevronRight, AlertCircle,
+  Baby, Sun, Layers, Link2,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -215,10 +217,13 @@ const MODO_LABEL = {
   anual:             'Anual',
 };
 
+/** "2026-12-01" → "01/12/2026". Deixa passar o que não for ISO. */
+const fmtDataBR = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d ?? '') ? d.split('-').reverse().join('/') : (d || ''));
+
 function describeSchedule(s) {
   switch (s.modoOperacao) {
     case 'data-especifica':
-      return `${s.dataInicio || '—'} → ${s.dataFim || '—'}  ${s.horaInicio || ''} / ${s.horaFim || ''}`.trim();
+      return `${fmtDataBR(s.dataInicio) || '—'} → ${fmtDataBR(s.dataFim) || '—'}  ${s.horaInicio || ''} / ${s.horaFim || ''}`.trim();
     case 'semanal': {
       const dias = (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ');
       return `Semanal · ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
@@ -241,8 +246,6 @@ const CAT_FORM_LABELS = ['Preços', 'Day Use', 'Quartos & Sazonais', 'Menores de
 const SEA_FORM_TABS   = ['agenda', 'categorias', 'precos', 'dayuse', 'criancas'];
 const SEA_FORM_LABELS = ['Agendamento', 'Categorias', 'Preços', 'Day Use', 'Menores de Idade'];
 
-const CAT_DETAIL_LABELS = ['Hospedagem', 'Day Use', 'Quartos & Sazonais', 'Menores de Idade'];
-const SEA_DETAIL_LABELS = ['Agendamento', 'Categorias', 'Preços', 'Day Use', 'Menores de Idade'];
 
 const CRIANCAS_MODO_LABEL = {
   'taxa-fixa':             'Taxa adicional fixa',
@@ -323,6 +326,64 @@ function isSeaValid(f) {
   return !!f.precosOcupacao[1];
 }
 
+// ── Resumo curto do agendamento — cabe no subtítulo da lista ─────────────────
+function resumoSchedule(s) {
+  switch (s.modoOperacao) {
+    case 'data-especifica': return `${fmtDataBR(s.dataInicio) || '—'} → ${fmtDataBR(s.dataFim) || '—'}`;
+    case 'semanal': return (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—';
+    case 'mensal':  return `Dias ${(s.diasMes || []).join(', ') || '—'}`;
+    case 'anual':   return (s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—';
+    default: return '';
+  }
+}
+
+// ── Campo rótulo/valor do painel de detalhe ───────────────────────────────────
+function Field({ label, value, lg = false }) {
+  const vazio = value == null || value === '';
+  return (
+    <div>
+      <p className={styles.fLabel}>{label}</p>
+      <p className={[styles.fVal, lg && !vazio ? styles.fValLg : ''].join(' ')}>{vazio ? '—' : value}</p>
+    </div>
+  );
+}
+
+// ── Pílula ────────────────────────────────────────────────────────────────────
+function Pill({ tom = '', children }) {
+  return <span className={[styles.tag, tom ? styles[tom] : ''].join(' ')}>{children}</span>;
+}
+
+// ── Esqueletos de carregamento ────────────────────────────────────────────────
+const sk = (...extra) => [styles.sk, ...extra].join(' ');
+
+function SkeletonLista({ linhas = 7 }) {
+  return (
+    <div role="status" aria-label="Carregando">
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className={styles.listItem} aria-hidden="true">
+          <span className={styles.listItemBody}>
+            <span className={sk(styles.skName)} style={{ width: `${62 + ((i * 13) % 26)}%` }} />
+            <span className={sk(styles.skSub)} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SkeletonPainel() {
+  return (
+    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className={styles.statCard} aria-hidden="true">
+          <span className={sk(styles.skLabel)} />
+          <span className={sk(styles.skNumero)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function OccTable({ label, occ, maxPessoas }) {
@@ -343,7 +404,7 @@ function OccTable({ label, occ, maxPessoas }) {
 
 function OccInputs({ occ, maxPessoas, onChange }) {
   return (
-    <div className={styles.fieldGrid}>
+    <div className={styles.inputGrid}>
       {Array.from({ length: maxPessoas }, (_, i) => i + 1).map((q) => (
         <div key={q} className={styles.fieldCard}>
           <span className={styles.fieldCardLabel}>{q} {q === 1 ? 'pessoa' : 'pessoas'}</span>
@@ -610,7 +671,7 @@ function ChildPricingFields({ criancas, onChange }) {
           {criancas.modo === 'taxa-quantidade' && (
             <>
               <div className={styles.sectionTitle}>Valores por quantidade de crianças</div>
-              <div className={styles.fieldGrid}>
+              <div className={styles.inputGrid}>
                 {criancas.entradas.map((e, i) => (
                   <div key={i} className={styles.fieldCard}>
                     <span className={styles.fieldCardLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
@@ -634,7 +695,7 @@ function ChildPricingFields({ criancas, onChange }) {
           {criancas.modo === 'taxa-faixa' && (
             <>
               <div className={styles.sectionTitle}>Faixas etárias</div>
-              <div className={styles.fieldGrid}>
+              <div className={styles.inputGrid}>
                 {criancas.faixas.map((f, i) => (
                   <div key={i} className={styles.fieldCard}>
                     <span className={styles.fieldCardLabel}>Faixa {i + 1}</span>
@@ -668,7 +729,7 @@ function ChildPricingFields({ criancas, onChange }) {
           {criancas.modo === 'porcentagem-quantidade' && (
             <>
               <div className={styles.sectionTitle}>Porcentagem por quantidade de crianças</div>
-              <div className={styles.fieldGrid}>
+              <div className={styles.inputGrid}>
                 {criancas.entradas.map((e, i) => (
                   <div key={i} className={styles.fieldCard}>
                     <span className={styles.fieldCardLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
@@ -697,7 +758,7 @@ function ChildPricingFields({ criancas, onChange }) {
 function ChildPricingDisplay({ criancas }) {
   const modo = criancas?.modo;
   return (
-    <div>
+    <div className={styles.rowsBlock}>
       {criancas?.gratuidadeAtiva && (
         <div className={styles.gratuidadeDisplay}>
           <span className={styles.gratuidadeDisplayLabel}>Gratuidade</span>
@@ -761,10 +822,13 @@ export default function PricingManagement() {
   const [loading, setLoading]     = useState(true);
   const [notification, setNotif]  = useState(null);
 
-  // Detail modal (read-only view)
+  // Lista: aba corrente e busca
+  const [aba, setAba]               = useState('cat'); // 'cat' | 'sea'
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Ficha aberta no painel de detalhe
   const [detailItem, setDetailItem] = useState(null);
   const [detailType, setDetailType] = useState(null); // 'cat' | 'sea'
-  const [detailTab,  setDetailTab]  = useState(0);
 
   // Category form modal
   const [catModal, setCatModal]     = useState(null);
@@ -815,10 +879,26 @@ export default function PricingManagement() {
 
   const { categorias, sazonalidades } = data;
 
-  // ── KPIs ──────────────────────────────────────────────────────────────────
-  // ── Detail modal ──────────────────────────────────────────────────────────
-  const openDetail = (item, type) => { setDetailItem(item); setDetailType(type); setDetailTab(0); };
-  const closeDetail = () => setDetailItem(null);
+  // ── Painel de detalhe ─────────────────────────────────────────────────────
+  const openDetail = (item, type) => { setDetailItem(item); setDetailType(type); };
+  const closeDetail = () => { setDetailItem(null); setDetailType(null); };
+
+  // Trocar de aba fecha a ficha aberta — ela é da outra lista.
+  const changeAba = (nova) => {
+    if (nova === aba) return;
+    setAba(nova); setSearchTerm(''); closeDetail();
+  };
+
+  // Depois de salvar, `load()` recria os objetos: a ficha aberta precisa
+  // apontar para a versão nova, ou fica mostrando os dados antigos.
+  useEffect(() => {
+    if (!detailItem) return;
+    const lista = detailType === 'sea' ? sazonalidades : categorias;
+    const fresco = lista.find((x) => x.id === detailItem.id);
+    if (!fresco) closeDetail();
+    else if (fresco !== detailItem) setDetailItem(fresco);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias, sazonalidades]);
 
   // ── Category form ──────────────────────────────────────────────────────────
   const advanceCatTab = () => {
@@ -1187,662 +1267,503 @@ export default function PricingManagement() {
     }
   };
 
-  // ── Detail modal content helpers ──────────────────────────────────────────
-  const IB = ({ icon, label, children, span2, className }) => (
-    <div className={[styles.infoBox, span2 ? styles.infoBoxSpan2 : '', className ?? ''].join(' ')}>
-      <div className={styles.infoBoxHeader}>
-        {icon}<span className={styles.infoBoxLabel}>{label}</span>
+  // ── Painel de detalhe ──────────────────────────────────────────────────────
+  /** Sazonalidades que incidem sobre a categoria aberta. */
+  const seasOf = (cat) => (cat.sazonaisAtivas ?? [])
+    .map((sid) => sazonalidades.find((s) => s.id === sid))
+    .filter(Boolean);
+
+  /** Tarifas de hospedagem de um item (categoria ou sazonalidade). */
+  const PrecoBloco = ({ item }) => {
+    const fixo = item.modeloCobranca === 'Por quarto (tarifa fixa)';
+    return (
+      <>
+        <div className={styles.panelFields}>
+          <Field label="Modelo de cobrança" value={item.modeloCobranca} />
+          {!fixo && (
+            <Field label="Capacidade" value={`${item.maxPessoas} pessoa${item.maxPessoas !== 1 ? 's' : ''}`} />
+          )}
+        </div>
+        {fixo
+          ? <Field label="Tarifa fixa" value={fmtBRL(item.precoFixo)} lg />
+          : <OccTable label="Preço/noite" occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />}
+      </>
+    );
+  };
+
+  /** Day Use de um item. */
+  const DayUseBloco = ({ item }) => {
+    const d = item.dayUse ?? {};
+    if (!d.ativo) return <p className={styles.duInactive}>Day Use não está ativo.</p>;
+    return (
+      <>
+        <div className={styles.panelFields}>
+          <Field label="Modo" value={d.modo === 'padrao' ? 'Padrão' : 'Por ocupação'} />
+          {d.modo === 'padrao'
+            ? <Field label="Horas incluídas" value={d.horasBase ? `${d.horasBase}h` : ''} />
+            : <Field label="Hora adicional/pessoa" value={fmtBRL(d.horaAdicionalPorPessoa)} />}
+        </div>
+        {d.modo === 'padrao' ? (
+          <div className={styles.panelFields}>
+            <Field label="Preço base" value={fmtBRL(d.precoFixo)} lg />
+            <Field label="Hora adicional" value={fmtBRL(d.precoAdicional)} />
+          </div>
+        ) : (
+          <OccTable label="Preço" occ={d.precosOcupacao} maxPessoas={item.maxPessoas} />
+        )}
+      </>
+    );
+  };
+
+  /**
+   * Base + uma coluna por sazonalidade. Os campos entram na mesma ordem dos
+   * dois lados, então as linhas se alinham sozinhas. Sem sazonalidade, mostra
+   * só o conteúdo, sem moldura.
+   */
+  const Comparado = ({ base, seas, render }) => {
+    if (seas.length === 0) return render(base);
+    return (
+      <div className={styles.compareGrid}>
+        <div className={styles.comparePanel}>
+          <span className={styles.comparePanelTitle}>Base</span>
+          {render(base)}
+        </div>
+        {seas.map((s) => (
+          <div key={s.id} className={[styles.comparePanel, styles.comparePanelSea].join(' ')}>
+            <span className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{s.nome}</span>
+            {render(s)}
+          </div>
+        ))}
       </div>
-      <div className={styles.infoBoxValue}>{children}</div>
+    );
+  };
+
+  /** Rodapé "criado por / cadastrado em", quando o back-end devolve. */
+  const AuditFooter = ({ item }) => (
+    (item.criado_por || item.data_criacao) ? (
+      <div className={styles.auditRow}>
+        {item.criado_por && <span className={styles.auditItem}><Users size={11} /> {item.criado_por.nome ?? '—'}</span>}
+        {item.data_criacao && <span className={styles.auditItem}><Clock size={11} /> {item.data_criacao}</span>}
+      </div>
+    ) : null
+  );
+
+  /** Barra de ações da ficha — voltar, editar, excluir, fechar. */
+  const FichaActions = ({ onEdit }) => (
+    <div className={styles.dCardActions}>
+      <Button className={styles.btnSolid} onClick={onEdit}>Editar</Button>
+      <Button variant="danger" className={[styles.btnSolid, styles.btnDanger].join(' ')}
+        onClick={() => setDeleteTarget({ type: detailType, id: detailItem.id, nome: detailItem.nome })}>
+        Excluir
+      </Button>
+      <button type="button" className={styles.idClose} onClick={closeDetail}
+        title="Fechar ficha" aria-label="Fechar ficha">
+        <X size={16} />
+      </button>
     </div>
   );
 
-  const renderCatDetail = (cat, tab) => {
-    const du = cat.dayUse ?? {};
-    const appliedSeas = (cat.sazonaisAtivas ?? [])
-      .map((sid) => sazonalidades.find((s) => s.id === sid))
-      .filter(Boolean);
-    const hasSeas  = appliedSeas.length > 0;
-    const single   = appliedSeas.length === 1;
-    const sea0     = appliedSeas[0];
+  const BackBtn = () => (
+    <button type="button" className={styles.backBtn} onClick={closeDetail}
+      title="Voltar para a lista" aria-label="Voltar para a lista">
+      <ChevronLeft size={17} />
+    </button>
+  );
 
-    // For a single seasonality: side-by-side only when the layout structure is the same
-    // (same model / same mode). If structure differs → stack (major change).
-    const priceGridCols = (single && sea0.modeloCobranca === cat.modeloCobranca)
-      ? '1fr 1fr' : '1fr';
-    const duGridCols = (single
-      && (sea0.dayUse?.ativo ?? false) === (cat.dayUse?.ativo ?? false)
-      && (sea0.dayUse?.modo ?? 'padrao') === (cat.dayUse?.modo ?? 'padrao'))
-      ? '1fr 1fr' : '1fr';
-    const childGridCols = (single
-      && (sea0?.criancas?.ativo ?? false) === (cat.criancas?.ativo ?? false)
-      && (sea0?.criancas?.modo ?? 'taxa-fixa') === (cat.criancas?.modo ?? 'taxa-fixa'))
-      ? '1fr 1fr' : '1fr';
-    const seaSchedCols = single ? '1fr 1fr' : '1fr';
+  // ── Ficha da categoria ─────────────────────────────────────────────────────
+  const renderCatPanel = (cat) => {
+    const seas   = seasOf(cat);
+    const fixo   = cat.modeloCobranca === 'Por quarto (tarifa fixa)';
+    const nQuart = (cat.quartos ?? []).length;
 
-    // ── Reusable panel wrapper ──────────────────────────────────────────────
-    const Panel = ({ label, isSea, children }) => (
-      <div className={[styles.comparePanel, isSea ? styles.comparePanelSea : ''].join(' ')}>
-        <div className={[styles.comparePanelTitle, isSea ? styles.comparePanelTitleSea : ''].join(' ')}>
-          {label}
-        </div>
-        {children}
-      </div>
-    );
+    return (
+      <div className={styles.detailPanel}>
 
-    // ── Pricing content (hospedagem) ────────────────────────────────────────
-    const PriceContent = ({ item }) => {
-      const fixo = item.modeloCobranca === 'Por quarto (tarifa fixa)';
-      return (
-        <>
-          <div className={styles.infoGrid}>
-            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo">{item.modeloCobranca}</IB>
-            {!fixo && (
-              <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
-                {item.maxPessoas} pessoa{item.maxPessoas !== 1 ? 's' : ''}
-              </IB>
-            )}
-          </div>
-          {fixo ? (
-            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
-              <span className={styles.infoBoxValueLg}>{fmtBRL(item.precoFixo)}</span>
-            </IB>
-          ) : (
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxHeader}>
-                <DollarSign size={13} color="var(--violet)" />
-                <span className={styles.infoBoxLabel}>Por ocupação</span>
-              </div>
-              <OccTable label="Preço/noite" occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />
-            </div>
-          )}
-        </>
-      );
-    };
+        {/* ── Identificação ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <BackBtn />
+            <Tag size={16} />
+            <span className={styles.dCardTitle}>Dados da categoria</span>
+            <FichaActions onEdit={() => openEditCat(cat)} />
+          </h3>
 
-    // ── Day Use content ─────────────────────────────────────────────────────
-    const DuContent = ({ item }) => {
-      const d = item.dayUse ?? {};
-      if (!d.ativo) return <span className={styles.badge}>Day Use inativo</span>;
-      return (
-        <>
-          <div className={styles.infoGrid}>
-            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
-              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
-            </IB>
-            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
-              {d.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
-            </IB>
-          </div>
-          {d.modo === 'padrao' ? (
-            <div className={styles.infoGrid}>
-              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
-                <span className={styles.infoBoxValueLg}>{fmtBRL(d.precoFixo)}</span>
-              </IB>
-              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas">
-                {d.horasBase ? `${d.horasBase}h` : '—'}
-              </IB>
-              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
-                {fmtBRL(d.precoAdicional)}
-              </IB>
-            </div>
-          ) : (
-            <>
-              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional/pessoa" span2>
-                {fmtBRL(d.horaAdicionalPorPessoa)}
-              </IB>
-              <div className={styles.infoBox}>
-                <div className={styles.infoBoxHeader}>
-                  <DollarSign size={13} color="var(--violet)" />
-                  <span className={styles.infoBoxLabel}>Por ocupação</span>
+          <div className={styles.dCardBody}>
+            <div className={styles.idHead}>
+              <div className={styles.idHeadMain}>
+                <div className={styles.idName}>
+                  <h2 style={{ margin: 0, font: 'inherit' }}>{cat.nome}</h2>
                 </div>
-                <OccTable label="Preço" occ={d.precosOcupacao} maxPessoas={item.maxPessoas} />
-              </div>
-            </>
-          )}
-        </>
-      );
-    };
-
-    // ── Aligned single-sea comparison helpers ──────────────────────────────
-    // Renders base IB + sea IB as direct children of a 2-col grid → rows auto-align
-    const SeaIB = ({ icon, label, children, span2 }) => (
-      <IB icon={icon} label={label} span2={span2} className={styles.comparePanelSea}>{children}</IB>
-    );
-
-    const renderPriceAligned = (baseCat, seaItem) => {
-      const fixo = baseCat.modeloCobranca === 'Por quarto (tarifa fixa)';
-      return (
-        <div className={styles.compareAligned}>
-          <div className={styles.comparePanelTitle}>Base</div>
-          <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{seaItem.nome}</div>
-
-          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo">{baseCat.modeloCobranca}</IB>
-          <SeaIB icon={<Tag size={13} color="#d97706" />} label="Modelo">{seaItem.modeloCobranca}</SeaIB>
-
-          {!fixo && <>
-            <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">{baseCat.maxPessoas} pessoa{baseCat.maxPessoas !== 1 ? 's' : ''}</IB>
-            <SeaIB icon={<Users size={13} color="#d97706" />} label="Capacidade">{seaItem.maxPessoas} pessoa{seaItem.maxPessoas !== 1 ? 's' : ''}</SeaIB>
-          </>}
-
-          {fixo ? <>
-            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa">
-              <span className={styles.infoBoxValueLg}>{fmtBRL(baseCat.precoFixo)}</span>
-            </IB>
-            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Tarifa fixa">
-              <span className={styles.infoBoxValueLg}>{fmtBRL(seaItem.precoFixo)}</span>
-            </SeaIB>
-          </> : <>
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
-              <OccTable label="Preço/noite" occ={baseCat.precosOcupacao} maxPessoas={baseCat.maxPessoas} />
-            </div>
-            <div className={[styles.infoBox, styles.comparePanelSea].join(' ')}>
-              <div className={styles.infoBoxHeader}><DollarSign size={13} color="#d97706" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
-              <OccTable label="Preço/noite" occ={seaItem.precosOcupacao} maxPessoas={seaItem.maxPessoas} />
-            </div>
-          </>}
-        </div>
-      );
-    };
-
-    const renderDuAligned = (baseCat, seaItem) => {
-      const bd = baseCat.dayUse ?? {};
-      const sd = seaItem.dayUse ?? {};
-      return (
-        <div className={styles.compareAligned}>
-          <div className={styles.comparePanelTitle}>Base</div>
-          <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{seaItem.nome}</div>
-
-          <IB icon={<Calendar size={13} color={bd.ativo ? '#f59e0b' : 'var(--text-2)'} />} label="Day Use">
-            <span className={[styles.badge, bd.ativo ? styles.badgeAmber : ''].join(' ')}>{bd.ativo ? 'Ativo' : 'Inativo'}</span>
-          </IB>
-          <SeaIB icon={<Calendar size={13} color="#d97706" />} label="Day Use">
-            <span className={[styles.badge, sd.ativo ? styles.badgeAmber : ''].join(' ')}>{sd.ativo ? 'Ativo' : 'Inativo'}</span>
-          </SeaIB>
-
-          {(bd.ativo || sd.ativo) && <>
-            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">{bd.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</IB>
-            <SeaIB icon={<Tag size={13} color="#d97706" />} label="Modo">{sd.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}</SeaIB>
-          </>}
-
-          {bd.ativo && bd.modo === 'padrao' && <>
-            <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
-              <span className={styles.infoBoxValueLg}>{fmtBRL(bd.precoFixo)}</span>
-            </IB>
-            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Preço base">
-              <span className={styles.infoBoxValueLg}>{fmtBRL(sd.precoFixo)}</span>
-            </SeaIB>
-            <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas">{bd.horasBase ? `${bd.horasBase}h` : '—'}</IB>
-            <SeaIB icon={<Clock size={13} color="#d97706" />} label="Horas">{sd.horasBase ? `${sd.horasBase}h` : '—'}</SeaIB>
-            <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">{fmtBRL(bd.precoAdicional)}</IB>
-            <SeaIB icon={<DollarSign size={13} color="#d97706" />} label="Hora adicional">{fmtBRL(sd.precoAdicional)}</SeaIB>
-          </>}
-
-          {bd.ativo && bd.modo === 'ocupacao' && <>
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
-              <OccTable label="Preço" occ={bd.precosOcupacao} maxPessoas={baseCat.maxPessoas} />
-            </div>
-            <div className={[styles.infoBox, styles.comparePanelSea].join(' ')}>
-              <div className={styles.infoBoxHeader}><DollarSign size={13} color="#d97706" /><span className={styles.infoBoxLabel}>Por ocupação</span></div>
-              <OccTable label="Preço" occ={sd.precosOcupacao} maxPessoas={seaItem.maxPessoas} />
-            </div>
-          </>}
-        </div>
-      );
-    };
-
-    // ── Tab 0 — Hospedagem ──────────────────────────────────────────────────
-    if (tab === 0) return (
-      <div className={styles.detailSection}>
-        {(cat.hora_checkin || cat.hora_checkout) && (
-          <div className={styles.infoGrid}>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">{cat.hora_checkin || '—'}</IB>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">{cat.hora_checkout || '—'}</IB>
-          </div>
-        )}
-        {!hasSeas && (
-          <>
-            <div className={styles.infoGrid}>
-              <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">{cat.modeloCobranca}</IB>
-              <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">{cat.maxPessoas} pessoa{cat.maxPessoas !== 1 ? 's' : ''}</IB>
-            </div>
-            {cat.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
-                <span className={styles.infoBoxValueLg}>{fmtBRL(cat.precoFixo)}</span>
-              </IB>
-            ) : (
-              <div className={styles.infoBox}>
-                <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Preço por ocupação</span></div>
-                <OccTable label="Preço/noite" occ={cat.precosOcupacao} maxPessoas={cat.maxPessoas} />
-              </div>
-            )}
-          </>
-        )}
-        {hasSeas && single && priceGridCols === '1fr 1fr' && renderPriceAligned(cat, appliedSeas[0])}
-        {hasSeas && (single ? priceGridCols !== '1fr 1fr' : true) && (
-          <div className={styles.compareGrid} style={{ gridTemplateColumns: priceGridCols }}>
-            <Panel label="Base" isSea={false}><PriceContent item={cat} /></Panel>
-            {appliedSeas.map((sea) => <Panel key={sea.id} label={sea.nome} isSea><PriceContent item={sea} /></Panel>)}
-          </div>
-        )}
-        {(cat.criado_por || cat.data_criacao) && (
-          <div className={styles.auditRow}>
-            {cat.criado_por && <span className={styles.auditItem}><Users size={11} /> {cat.criado_por.nome ?? '—'}</span>}
-            {cat.data_criacao && <span className={styles.auditItem}><Clock size={11} /> {cat.data_criacao}</span>}
-          </div>
-        )}
-      </div>
-    );
-
-    // ── Tab 1 — Day Use ─────────────────────────────────────────────────────
-    if (tab === 1) return (
-      <div className={styles.detailSection}>
-        {!hasSeas && (
-          !du.ativo ? (
-            <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
-              <span className={styles.badge}>Inativo</span>
-            </IB>
-          ) : (
-            <>
-              <div className={styles.infoGrid}>
-                <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
-                  <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
-                </IB>
-                <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
-                  {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
-                </IB>
-              </div>
-              {du.modo === 'padrao' ? (
-                <div className={styles.infoGrid}>
-                  <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
-                    <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
-                  </IB>
-                  <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
-                    {du.horasBase ? `${du.horasBase}h` : '—'}
-                  </IB>
-                  <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
-                    {fmtBRL(du.precoAdicional)}
-                  </IB>
+                {cat.descricao && <p className={styles.idSub}>{cat.descricao}</p>}
+                <div className={styles.idTags}>
+                  <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
+                  {cat.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
+                  {cat.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
+                  <Pill>{nQuart} quarto{nQuart !== 1 ? 's' : ''}</Pill>
                 </div>
+              </div>
+            </div>
+
+            <div className={styles.fieldGrid}>
+              <Field label="Modelo de cobrança" value={cat.modeloCobranca} />
+              {!fixo && <Field label="Capacidade" value={`${cat.maxPessoas} pessoa${cat.maxPessoas !== 1 ? 's' : ''}`} />}
+              <Field label="Check-in"  value={cat.hora_checkin} />
+              <Field label="Check-out" value={cat.hora_checkout} />
+            </div>
+
+            <AuditFooter item={cat} />
+          </div>
+        </section>
+
+        {/* ── Tarifas de hospedagem ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <DollarSign size={16} />
+            <span className={styles.dCardTitle}>Tarifas de hospedagem</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <Comparado base={cat} seas={seas} render={(item) => <PrecoBloco item={item} />} />
+          </div>
+        </section>
+
+        {/* ── Day Use ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <Sun size={16} />
+            <span className={styles.dCardTitle}>Day Use</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <Comparado base={cat} seas={seas} render={(item) => <DayUseBloco item={item} />} />
+          </div>
+        </section>
+
+        {/* ── Menores de idade ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <Baby size={16} />
+            <span className={styles.dCardTitle}>Menores de idade</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <Comparado base={cat} seas={seas} render={(item) => <ChildPricingDisplay criancas={item.criancas} />} />
+          </div>
+        </section>
+
+        {/* ── Quartos e sazonalidades ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <BedDouble size={16} />
+            <span className={styles.dCardTitle}>Quartos e sazonalidades</span>
+          </h3>
+
+          <div className={styles.dCardBody}>
+            <div className={styles.pillWrap}>
+              {(cat.quartosObj ?? []).length === 0
+                ? <span className={styles.detailEmpty}>Nenhum quarto vinculado.</span>
+                : (cat.quartosObj ?? []).map((q) => {
+                    const full = quartos.find((x) => x.id === q.id);
+                    return (
+                      <span key={q.id} className={styles.pill}>
+                        Quarto {full?.numero ?? q.id}{q.descricao ? ` · ${q.descricao}` : ''}
+                      </span>
+                    );
+                  })}
+            </div>
+
+            <div className={styles.subBlock}>
+              <div className={styles.blockHead}><Calendar size={15} /><span>Sazonalidades ativas</span></div>
+              {seas.length === 0 ? (
+                <p className={styles.blockEmpty}>Nenhuma sazonalidade ativa nesta categoria.</p>
               ) : (
-                <div className={styles.infoBox}>
-                  <div className={styles.infoBoxHeader}><DollarSign size={13} color="var(--violet)" /><span className={styles.infoBoxLabel}>Preço por ocupação</span></div>
-                  <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={cat.maxPessoas} />
+                <div className={styles.rowsBlock}>
+                  {seas.map((s) => (
+                    <div key={s.id} className={styles.duRow}>
+                      <span className={styles.duLabel}>{s.nome}</span>
+                      <span className={styles.duVal}>{MODO_LABEL[s.modoOperacao]} · {resumoSchedule(s)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
-            </>
-          )
-        )}
-        {hasSeas && single && duGridCols === '1fr 1fr' && renderDuAligned(cat, appliedSeas[0])}
-        {hasSeas && (single ? duGridCols !== '1fr 1fr' : true) && (
-          <div className={styles.compareGrid} style={{ gridTemplateColumns: duGridCols }}>
-            <Panel label="Base" isSea={false}><DuContent item={cat} /></Panel>
-            {appliedSeas.map((sea) => <Panel key={sea.id} label={sea.nome} isSea><DuContent item={sea} /></Panel>)}
-          </div>
-        )}
-      </div>
-    );
-
-    // ── Tab 2 — Quartos & Sazonais ──────────────────────────────────────────
-    if (tab === 2) return (
-      <div className={styles.detailSection}>
-        <div className={styles.infoBox}>
-          <div className={styles.infoBoxHeader}>
-            <BedDouble size={13} color="var(--violet)" />
-            <span className={styles.infoBoxLabel}>Quartos vinculados</span>
-          </div>
-          <div className={styles.pillWrap} style={{ marginTop: 8 }}>
-            {(cat.quartosObj ?? []).length === 0
-              ? <span className={styles.detailEmpty}>Nenhum quarto vinculado</span>
-              : (cat.quartosObj ?? []).map((q) => {
-                  const full = quartos.find((x) => x.id === q.id);
-                  const num  = full?.numero ?? q.id;
-                  const desc = q.descricao ? ` - ${q.descricao}` : '';
-                  return <span key={q.id} className={styles.pill}>Quarto {num}{desc}</span>;
-                })}
-          </div>
-        </div>
-        {hasSeas ? (
-          <div className={styles.compareGrid} style={{ gridTemplateColumns: seaSchedCols }}>
-            {appliedSeas.map((sea) => (
-              <div key={sea.id} className={[styles.comparePanel, styles.comparePanelSea].join(' ')}>
-                <div className={[styles.comparePanelTitle, styles.comparePanelTitleSea].join(' ')}>{sea.nome}</div>
-                <div className={styles.duRow}><span className={styles.duLabel}>Modo</span><span className={styles.duVal}>{MODO_LABEL[sea.modoOperacao]}</span></div>
-                <div className={styles.duRow}><span className={styles.duLabel}>Agendamento</span><span className={styles.duVal}>{describeSchedule(sea)}</span></div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={styles.infoBox}>
-            <div className={styles.infoBoxHeader}>
-              <Calendar size={13} color="var(--violet)" />
-              <span className={styles.infoBoxLabel}>Sazonalidades ativas</span>
-            </div>
-            <div className={styles.pillWrap} style={{ marginTop: 8 }}>
-              <span className={styles.detailEmpty}>Nenhuma sazonalidade ativa</span>
             </div>
           </div>
-        )}
+        </section>
       </div>
     );
-
-    // ── Tab 3 — Menores de Idade ────────────────────────────────────────────
-    if (tab === 3) return (
-      <div className={styles.detailSection}>
-        {hasSeas ? (
-          <div className={styles.compareGrid} style={{ gridTemplateColumns: childGridCols }}>
-            <Panel label="Base" isSea={false}><ChildPricingDisplay criancas={cat.criancas} /></Panel>
-            {appliedSeas.map((sea) => (
-              <Panel key={sea.id} label={sea.nome} isSea><ChildPricingDisplay criancas={sea.criancas} /></Panel>
-            ))}
-          </div>
-        ) : (
-          <ChildPricingDisplay criancas={cat.criancas} />
-        )}
-      </div>
-    );
-
-    return null;
   };
 
-  const renderSeaDetail = (s, tab) => {
-    const du = s.dayUse ?? {};
-
-    if (tab === 0) return (
-      <div className={styles.detailSection}>
-        <IB icon={<Calendar size={13} color="var(--violet)" />} label="Modo de operação" span2>
-          {MODO_LABEL[s.modoOperacao]}
-        </IB>
-        {s.modoOperacao === 'data-especifica' && (
-          <div className={styles.infoGrid}>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Início">
-              {s.dataInicio || '—'} {s.horaInicio}
-            </IB>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Fim">
-              {s.dataFim || '—'} {s.horaFim}
-            </IB>
-          </div>
-        )}
-        {s.modoOperacao === 'semanal' && (
-          <IB icon={<Clock size={13} color="var(--violet)" />} label="Dias da semana" span2>
-            {(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—'}
-          </IB>
-        )}
-        {s.modoOperacao === 'mensal' && (
-          <IB icon={<Clock size={13} color="var(--violet)" />} label="Dias do mês" span2>
-            {(s.diasMes || []).join(', ') || '—'}
-          </IB>
-        )}
-        {s.modoOperacao === 'anual' && (
-          <IB icon={<Clock size={13} color="var(--violet)" />} label="Meses" span2>
-            {(s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—'}
-          </IB>
-        )}
-        {(s.horaCheckin || s.horaCheckout) && (
-          <div className={styles.infoGrid}>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-in">
-              {s.horaCheckin || '—'}
-            </IB>
-            <IB icon={<Clock size={13} color="#10b981" />} label="Check-out">
-              {s.horaCheckout || '—'}
-            </IB>
-          </div>
-        )}
-        {(s.criado_por || s.data_criacao) && (
-          <div className={styles.auditRow}>
-            {s.criado_por && <span className={styles.auditItem}><Users size={11} /> {s.criado_por.nome ?? '—'}</span>}
-            {s.data_criacao && <span className={styles.auditItem}><Clock size={11} /> {s.data_criacao}</span>}
-          </div>
-        )}
-      </div>
+  // ── Ficha da sazonalidade ──────────────────────────────────────────────────
+  const renderSeaPanel = (s) => {
+    const fixo = s.modeloCobranca === 'Por quarto (tarifa fixa)';
+    const vinculadas = categorias.filter((c) =>
+      (c.sazonaisAtivas ?? []).includes(s.id) || (s.categoriasIds ?? []).includes(c.id)
     );
 
-    if (tab === 1) {
-      const linked = categorias.filter((c) =>
-        (c.sazonaisAtivas ?? []).includes(s.id) || (s.categoriasIds ?? []).includes(c.id)
-      );
-      return (
-        <div className={styles.detailSection}>
-          {linked.length === 0 ? (
-            <span className={styles.detailEmpty}>Nenhuma categoria vinculada</span>
-          ) : linked.map((cat) => {
-            const isFixo = cat.modeloCobranca === 'Por quarto (tarifa fixa)';
-            const duLabel = cat.dayUse?.ativo
-              ? (cat.dayUse.modo === 'ocupacao' ? 'Day Use · por ocupação' : 'Day Use · preço fixo')
-              : 'Sem Day Use';
-            const criLabel = cat.criancas?.ativo
-              ? (CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo)
-              : 'Sem cobrança de menores';
-            return (
-              <div key={cat.id} className={styles.checkboxRow} style={{ cursor: 'default' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span className={styles.checkboxLabel}>{cat.nome}</span>
-                  <span className={styles.checkboxSub}>
-                    {isFixo ? 'Tarifa fixa' : 'Por ocupação'} · {duLabel} · {criLabel}
-                  </span>
+    return (
+      <div className={styles.detailPanel}>
+
+        {/* ── Identificação e agendamento ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <BackBtn />
+            <Calendar size={16} />
+            <span className={styles.dCardTitle}>Dados da sazonalidade</span>
+            <FichaActions onEdit={() => openEditSea(s)} />
+          </h3>
+
+          <div className={styles.dCardBody}>
+            <div className={styles.idHead}>
+              <div className={styles.idHeadMain}>
+                <div className={styles.idName}>
+                  <h2 style={{ margin: 0, font: 'inherit' }}>{s.nome}</h2>
+                </div>
+                <p className={styles.idSub}>{describeSchedule(s)}</p>
+                <div className={styles.idTags}>
+                  <Pill tom="tagAmber">{MODO_LABEL[s.modoOperacao]}</Pill>
+                  <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
+                  {s.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
+                  {s.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    if (tab === 2) return (
-      <div className={styles.detailSection}>
-        <div className={styles.infoGrid}>
-          <IB icon={<Tag size={13} color="var(--violet)" />} label="Modelo de cobrança">
-            {s.modeloCobranca}
-          </IB>
-          <IB icon={<Users size={13} color="var(--violet)" />} label="Capacidade">
-            {s.maxPessoas} pessoa{s.maxPessoas !== 1 ? 's' : ''}
-          </IB>
-        </div>
-        {s.modeloCobranca === 'Por quarto (tarifa fixa)' ? (
-          <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Tarifa fixa" span2>
-            <span className={styles.infoBoxValueLg}>{fmtBRL(s.precoFixo)}</span>
-          </IB>
-        ) : (
-          <div className={styles.infoBox}>
-            <div className={styles.infoBoxHeader}>
-              <DollarSign size={13} color="var(--violet)" />
-              <span className={styles.infoBoxLabel}>Preço por ocupação</span>
             </div>
-            <OccTable label="Preço/noite" occ={s.precosOcupacao} maxPessoas={s.maxPessoas} />
-          </div>
-        )}
-      </div>
-    );
 
-    if (tab === 3) {
-      if (!du.ativo) return (
-        <div className={styles.detailSection}>
-          <IB icon={<Calendar size={13} color="var(--text-2)" />} label="Day Use" span2>
-            <span className={styles.badge}>Inativo</span>
-          </IB>
-        </div>
-      );
-      return (
-        <div className={styles.detailSection}>
-          <div className={styles.infoGrid}>
-            <IB icon={<Calendar size={13} color="#f59e0b" />} label="Day Use">
-              <span className={[styles.badge, styles.badgeAmber].join(' ')}>Ativo</span>
-            </IB>
-            <IB icon={<Tag size={13} color="var(--violet)" />} label="Modo">
-              {du.modo === 'padrao' ? 'Padrão' : 'Por ocupação'}
-            </IB>
-          </div>
-          {du.modo === 'padrao' ? (
-            <div className={styles.infoGrid}>
-              <IB icon={<DollarSign size={13} color="var(--violet)" />} label="Preço base">
-                <span className={styles.infoBoxValueLg}>{fmtBRL(du.precoFixo)}</span>
-              </IB>
-              <IB icon={<Clock size={13} color="var(--violet)" />} label="Horas incluídas">
-                {du.horasBase ? `${du.horasBase}h` : '—'}
-              </IB>
-              <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional">
-                {fmtBRL(du.precoAdicional)}
-              </IB>
+            <div className={styles.fieldGrid}>
+              <Field label="Modo de operação" value={MODO_LABEL[s.modoOperacao]} />
+              {s.modoOperacao === 'data-especifica' && <>
+                <Field label="Início" value={[fmtDataBR(s.dataInicio), s.horaInicio].filter(Boolean).join(' · ')} />
+                <Field label="Fim"    value={[fmtDataBR(s.dataFim), s.horaFim].filter(Boolean).join(' · ')} />
+              </>}
+              {s.modoOperacao === 'semanal' && (
+                <Field label="Dias da semana" value={(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ')} />
+              )}
+              {s.modoOperacao === 'mensal' && (
+                <Field label="Dias do mês" value={(s.diasMes || []).join(', ')} />
+              )}
+              {s.modoOperacao === 'anual' && (
+                <Field label="Meses" value={(s.meses || []).map((m) => MESES_NOME[m]).join(', ')} />
+              )}
+              <Field label="Check-in"  value={s.horaCheckin} />
+              <Field label="Check-out" value={s.horaCheckout} />
             </div>
-          ) : (<>
-            <IB icon={<DollarSign size={13} color="#f59e0b" />} label="Hora adicional/pessoa" span2>
-              {fmtBRL(du.horaAdicionalPorPessoa)}
-            </IB>
-            <div className={styles.infoBox}>
-              <div className={styles.infoBoxHeader}>
-                <DollarSign size={13} color="var(--violet)" />
-                <span className={styles.infoBoxLabel}>Preço por ocupação</span>
+
+            <AuditFooter item={s} />
+          </div>
+        </section>
+
+        {/* ── Tarifas de hospedagem ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <DollarSign size={16} />
+            <span className={styles.dCardTitle}>Tarifas de hospedagem</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <PrecoBloco item={s} />
+          </div>
+        </section>
+
+        {/* ── Day Use ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <Sun size={16} />
+            <span className={styles.dCardTitle}>Day Use</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <DayUseBloco item={s} />
+          </div>
+        </section>
+
+        {/* ── Menores de idade ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <Baby size={16} />
+            <span className={styles.dCardTitle}>Menores de idade</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            <ChildPricingDisplay criancas={s.criancas} />
+          </div>
+        </section>
+
+        {/* ── Categorias vinculadas ── */}
+        <section className={styles.dCard}>
+          <h3 className={styles.dCardHead}>
+            <Link2 size={16} />
+            <span className={styles.dCardTitle}>Categorias vinculadas</span>
+          </h3>
+          <div className={styles.dCardBody}>
+            {vinculadas.length === 0 ? (
+              <p className={styles.blockEmpty}>Esta sazonalidade não está vinculada a nenhuma categoria.</p>
+            ) : (
+              <div className={styles.rowsBlock}>
+                {vinculadas.map((c) => (
+                  <div key={c.id} className={styles.duRow}>
+                    <span className={styles.duLabel}>{c.nome}</span>
+                    <span className={styles.duVal}>
+                      {c.modeloCobranca === 'Por quarto (tarifa fixa)' ? 'Tarifa fixa' : 'Por ocupação'}
+                      {c.dayUse?.ativo ? ' · Day Use' : ''}
+                    </span>
+                  </div>
+                ))}
               </div>
-              <OccTable label="Preço" occ={du.precosOcupacao} maxPessoas={s.maxPessoas} />
-            </div>
-          </>)}
-        </div>
-      );
-    }
-
-    if (tab === 4) return (
-      <div className={styles.detailSection}>
-        <ChildPricingDisplay criancas={s.criancas} />
+            )}
+          </div>
+        </section>
       </div>
     );
-
-    return null;
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const isSeaTab = aba === 'sea';
+  const busca    = searchTerm.trim().toLowerCase();
+
+  // Lista da aba corrente, já filtrada pela busca.
+  const items = (isSeaTab ? sazonalidades : categorias).filter((it) => {
+    if (!busca) return true;
+    const alvo = isSeaTab
+      ? [it.nome, MODO_LABEL[it.modoOperacao], describeSchedule(it)]
+      : [it.nome, it.descricao, it.modeloCobranca];
+    return alvo.filter(Boolean).join(' ').toLowerCase().includes(busca);
+  });
+
+  // Totais do painel geral.
+  const quartosVinculados = new Set(categorias.flatMap((c) => c.quartos ?? [])).size;
+  const comDayUse = categorias.filter((c) => c.dayUse?.ativo).length;
+
   return (
     <div className={styles.page}>
       <Notification notification={notification} />
       <div className={styles.container}>
+        {/* Abaixo de 1024px, com uma ficha aberta, ela toma a tela e a lista sai. */}
+        <main className={[styles.split, detailItem ? styles.splitListHidden : ''].join(' ')}>
 
-        {/* ── Categorias de Preço ── */}
-        <div className={styles.card}>
-          <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Categorias de Preço</h2>
-              <p className={styles.subtitle}>Clique em uma categoria para ver detalhes, tarifas e Day Use</p>
+          {/* ══ LISTA ═══════════════════════════════════════════ */}
+          <aside className={styles.listPanel}>
+            <div className={styles.segmented}>
+              <button type="button"
+                className={[styles.segmentedBtn, !isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
+                onClick={() => changeAba('cat')}>
+                Categorias
+              </button>
+              <button type="button"
+                className={[styles.segmentedBtn, isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
+                onClick={() => changeAba('sea')}>
+                Sazonalidades
+              </button>
             </div>
-            <div className={styles.tableTools}>
-              <Button variant="secondary" onClick={openCreateSea}><Calendar size={14} /> Nova Sazonalidade</Button>
-              <Button variant="primary"   onClick={openCreateCat}><Plus size={15} /> Nova Categoria</Button>
-            </div>
-          </div>
 
-          {loading ? (
-            <div className={styles.empty}><Loader2 size={28} className={styles.spin} /><span>Carregando...</span></div>
-          ) : categorias.length === 0 ? (
-            <div className={styles.empty}><Tag size={32} color="var(--text-2)" /><span>Nenhuma categoria cadastrada</span></div>
-          ) : categorias.map((cat) => {
-            const du = cat.dayUse ?? {};
-            const isFixo = cat.modeloCobranca === 'Por quarto (tarifa fixa)';
-            const duLabel = du.ativo
-              ? (du.modo === 'ocupacao' ? 'Day Use · por ocupação' : 'Day Use · preço fixo')
-              : null;
-            const criLabel = cat.criancas?.ativo
-              ? (CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo)
-              : null;
-            return (
-              <div key={cat.id} className={styles.listRow} onClick={() => openDetail(cat, 'cat')}>
-                <div className={styles.listRowLeft}>
-                  <span className={styles.rowName}>{cat.nome}</span>
-                  <div className={styles.listRowTags}>
-                    <span className={[styles.listTag, isFixo ? styles.listTagSlate : styles.listTagEmerald].join(' ')}>
-                      {isFixo ? 'Tarifa fixa' : 'Por ocupação'}
-                    </span>
-                    {duLabel && <span className={[styles.listTag, styles.listTagAmber].join(' ')}>{duLabel}</span>}
-                    {criLabel && <span className={[styles.listTag, styles.listTagBlue].join(' ')}>{criLabel}</span>}
-                    {(cat.sazonaisAtivas ?? []).length > 0 && (
-                      <span className={[styles.listTag, styles.listTagViolet].join(' ')}>
-                        {cat.sazonaisAtivas.length} sazonalidade{cat.sazonaisAtivas.length !== 1 ? 's' : ''}
+            <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
+              <Search size={16} className={styles.searchIcon} />
+              <Input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={isSeaTab ? 'Buscar sazonalidade...' : 'Buscar categoria...'}
+                className={styles.searchInput}
+                aria-label="Buscar"
+              />
+              {searchTerm.length > 0 && (
+                <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className={styles.listMeta}>
+              <span>
+                {loading
+                  ? 'Carregando...'
+                  : isSeaTab
+                    ? `${items.length} sazonalidade${items.length !== 1 ? 's' : ''}`
+                    : `${items.length} categoria${items.length !== 1 ? 's' : ''}`}
+              </span>
+              <Button className={[styles.btnSolid, styles.btnSm, styles.btnPrimary].join(' ')}
+                onClick={isSeaTab ? openCreateSea : openCreateCat}>
+                {isSeaTab ? 'Nova sazonalidade' : 'Nova categoria'}
+              </Button>
+            </div>
+
+            <div className={styles.listScroll}>
+              {loading ? (
+                <SkeletonLista />
+              ) : items.length === 0 ? (
+                <div className={styles.empty}>
+                  <AlertCircle size={24} opacity={0.3} />
+                  <span>{searchTerm ? 'Nenhum resultado encontrado.' : isSeaTab ? 'Nenhuma sazonalidade cadastrada.' : 'Nenhuma categoria cadastrada.'}</span>
+                </div>
+              ) : items.map((item, i) => {
+                const ativo = detailItem?.id === item.id && detailType === (isSeaTab ? 'sea' : 'cat');
+                const fixo  = item.modeloCobranca === 'Por quarto (tarifa fixa)';
+                return (
+                  <button key={item.id} type="button"
+                    className={[styles.listItem, ativo ? styles.listItemActive : ''].join(' ')}
+                    onClick={() => openDetail(item, isSeaTab ? 'sea' : 'cat')}>
+                    <span className={styles.listItemBody}>
+                      <span className={styles.listItemName}>
+                        <span className={styles.nome}>{item.nome}</span>
                       </span>
-                    )}
-                    <span className={styles.listTag}>{(cat.quartos ?? []).length} quarto{(cat.quartos ?? []).length !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* ── Sazonalidades Cadastradas ── */}
-        <div className={styles.card}>
-          <div className={styles.tableHeader}>
-            <div>
-              <h2 className={styles.h2}>Sazonalidades Cadastradas</h2>
-              <p className={styles.subtitle}>Clique em uma sazonalidade para ver detalhes e preços</p>
+                      <span className={styles.listItemSub}>
+                        {isSeaTab ? (
+                          <>
+                            <Pill tom="tagAmber">{MODO_LABEL[item.modoOperacao]}</Pill>
+                            {resumoSchedule(item)}
+                          </>
+                        ) : (
+                          <>
+                            <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
+                            {item.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
+                            {(item.sazonaisAtivas ?? []).length > 0 && (
+                              <Pill tom="tagPrimary">
+                                {item.sazonaisAtivas.length} sazonal{item.sazonaisAtivas.length !== 1 ? 'idades' : 'idade'}
+                              </Pill>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    </span>
+                    <ChevronRight size={16} className={styles.listChevron} />
+                  </button>
+                );
+              })}
             </div>
-          </div>
+          </aside>
 
-          {loading ? (
-            <div className={styles.empty}><Loader2 size={24} className={styles.spin} /></div>
-          ) : sazonalidades.length === 0 ? (
-            <div className={styles.empty}><Calendar size={32} color="var(--text-2)" /><span>Nenhuma sazonalidade cadastrada</span></div>
-          ) : sazonalidades.map((s) => {
-            const du = s.dayUse ?? {};
-            return (
-              <div key={s.id} className={styles.listRow} onClick={() => openDetail(s, 'sea')}>
-                <div className={styles.listRowLeft}>
-                  <span className={styles.rowName}>{s.nome}</span>
-                  <div className={styles.listRowTags}>
-                    <span className={styles.listTag}>{MODO_LABEL[s.modoOperacao] || s.modoOperacao}</span>
-                    <span className={styles.listTag}>{s.modeloCobranca}</span>
-                    {du.ativo && <span className={[styles.listTag, styles.listTagAmber].join(' ')}>Day Use</span>}
-                  </div>
+          {/* ══ DETALHE ═════════════════════════════════════════ */}
+          {!detailItem ? (
+            /* ── Painel geral (nada selecionado) ── */
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <Layers size={16} />
+                  <span className={styles.dCardTitle}>Visão geral de preços</span>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  {loading ? <SkeletonPainel /> : (
+                    <div className={styles.statGrid}>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Categorias</p>
+                        <p className={styles.statVal}>{categorias.length}</p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Sazonalidades</p>
+                        <p className={[styles.statVal, styles.statValAmber].join(' ')}>{sazonalidades.length}</p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Quartos vinculados</p>
+                        <p className={styles.statVal}>{quartosVinculados}</p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Com Day Use</p>
+                        <p className={[styles.statVal, styles.statValGreen].join(' ')}>{comDayUse}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className={styles.listRowRight}>
-                  <span className={styles.listPriceSub} style={{ textAlign: 'right' }}>{describeSchedule(s)}</span>
-                </div>
+              </section>
+
+              <div className={styles.detailHint}>
+                Escolha uma categoria ou sazonalidade na lista ao lado para ver as tarifas.
               </div>
-            );
-          })}
-        </div>
+            </div>
+          ) : detailType === 'cat' ? renderCatPanel(detailItem) : renderSeaPanel(detailItem)}
+        </main>
       </div>
-
-      {/* ═══════════════════════════════════════════════════════
-          MODAL — Detalhe (Categoria ou Sazonalidade)
-      ═══════════════════════════════════════════════════════ */}
-      {detailItem && (
-        <Modal
-          open={!!detailItem}
-          onClose={closeDetail}
-          size="lg"
-          title={detailItem.nome}
-          footer={
-            <div className={styles.modalFooterBetween}>
-              <Button variant="danger" onClick={() => {
-                closeDetail();
-                setDeleteTarget({ type: detailType, id: detailItem.id, nome: detailItem.nome });
-              }}>
-                <Trash2 size={14} /> Excluir
-              </Button>
-              <Button variant="primary" onClick={() => {
-                const item = detailItem;
-                const type = detailType;
-                closeDetail();
-                if (type === 'cat') openEditCat(item);
-                else openEditSea(item);
-              }}>
-                <Edit2 size={14} /> Editar
-              </Button>
-            </div>
-          }
-        >
-          <div className={styles.tabs}>
-            {(detailType === 'cat' ? CAT_DETAIL_LABELS : SEA_DETAIL_LABELS).map((label, i) => (
-              <button key={i} type="button"
-                className={[styles.tab, detailTab === i ? styles.tabActive : ''].join(' ')}
-                onClick={() => setDetailTab(i)}
-              >{label}</button>
-            ))}
-          </div>
-          <div className={styles.detailTabBody}>
-            {detailType === 'cat' && renderCatDetail(detailItem, detailTab)}
-            {detailType === 'sea' && renderSeaDetail(detailItem, detailTab)}
-          </div>
-        </Modal>
-      )}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Criar / Editar Categoria

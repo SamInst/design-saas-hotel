@@ -1,188 +1,448 @@
-/* ── Layout ── */
-.page      { min-height: 100%; }
-.container { max-width: 1400px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+/* ═════════════════════════════════════════════════════════════
+   Preços — mesma estética das telas de Cadastro e Funcionários:
+   tokens do protótipo (Lovable/Hotalize) em oklch, no escopo da
+   página. Escalas do Tailwind do protótipo: 1=4px … 6=24px;
+   text-xs=12px, text-sm=14px, text-lg=18px, text-xl=20px;
+   radius 0.75rem → md 10px, lg 12px, xl 16px.
+   ═════════════════════════════════════════════════════════════ */
+.page {
+  --l-bg:            oklch(0.988 0.003 250);
+  --l-card:          oklch(1 0 0);
+  --l-fg:            oklch(0.24 0.03 262);
+  --l-muted-fg:      oklch(0.52 0.03 258);
+  --l-border:        oklch(0.925 0.008 255);
+  --l-primary:       oklch(0.55 0.21 262);
+  --l-primary-fg:    oklch(0.985 0.005 250);
+  --l-secondary:     oklch(0.965 0.008 255);
+  --l-secondary-fg:  oklch(0.32 0.03 262);
+  --l-accent:        oklch(0.945 0.018 255);
+  --l-accent-fg:     oklch(0.32 0.05 262);
+  --l-destructive:   oklch(0.6 0.22 25);
+  --l-ring:          oklch(0.65 0.15 260);
 
-/* ── KPI grid ── */
-.kpiGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-@media (max-width: 900px) { .kpiGrid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 500px) { .kpiGrid { grid-template-columns: 1fr; } }
+  --l-emerald-bg: oklch(0.95 0.052 163.051);
+  --l-emerald-fg: oklch(0.432 0.095 166.913);
 
-.kpiCard {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px 18px; border-radius: var(--radius);
-  border: 1px solid var(--border); background: var(--surface);
-  box-shadow: var(--shadow);
-}
-.kpiIcon { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.kpiBody  { display: flex; flex-direction: column; gap: 2px; }
-.kpiLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
-.kpiValue { font-size: 20px; font-weight: 800; color: var(--text); line-height: 1.1; }
-.kpiSub   { font-size: 11px; color: var(--text-2); }
+  /* âmbar — identifica tudo que vem de sazonalidade */
+  --l-amber-bg:     oklch(0.96 0.048 88);
+  --l-amber-fg:     oklch(0.49 0.11 72);
+  --l-amber-border: oklch(0.86 0.09 80);
 
-.kpi_blue    .kpiIcon { background: rgba(14,165,233,.12);  color: #0ea5e9; }
-.kpi_violet  .kpiIcon { background: rgba(124,58,237,.12);  color: var(--violet); }
-.kpi_amber   .kpiIcon { background: rgba(245,158,11,.12);  color: #f59e0b; }
-.kpi_emerald .kpiIcon { background: rgba(16,185,129,.12);  color: var(--emerald); }
+  --l-slate-bg: oklch(0.955 0.008 255);
+  --l-slate-fg: oklch(0.45 0.03 258);
 
-/* ── Card ── */
-.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  --l-radius: 0.75rem;
+  --l-r-md: calc(var(--l-radius) - 2px);
+  --l-r-lg: var(--l-radius);
+  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
-/* ── Toolbar ── */
-.tableHeader {
-  display: flex; gap: 12px; align-items: center;
-  justify-content: space-between; flex-wrap: wrap;
-  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
-}
-.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
-.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
-.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-/* ── Expandable rows ── */
-.expandRow {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; cursor: pointer;
-  transition: background .12s; border-bottom: 1px solid var(--border);
-}
-.expandRow:hover { background: rgba(124,58,237,.04); }
-.expandRow:last-child { border-bottom: none; }
-
-.expandLeft  { display: flex; align-items: flex-start; gap: 10px; }
-.expandRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-
-.chevron { color: var(--text-2); transition: transform .18s; flex-shrink: 0; margin-top: 2px; }
-.chevronOpen { transform: rotate(180deg); }
-
-.rowName { font-size: 14px; font-weight: 600; color: var(--text); }
-.rowDesc { font-size: 12px; color: var(--text-2); margin-top: 2px; }
-.rowMeta { font-size: 11px; color: var(--text-2); margin-top: 2px; }
-
-.badges { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
-
-/* ── Badges / pills ── */
-.badge {
-  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
-  white-space: nowrap;
-}
-.badgeViolet { border-color: rgba(124,58,237,.3); background: rgba(124,58,237,.08); color: var(--violet); }
-.badgeBlue   { border-color: rgba(14,165,233,.3);  background: rgba(14,165,233,.08);  color: #0ea5e9; }
-.badgeAmber  { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.08);  color: #d97706; }
-
-/* ── Expanded detail panel ── */
-.expandBody {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
-  padding: 14px 16px 16px; border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
-}
-@media (max-width: 900px) { .expandBody { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 600px) { .expandBody { grid-template-columns: 1fr; } }
-
-.expandPanel {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
-}
-.panelTitle {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2); display: flex; align-items: center; gap: 6px;
+  /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
+  margin: -18px -22px;
+  height: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--l-bg);
+  color: var(--l-fg);
 }
 
-/* ── Mini price table (inside expanded panel) ── */
-.miniTable { width: 100%; border-collapse: collapse; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); }
-.miniTable th { font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); padding: 4px 8px; text-align: left; }
-.miniTable td { font-size: 12px; padding: 5px 8px; border-top: 1px solid var(--border); color: var(--text); }
-.miniTable tbody tr:last-child td { border-bottom: none; }
-.miniPrice { font-weight: 600; color: var(--violet); }
-.fixedPrice { font-size: 20px; font-weight: 800; color: var(--violet); }
+[data-theme='dark'] .page {
+  --l-bg:           oklch(0.129 0.042 264.695);
+  --l-card:         oklch(0.208 0.042 265.755);
+  --l-fg:           oklch(0.984 0.003 247.858);
+  --l-muted-fg:     oklch(0.704 0.04 256.788);
+  --l-border:       oklch(1 0 0 / 10%);
+  --l-secondary:    oklch(0.279 0.041 260.031);
+  --l-secondary-fg: oklch(0.984 0.003 247.858);
+  --l-accent:       oklch(0.279 0.041 260.031);
+  --l-accent-fg:    oklch(0.984 0.003 247.858);
+  --l-destructive:  oklch(0.704 0.191 22.216);
+  --l-ring:         oklch(0.551 0.027 264.364);
+  --l-shadow: none;
 
-/* Day Use info rows (kept for ChildPricingDisplay) */
-.duRow { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
-.duLabel { color: var(--text-2); }
-.duVal   { font-weight: 600; color: var(--text); }
-.duInactive { font-size: 12px; color: var(--text-2); font-style: italic; }
+  --l-emerald-bg: oklch(0.28 0.05 165);
+  --l-emerald-fg: oklch(0.8 0.13 163);
 
-/* ── Info box grid (padrão recepção) ── */
-.infoGrid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-}
-.infoBox {
-  background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
-  display: flex; flex-direction: column; gap: 6px;
-}
-.infoBoxSpan2 { grid-column: 1 / -1; }
-.infoBoxHeader {
-  display: flex; align-items: center; gap: 6px;
-}
-.infoBoxLabel {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--text-2);
-}
-.infoBoxValue  { font-size: 13px; font-weight: 500; color: var(--text); }
-.infoBoxValueLg { font-size: 18px; font-weight: 800; color: var(--violet); }
-.pillViolet {
-  background: rgba(124,58,237,.08); border-color: rgba(124,58,237,.25); color: var(--violet);
+  --l-amber-bg:     oklch(0.3 0.055 78);
+  --l-amber-fg:     oklch(0.84 0.13 80);
+  --l-amber-border: oklch(0.45 0.08 78);
+
+  --l-slate-bg: oklch(0.279 0.041 260.031);
+  --l-slate-fg: oklch(0.78 0.03 258);
 }
 
-/* ── Detail modal layout ── */
-.detailBody { display: flex; flex-direction: column; gap: 0; }
-.detailRow {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 9px 0; font-size: 13px;
-  border-bottom: 1px solid var(--border);
-}
-.detailRow:last-child { border-bottom: none; }
-.detailRowLabel { color: var(--text-2); }
-.detailRowVal   { font-weight: 600; color: var(--text); text-align: right; }
-.detailDivider  { height: 1px; background: var(--border); margin: 4px 0; }
-.detailGroupLabel {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2);
-  display: block; padding: 8px 0 6px;
-}
-.detailPrice { font-size: 15px; font-weight: 800; color: var(--violet); }
-.detailEmpty { font-size: 12px; color: var(--text-2); font-style: italic; }
+.container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-/* Seasonal + Rooms pills */
-.pillWrap { display: flex; flex-wrap: wrap; gap: 5px; }
-.pill {
-  font-size: 11px; font-weight: 500; padding: 3px 10px; border-radius: 20px;
-  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+.split {
+  flex: 1; min-height: 0; width: 100%;
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+  padding: 10px 24px 24px;
 }
-.pillEmpty { font-size: 12px; color: var(--text-2); font-style: italic; }
+@media (min-width: 1024px) {
+  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
+}
 
-/* Price range text */
-.priceRange { font-size: 12px; color: var(--text-2); white-space: nowrap; text-align: right; }
+/* ══ LISTA ═══════════════════════════════════════════════════ */
+.listPanel {
+  display: flex; flex-direction: column; min-height: 0;
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
+}
+@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
 
-/* ── Empty / loading ── */
-.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 48px 20px; color: var(--text-2); font-size: 13px; }
-.spin  { animation: spin .8s linear infinite; }
+/* Categorias / Sazonalidades */
+.segmented {
+  display: flex; gap: 4px;
+  border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border);
+  background: var(--l-bg);
+  padding: 4px;
+}
+.segmentedBtn {
+  flex: 1; cursor: pointer;
+  border: none; border-radius: var(--l-r-md);
+  padding: 6px 12px;
+  background: transparent; color: var(--l-muted-fg);
+  font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
+  transition: background-color .15s, color .15s;
+}
+.segmentedBtn:hover { color: var(--l-fg); }
+.segmentedBtnActive,
+.segmentedBtnActive:hover { background: var(--l-primary); color: var(--l-primary-fg); }
+
+.searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
+.searchWrapFull { min-width: 0; width: 100%; margin-top: 12px; }
+.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchInput    { padding-left: 36px !important; }
+.searchWrapFull .searchInput {
+  height: 40px; width: 100%;
+  border-radius: var(--l-r-lg) !important;
+  border: 1px solid var(--l-border) !important;
+  background: var(--l-bg) !important;
+  color: var(--l-fg) !important;
+  padding-right: 12px !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+.searchWrapFull .searchInput:focus {
+  outline: none;
+  border-color: var(--l-ring) !important;
+  box-shadow: 0 0 0 2px var(--l-ring) !important;
+}
+.searchClear {
+  position: absolute; right: 10px;
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: none; background: transparent; color: var(--l-muted-fg);
+  cursor: pointer; opacity: .6; transition: opacity .12s; flex-shrink: 0;
+}
+.searchClear:hover { opacity: 1; }
+
+.listMeta {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+
+.listScroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  margin-top: 8px; display: flex; flex-direction: column; gap: 6px;
+}
+.listItem {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 12px;
+  border-radius: var(--l-r-lg);
+  border: 1px solid transparent; background: transparent;
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.listItem:hover { background: var(--l-accent); }
+.listItemActive,
+.listItemActive:hover {
+  background: color-mix(in oklch, var(--l-primary) 10%, transparent);
+  border-color: color-mix(in oklch, var(--l-primary) 35%, transparent);
+}
+.listItemBody { flex: 1; min-width: 0; }
+.listItemName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.listItemSub {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+.listItemSub svg { flex-shrink: 0; }
+.listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
+
+.nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Etiquetas ── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 5px;
+  border: 1px solid var(--l-border); background: var(--l-secondary); color: var(--l-secondary-fg);
+  font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap;
+}
+.tagPrimary { border-color: color-mix(in oklch, var(--l-primary) 35%, transparent); background: color-mix(in oklch, var(--l-primary) 12%, transparent); color: var(--l-primary); }
+.tagAmber   { border-color: var(--l-amber-border); background: var(--l-amber-bg); color: var(--l-amber-fg); }
+.tagEmerald { border-color: color-mix(in oklch, var(--l-emerald-fg) 30%, transparent); background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
+.tagSlate   { background: var(--l-slate-bg); color: var(--l-slate-fg); }
+
+/* ── Vazio / carregando ── */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; text-align: center; }
 .spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Action buttons ── */
-.actionBtns { display: flex; gap: 4px; }
-.actionBtn {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border);
-  font-size: 11px; font-weight: 500; cursor: pointer;
-  background: var(--surface-2); color: var(--text-2);
-  transition: all .12s; white-space: nowrap;
+/* ── Esqueletos ── */
+.sk {
+  position: relative; overflow: hidden; display: block; flex-shrink: 0;
+  background: var(--l-secondary); border-radius: 6px;
 }
-.actionBtn:hover  { border-color: var(--violet); color: var(--violet); }
-.actionBtnDanger  { border-color: rgba(239,68,68,.25); color: #ef4444; background: rgba(239,68,68,.06); }
-.actionBtnDanger:hover { background: rgba(239,68,68,.15); }
+.sk::after {
+  content: ''; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--l-card) 75%, transparent), transparent);
+  animation: skShine 1.3s ease-in-out infinite;
+}
+@keyframes skShine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
+.skName   { width: 70%; height: 13px; }
+.skSub    { width: 45%; height: 10px; margin-top: 6px; }
+.skLabel  { width: 58%; height: 10px; }
+.skNumero { width: 46%; height: 22px; margin-top: 8px; }
+
+/* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+
+.dCard {
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 20px; box-shadow: var(--l-shadow);
+}
+.dCardHead {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
+}
+.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardTitle { font-weight: 700; }
+.dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.dCardBody { margin-top: 16px; }
+
+/* Voltar para a lista — à esquerda do título, só quando a ficha ocupa a tela */
+.backBtn {
+  display: none; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s;
+}
+.backBtn:hover { background: var(--l-accent); }
+
+.idClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s, color .15s;
+}
+.idClose:hover { background: var(--l-accent); color: var(--l-accent-fg); }
+
+.idHead {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+}
+.idHeadMain { min-width: 0; flex: 1; }
+.idName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
+.idSub  { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+.idTags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* Campos rótulo/valor */
+.fieldGrid { display: grid; gap: 16px 24px; }
+@media (min-width: 640px)  { .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .fieldGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.fVal   { margin-top: 2px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow-wrap: break-word; }
+.fValLg { font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-primary); }
+
+/* Blocos internos de um cartão */
+.subBlock { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--l-border); }
+.blockHead {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+  font-size: 13px; line-height: 18px; font-weight: 700; color: var(--l-fg);
+}
+.blockHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
+
+/* ── Botões: cor sólida, sem brilho nem ícone ── */
+.page .btnSolid {
+  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
+  padding: 8px 14px; font-size: 13px; font-weight: 600;
+  background: var(--l-secondary); color: var(--l-secondary-fg);
+  box-shadow: none; transition: background-color .15s, color .15s;
+}
+.page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
+.page .btnSolid:active { transform: none; }
+.page .btnSm { padding: 5px 11px; font-size: 12px; }
+.page .btnPrimary { background: var(--l-primary); color: var(--l-primary-fg); }
+.page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
+.page .btnDanger { background: var(--l-destructive); color: var(--l-primary-fg); }
+.page .btnDanger:hover { background: color-mix(in oklch, var(--l-destructive) 88%, black); color: var(--l-primary-fg); }
+
+/* ── Painel geral (nada selecionado) ── */
+.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 780px) { .statGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.statCard {
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px;
+}
+.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
+.statValAmber { color: var(--l-amber-fg); }
+.statValGreen { color: var(--l-emerald-fg); }
+.detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
+
+/* ── Tabela de preço por ocupação ── */
+.miniTable {
+  width: 100%; border-collapse: collapse;
+  border-radius: var(--l-r-md); overflow: hidden;
+  border: 1px solid var(--l-border);
+  /* sem comparação a tabela fica sozinha no cartão largo: o teto evita que
+     o preço fuja para a outra ponta da tela */
+  max-width: 560px;
+}
+.comparePanel .miniTable { max-width: none; }
+.miniTable th {
+  font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--l-muted-fg);
+  background: var(--l-bg); padding: 6px 10px; text-align: left;
+}
+.miniTable th:last-child { text-align: right; }
+.miniTable td { font-size: 13px; line-height: 18px; padding: 7px 10px; border-top: 1px solid var(--l-border); color: var(--l-fg); }
+.miniPrice { font-weight: 700; color: var(--l-primary); text-align: right; white-space: nowrap; }
+
+/* ── Linha rótulo/valor compacta ──
+   O teto vale só fora da comparação: num cartão largo, sem ele o valor vai
+   parar na outra ponta da tela, longe do rótulo. */
+.rowsBlock { max-width: 560px; }
+.comparePanel .rowsBlock { max-width: none; }
+.duRow { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 5px 0; font-size: 13px; line-height: 18px; }
+.duLabel { color: var(--l-muted-fg); }
+.duVal   { font-weight: 600; color: var(--l-fg); text-align: right; }
+.duInactive { font-size: 13px; color: var(--l-muted-fg); }
+
+/* ── Pílulas de quartos ── */
+.pillWrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--l-border); background: var(--l-bg); color: var(--l-fg);
+  font-size: 12px; line-height: 16px; font-weight: 500;
+}
+.detailEmpty { font-size: 13px; color: var(--l-muted-fg); }
+
+/* ── Gratuidade (menores) ── */
+.gratuidadeDisplay {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 10px; padding: 8px 12px;
+  border-radius: var(--l-r-md);
+  border: 1px solid color-mix(in oklch, var(--l-emerald-fg) 30%, transparent);
+  background: var(--l-emerald-bg);
+}
+.gratuidadeDisplayLabel { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--l-emerald-fg); }
+.gratuidadeDisplayVal   { font-size: 13px; font-weight: 600; color: var(--l-emerald-fg); text-align: right; }
+
+/* ── Comparação base × sazonalidade ──
+   Uma coluna por painel; os campos entram na mesma ordem dos dois
+   lados, então as linhas se alinham sozinhas. */
+/* auto-fit responde à largura do painel, não à da janela: os cartões ficam
+   lado a lado enquanto couberem e quebram sozinhos quando não couberem. */
+.compareGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.comparePanel {
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px;
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+}
+.comparePanelSea { border-color: var(--l-amber-border); background: var(--l-amber-bg); }
+.comparePanelTitle {
+  font-size: 11px; line-height: 16px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--l-muted-fg);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.comparePanelTitleSea { color: var(--l-amber-fg); }
+.comparePanelSea .fLabel    { color: var(--l-amber-fg); opacity: .8; }
+.comparePanelSea .fVal      { color: var(--l-amber-fg); }
+.comparePanelSea .fValLg    { color: var(--l-amber-fg); }
+.comparePanelSea .duLabel   { color: var(--l-amber-fg); opacity: .8; }
+.comparePanelSea .duVal     { color: var(--l-amber-fg); }
+.comparePanelSea .miniPrice { color: var(--l-amber-fg); }
+.comparePanelSea .miniTable    { border-color: var(--l-amber-border); }
+.comparePanelSea .miniTable th { background: transparent; color: var(--l-amber-fg); }
+.comparePanelSea .miniTable td { border-top-color: var(--l-amber-border); color: var(--l-amber-fg); }
+.comparePanelSea .duInactive,
+.comparePanelSea .detailEmpty  { color: var(--l-amber-fg); opacity: .85; }
+
+/* Campos dentro de um cartão de comparação — duas colunas enquanto houver
+   espaço, uma quando o cartão aperta. */
+.panelFields { display: grid; gap: 12px 16px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+
+/* ── Rodapé de auditoria (criado por / data) ── */
+.auditRow {
+  display: flex; flex-wrap: wrap; gap: 14px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--l-border);
+}
+.auditItem { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; line-height: 16px; color: var(--l-muted-fg); }
+.auditItem svg { flex-shrink: 0; }
+
+/* ── Responsivo ── */
+@media (max-width: 1023px) {
+  .splitListHidden .listPanel { display: none; }
+  .split { padding: 8px 16px 16px; gap: 16px; }
+  .detailPanel { order: 1; }
+  .listPanel   { order: 2; }
+  .listScroll { flex: none; max-height: 55vh; }
+  .backBtn { display: inline-flex; }
+}
+
+@media (max-width: 640px) {
+  .page  { margin: -12px -12px -24px; }
+  .split { padding: 6px 12px 12px; gap: 12px; }
+  .listPanel { padding: 12px; }
+  .dCard { padding: 14px; }
+  .idHead { gap: 12px; margin-bottom: 18px; padding-bottom: 16px; }
+  .idName { font-size: 18px; line-height: 24px; }
+  .dCardHead { flex-wrap: wrap; }
+  .dCardActions { margin-left: 0; flex: 1 1 100%; }
+  .dCardActions > * { flex: 1; }
+  .dCardActions > .idClose { flex: 0 0 auto; }
+  .blockHead { flex-wrap: wrap; }
+  .statVal { font-size: 20px; line-height: 26px; }
+  .subBlock { margin-top: 18px; padding-top: 16px; }
+}
+
+@media (max-width: 420px) {
+  .statGrid { grid-template-columns: minmax(0, 1fr); }
+  .listItem { padding: 10px; gap: 10px; }
+  .listItem .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   FORMULÁRIOS (modais de criar/editar) — estilo anterior mantido
+   ═════════════════════════════════════════════════════════════ */
 
 /* ── Modal footer ── */
 .modalFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 
-/* ── Tabs (inside modal) ── */
+/* ── Tabs (dentro do modal) ── */
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
 .tab {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 10px 16px; font-size: 13px; font-weight: 500;
-  border: none; background: none; color: var(--text-2);
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  cursor: pointer; transition: color .12s, border-color .12s;
+  padding: 8px 14px; font-size: 12px; font-weight: 600;
+  color: var(--text-2); background: none; border: none;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  transition: color .15s, border-color .15s; white-space: nowrap;
 }
 .tab:hover  { color: var(--text); }
 .tabActive  { color: var(--violet); border-bottom-color: var(--violet); }
@@ -195,249 +455,104 @@
 .sectionTitle {
   display: flex; align-items: center; gap: 8px;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--violet);
-  margin: 2px 0;
+  letter-spacing: .06em; color: var(--text-2); margin-top: 4px;
 }
 .sectionTitle::before {
-  content: ''; width: 3px; height: 14px;
-  background: var(--violet); border-radius: 2px; flex-shrink: 0;
+  content: ''; width: 3px; height: 12px; border-radius: 2px;
+  background: var(--violet); flex-shrink: 0;
 }
 .sectionTitle::after {
-  content: ''; flex: 1; height: 1px;
-  background: rgba(124, 58, 237, 0.2);
+  content: ''; flex: 1; height: 1px; background: var(--border);
 }
 
-/* ── Mode cards (radio selection) ── */
+/* ── Mode cards (seleção tipo radio) ── */
 .modeCards { display: flex; gap: 6px; flex-wrap: wrap; }
 .modeCard {
-  flex: 1; min-width: 80px; display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 8px 10px; border-radius: 10px; border: 1px solid var(--border);
-  background: var(--surface-2); cursor: pointer; transition: all .12s;
-  text-align: center;
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
 }
 .modeCard:hover { border-color: rgba(124,58,237,.3); }
 .modeCardActive { border-color: var(--violet); background: rgba(124,58,237,.08); }
 .modeCardLabel  { font-size: 11px; font-weight: 600; color: var(--text); }
 .modeCardDesc   { font-size: 10px; color: var(--text-2); }
 
-/* ── Toggle chips (dias da semana, meses) ── */
+/* ── Chips (dias da semana, meses) ── */
 .chipGroup { display: flex; gap: 5px; flex-wrap: wrap; }
 .chip {
-  padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border);
-  font-size: 11px; font-weight: 500; cursor: pointer;
-  background: var(--surface-2); color: var(--text-2); transition: all .12s;
+  padding: 5px 10px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--surface); font-size: 11px; color: var(--text);
+  cursor: pointer; transition: all .12s;
 }
-.chip:hover    { border-color: rgba(124,58,237,.4); }
-.chipActive    { background: rgba(124,58,237,.12); border-color: var(--violet); color: var(--violet); font-weight: 600; }
-.chipDanger    { background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.3); color: #ef4444; }
+.chip:hover { border-color: rgba(124,58,237,.4); }
+.chipActive { background: rgba(124,58,237,.12); border-color: var(--violet); color: var(--violet); font-weight: 600; }
 
-/* Dias do mês (grid 7 colunas) */
 .dayGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 
-/* ── Field grid (3 per row — hospedagem + crianças) ── */
-.fieldGrid     { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.fieldCard     { display: flex; flex-direction: column; gap: 6px; }
+/* ── Grade de inputs (3 por linha — hospedagem + crianças) ── */
+.inputGrid      { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fieldCard      { display: flex; flex-direction: column; gap: 6px; }
 .fieldCardLabel { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
-.fieldCardRow  { display: flex; align-items: center; gap: 4px; }
+.fieldCardRow   { display: flex; align-items: center; gap: 4px; }
 
-/* ── Checkbox list (quartos / sazonais) ── */
+/* ── Lista de checkboxes (quartos / sazonais) ── */
 .checkList { display: flex; flex-direction: column; gap: 6px; }
 .checkItem {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface-2); cursor: pointer; transition: all .12s;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
 }
-.checkItem:hover    { border-color: rgba(124,58,237,.3); }
-.checkItemActive    { border-color: var(--violet); background: rgba(124,58,237,.06); }
-.checkItemCb        { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
-.checkItemLabel     { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.checkItemSub       { font-size: 11px; color: var(--text-2); margin-left: auto; }
-.checkItemUnavailable {
-  opacity: .55; cursor: not-allowed;
-  background: var(--surface-2); border-color: var(--border);
-}
+.checkItem:hover { border-color: rgba(124,58,237,.3); }
+.checkItemActive { border-color: var(--violet); background: rgba(124,58,237,.06); }
+.checkItemCb     { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
+.checkItemLabel  { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.checkItemSub    { font-size: 11px; color: var(--text-2); margin-left: auto; }
+.checkItemUnavailable { opacity: .5; cursor: not-allowed; }
 .checkItemUnavailable:hover { border-color: var(--border); }
 .checkItemUnavailable .checkItemCb { cursor: not-allowed; }
 .checkItemTag {
-  font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 5px;
-  background: rgba(239,68,68,.1); color: #ef4444; white-space: nowrap;
+  font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
+  background: rgba(100,116,139,.15); color: var(--text-2);
 }
 
-/* ── Seasonality category selector ── */
-.seaCatItem  { align-items: flex-start; padding: 10px 12px; }
-.seaCatInfo  { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
-.seaCatTags  { display: flex; flex-wrap: wrap; gap: 4px; }
-.seaCatTag   {
-  font-size: 10px; font-weight: 500; color: var(--text-2);
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 4px; padding: 2px 7px; white-space: nowrap;
-}
+/* ── Seletor de categorias da sazonalidade ── */
 .seaRefBtn {
-  flex-shrink: 0; font-size: 11px; font-weight: 600; color: var(--violet);
-  background: rgba(124,58,237,.08); border: 1px solid rgba(124,58,237,.25);
-  border-radius: 6px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
-  transition: background .12s;
+  flex-shrink: 0; padding: 4px 10px; border-radius: 6px;
+  border: 1px solid rgba(124,58,237,.3); background: rgba(124,58,237,.08);
+  color: var(--violet); font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: background .15s;
 }
 .seaRefBtn:hover { background: rgba(124,58,237,.16); }
 
-/* ── Checkbox row (toggle Day Use) ── */
+/* ── Linha de checkbox ── */
 .checkboxRow {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 12px 14px; border-radius: 10px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  cursor: pointer; transition: border-color .12s;
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
 }
-.checkboxRowActive {
-  border-color: var(--violet); background: rgba(124,58,237,.06);
-}
+.checkboxRowActive { border-color: var(--violet); background: rgba(124,58,237,.06); }
 .checkbox      { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
 .checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
 .checkboxSub   { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
 
-/* ── Gratuidade ── */
+/* ── Gratuidade (formulário) ── */
 .gratuidadeBox {
-  background: rgba(16,185,129,.06);
-  border: 1px solid rgba(16,185,129,.2);
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  margin-bottom: 4px;
-}
-.gratuidadeDisplay {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(16,185,129,.08);
-  border: 1px solid rgba(16,185,129,.2);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  margin-bottom: 10px;
-}
-.gratuidadeDisplayLabel {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: #10b981; white-space: nowrap;
-}
-.gratuidadeDisplayVal {
-  font-size: 12px; color: var(--text);
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 12px; border-radius: 8px;
+  border: 1px solid rgba(16,185,129,.25); background: rgba(16,185,129,.06);
 }
 
-/* ── Child pricing rows ── */
-.childRow {
-  display: flex; align-items: center; gap: 6px;
-  margin-bottom: 8px; min-width: 0;
-}
-.childInputAge  { width: 58px !important; min-width: 0; flex-shrink: 0; }
-.childInputVal  { flex: 1; min-width: 0; }
-.childQtdLabel {
-  font-size: 12px; font-weight: 600; color: var(--text-2);
-  white-space: nowrap; min-width: 90px;
-}
-.childSep {
-  font-size: 13px; color: var(--text-2); white-space: nowrap;
-}
+/* ── Linhas de preço de menores ── */
+.childInputAge { width: 58px !important; min-width: 0; flex-shrink: 0; }
+.childInputVal { flex: 1; min-width: 0; }
+.childSep      { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
 .childRemoveBtn {
-  background: none; border: none; cursor: pointer;
-  color: var(--text-2); padding: 4px; border-radius: var(--radius);
-  display: flex; align-items: center; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  border: none; background: transparent; color: var(--text-2);
+  cursor: pointer; transition: color .15s, background .15s;
 }
 .childRemoveBtn:hover { color: #ef4444; background: rgba(239,68,68,.08); }
 
-/* ── Non-expanding listing rows ── */
-.listRow {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 16px; cursor: pointer;
-  transition: background .12s; border-bottom: 1px solid var(--border);
-  gap: 12px;
-}
-.listRow:hover { background: rgba(124,58,237,.04); }
-.listRow:last-child { border-bottom: none; }
-
-.listRowLeft  { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1; }
-.listRowRight { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-
-.listRowTags { display: flex; flex-wrap: wrap; gap: 4px; }
-.listTag {
-  font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
-  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
-  white-space: nowrap;
-}
-.listTagAmber   { border-color: rgba(245,158,11,.3);  background: rgba(245,158,11,.08);  color: #d97706; }
-.listTagViolet  { border-color: rgba(124,58,237,.3);  background: rgba(124,58,237,.08);  color: var(--violet); }
-.listTagEmerald { border-color: rgba(16,185,129,.3);  background: rgba(16,185,129,.08);  color: #059669; }
-.listTagBlue    { border-color: rgba(59,130,246,.3);  background: rgba(59,130,246,.08);  color: #2563eb; }
-.listTagSlate   { border-color: rgba(100,116,139,.3); background: rgba(100,116,139,.08); color: #475569; }
-
-.listPrice    { font-size: 15px; font-weight: 800; color: var(--violet); white-space: nowrap; }
-.listPriceSub { font-size: 11px; color: var(--text-2); white-space: nowrap; max-width: 220px; text-align: right; }
-
-/* ── Fixed-height tab bodies — prevents modal resize on tab switch ── */
-.formTabBody   { padding: 16px 0 0; height: 420px; overflow-y: auto; overflow-x: hidden; }
-.detailTabBody { min-height: 300px; }
-
-/* ── Detail section padding ── */
-.detailSection { display: flex; flex-direction: column; gap: 10px; padding: 12px 0; }
-
-/* ── Audit row (criado por / data) ── */
-.auditRow  {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 8px 10px; border-radius: 6px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  margin-top: 4px;
-}
-.auditItem {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 11px; color: var(--text-2); font-weight: 500;
-}
-
-/* ── Comparison panels (base vs seasonality) ── */
-.compareGrid {
-  display: grid;
-  gap: 10px;
-}
-/* Flat 2-col grid — each pair of items is in the same row → auto-aligns */
-.compareAligned {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  align-items: start;
-}
-.comparePanel {
-  padding: 12px;
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.comparePanelSea {
-  border-color: rgba(217,119,6,.4);
-  background: rgba(245,158,11,.05);
-}
-.comparePanelTitle {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--text-2);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.comparePanelTitleSea {
-  color: #d97706;
-  border-bottom-color: rgba(217,119,6,.25);
-}
-
-/* All content inside a sea panel uses the amber/orange theme */
-.comparePanelSea .infoBoxLabel   { color: #92400e; }
-.comparePanelSea .infoBoxValue   { color: #d97706; font-weight: 600; }
-.comparePanelSea .infoBoxValueLg { color: #d97706; font-weight: 700; }
-.comparePanelSea .miniPrice      { color: #d97706; font-weight: 700; }
-.comparePanelSea .duLabel        { color: #92400e; }
-.comparePanelSea .duVal          { color: #d97706; font-weight: 600; }
-.comparePanelSea .badge          { border-color: rgba(217,119,6,.3); background: rgba(245,158,11,.1); color: #d97706; }
-.comparePanelSea .infoBox        { border-color: rgba(217,119,6,.2); background: rgba(245,158,11,.04); }
-
-/* ── Detail modal footer (excluir left, editar right) ── */
-.modalFooterBetween { display: flex; gap: 8px; align-items: center; justify-content: space-between; width: 100%; }
-
-/* ── Dark adjustments ── */
-:root[data-theme="dark"] .card    { box-shadow: none; }
-:root[data-theme="dark"] .kpiCard { box-shadow: none; }
+/* ── Corpo das abas do formulário — evita o modal pular de altura ── */
+.formTabBody { padding: 16px 0 0; height: 420px; overflow-y: auto; overflow-x: hidden; }

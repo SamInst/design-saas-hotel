@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   CalendarDays, Wallet, Package, Tag, LogOut, Sun, Moon, ChevronDown,
-  UserCog, Users, ShieldCheck, Building2, LayoutGrid,
+  UserCog, Users, ShieldCheck, Building2,
 } from 'lucide-react';
 import styles from './TopBar.module.css';
 import logo from '../../assets/logo-hospedagem-simbolo.png';
@@ -19,6 +19,20 @@ const NAV_ITEMS = [
   { id: 'employees',   label: 'Funcionários',         icon: UserCog,    tela: 'FUNCIONARIOS'       },
   { id: 'permissions', label: 'Cargos e Permissões',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES'},
 ];
+
+/** Ícone do menu de telas — SVG próprio, herda a cor do botão. */
+function MenuIcon({ size = 19 }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 512 474.051"
+      fill="currentColor" fillRule="evenodd" clipRule="evenodd"
+      shapeRendering="geometricPrecision"
+      aria-hidden="true" focusable="false"
+    >
+      <path d="M11.216 0H88.37c6.169 0 11.216 5.047 11.216 11.216v70.947c0 6.17-5.047 11.217-11.216 11.217H11.216C5.047 93.38 0 88.333 0 82.163V11.216C0 5.047 5.047 0 11.216 0zm152.662 380.672h336.906c6.169 0 11.216 5.05 11.216 11.216v70.947c0 6.166-5.051 11.216-11.216 11.216H163.878c-6.166 0-11.217-5.046-11.217-11.216v-70.947c0-6.169 5.047-11.216 11.217-11.216zm-152.662 0H88.37c6.169 0 11.216 5.047 11.216 11.216v70.947c0 6.17-5.047 11.216-11.216 11.216H11.216C5.047 474.051 0 469.005 0 462.835v-70.947c0-6.169 5.047-11.216 11.216-11.216zm152.662-190.336h336.906c6.169 0 11.216 5.05 11.216 11.216v70.947c0 6.166-5.051 11.216-11.216 11.216H163.878c-6.166 0-11.217-5.046-11.217-11.216v-70.947c0-6.17 5.047-11.216 11.217-11.216zm-152.662 0H88.37c6.169 0 11.216 5.046 11.216 11.216v70.947c0 6.17-5.047 11.216-11.216 11.216H11.216C5.047 283.715 0 278.669 0 272.499v-70.947c0-6.17 5.047-11.216 11.216-11.216zM163.878 0h336.906C506.953 0 512 5.051 512 11.216v70.947c0 6.166-5.051 11.217-11.216 11.217H163.878c-6.166 0-11.217-5.047-11.217-11.217V11.216C152.661 5.047 157.708 0 163.878 0z" />
+    </svg>
+  );
+}
 
 /** Fecha o menu ao clicar fora ou apertar Esc. */
 function useDismiss(ref, onDismiss) {
@@ -93,7 +107,7 @@ export default function TopBar({
             aria-expanded={menuOpen}
             title="Menu"
           >
-            <LayoutGrid size={19} />
+            <MenuIcon size={19} />
           </button>
 
           {menuOpen && (

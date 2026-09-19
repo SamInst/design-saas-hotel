@@ -1,86 +1,452 @@
-/* ── Layout ── */
-.page      { min-height: 100%; }
-.container { max-width: 1400px; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 16px; }
+/* ═════════════════════════════════════════════════════════════
+   Itens — mesma estética das telas de Cadastro, Funcionários,
+   Preços e Cargos: tokens do protótipo (Lovable/Hotalize) em
+   oklch, no escopo da página.
+   Escalas do Tailwind do protótipo: 1=4px … 6=24px;
+   text-xs=12px, text-sm=14px, text-lg=18px, text-xl=20px;
+   radius 0.75rem → md 10px, lg 12px, xl 16px.
+   ═════════════════════════════════════════════════════════════ */
+.page {
+  --l-bg:            oklch(0.988 0.003 250);
+  --l-card:          oklch(1 0 0);
+  --l-fg:            oklch(0.24 0.03 262);
+  --l-muted-fg:      oklch(0.52 0.03 258);
+  --l-border:        oklch(0.925 0.008 255);
+  --l-primary:       oklch(0.55 0.21 262);
+  --l-primary-fg:    oklch(0.985 0.005 250);
+  --l-secondary:     oklch(0.965 0.008 255);
+  --l-secondary-fg:  oklch(0.32 0.03 262);
+  --l-accent:        oklch(0.945 0.018 255);
+  --l-accent-fg:     oklch(0.32 0.05 262);
+  --l-destructive:   oklch(0.6 0.22 25);
+  --l-ring:          oklch(0.65 0.15 260);
 
-/* ── Card principal ── */
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  --l-emerald-bg: oklch(0.95 0.052 163.051);
+  --l-emerald-fg: oklch(0.432 0.095 166.913);
+
+  --l-amber-bg:     oklch(0.96 0.048 88);
+  --l-amber-fg:     oklch(0.49 0.11 72);
+  --l-amber-border: oklch(0.86 0.09 80);
+
+  --l-rose-bg: oklch(0.95 0.04 20);
+  --l-rose-fg: oklch(0.5 0.17 25);
+
+  --l-radius: 0.75rem;
+  --l-r-md: calc(var(--l-radius) - 2px);
+  --l-r-lg: var(--l-radius);
+  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
+  margin: -18px -22px;
+  height: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--l-bg);
+  color: var(--l-fg);
 }
 
-/* ── Toolbar ── */
-.tableHeader {
-  display: flex; gap: 12px; align-items: center;
-  justify-content: space-between; flex-wrap: wrap;
-  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
-}
-.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
-.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
-.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+[data-theme='dark'] .page {
+  --l-bg:           oklch(0.129 0.042 264.695);
+  --l-card:         oklch(0.208 0.042 265.755);
+  --l-fg:           oklch(0.984 0.003 247.858);
+  --l-muted-fg:     oklch(0.704 0.04 256.788);
+  --l-border:       oklch(1 0 0 / 10%);
+  --l-secondary:    oklch(0.279 0.041 260.031);
+  --l-secondary-fg: oklch(0.984 0.003 247.858);
+  --l-accent:       oklch(0.279 0.041 260.031);
+  --l-accent-fg:    oklch(0.984 0.003 247.858);
+  --l-destructive:  oklch(0.704 0.191 22.216);
+  --l-ring:         oklch(0.551 0.027 264.364);
+  --l-shadow: none;
 
-.searchWrap    { position: relative; min-width: 220px; display: flex; align-items: center; }
-.searchIcon    { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; flex-shrink: 0; }
-.searchInput   { padding-left: 32px !important; }
-.searchSpinner { position: absolute; right: 10px; color: var(--violet); }
+  --l-emerald-bg: oklch(0.28 0.05 165);
+  --l-emerald-fg: oklch(0.8 0.13 163);
 
-/* ── Section list ── */
-.sectionList { display: flex; flex-direction: column; gap: 12px; }
+  --l-amber-bg:     oklch(0.3 0.055 78);
+  --l-amber-fg:     oklch(0.84 0.13 80);
+  --l-amber-border: oklch(0.45 0.08 78);
 
-.catSection {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
-}
-
-/* ── Section header ── */
-.catSectionHeader {
-  display: flex; align-items: center; gap: 12px;
-  justify-content: space-between; flex-wrap: wrap;
-  padding: 14px 18px 8px;
+  --l-rose-bg: oklch(0.28 0.06 20);
+  --l-rose-fg: oklch(0.8 0.13 22);
 }
 
-.catSectionLeft {
-  display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0;
+.container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.split {
+  flex: 1; min-height: 0; width: 100%;
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+  padding: 10px 24px 24px;
+}
+@media (min-width: 1024px) {
+  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
 }
 
-.catSectionIcon {
-  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+/* ══ LISTA ═══════════════════════════════════════════════════ */
+.listPanel {
+  display: flex; flex-direction: column; min-height: 0;
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
+}
+@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+
+/* Categorias / Quartos */
+.segmented {
+  display: flex; gap: 4px; margin-bottom: 12px;
+  border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border);
+  background: var(--l-bg);
+  padding: 4px;
+}
+.segmentedBtn {
+  flex: 1; cursor: pointer;
+  border: none; border-radius: var(--l-r-md);
+  padding: 6px 12px;
+  background: transparent; color: var(--l-muted-fg);
+  font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
+  transition: background-color .15s, color .15s;
+}
+.segmentedBtn:hover { color: var(--l-fg); }
+.segmentedBtnActive,
+.segmentedBtnActive:hover { background: var(--l-primary); color: var(--l-primary-fg); }
+
+.searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
+.searchWrapFull { min-width: 0; flex: 1; }
+.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchInput    { padding-left: 36px !important; }
+.searchWrapFull .searchInput {
+  height: 40px; width: 100%;
+  border-radius: var(--l-r-lg) !important;
+  border: 1px solid var(--l-border) !important;
+  background: var(--l-bg) !important;
+  color: var(--l-fg) !important;
+  padding-right: 12px !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+.searchWrapFull .searchInput:focus {
+  outline: none;
+  border-color: var(--l-ring) !important;
+  box-shadow: 0 0 0 2px var(--l-ring) !important;
+}
+.searchClear {
+  position: absolute; right: 10px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(124,58,237,.1); color: var(--violet);
+  width: 18px; height: 18px; border-radius: 50%;
+  border: none; background: transparent; color: var(--l-muted-fg);
+  cursor: pointer; opacity: .6; transition: opacity .12s; flex-shrink: 0;
+}
+.searchClear:hover { opacity: 1; }
+
+.listMeta {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
 }
 
-.catSectionInfo  { flex: 1; min-width: 0; }
-.catSectionName  {
-  font-size: 13px; font-weight: 700; color: var(--text);
-  text-transform: uppercase; letter-spacing: .04em; margin: 0;
+.listScroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  margin-top: 8px; display: flex; flex-direction: column; gap: 6px;
 }
-.catSectionDesc  { font-size: 11px; color: var(--text-2); margin: 2px 0 0; }
-
-.catSectionActions { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
-
-/* ── Stats chips ── */
-.catStats {
-  display: flex; gap: 6px; flex-wrap: wrap;
-  padding: 0 18px 10px;
+.listItem {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 12px;
+  border-radius: var(--l-r-lg);
+  border: 1px solid transparent; background: transparent;
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s, border-color .15s;
 }
-
-.catStat {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 3px 10px; border-radius: 20px;
-  background: var(--surface-2); border: 1px solid var(--border);
-  font-size: 12px;
+.listItem:hover { background: var(--l-accent); }
+.listItemActive,
+.listItemActive:hover {
+  background: color-mix(in oklch, var(--l-primary) 10%, transparent);
+  border-color: color-mix(in oklch, var(--l-primary) 35%, transparent);
 }
-.catStatLabel { color: var(--text-2); font-weight: 400; }
-.catStatValue { font-weight: 700; color: var(--text); }
-.catStatRose   { color: #ef4444; }
-.catStatGreen  { color: var(--emerald); }
-.catStatViolet { color: var(--violet); }
+.listItemBody { flex: 1; min-width: 0; }
+.listItemName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.listItemSub {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+.listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
 
-/* ── Empty inside a section ── */
-.emptyCat {
+.nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Etiquetas ── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 5px;
+  border: 1px solid var(--l-border); background: var(--l-secondary); color: var(--l-secondary-fg);
+  font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap;
+}
+.tagPrimary { border-color: color-mix(in oklch, var(--l-primary) 35%, transparent); background: color-mix(in oklch, var(--l-primary) 12%, transparent); color: var(--l-primary); }
+.tagEmerald { border-color: color-mix(in oklch, var(--l-emerald-fg) 30%, transparent); background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
+.tagRose    { border-color: color-mix(in oklch, var(--l-rose-fg) 30%, transparent); background: var(--l-rose-bg); color: var(--l-rose-fg); }
+
+/* ── Vazio / carregando ── */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; text-align: center; }
+
+/* ── Esqueletos ── */
+.sk {
+  position: relative; overflow: hidden; display: block; flex-shrink: 0;
+  background: var(--l-secondary); border-radius: 6px;
+}
+.sk::after {
+  content: ''; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--l-card) 75%, transparent), transparent);
+  animation: skShine 1.3s ease-in-out infinite;
+}
+@keyframes skShine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
+.skName   { width: 70%; height: 13px; }
+.skSub    { width: 45%; height: 10px; margin-top: 6px; }
+.skLabel  { width: 58%; height: 10px; }
+.skNumero { width: 46%; height: 22px; margin-top: 8px; }
+
+/* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+
+.dCard {
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 20px; box-shadow: var(--l-shadow);
+}
+.dCardHead {
   display: flex; align-items: center; gap: 8px;
-  padding: 14px 18px; color: var(--text-2); font-size: 12px;
+  font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
+}
+.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardTitle { font-weight: 700; }
+.dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.dCardBody { margin-top: 16px; }
+
+/* Voltar para a lista — à esquerda do título, só quando a ficha ocupa a tela */
+.backBtn {
+  display: none; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s;
+}
+.backBtn:hover { background: var(--l-accent); }
+
+.idClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s, color .15s;
+}
+.idClose:hover { background: var(--l-accent); color: var(--l-accent-fg); }
+
+.idHead {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+}
+.idHeadMain { min-width: 0; flex: 1; }
+.idName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
+.idSub  { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+
+/* Aviso de "nada aqui" dentro do corpo de um cartão */
+.blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
+
+/* ── Botões: cor sólida, sem brilho nem ícone ── */
+.page .btnSolid {
+  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
+  padding: 8px 14px; font-size: 13px; font-weight: 600;
+  background: var(--l-secondary); color: var(--l-secondary-fg);
+  box-shadow: none; transition: background-color .15s, color .15s;
+}
+.page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
+.page .btnSolid:active { transform: none; }
+.page .btnSm { padding: 5px 11px; font-size: 12px; }
+.page .btnPrimary { background: var(--l-primary); color: var(--l-primary-fg); }
+.page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
+
+/* ── Painel geral (nada selecionado) ── */
+.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.statCard {
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px;
+}
+.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
+.statValEmerald { color: var(--l-emerald-fg); }
+.statValRose    { color: var(--l-rose-fg); }
+.detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
+
+/* ── Itens da categoria, no painel ── */
+.itemSearch { max-width: 320px; margin-bottom: 4px; }
+
+.itemList { display: flex; flex-direction: column; }
+/* Primeira linha: nome à esquerda, preço à direita. As ações quebram para
+   uma linha própria logo abaixo (ver .itemRowActions). */
+.itemRow {
+  display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+  padding: 12px 0; border-bottom: 1px solid var(--l-border);
+}
+.itemRow:last-child  { border-bottom: none; }
+.itemRow:first-child { padding-top: 0; }
+.itemRowMain { flex: 1; min-width: 180px; }
+.itemRowNome {
+  font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg);
+  overflow-wrap: anywhere;
+}
+.itemRowSub {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+/* ── Itens da categoria, em cartões ──
+   O max() no minmax segura o teto em 3 colunas: cada coluna nunca fica menor
+   que um terço do painel, então nunca cabem quatro. Abaixo de ~3×260px o
+   auto-fit quebra sozinho para 2 e depois 1. */
+.itemGrid {
+  display: grid; gap: 12px; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(max(260px, (100% - 24px) / 3), 1fr));
+}
+.itemCard {
+  display: flex; flex-direction: column; min-width: 0;
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px;
+}
+.itemCardHead { display: flex; align-items: flex-start; gap: 8px; }
+.itemCardNome {
+  flex: 1; min-width: 0;
+  font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg);
+  overflow-wrap: anywhere;
+}
+.itemCardTags {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+.itemCardForn {
+  margin-top: 6px; font-size: 12px; line-height: 16px;
+  color: var(--l-muted-fg); overflow-wrap: anywhere;
+}
+/* margin-top auto cola o preço no rodapé: cartões da mesma linha alinham. */
+.itemCardPreco { margin-top: auto; padding-top: 12px; text-align: right; }
+
+/* ── Menu de ações do item ── */
+.itemMenuWrap { position: relative; flex-shrink: 0; }
+.itemMenuBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; margin: -4px -4px 0 0;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-muted-fg);
+  cursor: pointer; transition: background-color .15s, color .15s;
+}
+.itemMenuBtn:hover { background: var(--l-accent); color: var(--l-fg); }
+.itemMenuBtnOn,
+.itemMenuBtnOn:hover { background: var(--l-accent); color: var(--l-primary); }
+/* Desenhado num portal no <body>: position fixed e coordenadas vindas do
+   botão, para não ser recortado pelo overflow do painel de detalhe.
+   Por viver fora de .page, usa os tokens globais — os --l-* não chegam lá.
+   z-index 45 fica acima do overlay de navegação (40) e abaixo do modal (50). */
+.itemMenu {
+  position: fixed; z-index: 45;
+  min-width: 180px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .18);
+}
+.itemMenuItem {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; width: 100%;
+  border: none; border-radius: 8px; background: transparent;
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 500;
+  text-align: left; cursor: pointer; transition: background-color .15s;
+}
+.itemMenuItem:hover { background: var(--surface-2); }
+.itemMenuItem > svg { flex-shrink: 0; color: var(--text-2); }
+.itemMenuItemDanger { color: #ef4444; }
+.itemMenuItemDanger > svg { color: #ef4444; }
+
+/* Preço — o dado mais consultado, então ganha tamanho próprio */
+.itemRowPreco { flex-shrink: 0; margin-left: auto; text-align: right; min-width: 104px; }
+.itemRowVenda {
+  font-size: 20px; line-height: 26px; font-weight: 700;
+  color: var(--l-emerald-fg); white-space: nowrap;
+}
+.itemRowCompra {
+  margin-top: 1px; font-size: 11px; line-height: 15px;
+  color: var(--l-muted-fg); white-space: nowrap;
 }
 
+
+/* Atalho para a categoria, na lista de estoque baixo */
+.linkCat {
+  border: none; background: transparent; padding: 0;
+  color: var(--l-primary); font: inherit; font-weight: 600;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.linkCat:hover { color: color-mix(in oklch, var(--l-primary) 80%, black); }
+
+/* ── Distribuição do item pelos quartos ── */
+.quartosToggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: none; background: transparent; padding: 0;
+  color: var(--l-muted-fg); font: inherit; cursor: pointer;
+  transition: color .15s;
+}
+.quartosToggle:hover { color: var(--l-fg); }
+.quartosToggle > svg:first-child { flex-shrink: 0; }
+.quartosChevron { transition: transform .18s; flex-shrink: 0; }
+.quartosChevronOpen { transform: rotate(90deg); color: var(--l-primary); }
+
+.quartosList {
+  margin-top: 10px; margin-left: 2px; padding-left: 10px;
+  border-left: 2px solid var(--l-border);
+  display: flex; flex-direction: column; gap: 4px;
+  max-width: 420px;
+}
+.quartosRow {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-size: 12px; line-height: 17px; color: var(--l-muted-fg);
+}
+.quartosNome { min-width: 0; overflow-wrap: anywhere; }
+.quartosQtd  { font-weight: 600; color: var(--l-fg); white-space: nowrap; }
+.quartosQtdBaixa { color: var(--l-rose-fg); }
+
+/* ── Responsivo ── */
+@media (max-width: 1023px) {
+  .splitListHidden .listPanel { display: none; }
+  .split { padding: 8px 16px 16px; gap: 16px; }
+  .detailPanel { order: 1; }
+  .listPanel   { order: 2; }
+  .listScroll { flex: none; max-height: 55vh; }
+  .backBtn { display: inline-flex; }
+}
+
+@media (max-width: 640px) {
+  .page  { margin: -12px -12px -24px; }
+  .split { padding: 6px 12px 12px; gap: 12px; }
+  .listPanel { padding: 12px; }
+  .dCard { padding: 14px; }
+  .idHead { gap: 12px; margin-bottom: 18px; padding-bottom: 16px; }
+  .idName { font-size: 18px; line-height: 24px; }
+  .dCardHead { flex-wrap: wrap; }
+  .dCardActions { margin-left: 0; flex: 1 1 100%; }
+  .dCardActions > * { flex: 1; }
+  .dCardActions > .idClose { flex: 0 0 auto; }
+  .statVal { font-size: 20px; line-height: 26px; }
+}
+
+@media (max-width: 420px) {
+  .listItem { padding: 10px; gap: 10px; }
+  .listItem .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   MODAIS — estilo anterior mantido
+   ═════════════════════════════════════════════════════════════ */
 /* ── Table ── */
 .tableWrap { overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -101,11 +467,11 @@
 
 .row      { cursor: pointer; transition: background .12s; }
 .row:hover { background: rgba(124,58,237,.04); }
+.rowHover  { transition: background .12s; }
+.rowHover:hover { background: rgba(124,58,237,.04); }
 .rowCancelado { cursor: pointer; transition: background .12s; opacity: .55; }
 .rowCancelado td { color: var(--text-2) !important; }
 .rowCancelado:hover { background: rgba(0,0,0,.03); }
-.rowHover  { transition: background .12s; }
-.rowHover:hover { background: rgba(124,58,237,.04); }
 
 .itemName { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
 .itemSub  { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
@@ -125,28 +491,22 @@
 
 /* ── Date cell ── */
 .dateCell  { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-2); }
-.dateEmpty { font-size: 12px; color: var(--text-2); }
 
-/* ── Action buttons in table ── */
+/* ── Botões de ação dentro das tabelas dos modais ── */
 .actionBtns { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: nowrap; }
 .actionBtn  {
-  display: inline-flex; align-items: center; gap: 3px;
-  padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border);
-  font-size: 11px; font-weight: 500; cursor: pointer;
-  background: var(--surface-2); color: var(--text-2);
-  transition: all .12s; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-2); font-size: 11px; font-weight: 600;
+  cursor: pointer; transition: all .12s; white-space: nowrap;
 }
-.actionBtnConsumir { border-color: rgba(239,68,68,.25); color: #ef4444; background: rgba(239,68,68,.06); }
-.actionBtnConsumir:hover { background: rgba(239,68,68,.15); }
-.actionBtnRepor { border-color: rgba(16,185,129,.25); color: var(--emerald); background: rgba(16,185,129,.06); }
-.actionBtnRepor:hover { background: rgba(16,185,129,.15); }
-.actionBtnHist:hover  { border-color: var(--violet); color: var(--violet); }
+.actionBtn:hover { border-color: var(--violet); color: var(--violet); }
 
-/* ── Empty / loading ── */
-.empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 10px; padding: 48px 20px; color: var(--text-2); font-size: 13px;
-}
+/* ── Título do modal de histórico ── */
+.histModalTitle { display: inline-flex; align-items: center; gap: 8px; }
+
+/* ── Empty / loading (dentro dos modais) ── */
 .emptyInline {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; padding: 40px 20px; color: var(--text-2); font-size: 13px; height: 100%;
@@ -155,8 +515,6 @@
 .spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Historico modal ── */
-.histModalTitle { display: inline-flex; align-items: center; gap: 8px; }
 .histTabBody {
   min-height: 360px;
   display: flex; flex-direction: column;
@@ -186,7 +544,9 @@
   font-size: 13px; color: var(--text); cursor: pointer;
   user-select: none;
 }
-.checkboxRow input { accent-color: var(--violet); width: 15px; height: 15px; cursor: pointer; }
+.checkboxRow input { accent-color: var(--violet); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
+.checkboxSub   { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
 
 /* ── Consumo informativo ── */
 .consumoAlert {
@@ -253,22 +613,9 @@
 .quartoItensLow   { font-weight: 700; color: #ef4444; }
 .quartoItensNone  { color: var(--text-2); font-style: italic; }
 
-/* ── Mobile ≤ 480px ── */
+
+/* ── Mobile ≤ 480px (modais) ── */
 @media (max-width: 480px) {
-  /* Toolbar: empilha busca + botões */
-  .tableHeader  { flex-direction: column; align-items: stretch; gap: 10px; }
-  .tableTools   { flex-direction: column; align-items: stretch; }
-  .tableTools > * { width: 100%; justify-content: center; }
-  .searchWrap   { min-width: 0; width: 100%; }
-
-  /* Botões de categoria: empilha verticalmente */
-  .catSectionActions { flex-direction: column; align-items: stretch; width: 100%; }
-  .catSectionActions > * { width: 100%; justify-content: center; }
-  .catSectionHeader { align-items: flex-start; }
-
-  /* Botões de ação da tabela: permite quebra de linha */
-  .actionBtns   { flex-wrap: wrap; justify-content: flex-end; }
-
   /* Pagamento chip: quebra em duas linhas (texto + botão Alterar) */
   .pagamentoChip          { flex-wrap: wrap; gap: 6px 8px; }
   .pagamentoChip span     { width: 100%; word-break: break-word; }
@@ -281,6 +628,3 @@
   /* Item info sub: quebra naturalmente */
   .itemInfoSub            { line-height: 1.6; }
 }
-
-/* ── Dark adjustments ── */
-:root[data-theme="dark"] .card { box-shadow: none; }

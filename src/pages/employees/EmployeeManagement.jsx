@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Search, Plus, Loader2, AlertCircle, Calendar, Edit2, X,
-  Phone, Mail, Trash2, Eye, EyeOff, Lock, Building,
+  Search, Loader2, AlertCircle, Calendar, X,
+  Eye, EyeOff, Lock, Building,
   Users, ChevronLeft, ChevronRight as ChevRight,
-  CreditCard, MapPin, CheckCircle2, AlertTriangle, XCircle, Download, Upload, UserCheck,
+  CreditCard, CheckCircle2, AlertTriangle, XCircle, Upload,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
@@ -12,6 +12,8 @@ import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification } from '../../components/ui/Notification';
 import { DatePicker } from '../../components/ui/DatePicker';
 import { funcionarioApi, cargoApi, cadastroApi, usuarioApi, enumApi } from '../../services/api';
+import iconWhatsapp from '../../assets/whatsapp.png';
+import iconGmail    from '../../assets/gmail.png';
 
 import styles from './EmployeeManagement.module.css';
 
@@ -62,21 +64,10 @@ const formatDateDMY = d => {
 };
 
 // ── Avatar helpers ────────────────────────────────────────────
-const AVATAR_COLORS = [
-  { bg: 'rgba(124,58,237,.18)',  fg: '#7c3aed' },
-  { bg: 'rgba(14,165,233,.18)',  fg: '#0ea5e9' },
-  { bg: 'rgba(16,185,129,.18)',  fg: '#10b981' },
-  { bg: 'rgba(249,115,22,.18)',  fg: '#f97316' },
-  { bg: 'rgba(236,72,153,.18)',  fg: '#ec4899' },
-  { bg: 'rgba(245,158,11,.18)',  fg: '#f59e0b' },
-  { bg: 'rgba(99,102,241,.18)',  fg: '#6366f1' },
-  { bg: 'rgba(20,184,166,.18)',  fg: '#14b8a6' },
-];
-
-const avatarColor = (name) => {
-  const idx = ((name ?? '').charCodeAt(0) || 0) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
-};
+// Círculo sólido com as iniciais em branco, no ciclo de cores das faixas do
+// calendário. A cor vem da posição na lista, como na tela de Cadastro.
+const AVATAR_TONES = ['avTeal', 'avAmber', 'avCoral', 'avIndigo', 'avSky', 'avEmerald'];
+const avatarTone = (i) => styles[AVATAR_TONES[((i % AVATAR_TONES.length) + AVATAR_TONES.length) % AVATAR_TONES.length]];
 
 const getInitials = (name) => {
   if (!name) return '?';
@@ -119,6 +110,9 @@ const blankFuncionario = () => ({
   senhaConfirma: '',
 });
 
+// Teto da busca única que alimenta os totais do painel geral.
+const TETO_STATS = 300;
+
 const dateFromApi = d => {
   if (!d) return '';
   if (d.includes('/')) return d; // already formatted
@@ -128,40 +122,73 @@ const dateFromApi = d => {
 
 // ── Status Badge ──────────────────────────────────────────────
 function StatusBadge({ status }) {
-  const cls = status === 'ATIVO'     ? styles.badgeAtivo
-            : status === 'CONTRATADO' ? styles.badgeContratado
+  const cls = status === 'ATIVO'    ? styles.badgeAtivo
+            : status === 'DEMITIDO' ? styles.badgeDemitido
             : styles.badgeDefault;
   return <span className={cls}>{status ?? '—'}</span>;
 }
 
 // ── Avatar Circle ─────────────────────────────────────────────
-function AvatarCircle({ name, size = 40, className = '' }) {
-  const { bg, fg } = avatarColor(name);
+function AvatarCircle({ name, size = 40, tone = 0 }) {
   return (
-    <div
-      className={[styles.avatar, className].join(' ')}
-      style={{ width: size, height: size, fontSize: size * 0.36, background: bg, color: fg }}
+    <span
+      className={[styles.avatar, avatarTone(tone)].join(' ')}
+      style={{ width: size, height: size, fontSize: size >= 56 ? 16 : 12 }}
     >
       {getInitials(name)}
+    </span>
+  );
+}
+
+// ── Campo rótulo/valor do painel de detalhe ───────────────────
+function Field({ label, value, mono = false }) {
+  return (
+    <div>
+      <p className={styles.fLabel}>{label}</p>
+      <p className={[styles.fVal, mono ? styles.fMono : ''].join(' ')}>{value || '—'}</p>
     </div>
   );
 }
 
-// ── Section & KV helpers ──────────────────────────────────────
-function Section({ title, children }) {
+// ── Atalhos de contato — o campo inteiro é o clique ───────────
+function ContatoBotao({ tipo, href, title, children }) {
   return (
-    <div className={styles.section}>
-      <div className={styles.sectionLabel}>{title}</div>
-      <div className={styles.kvList}>{children}</div>
+    <a href={href} title={title} className={styles.contatoBtn}
+      {...(tipo === 'whatsapp' ? { target: '_blank', rel: 'noreferrer' } : {})}>
+      <img src={tipo === 'whatsapp' ? iconWhatsapp : iconGmail} alt="" className={styles.quickIcon} />
+      <span className={styles.contatoTexto}>{children}</span>
+    </a>
+  );
+}
+
+// ── Esqueletos de carregamento ────────────────────────────────
+const sk = (...extra) => [styles.sk, ...extra].join(' ');
+
+function SkeletonLista({ linhas = 7 }) {
+  return (
+    <div role="status" aria-label="Carregando funcionários">
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className={styles.listItem} aria-hidden="true">
+          <span className={sk(styles.skAvatar)} />
+          <span className={styles.listItemBody}>
+            <span className={sk(styles.skName)} style={{ width: `${62 + ((i * 13) % 26)}%` }} />
+            <span className={sk(styles.skSub)} />
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
 
-function KV({ label, value }) {
+function SkeletonPainel() {
   return (
-    <div className={styles.kvRow}>
-      <span className={styles.kvLabel}>{label}</span>
-      <span className={styles.kvVal}>{value || '—'}</span>
+    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className={styles.statCard} aria-hidden="true">
+          <span className={sk(styles.skLabel)} />
+          <span className={sk(styles.skNumero)} />
+        </div>
+      ))}
     </div>
   );
 }
@@ -337,7 +364,11 @@ export default function EmployeeManagement() {
 
   // modais
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showDetail, setShowDetail] = useState(false);
+  const [detailTone, setDetailTone] = useState(0);
+
+  // painel geral, exibido enquanto nenhum funcionário está selecionado
+  const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   const [showEdit, setShowEdit] = useState(false);
   const [detailItem, setDetailItem] = useState(null);
   const [cargos, setCargos] = useState([]);
@@ -351,8 +382,7 @@ export default function EmployeeManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // detail modal tabs and history
-  const [detailTab, setDetailTab] = useState('cadastro');
+  // histórico de cargo/salário da ficha
   const [historico, setHistorico] = useState([]);
   const [historicoLoading, setHistoricoLoading] = useState(false);
 
@@ -470,6 +500,31 @@ export default function EmployeeManagement() {
     status:          p.status ?? 'ATIVO',
   });
 
+  // Totais do painel geral. O /funcionario não tem contagem por status, então
+  // busca a lista inteira uma vez e conta aqui. Acima do teto a soma sairia
+  // errada (viria só a primeira página), e aí só o total é mostrado.
+  const fetchStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const res = await funcionarioApi.listar({ size: TETO_STATS, page: 0 });
+      const total = res?.totalElements ?? 0;
+      const lista = res?.content ?? [];
+      const completo = total <= TETO_STATS;
+      setStats({
+        total,
+        completo,
+        ativos:    completo ? lista.filter(f => f.pessoa?.status !== 'DEMITIDO').length : null,
+        demitidos: completo ? lista.filter(f => f.pessoa?.status === 'DEMITIDO').length : null,
+      });
+    } catch {
+      setStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
   const fetchData = useCallback(async (term = '', pg = 0) => {
     setLoading(true);
     try {
@@ -559,6 +614,7 @@ export default function EmployeeManagement() {
       setShowPassword(false);
       setShowConfirmPassword(false);
       fetchData(searchTerm, page);
+      fetchStats();
     } catch (e) {
       showNotif(e.message || 'Erro ao cadastrar funcionário.', 'error');
     } finally {
@@ -566,10 +622,11 @@ export default function EmployeeManagement() {
     }
   };
 
-  const openDetail = async item => {
+  // `tone` mantém o avatar da ficha na mesma cor do item da lista.
+  const openDetail = async (item, tone = 0) => {
     setDetailItem(item);
-    setDetailTab('cadastro');
-    setShowDetail(true);
+    setDetailTone(tone);
+    setEditHistoryItem(null);
     setRecebidos([]);
 
     // Fetch salary history
@@ -583,6 +640,23 @@ export default function EmployeeManagement() {
     } finally {
       setHistoricoLoading(false);
     }
+  };
+
+  // A ficha agora fica aberta depois de salvar (antes o modal fechava), então
+  // precisa reler o registro — senão continuaria mostrando os valores antigos.
+  const refreshDetail = async () => {
+    if (!detailItem?.id) return;
+    try {
+      const atualizado = await funcionarioApi.buscarPorId(detailItem.id);
+      if (atualizado) setDetailItem(atualizado);
+    } catch { /* mantém o que está na tela */ }
+  };
+
+  const closeDetail = () => {
+    setDetailItem(null);
+    setHistorico([]);
+    setEditHistoryItem(null);
+    setRecebidos([]);
   };
 
   const openEditEmployee = () => {
@@ -618,7 +692,7 @@ export default function EmployeeManagement() {
       showPassword: false,
       showConfirmPassword: false,
     });
-    setShowDetail(false);
+    // a ficha continua aberta; o modal de edição sobe por cima
     setShowEdit(true);
   };
 
@@ -643,6 +717,8 @@ export default function EmployeeManagement() {
       showNotif('Funcionário atualizado!');
       setShowEdit(false);
       fetchData(searchTerm, page);
+      fetchStats();
+      refreshDetail();
     } catch (e) {
       showNotif(e.message || 'Erro ao atualizar.', 'error');
     } finally {
@@ -660,8 +736,9 @@ export default function EmployeeManagement() {
       const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'DEMITIDO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
       showNotif('Funcionário demitido e usuário bloqueado!');
-      setShowDetail(false);
+      setDetailItem(null);
       fetchData(searchTerm, page);
+      fetchStats();
     } catch (e) {
       showNotif(e.message || 'Erro ao desligar funcionário.', 'error');
     } finally {
@@ -679,8 +756,9 @@ export default function EmployeeManagement() {
       const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'CONTRATADO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
       showNotif('Funcionário reativado com sucesso!');
-      setShowDetail(false);
+      setDetailItem(null);
       fetchData(searchTerm, page);
+      fetchStats();
     } catch (e) {
       showNotif(e.message || 'Erro ao reativar funcionário.', 'error');
     } finally {
@@ -704,6 +782,7 @@ export default function EmployeeManagement() {
       showNotif('Credenciais atualizadas!');
       setShowEditCredentials(false);
       setCredentialsForm({ username: '', senha: '' });
+      refreshDetail();
     } catch (e) {
       showNotif(e.message || 'Erro ao atualizar credenciais.', 'error');
     } finally {
@@ -856,369 +935,384 @@ export default function EmployeeManagement() {
     }
   };
 
-  // ── Modal footers ──────────────────────────────────────────
-  const detailFooter = detailItem ? (
-    <div className={styles.detailFooterActions}>
-      <Button onClick={() => {
-        setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
-        setShowEditCredentials(true);
-      }}>
-        <Lock size={13} /> Atualizar Credenciais
-      </Button>
-      <Button onClick={openEditEmployee}>
-        <Edit2 size={13} /> Editar
-      </Button>
-      {detailItem?.pessoa?.status === 'DEMITIDO' ? (
-        <Button variant="primary" onClick={handleReativarEmployee} disabled={fireLoading}>
-          <UserCheck size={13} /> Reativar
-        </Button>
-      ) : (
-        <Button variant="danger" onClick={handleFireEmployee} disabled={fireLoading}>
-          <Trash2 size={13} /> Desligar
-        </Button>
-      )}
-    </div>
-  ) : null;
-
   // ─────────────────────────────────────────────────────────────
   return (
     <div className={styles.page}>
       <div className={styles.container}>
+        {/* Abaixo de 1024px, com uma ficha aberta, ela toma a tela e a lista sai. */}
+        <main className={[styles.split, detailItem ? styles.splitListHidden : ''].join(' ')}>
 
-        <div className={styles.card}>
-          {/* Header */}
-          <div className={styles.tableHeader}>
-            <div className={styles.tableTools}>
-              <div className={styles.searchWrap}>
-                <Search size={13} className={styles.searchIcon} />
-                <Input
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Nome, CPF, email, cargo..."
-                  className={styles.searchInput}
-                />
-                {loading && searchTerm.length >= 3 &&
-                  <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
-              </div>
-              <Button variant="primary" onClick={() => {
-                setNewFunc(blankFuncionario());
-                setShowErrors(false);
-                setShowPassword(false);
-                setShowConfirmPassword(false);
-                setShowAddModal(true);
-              }}>
-                <Plus size={14} /> Adicionar
-              </Button>
+          {/* ══ LISTA ═══════════════════════════════════════════ */}
+          <aside className={styles.listPanel}>
+            <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
+              <Search size={16} className={styles.searchIcon} />
+              <Input
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Buscar por nome, CPF, e-mail ou cargo..."
+                className={styles.searchInput}
+                aria-label="Buscar"
+              />
+              {loading && searchTerm.length >= 3
+                ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
+                : searchTerm.length > 0 &&
+                  <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                    <X size={14} />
+                  </button>
+              }
             </div>
-          </div>
 
-          {/* Table */}
-          <div className={styles.tableWrap}>
-            {loading ? (
-              <div className={styles.empty}><Loader2 size={20} className={styles.spin} /> Carregando...</div>
-            ) : items.length === 0 ? (
-              <div className={styles.empty}><AlertCircle size={26} opacity={0.3} /><span>Nenhum resultado encontrado.</span></div>
-            ) : (
-              <table className={styles.table}>
-                <thead><tr>
-                  <th style={{ width: 44 }}></th>
-                  <th>Nome</th>
-                  <th style={{ width: 140 }}>Cargo</th>
-                  <th style={{ width: 140 }}>Data Admissão</th>
-                  <th style={{ width: 100 }}>Status</th>
-                </tr></thead>
-                <tbody>
-                  {items.map(item => {
-                    const name = item.pessoa?.nome || '—';
-                    const { bg, fg } = avatarColor(name);
-                    return (
-                      <tr key={item.id} className={styles.row} onClick={() => openDetail(item)}>
-                        <td>
-                          <div className={styles.listAvatar} style={{ background: bg, color: fg }}>
-                            {getInitials(name)}
-                          </div>
-                        </td>
-                        <td>
-                          <div className={styles.nome}>{name}</div>
-                          <div className={styles.sub}>{item.usuario?.username || '—'}</div>
-                        </td>
-                        <td className={styles.nome}>{item.cargo?.descricao || '—'}</td>
-                        <td className={styles.mono}>{dateFromApi(item.data_admissao ?? '')}</td>
-                        <td><StatusBadge status={item.pessoa?.status} /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}>
-                <ChevronLeft size={14} />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button key={i}
-                  className={[styles.pageBtn, page === i ? styles.pageBtnActive : ''].join(' ')}
-                  onClick={() => goToPage(i)}>{i + 1}</button>
-              ))}
-              <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}>
-                <ChevRight size={14} />
-              </button>
-              <span className={styles.pageInfo}>{totalElements} registro{totalElements !== 1 ? 's' : ''}</span>
+            <div className={styles.listMeta}>
+              <span>
+                {loading
+                  ? 'Carregando...'
+                  : `${totalElements} funcionário${totalElements !== 1 ? 's' : ''}`}
+              </span>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* ══ MODAL: DETALHE FUNCIONÁRIO ════════════════════════ */}
-      {detailItem && (
-        <Modal
-          open={showDetail}
-          onClose={() => setShowDetail(false)}
-          size="xl"
-          title={
-            <div className={styles.modalTitleBlock}>
-              <AvatarCircle name={detailItem.pessoa?.nome} size={42} />
-              <div>
-                <div className={styles.modalTitleName}>{detailItem.pessoa?.nome ?? '—'}</div>
-                <div className={styles.modalTitleMeta}>
-                  <span className={styles.detailId}>#{detailItem.id}</span>
-                  <StatusBadge status={detailItem.pessoa?.status} />
+            <div className={styles.listScroll}>
+              {loading ? (
+                <SkeletonLista />
+              ) : items.length === 0 ? (
+                <div className={styles.empty}>
+                  <AlertCircle size={24} opacity={0.3} />
+                  <span>Nenhum resultado encontrado.</span>
                 </div>
+              ) : items.map((item, i) => {
+                const nome  = item.pessoa?.nome || '—';
+                const ativo = detailItem?.id === item.id;
+                return (
+                  <button key={item.id} type="button"
+                    className={[styles.listItem, ativo ? styles.listItemActive : ''].join(' ')}
+                    onClick={() => openDetail(item, i)}>
+                    <AvatarCircle name={nome} size={40} tone={i} />
+                    <span className={styles.listItemBody}>
+                      <span className={styles.listItemName}>
+                        <span className={styles.nome}>{nome}</span>
+                        {item.pessoa?.status === 'DEMITIDO' && <span className={styles.badgeDemitido}>Demitido</span>}
+                      </span>
+                      <span className={styles.listItemLoc}>
+                        <Building size={12} /> {item.cargo?.descricao || 'Sem cargo'}
+                      </span>
+                    </span>
+                    <ChevRight size={16} className={styles.listChevron} />
+                  </button>
+                );
+              })}
+            </div>
+
+            {totalPages > 1 && (
+              <div className={styles.pagination}>
+                <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}
+                  aria-label="Página anterior">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}
+                  aria-label="Próxima página">
+                  <ChevRight size={16} />
+                </button>
+              </div>
+            )}
+          </aside>
+
+          {/* ══ DETALHE ═════════════════════════════════════════ */}
+          {!detailItem ? (
+            /* ── Painel geral (nenhum funcionário selecionado) ── */
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <Users size={16} />
+                  <span className={styles.dCardTitle}>Visão geral da equipe</span>
+                  <div className={styles.dCardActions}>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={() => {
+                        setNewFunc(blankFuncionario());
+                        setShowErrors(false);
+                        setShowPassword(false);
+                        setShowConfirmPassword(false);
+                        setShowAddModal(true);
+                      }}>
+                      Adicionar funcionário
+                    </Button>
+                  </div>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  {statsLoading ? (
+                    <SkeletonPainel />
+                  ) : !stats ? (
+                    <div className={styles.empty}>
+                      <AlertCircle size={24} opacity={0.3} />
+                      <span>Não foi possível carregar os totais.</span>
+                    </div>
+                  ) : (
+                    <div className={styles.statGrid}>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Funcionários</p>
+                        <p className={styles.statVal}>{stats.total}</p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Ativos</p>
+                        <p className={[styles.statVal, styles.statValGreen].join(' ')}>
+                          {stats.completo ? stats.ativos : '—'}
+                        </p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Demitidos</p>
+                        <p className={[styles.statVal, styles.statValRed].join(' ')}>
+                          {stats.completo ? stats.demitidos : '—'}
+                        </p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Cargos</p>
+                        <p className={styles.statVal}>{cargos.length}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <div className={styles.detailHint}>
+                Escolha um funcionário na lista ao lado para ver a ficha completa.
               </div>
             </div>
-          }
-          footer={detailFooter}
-        >
-          {/* Tabs */}
-          <div className={styles.tabs}>
-            {[['cadastro', 'Cadastro'], ['profissional', 'Profissional'], ['historico', 'Histórico do Funcionario']].map(([id, label]) => (
-              <button key={id}
-                className={[styles.tab, detailTab === id ? styles.tabActive : ''].join(' ')}
-                onClick={() => setDetailTab(id)}>
-                {label}
-              </button>
-            ))}
-          </div>
+          ) : (
+            /* ── Ficha do funcionário ── */
+            <div className={styles.detailPanel}>
 
-          {/* Tab: Cadastro */}
-          {detailTab === 'cadastro' && (
-            <div className={styles.detailGrid}>
-              <Section title="Dados Pessoais">
-                <KV label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} />
-                <KV label="RG" value={detailItem.pessoa?.rg} />
-                <KV label="Nasc." value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
-                <KV label="Sexo" value={detailItem.pessoa?.sexo === 1 ? 'Masculino' : detailItem.pessoa?.sexo === 2 ? 'Feminino' : 'Outro'} />
-                <KV label="Telefone" value={
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <span>{maskPhone(detailItem.pessoa?.telefone ?? '') || '—'}</span>
-                    {detailItem.pessoa?.telefone && (
-                      <a href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} target="_blank"
-                        rel="noreferrer" className={styles.quickBtn} title="WhatsApp" onClick={e => e.stopPropagation()}>
-                        <Phone size={11} />
-                      </a>
+              {/* ── Dados do funcionário ── */}
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
+                  <button type="button" className={styles.backBtn} onClick={closeDetail}
+                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <CreditCard size={16} />
+                  <span className={styles.dCardTitle}>Dados do funcionário</span>
+                  <div className={styles.dCardActions}>
+                    <Button className={styles.btnSolid} onClick={openEditEmployee}>
+                      Editar
+                    </Button>
+                    {detailItem.pessoa?.status === 'DEMITIDO' ? (
+                      <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                        onClick={handleReativarEmployee} disabled={fireLoading}>
+                        Reativar
+                      </Button>
+                    ) : (
+                      <Button variant="danger" className={[styles.btnSolid, styles.btnDanger].join(' ')}
+                        onClick={handleFireEmployee} disabled={fireLoading}>
+                        Desligar
+                      </Button>
                     )}
+                    <button type="button" className={styles.idClose} onClick={closeDetail}
+                      title="Fechar ficha" aria-label="Fechar ficha">
+                      <X size={16} />
+                    </button>
                   </div>
-                } />
-                <KV label="Email" value={
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <span>{detailItem.pessoa?.email || '—'}</span>
-                    {detailItem.pessoa?.email && (
-                      <a href={`mailto:${detailItem.pessoa.email}`} target="_blank" rel="noreferrer"
-                        className={styles.quickBtn} title="Enviar e-mail" onClick={e => e.stopPropagation()}>
-                        <Mail size={11} />
-                      </a>
-                    )}
-                  </div>
-                } />
-              </Section>
-              <Section title="Endereço">
-                <KV label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} />
-                <KV label="Endereço" value={`${detailItem.pessoa?.endereco ?? ''}${detailItem.pessoa?.numero ? ', ' + detailItem.pessoa.numero : ''}`} />
-                <KV label="Bairro" value={detailItem.pessoa?.bairro} />
-                <KV label="Cidade" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' - ')} />
-                <KV label="País" value={detailItem.pessoa?.pais} />
-              </Section>
-            </div>
-          )}
+                </h3>
 
-          {/* Tab: Profissional */}
-          {detailTab === 'profissional' && (
-            <div className={styles.detailGrid}>
-              <Section title="Profissional">
-                <KV label="Cargo" value={detailItem.cargo?.descricao} />
-                <KV label="Data Admissão" value={dateFromApi(detailItem.data_admissao ?? '')} />
-                <KV label="Salário" value={fmtBRL(detailItem.salario)} />
-                <KV label="Usuário" value={detailItem.usuario?.username} />
-                <KV label="Status Acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Ativo'} />
-              </Section>
-            </div>
-          )}
-
-          {/* Tab: Histórico de Salário */}
-          {detailTab === 'historico' && (
-            <div className={styles.tabBody}>
-              {historicoLoading ? (
-                <div className={styles.empty}><Loader2 size={20} className={styles.spin} /> Carregando histórico...</div>
-              ) : historico.length === 0 ? (
-                <div className={styles.empty}><AlertCircle size={26} opacity={0.3} /><span>Sem histórico de salário.</span></div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {historico.map((h) => (
-                    <div key={h.id}>
-                      <div className={styles.historyCard} style={{
-                        border: '1px solid var(--border)',
-                        padding: 12,
-                        borderRadius: 8,
-                        cursor: 'pointer',
-                        transition: 'background .12s',
-                        background: editHistoryItem?.id === h.id ? 'rgba(124,58,237,.08)' : 'transparent'
-                      }} onMouseEnter={e => !editHistoryItem && (e.currentTarget.style.background = 'rgba(124,58,237,.04)')}
-                         onMouseLeave={e => !editHistoryItem && (e.currentTarget.style.background = 'transparent')}
-                         onClick={() => {
-                           if (editHistoryItem?.id === h.id) {
-                             setEditHistoryItem(null);
-                             setRecebidos([]);
-                           } else {
-                             setEditHistoryItem(h);
-                             setHistoryForm({
-                               cargoId: String(h.cargo?.id ?? ''),
-                               salario: maskBRL(String(Math.round(h.salario * 100)))
-                             });
-                             loadRecebidos(h.id);
-                           }
-                         }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div className={styles.nome}>{h.cargo?.descricao}</div>
-                            <div className={styles.sub}>R$ {maskBRL(String(Math.round(h.salario * 100)))}</div>
-                          </div>
-                          <ChevRight size={14} className={styles.iconMuted} style={{ transform: editHistoryItem?.id === h.id ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-                        </div>
+                <div className={styles.dCardBody}>
+                  <div className={styles.idHead}>
+                    <AvatarCircle name={detailItem.pessoa?.nome} size={56} tone={detailTone} />
+                    <div className={styles.idHeadMain}>
+                      <div className={styles.idName}>
+                        <h2 style={{ margin: 0, font: 'inherit' }}>{detailItem.pessoa?.nome ?? '—'}</h2>
+                        <StatusBadge status={detailItem.pessoa?.status} />
                       </div>
+                      <p className={styles.idSub}>
+                        {detailItem.cargo?.descricao || 'Sem cargo'}
+                        {detailItem.data_admissao && ` · admitido em ${dateFromApi(detailItem.data_admissao)}`}
+                      </p>
+                      <p className={styles.idSub}>Salário atual: {fmtBRL(detailItem.salario)}</p>
+                    </div>
+                  </div>
 
-                      {/* Expandable recebidos section */}
-                      {editHistoryItem?.id === h.id && (
-                        <div style={{
-                          padding: '12px 12px 0 12px',
-                          borderLeft: '2px solid var(--violet)',
-                          marginLeft: '20px',
-                          marginTop: '8px',
+                  <div className={styles.fieldGrid}>
+                    <Field label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} mono />
+                    <Field label="Data de nascimento" value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
+                    <Field label="E-mail" value={detailItem.pessoa?.email ? (
+                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.pessoa.email}`} title="Enviar e-mail">
+                        {detailItem.pessoa.email}
+                      </ContatoBotao>
+                    ) : ''} />
+                    <Field label="Telefone" value={detailItem.pessoa?.telefone ? (
+                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} title="WhatsApp">
+                        {maskPhone(detailItem.pessoa.telefone)}
+                      </ContatoBotao>
+                    ) : ''} />
+                    <Field label="Endereço" value={[
+                      [detailItem.pessoa?.endereco, detailItem.pessoa?.numero].filter(Boolean).join(', '),
+                      detailItem.pessoa?.bairro,
+                    ].filter(Boolean).join(' — ')} />
+                    <Field label="Cidade / UF" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' — ')} />
+                    <Field label="RG" value={detailItem.pessoa?.rg} mono />
+                    <Field label="Sexo" value={
+                      detailItem.pessoa?.sexo === 1 ? 'Masculino'
+                      : detailItem.pessoa?.sexo === 2 ? 'Feminino'
+                      : detailItem.pessoa?.sexo ? 'Outro' : ''
+                    } />
+                    <Field label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} mono />
+                    <Field label="País" value={detailItem.pessoa?.pais} />
+                  </div>
+
+                  {/* ── Acesso ao sistema ── */}
+                  <div className={styles.subBlock}>
+                    <div className={styles.blockHead}>
+                      <Lock size={15} />
+                      <span>Acesso ao sistema</span>
+                      <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                        onClick={() => {
+                          setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
+                          setShowEditCredentials(true);
                         }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-2)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                              Histórico de Recebimentos
-                            </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button
-                                onClick={() => {
-                                  setAddRecebidoForm({
-                                    historicoFuncionarioId: h.id,
-                                    valorRecebido: '',
-                                    dataHoraInicio: null,
-                                    dataHoraFim: null,
-                                    dataHoraPagamento: null,
-                                    tipoPagamentoId: '1',
-                                    descricao: '',
-                                  });
-                                  setRecebidoFile(null);
-                                  setShowAddRecebido(true);
-                                }}
-                                className={styles.historyActionBtn}>
-                                <Plus size={11} /> Novo
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setHistoryForm({
-                                    cargoId: String(h.cargo?.id ?? ''),
-                                    salario: maskBRL(String(Math.round(h.salario * 100)))
-                                  });
-                                  setShowEditHistory(true);
-                                }}
-                                className={styles.historyActionBtn}>
-                                <Edit2 size={11} /> Editar
-                              </button>
-                            </div>
-                          </div>
+                        Atualizar credenciais
+                      </Button>
+                    </div>
+                    <div className={styles.fieldGrid}>
+                      <Field label="Usuário" value={detailItem.usuario?.username} />
+                      <Field label="Situação do acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Liberado'} />
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-                          {recebidosLoading ? (
-                            <div className={styles.empty} style={{ padding: '20px 10px' }}>
-                              <Loader2 size={16} className={styles.spinInline} /> Carregando...
-                            </div>
-                          ) : recebidos.length === 0 ? (
-                            <div style={{ fontSize: '12px', color: 'var(--text-2)', padding: '10px', fontStyle: 'italic' }}>
-                              Sem registros de recebimento
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '10px' }}>
-                              {recebidos.map((r) => (
-                                <div key={r.id} style={{
-                                  padding: '8px',
-                                  background: 'var(--surface-2)',
-                                  borderRadius: '6px',
-                                  fontSize: '12px',
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center'
-                                }}>
-                                  <div>
-                                    <div style={{ color: 'var(--text)', fontWeight: '500' }}>
-                                      R$ {maskBRL(String(Math.round(r.valorRecebido * 100)))}
-                                    </div>
-                                    <div style={{ color: 'var(--text-2)', fontSize: '11px' }}>
-                                      {r.tipoPagamento?.descricao} • {dateFromApi(r.dataHoraPagamento)} {r.descricao && `• ${r.descricao.toUpperCase()}`}
-                                    </div>
-                                  </div>
-                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                    {r.pathArquivoComprovante && (
-                                      <button onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleDownloadArquivo(r.pathArquivoComprovante);
-                                      }}
-                                        className={styles.historyActionBtn}>
-                                        <Download size={11} /> Doc.
-                                      </button>
-                                    )}
-                                    <button onClick={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      setEditRecebidoItem(r);
-                                      setEditRecebidoForm({
-                                        historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
-                                        valorRecebido: maskBRL(String(Math.round(r.valorRecebido * 100))),
-                                        dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
-                                        dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
-                                        dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
-                                        tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
-                                        descricao: r.descricao ?? '',
-                                      });
-                                      setEditRecebidoFile(null);
-                                      setShowEditRecebido(true);
-                                    }}
-                                    className={styles.historyActionBtn}>
-                                      <Edit2 size={11} /> Editar
-                                    </button>
+              {/* ── Histórico do funcionário ── */}
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <Calendar size={16} />
+                  <span className={styles.dCardTitle}>Histórico do funcionário</span>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  {historicoLoading ? (
+                    <div className={styles.empty}>
+                      <Loader2 size={18} className={styles.spinInline} /> Carregando histórico...
+                    </div>
+                  ) : historico.length === 0 ? (
+                    <p className={styles.blockEmpty}>Sem histórico de cargo e salário.</p>
+                  ) : (
+                    <div className={styles.histList}>
+                      {historico.map((h) => {
+                        const aberto = editHistoryItem?.id === h.id;
+                        return (
+                          <div key={h.id} className={styles.histItem}>
+                            <button type="button" className={styles.histToggle}
+                              aria-expanded={aberto}
+                              onClick={() => {
+                                if (aberto) { setEditHistoryItem(null); setRecebidos([]); return; }
+                                setEditHistoryItem(h);
+                                setHistoryForm({
+                                  cargoId: String(h.cargo?.id ?? ''),
+                                  salario: maskBRL(String(Math.round(h.salario * 100))),
+                                });
+                                loadRecebidos(h.id);
+                              }}>
+                              <span>
+                                <span className={styles.histCargo}>{h.cargo?.descricao || '—'}</span>
+                                <span className={styles.histSalario}>{fmtBRL(h.salario)}</span>
+                              </span>
+                              <ChevRight size={16}
+                                className={[styles.histChevron, aberto ? styles.histChevronOpen : ''].join(' ')} />
+                            </button>
+
+                            {aberto && (
+                              <div className={styles.histPanel}>
+                                <div className={styles.histPanelHead}>
+                                  <span>Recebimentos</span>
+                                  <div className={styles.histPanelActions}>
+                                    <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                      onClick={() => {
+                                        setAddRecebidoForm({
+                                          historicoFuncionarioId: h.id,
+                                          valorRecebido: '',
+                                          dataHoraInicio: null,
+                                          dataHoraFim: null,
+                                          dataHoraPagamento: null,
+                                          tipoPagamentoId: '1',
+                                          descricao: '',
+                                        });
+                                        setRecebidoFile(null);
+                                        setShowAddRecebido(true);
+                                      }}>
+                                      Novo
+                                    </Button>
+                                    <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                      onClick={() => {
+                                        setHistoryForm({
+                                          cargoId: String(h.cargo?.id ?? ''),
+                                          salario: maskBRL(String(Math.round(h.salario * 100))),
+                                        });
+                                        setShowEditHistory(true);
+                                      }}>
+                                      Editar
+                                    </Button>
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+
+                                {recebidosLoading ? (
+                                  <div className={styles.empty} style={{ padding: '16px 10px' }}>
+                                    <Loader2 size={16} className={styles.spinInline} /> Carregando...
+                                  </div>
+                                ) : recebidos.length === 0 ? (
+                                  <p className={styles.blockEmpty} style={{ paddingLeft: 8 }}>
+                                    Sem registros de recebimento.
+                                  </p>
+                                ) : (
+                                  <div className={styles.recebList}>
+                                    {recebidos.map((r) => (
+                                      <div key={r.id} className={styles.recebRow}>
+                                        <div style={{ minWidth: 0 }}>
+                                          <div className={styles.recebVal}>{fmtBRL(r.valorRecebido)}</div>
+                                          <div className={styles.recebMeta}>
+                                            {r.tipoPagamento?.descricao} · {dateFromApi(r.dataHoraPagamento)}
+                                            {r.descricao && ` · ${r.descricao.toUpperCase()}`}
+                                          </div>
+                                        </div>
+                                        <div className={styles.recebActions}>
+                                          {r.pathArquivoComprovante && (
+                                            <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                              onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}>
+                                              Comprovante
+                                            </Button>
+                                          )}
+                                          <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                            onClick={() => {
+                                              setEditRecebidoItem(r);
+                                              setEditRecebidoForm({
+                                                historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
+                                                valorRecebido: maskBRL(String(Math.round(r.valorRecebido * 100))),
+                                                dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
+                                                dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
+                                                dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
+                                                tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
+                                                descricao: r.descricao ?? '',
+                                              });
+                                              setEditRecebidoFile(null);
+                                              setShowEditRecebido(true);
+                                            }}>
+                                            Editar
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+              </section>
             </div>
           )}
-        </Modal>
-      )}
+        </main>
+      </div>
+
 
       {/* ══ MODAL: EDITAR FUNCIONÁRIO ═════════════════════════ */}
       <Modal

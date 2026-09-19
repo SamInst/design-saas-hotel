@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Search, Plus, Loader2, ShieldCheck, Edit2,
+  Search, Loader2, ShieldCheck, X,
   Lock, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
@@ -25,6 +25,48 @@ const FINANCEIRO_CASCADES = {
 const FINANCEIRO_AUTO = 'HISTORICO DO FLUXO DE CAIXA';
 const isFinanceiro = tela => (tela?.nome ?? tela?.descricao ?? '').toUpperCase() === 'FINANCEIRO';
 
+// ── Campo rótulo/valor do painel de detalhe ──────────────────
+function Field({ label, value }) {
+  const vazio = value == null || value === '';
+  return (
+    <div>
+      <p className={styles.fLabel}>{label}</p>
+      <p className={styles.fVal}>{vazio ? '—' : value}</p>
+    </div>
+  );
+}
+
+// ── Esqueletos de carregamento ───────────────────────────────
+const sk = (...extra) => [styles.sk, ...extra].join(' ');
+
+function SkeletonLista({ linhas = 7 }) {
+  return (
+    <div role="status" aria-label="Carregando cargos">
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className={styles.listItem} aria-hidden="true">
+          <span className={styles.listItemBody}>
+            <span className={sk(styles.skName)} style={{ width: `${52 + ((i * 13) % 26)}%` }} />
+            <span className={sk(styles.skSub)} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SkeletonPainel() {
+  return (
+    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+      {Array.from({ length: 3 }, (_, i) => (
+        <div key={i} className={styles.statCard} aria-hidden="true">
+          <span className={sk(styles.skLabel)} />
+          <span className={sk(styles.skNumero)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── main component ───────────────────────────────────────────
 export default function RolePermissions() {
 
@@ -43,8 +85,7 @@ export default function RolePermissions() {
   const [systemDataLoaded, setSystemDataLoaded] = useState(false);
   const [permDescMap, setPermDescMap]           = useState({});   // { permId: descricao }
 
-  // ── modals ────────────────────────────────────────────────
-  const [detailModal,   setDetailModal]   = useState(false);
+  // ── ficha aberta no painel de detalhe / modal de formulário ──
   const [formModal,     setFormModal]     = useState(false);
   const [selectedCargo, setSelectedCargo] = useState(null);
   const [isEditing,     setIsEditing]     = useState(false);
@@ -130,8 +171,30 @@ export default function RolePermissions() {
     void telaId; // systemPerms já preenchido em loadSystemData
   }, []);
 
-  // ── open detail ───────────────────────────────────────────
-  const openDetail = (cargo) => { setSelectedCargo(cargo); setDetailModal(true); };
+  // O painel geral mostra os totais de telas e permissões do sistema, então
+  // agora isso precisa carregar na montagem, não só ao abrir o formulário.
+  useEffect(() => { loadSystemData(); }, [loadSystemData]);
+
+  // ── painel de detalhe ─────────────────────────────────────
+  const openDetail  = (cargo) => setSelectedCargo(cargo);
+  const closeDetail = () => setSelectedCargo(null);
+
+  // Depois de salvar, loadCargos recria os objetos: a ficha aberta precisa
+  // apontar para a versão nova, ou fica mostrando os dados antigos.
+  useEffect(() => {
+    if (!selectedCargo) return;
+    const fresco = cargos.find(c => c.id === selectedCargo.id);
+    if (fresco && fresco !== selectedCargo) setSelectedCargo(fresco);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cargos]);
+
+  const clearSearch = () => {
+    setSearch('');
+    setPage(0);
+    clearTimeout(searchTimer.current);
+    setSearchLoading(true);
+    loadCargos(0, '');
+  };
 
   // ── open create ───────────────────────────────────────────
   const openCreate = async () => {
@@ -170,7 +233,6 @@ export default function RolePermissions() {
     await loadSystemData();
     for (const tela of (cargo.telas ?? [])) loadPermsForTela(tela.id);
 
-    setDetailModal(false);
     setFormModal(true);
   };
 
@@ -305,173 +367,240 @@ export default function RolePermissions() {
     }
   };
 
-  // ── pagination ────────────────────────────────────────────
-  const pageButtons = () => {
-    const btns = [];
-    const start = Math.max(0, page - 2);
-    const end   = Math.min(totalPages - 1, page + 2);
-    for (let i = start; i <= end; i++) btns.push(i);
-    return btns;
-  };
+  // ── Render ────────────────────────────────────────────────
+  // Totais do painel geral: as telas/permissões do sistema só chegam depois
+  // de loadSystemData, então enquanto não chegam o cartão mostra o esqueleto.
+  const totalPermsSistema = systemTelas.reduce((n, t) => n + (t.permissoes ?? []).length, 0);
 
-  // ─────────────────────────────────────────────────────────
+  const telasDoCargo = selectedCargo?.telas ?? [];
+  const permsDoCargo = telasDoCargo.reduce((n, t) => n + (t.permissoes ?? []).length, 0);
+
   return (
     <div className={styles.page}>
+      <Notification notification={notification} />
       <div className={styles.container}>
+        {/* Abaixo de 1024px, com uma ficha aberta, ela toma a tela e a lista sai. */}
+        <main className={[styles.split, selectedCargo ? styles.splitListHidden : ''].join(' ')}>
 
-        {/* ── CARD ── */}
-        <div className={styles.card}>
-
-          {/* toolbar inside card */}
-          <div className={styles.tableHeader}>
-            <div className={styles.tableTools}>
-              <div className={styles.searchWrap}>
-                <Search size={14} className={styles.searchIcon} />
-                <Input
-                  className={styles.searchInput}
-                  placeholder="Buscar cargo..."
-                  value={search}
-                  onChange={handleSearch}
-                />
-                {searchLoading && (
-                  <Loader2 size={14} className={[styles.searchSpinner, styles.spin].join(' ')} />
+          {/* ══ LISTA ═══════════════════════════════════════════ */}
+          <aside className={styles.listPanel}>
+            <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
+              <Search size={16} className={styles.searchIcon} />
+              <Input
+                value={search}
+                onChange={handleSearch}
+                placeholder="Buscar cargo..."
+                className={styles.searchInput}
+                aria-label="Buscar"
+              />
+              {searchLoading
+                ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
+                : search.length > 0 && (
+                  <button className={styles.searchClear} onClick={clearSearch} aria-label="Limpar busca">
+                    <X size={14} />
+                  </button>
                 )}
-              </div>
-              <Button variant="primary" onClick={openCreate}>
-                <Plus size={15} />
-                Novo Cargo
+            </div>
+
+            <div className={styles.listMeta}>
+              <span>
+                {loading ? 'Carregando...' : `${totalElements} cargo${totalElements !== 1 ? 's' : ''}`}
+              </span>
+              <Button className={[styles.btnSolid, styles.btnSm, styles.btnPrimary].join(' ')}
+                onClick={openCreate}>
+                Novo cargo
               </Button>
             </div>
-          </div>
 
-          <div className={styles.tableWrap}>
-            {loading ? (
-              <div className={styles.empty}>
-                <Loader2 size={22} className={styles.spin} />
-                Carregando cargos…
-              </div>
-            ) : cargos.length === 0 ? (
-              <div className={styles.empty}>
-                <ShieldCheck size={28} style={{ opacity: .3 }} />
-                Nenhum cargo encontrado
-              </div>
-            ) : (
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={{ width: 60 }}>#</th>
-                    <th>Cargo</th>
-                    <th>Telas vinculadas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cargos.map(cargo => (
-                    <tr key={cargo.id} className={styles.row} onClick={() => openDetail(cargo)}>
-                      <td><span className={styles.cargoId}>#{cargo.id}</span></td>
-                      <td><span className={styles.cargoName}>{cargo.descricao}</span></td>
-                      <td><TelaTags telas={cargo.telas ?? []} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+            <div className={styles.listScroll}>
+              {loading ? (
+                <SkeletonLista />
+              ) : cargos.length === 0 ? (
+                <div className={styles.empty}>
+                  <ShieldCheck size={24} opacity={0.3} />
+                  <span>{search ? 'Nenhum cargo encontrado.' : 'Nenhum cargo cadastrado.'}</span>
+                </div>
+              ) : cargos.map(cargo => {
+                const telas = cargo.telas ?? [];
+                const ativo = selectedCargo?.id === cargo.id;
+                return (
+                  <button key={cargo.id} type="button"
+                    className={[styles.listItem, ativo ? styles.listItemActive : ''].join(' ')}
+                    onClick={() => openDetail(cargo)}>
+                    <span className={styles.listItemBody}>
+                      <span className={styles.listItemName}>
+                        <span className={styles.nome}>{cargo.descricao}</span>
+                        <span className={styles.idMono}>#{cargo.id}</span>
+                      </span>
+                      <span className={styles.listItemSub}>
+                        <TelaTags telas={telas} />
+                      </span>
+                    </span>
+                    <ChevronRight size={16} className={styles.listChevron} />
+                  </button>
+                );
+              })}
+            </div>
 
-          {totalPages > 1 && (
-            <div className={styles.pagination}>
-              <button className={styles.pageBtn} onClick={() => handlePageChange(page - 1)} disabled={page === 0}>
-                <ChevronLeft size={14} />
-              </button>
-              {pageButtons().map(p => (
-                <button
-                  key={p}
-                  className={[styles.pageBtn, p === page ? styles.pageBtnActive : ''].join(' ')}
-                  onClick={() => handlePageChange(p)}
-                >
-                  {p + 1}
+            {totalPages > 1 && (
+              <div className={styles.pagination}>
+                <button className={styles.pageBtn} disabled={page === 0}
+                  onClick={() => handlePageChange(page - 1)} aria-label="Página anterior">
+                  <ChevronLeft size={16} />
                 </button>
-              ))}
-              <button className={styles.pageBtn} onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages - 1}>
-                <ChevronRight size={14} />
-              </button>
-              <span className={styles.pageInfo}>{totalElements} resultado{totalElements !== 1 ? 's' : ''}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── DETAIL MODAL ── */}
-      <Modal
-        open={detailModal}
-        onClose={() => setDetailModal(false)}
-        title={
-          selectedCargo
-            ? <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <ShieldCheck size={15} style={{ color: 'var(--violet)', flexShrink: 0 }} />
-                <span>{selectedCargo.descricao}</span>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-2)', fontWeight: 400 }}>
-                  #{selectedCargo.id}
-                </span>
-              </span>
-            : 'Cargo'
-        }
-        size="md"
-        footer={
-          <div className={styles.modalFooter}>
-            <Button variant="primary" className={styles.full} onClick={() => openEdit(selectedCargo)}>
-              <Edit2 size={14} />
-              Editar
-            </Button>
-          </div>
-        }
-      >
-        {selectedCargo && (
-          <div>
-            <div className={styles.detailSectionTitle}>
-              <Lock size={12} />
-              Telas e Permissões
-            </div>
-
-            {(selectedCargo.telas ?? []).length === 0 ? (
-              <div className={styles.detailNoTelas}>
-                <ShieldCheck size={24} style={{ opacity: .25 }} />
-                Nenhuma tela vinculada
+                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <button className={styles.pageBtn} disabled={page >= totalPages - 1}
+                  onClick={() => handlePageChange(page + 1)} aria-label="Próxima página">
+                  <ChevronRight size={16} />
+                </button>
               </div>
-            ) : (
-              <div className={styles.detailTelas}>
-                {(selectedCargo.telas ?? []).map(tela => (
-                  <div key={tela.id} className={styles.detailTelaCard}>
-                    <div className={styles.detailTelaHeader}>
-                      <div className={styles.detailTelaIcon}>
-                        <ShieldCheck size={13} />
+            )}
+          </aside>
+
+          {/* ══ DETALHE ═════════════════════════════════════════ */}
+          {!selectedCargo ? (
+            /* ── Painel geral (nenhum cargo selecionado) ── */
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <ShieldCheck size={16} />
+                  <span className={styles.dCardTitle}>Visão geral de acessos</span>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  {!systemDataLoaded ? (
+                    <SkeletonPainel />
+                  ) : (
+                    <div className={styles.statGrid}>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Cargos</p>
+                        <p className={styles.statVal}>{totalElements}</p>
                       </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className={styles.detailTelaName}>{tela.nome ?? tela.descricao}</div>
-                        {tela.descricao && tela.nome && (
-                          <div className={styles.detailTelaDesc}>{tela.descricao}</div>
-                        )}
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Telas do sistema</p>
+                        <p className={styles.statVal}>{systemTelas.length}</p>
+                      </div>
+                      <div className={styles.statCard}>
+                        <p className={styles.statLabel}>Permissões do sistema</p>
+                        <p className={styles.statVal}>{totalPermsSistema}</p>
                       </div>
                     </div>
+                  )}
+                </div>
+              </section>
 
-                    {(tela.permissoes ?? []).length === 0 ? (
-                      <div className={styles.detailPermEmpty}>Sem permissões específicas</div>
-                    ) : (
-                      <div className={styles.detailPermList}>
-                        {(tela.permissoes ?? []).map(p => (
-                          <div key={p.id} className={styles.detailPermItem}>
-                            <span className={styles.detailPermBullet} />
-                            <span>{p.descricao ?? p.permissao}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className={styles.detailHint}>
+                Escolha um cargo na lista ao lado para ver as telas e permissões.
               </div>
-            )}
-          </div>
-        )}
-      </Modal>
+            </div>
+          ) : (
+            /* ── Ficha do cargo ── */
+            <div className={styles.detailPanel}>
+
+              {/* ── Identificação ── */}
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn} onClick={closeDetail}
+                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <ShieldCheck size={16} />
+                  <span className={styles.dCardTitle}>Dados do cargo</span>
+                  <div className={styles.dCardActions}>
+                    <Button className={styles.btnSolid} onClick={() => openEdit(selectedCargo)}>
+                      Editar
+                    </Button>
+                    <button type="button" className={styles.idClose} onClick={closeDetail}
+                      title="Fechar ficha" aria-label="Fechar ficha">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  <div className={styles.idHead}>
+                    <div className={styles.idHeadMain}>
+                      <div className={styles.idName}>
+                        <h2 style={{ margin: 0, font: 'inherit' }}>{selectedCargo.descricao}</h2>
+                        <span className={styles.idMono}>#{selectedCargo.id}</span>
+                      </div>
+                      {telasDoCargo.length === 0 && (
+                        <div className={styles.idTags}>
+                          <span className={[styles.tag, styles.tagMuted].join(' ')}>Sem acesso a nenhuma tela</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* "x de y" diz mais que a contagem sozinha: mostra o quanto
+                      do sistema este cargo alcança. */}
+                  <div className={styles.fieldGrid}>
+                    <Field
+                      label="Telas com acesso"
+                      value={systemDataLoaded
+                        ? `${telasDoCargo.length} de ${systemTelas.length}`
+                        : telasDoCargo.length}
+                    />
+                    <Field
+                      label="Permissões concedidas"
+                      value={systemDataLoaded && totalPermsSistema > 0
+                        ? `${permsDoCargo} de ${totalPermsSistema}`
+                        : permsDoCargo}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              {/* ── Telas e permissões ── */}
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <Lock size={16} />
+                  <span className={styles.dCardTitle}>Telas e permissões</span>
+                </h3>
+
+                <div className={styles.dCardBody}>
+                  {telasDoCargo.length === 0 ? (
+                    <p className={styles.blockEmpty}>Nenhuma tela vinculada a este cargo.</p>
+                  ) : (
+                    <div className={styles.telaGrid}>
+                      {telasDoCargo.map(tela => {
+                        const perms = tela.permissoes ?? [];
+                        return (
+                          <div key={tela.id} className={styles.telaCard}>
+                            <div className={styles.telaCardHead}>
+                              <span className={styles.telaCardNome}>{tela.nome ?? tela.descricao}</span>
+                              {perms.length > 0 && (
+                                <span className={[styles.tag, styles.telaCardCount].join(' ')}>{perms.length}</span>
+                              )}
+                            </div>
+                            {tela.nome && tela.descricao && tela.descricao !== tela.nome && (
+                              <p className={styles.telaCardDesc}>{tela.descricao}</p>
+                            )}
+
+                            {perms.length === 0 ? (
+                              <p className={styles.permEmpty}>Sem permissões específicas.</p>
+                            ) : (
+                              <div className={styles.permList}>
+                                {perms.map(p => (
+                                  <span key={p.id} className={styles.permItem}>
+                                    <span className={styles.permBullet} />
+                                    <span>{p.descricao ?? p.permissao}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
+        </main>
+      </div>
+
 
       {/* ── CREATE / EDIT MODAL ── */}
       <Modal
@@ -614,22 +743,24 @@ export default function RolePermissions() {
         </div>
       </Modal>
 
-      <Notification notification={notification} />
     </div>
   );
 }
 
 // ── TelaTags ─────────────────────────────────────────────────
+// Só as duas primeiras telas cabem na linha da lista; o resto vira "+n".
 function TelaTags({ telas }) {
-  if (!telas || telas.length === 0) return <span className={styles.telaTagEmpty}>—</span>;
-  const visible = telas.slice(0, 3);
+  if (!telas || telas.length === 0) {
+    return <span className={[styles.tag, styles.tagMuted].join(' ')}>Sem telas</span>;
+  }
+  const visible = telas.slice(0, 2);
   const rest    = telas.length - visible.length;
   return (
-    <div className={styles.telaTags}>
+    <>
       {visible.map(t => (
-        <span key={t.id} className={styles.telaTag}>{t.nome ?? t.descricao}</span>
+        <span key={t.id} className={styles.tag}>{t.nome ?? t.descricao}</span>
       ))}
-      {rest > 0 && <span className={styles.telaTagMore}>+{rest}</span>}
-    </div>
+      {rest > 0 && <span className={[styles.tag, styles.tagMuted].join(' ')}>+{rest}</span>}
+    </>
   );
 }

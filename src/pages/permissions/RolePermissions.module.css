@@ -1,89 +1,346 @@
-/* ── Layout ── */
-.page      { min-height: 100%; }
-.container { max-width: 1400px; margin: 0 auto; padding: 0; }
+/* ═════════════════════════════════════════════════════════════
+   Cargos e Permissões — mesma estética das telas de Cadastro,
+   Funcionários e Preços: tokens do protótipo (Lovable/Hotalize)
+   em oklch, no escopo da página.
+   Escalas do Tailwind do protótipo: 1=4px … 6=24px;
+   text-xs=12px, text-sm=14px, text-lg=18px, text-xl=20px;
+   radius 0.75rem → md 10px, lg 12px, xl 16px.
+   ═════════════════════════════════════════════════════════════ */
+.page {
+  --l-bg:            oklch(0.988 0.003 250);
+  --l-card:          oklch(1 0 0);
+  --l-fg:            oklch(0.24 0.03 262);
+  --l-muted-fg:      oklch(0.52 0.03 258);
+  --l-border:        oklch(0.925 0.008 255);
+  --l-primary:       oklch(0.55 0.21 262);
+  --l-primary-fg:    oklch(0.985 0.005 250);
+  --l-secondary:     oklch(0.965 0.008 255);
+  --l-secondary-fg:  oklch(0.32 0.03 262);
+  --l-accent:        oklch(0.945 0.018 255);
+  --l-accent-fg:     oklch(0.32 0.05 262);
+  --l-destructive:   oklch(0.6 0.22 25);
+  --l-ring:          oklch(0.65 0.15 260);
 
-/* ── Toolbar dentro do card ── */
-.tableHeader {
-  display: flex; gap: 12px; align-items: center;
-  justify-content: space-between; flex-wrap: wrap;
-  padding: 14px 16px 12px; border-bottom: 1px solid var(--border);
-}
-.h2       { font-size: 18px; font-weight: 700; color: var(--text); margin: 0; }
-.subtitle { font-size: 12px; color: var(--text-2); margin: 3px 0 0; }
-.tableTools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  --l-emerald-bg: oklch(0.95 0.052 163.051);
+  --l-emerald-fg: oklch(0.432 0.095 166.913);
 
-.searchWrap    { position: relative; min-width: 220px; display: flex; align-items: center; }
-.searchIcon    { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-2); pointer-events: none; flex-shrink: 0; }
-.searchInput   { padding-left: 32px !important; }
-.searchSpinner { position: absolute; right: 10px; color: var(--violet); }
+  --l-radius: 0.75rem;
+  --l-r-md: calc(var(--l-radius) - 2px);
+  --l-r-lg: var(--l-radius);
+  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
-/* ── Card principal ── */
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
-}
-
-/* ── Table ── */
-.tableWrap { overflow-x: auto; min-height: 180px; }
-.table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.table th {
-  padding: 9px 16px; text-align: left;
-  font-size: 11px; font-weight: 600; color: var(--text-2);
-  background: var(--surface-2); border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.table td  { padding: 10px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
-.row       { cursor: pointer; transition: background .12s; }
-.row:hover { background: rgba(124,58,237,.04); }
-.row:last-child td { border-bottom: none; }
-
-.cargoName { font-size: 13px; font-weight: 600; color: var(--text); }
-.cargoId   {
-  font-size: 11px; font-family: var(--font-mono); color: var(--text-2);
-  background: var(--surface-2); border: 1px solid var(--border);
-  padding: 1px 7px; border-radius: 6px;
+  /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
+  margin: -18px -22px;
+  height: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--l-bg);
+  color: var(--l-fg);
 }
 
-/* ── Tela tags in table ── */
-.telaTags  { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
-.telaTag   {
-  font-size: 11px; font-weight: 500; padding: 2px 9px; border-radius: 20px;
-  background: rgba(124,58,237,.1); color: var(--violet);
-  border: 1px solid rgba(124,58,237,.2); white-space: nowrap;
+[data-theme='dark'] .page {
+  --l-bg:           oklch(0.129 0.042 264.695);
+  --l-card:         oklch(0.208 0.042 265.755);
+  --l-fg:           oklch(0.984 0.003 247.858);
+  --l-muted-fg:     oklch(0.704 0.04 256.788);
+  --l-border:       oklch(1 0 0 / 10%);
+  --l-secondary:    oklch(0.279 0.041 260.031);
+  --l-secondary-fg: oklch(0.984 0.003 247.858);
+  --l-accent:       oklch(0.279 0.041 260.031);
+  --l-accent-fg:    oklch(0.984 0.003 247.858);
+  --l-destructive:  oklch(0.704 0.191 22.216);
+  --l-ring:         oklch(0.551 0.027 264.364);
+  --l-shadow: none;
+
+  --l-emerald-bg: oklch(0.28 0.05 165);
+  --l-emerald-fg: oklch(0.8 0.13 163);
 }
-.telaTagMore  { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); }
-.telaTagEmpty { font-size: 12px; color: var(--text-2); }
+
+.container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+.split {
+  flex: 1; min-height: 0; width: 100%;
+  display: grid; gap: 20px;
+  grid-template-columns: minmax(0, 1fr);
+  overflow-y: auto;
+  padding: 10px 24px 24px;
+}
+@media (min-width: 1024px) {
+  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
+}
+
+/* ══ LISTA ═══════════════════════════════════════════════════ */
+.listPanel {
+  display: flex; flex-direction: column; min-height: 0;
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
+}
+@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+
+.searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
+.searchWrapFull { min-width: 0; width: 100%; }
+.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchInput    { padding-left: 36px !important; }
+.searchWrapFull .searchInput {
+  height: 40px; width: 100%;
+  border-radius: var(--l-r-lg) !important;
+  border: 1px solid var(--l-border) !important;
+  background: var(--l-bg) !important;
+  color: var(--l-fg) !important;
+  padding-right: 12px !important;
+  font-size: 14px !important;
+  box-shadow: none !important;
+}
+.searchWrapFull .searchInput:focus {
+  outline: none;
+  border-color: var(--l-ring) !important;
+  box-shadow: 0 0 0 2px var(--l-ring) !important;
+}
+.searchSpinner { position: absolute; right: 12px; color: var(--l-primary); }
+.searchClear {
+  position: absolute; right: 10px;
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: none; background: transparent; color: var(--l-muted-fg);
+  cursor: pointer; opacity: .6; transition: opacity .12s; flex-shrink: 0;
+}
+.searchClear:hover { opacity: 1; }
+
+.listMeta {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+
+.listScroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  margin-top: 8px; display: flex; flex-direction: column; gap: 6px;
+}
+.listItem {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 12px;
+  border-radius: var(--l-r-lg);
+  border: 1px solid transparent; background: transparent;
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.listItem:hover { background: var(--l-accent); }
+.listItemActive,
+.listItemActive:hover {
+  background: color-mix(in oklch, var(--l-primary) 10%, transparent);
+  border-color: color-mix(in oklch, var(--l-primary) 35%, transparent);
+}
+.listItemBody { flex: 1; min-width: 0; }
+.listItemName { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.listItemSub {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-top: 5px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+.listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
+
+.nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.idMono {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 400;
+  color: var(--l-muted-fg); flex-shrink: 0;
+}
+
+/* ── Etiquetas ── */
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 5px;
+  border: 1px solid var(--l-border); background: var(--l-secondary); color: var(--l-secondary-fg);
+  font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap;
+}
+.tagPrimary { border-color: color-mix(in oklch, var(--l-primary) 35%, transparent); background: color-mix(in oklch, var(--l-primary) 12%, transparent); color: var(--l-primary); }
+.tagEmerald { border-color: color-mix(in oklch, var(--l-emerald-fg) 30%, transparent); background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
+.tagMuted   { color: var(--l-muted-fg); background: var(--l-bg); }
 
 /* ── Paginação ── */
-.pagination { display:flex; align-items:center; gap:4px; padding:10px 16px; border-top:1px solid var(--border); background:var(--surface-2); }
+.pagination { display: flex; align-items: center; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--l-border); }
 .pageBtn {
-  display:inline-flex; align-items:center; justify-content:center;
-  min-width:30px; height:30px; padding:0 6px;
-  border-radius:8px; border:1px solid var(--border);
-  background:var(--surface); color:var(--text-2);
-  font-size:12px; font-weight:500; cursor:pointer; transition:all .12s;
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 1px solid var(--l-border); border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg); cursor: pointer;
+  transition: background-color .15s, color .15s;
 }
-.pageBtn:hover:not(:disabled) { border-color:var(--violet); color:var(--violet); }
-.pageBtn:disabled              { opacity:.4; cursor:not-allowed; }
-.pageBtnActive { background:var(--violet); color:#fff; border-color:var(--violet); }
-.pageInfo      { margin-left:8px; font-size:12px; color:var(--text-2); }
+.pageBtn:hover:not(:disabled) { background: var(--l-accent); color: var(--l-accent-fg); }
+.pageBtn:disabled { opacity: .5; cursor: not-allowed; }
+.pageCurrent { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--l-fg); white-space: nowrap; }
 
-/* ── Empty / loading ── */
-.empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:48px 20px; color:var(--text-2); font-size:13px; }
-.spin       { animation:spin .8s linear infinite; }
-.spinInline { animation:spin .8s linear infinite; display:inline-block; flex-shrink:0; }
-@keyframes spin { to { transform:rotate(360deg); } }
+/* ── Vazio / carregando ── */
+.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; text-align: center; }
+.spin       { animation: spin .8s linear infinite; }
+.spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Modal form ── */
+/* ── Esqueletos ── */
+.sk {
+  position: relative; overflow: hidden; display: block; flex-shrink: 0;
+  background: var(--l-secondary); border-radius: 6px;
+}
+.sk::after {
+  content: ''; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--l-card) 75%, transparent), transparent);
+  animation: skShine 1.3s ease-in-out infinite;
+}
+@keyframes skShine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
+.skName   { width: 70%; height: 13px; }
+.skSub    { width: 45%; height: 10px; margin-top: 6px; }
+.skLabel  { width: 58%; height: 10px; }
+.skNumero { width: 46%; height: 22px; margin-top: 8px; }
+
+/* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+
+.dCard {
+  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); padding: 20px; box-shadow: var(--l-shadow);
+}
+.dCardHead {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
+}
+.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardTitle { font-weight: 700; }
+.dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.dCardBody { margin-top: 16px; }
+
+/* Voltar para a lista — à esquerda do título, só quando a ficha ocupa a tela */
+.backBtn {
+  display: none; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s;
+}
+.backBtn:hover { background: var(--l-accent); }
+
+.idClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s, color .15s;
+}
+.idClose:hover { background: var(--l-accent); color: var(--l-accent-fg); }
+
+.idHead {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+}
+.idHeadMain { min-width: 0; flex: 1; }
+.idName { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
+.idTags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* Campos rótulo/valor */
+.fieldGrid { display: grid; gap: 16px 24px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.fLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.fVal   { margin-top: 2px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow-wrap: break-word; }
+
+/* Aviso de "nada aqui" dentro do corpo de um cartão */
+.blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
+
+/* ── Botões: cor sólida, sem brilho nem ícone ── */
+.page .btnSolid {
+  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
+  padding: 8px 14px; font-size: 13px; font-weight: 600;
+  background: var(--l-secondary); color: var(--l-secondary-fg);
+  box-shadow: none; transition: background-color .15s, color .15s;
+}
+.page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
+.page .btnSolid:active { transform: none; }
+.page .btnSm { padding: 5px 11px; font-size: 12px; }
+.page .btnPrimary { background: var(--l-primary); color: var(--l-primary-fg); }
+.page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
+
+/* ── Painel geral (nada selecionado) ── */
+.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.statCard {
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px;
+}
+.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
+.detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
+
+/* ── Telas do cargo ──
+   auto-fit responde à largura do painel: as telas ficam lado a lado
+   enquanto couberem e quebram sozinhas quando não couberem. */
+.telaGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); align-items: start; }
+.telaCard {
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-bg); padding: 14px 16px; min-width: 0;
+}
+.telaCardHead { display: flex; align-items: baseline; gap: 8px; }
+.telaCardNome {
+  font-size: 13px; line-height: 18px; font-weight: 700; color: var(--l-fg);
+  min-width: 0; overflow-wrap: anywhere;
+}
+.telaCardDesc { margin-top: 2px; font-size: 11px; line-height: 15px; color: var(--l-muted-fg); }
+.telaCardCount { margin-left: auto; flex-shrink: 0; }
+
+.permList { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.permItem {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 12px; line-height: 17px; color: var(--l-fg);
+}
+.permBullet {
+  flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--l-primary); transform: translateY(-2px);
+}
+.permEmpty { margin-top: 10px; font-size: 12px; color: var(--l-muted-fg); }
+
+/* ── Responsivo ── */
+@media (max-width: 1023px) {
+  .splitListHidden .listPanel { display: none; }
+  .split { padding: 8px 16px 16px; gap: 16px; }
+  .detailPanel { order: 1; }
+  .listPanel   { order: 2; }
+  .listScroll { flex: none; max-height: 55vh; }
+  .backBtn { display: inline-flex; }
+}
+
+@media (max-width: 640px) {
+  .page  { margin: -12px -12px -24px; }
+  .split { padding: 6px 12px 12px; gap: 12px; }
+  .listPanel { padding: 12px; }
+  .dCard { padding: 14px; }
+  .idHead { gap: 12px; margin-bottom: 18px; padding-bottom: 16px; }
+  .idName { font-size: 18px; line-height: 24px; }
+  .dCardHead { flex-wrap: wrap; }
+  .dCardActions { margin-left: 0; flex: 1 1 100%; }
+  .dCardActions > * { flex: 1; }
+  .dCardActions > .idClose { flex: 0 0 auto; }
+  .statVal { font-size: 20px; line-height: 26px; }
+}
+
+@media (max-width: 420px) {
+  .listItem { padding: 10px; gap: 10px; }
+  .pagination { flex-wrap: wrap; }
+  .listItem .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   FORMULÁRIO (modal de criar/editar) — estilo anterior mantido
+   ═════════════════════════════════════════════════════════════ */
 .formBody    { display: flex; flex-direction: column; gap: 14px; }
 .formDivider { height: 1px; background: var(--border); margin: 2px 0; }
 
-/* ── Telas section in form ── */
 .telasSection { display: flex; flex-direction: column; gap: 8px; }
 .telasSectionTitle {
+  display: flex; align-items: center; gap: 6px;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .06em; color: var(--text-2);
-  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
 }
 
 .telaItem { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color .15s; }
@@ -91,8 +348,7 @@
 
 .telaItemHeader {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: var(--surface-2);
-  cursor: pointer; user-select: none;
+  padding: 10px 12px; cursor: pointer; transition: background .15s;
 }
 .telaItemHeaderActive { background: rgba(124,58,237,.06); }
 
@@ -101,113 +357,38 @@
 .telaNome     { font-size: 13px; font-weight: 600; color: var(--text); }
 .telaDesc     { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 
-/* ── Acesso Total row ── */
 .acessoTotalRow {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 14px; border-top: 1px solid var(--border);
-  background: var(--surface); cursor: pointer; user-select: none;
+  padding: 8px 12px; border-top: 1px solid var(--border); cursor: pointer;
 }
 .acessoTotalCheckbox { width: 14px; height: 14px; accent-color: var(--emerald); cursor: pointer; flex-shrink: 0; }
 .acessoTotalLabel    { font-size: 12px; font-weight: 600; color: var(--text); }
 .acessoTotalBadge    {
-  font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 20px;
+  margin-left: auto; font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
   background: rgba(16,185,129,.12); color: var(--emerald);
-  border: 1px solid rgba(16,185,129,.25); margin-left: auto;
 }
 
-/* ── Permissoes list (vertical) ── */
 .permissoesList {
-  display: flex; flex-direction: column; gap: 1px;
-  border-top: 1px solid var(--border); background: var(--surface);
+  display: flex; flex-direction: column;
+  border-top: 1px solid var(--border);
 }
 .permissaoItem {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 14px; cursor: pointer; user-select: none;
-  transition: background .1s;
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 7px 12px 7px 32px; cursor: pointer; transition: background .12s;
 }
 .permissaoItem:hover:not(.permissaoItemDisabled) { background: rgba(124,58,237,.03); }
 .permissaoItemDisabled { cursor: not-allowed; opacity: .45; }
 
-.permissaoCheckbox { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
+.permissaoCheckbox { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
 .permissaoTexts    { display: flex; flex-direction: column; gap: 1px; }
 .permissaoNome     { font-size: 12px; font-weight: 600; color: var(--text); }
 .permissaoDesc     { font-size: 11px; color: var(--text-2); }
 
-.permissaoLoading {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 14px; color: var(--text-2); font-size: 12px;
-  border-top: 1px solid var(--border);
-}
 .permissaoEmpty {
-  padding: 8px 14px; font-size: 12px; color: var(--text-2);
-  border-top: 1px solid var(--border); font-style: italic;
+  padding: 8px 12px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-2);
 }
 
-/* ── Detail (view) modal ── */
-.detailHeader {
-  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
-}
-.detailHeaderIcon {
-  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-  background: rgba(124,58,237,.12); color: var(--violet);
-  display: flex; align-items: center; justify-content: center;
-}
-.detailHeaderText { flex: 1; min-width: 0; }
-.detailCargoName  { font-size: 16px; font-weight: 700; color: var(--text); line-height: 1.2; }
-.detailCargoId    {
-  font-size: 11px; font-family: var(--font-mono); color: var(--text-2);
-  background: var(--surface-2); border: 1px solid var(--border);
-  padding: 1px 8px; border-radius: 6px; display: inline-block; margin-top: 3px;
-}
-
-.detailSectionTitle {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2);
-  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
-}
-
-.detailTelas { display: flex; flex-direction: column; gap: 10px; }
-.detailTelaCard  { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-.detailTelaHeader {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: var(--surface-2);
-}
-.detailTelaIcon {
-  width: 28px; height: 28px; border-radius: 8px;
-  background: rgba(124,58,237,.12); color: var(--violet);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.detailTelaName { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
-.detailTelaDesc { font-size: 11px; color: var(--text-2); }
-
-/* Permissões no detalhe — uma abaixo da outra */
-.detailPermList { display: flex; flex-direction: column; }
-.detailPermItem {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 14px; border-top: 1px solid var(--border);
-  font-size: 12px; color: var(--text);
-}
-.detailPermBullet {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-  background: var(--violet);
-}
-.detailPermEmpty {
-  padding: 8px 14px; font-size: 12px; color: var(--text-2);
-  border-top: 1px solid var(--border); font-style: italic;
-}
-
-.detailNoTelas {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 32px 20px; color: var(--text-2); font-size: 13px;
-}
-
-/* ── Modal footer ── */
 .modalFooter { display: flex; gap: 8px; align-items: center; }
-.full { flex: 1; justify-content: center; }
-
-/* ── Dark adjustments ── */
-:root[data-theme="dark"] .card { box-shadow: none; }
-:root[data-theme="dark"] .telaItemHeader       { background: var(--surface-2); }
-:root[data-theme="dark"] .telaItemHeaderActive { background: rgba(124,58,237,.08); }
-:root[data-theme="dark"] .acessoTotalRow       { background: var(--surface); }
-:root[data-theme="dark"] .permissoesList       { background: var(--surface); }
+.full        { flex: 1; justify-content: center; }
