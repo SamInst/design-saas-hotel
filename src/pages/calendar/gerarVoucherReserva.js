@@ -1,3 +1,5 @@
+import { NOME_HOTEL } from '../../constants/hotel';
+
 // Prefixo da linha de observação gerada ao ajustar o preço ("Gerenciar Preços").
 // É um registro interno e NÃO deve ser impresso no voucher.
 export const ADJ_OBS_PREFIX = 'Ajuste de preço:';
@@ -33,14 +35,20 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     .flatMap((p, pi) => p.rooms.map((q) => precosCalc[`${q}_${pi}`]?.valor_total ?? 0))
     .reduce((a, b) => a + b, 0);
 
+  // O voucher de grupo monta um "período" por quarto, todos com as mesmas
+  // datas. Nesse caso a faixa de período é a mesma repetida acima de cada
+  // quarto, então sai uma única vez no topo.
+  const datasDistintas = new Set(displayPeriodos.map((p) => `${p.checkin}|${p.checkout}`));
+  const bandaUnica = periodoMode === 'unico' || datasDistintas.size <= 1;
+
   let periodsHtml = '';
   let unicoRoomsHtml = '';
 
   displayPeriodos.forEach((p, pi) => {
     const d = dias(p.checkin, p.checkout);
-    const periodLabel = periodoMode === 'multiplos'
-      ? `<div class="periodo-band">Período ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>`
-      : '';
+    const periodLabel = bandaUnica
+      ? ''
+      : `<div class="periodo-band">Período ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>`;
     let roomsHtml = '';
 
     p.rooms.forEach((quartoId) => {
@@ -53,8 +61,14 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
         .join('\n')
         .trim();
 
+      // Uma diária só: o detalhamento e o total diriam a mesma coisa, e as
+      // datas já estão na faixa acima. Sai uma linha só, com o peso do total.
+      const umaDiaria = d === 1;
+
       let detalhesHtml = '';
-      if ((calc.detalhes || []).length > 0) {
+      if (umaDiaria) {
+        detalhesHtml = '';
+      } else if ((calc.detalhes || []).length > 0) {
         calc.detalhes.forEach((det) => {
           const hasSub = det.valor_base > 0 || det.acrescimo_sazonalidade > 0 || det.valor_criancas > 0;
           detalhesHtml += `
@@ -96,26 +110,26 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
           ${sazHtml}
           ${obs ? `<div><span class="obs-label">Observação</span><div class="obs-box">${obs.replace(/\n/g, '<br>')}</div></div>` : ''}
           <div class="total-row">
-            <span class="total-label">Total</span>
+            <span class="total-label">${umaDiaria ? '1 Diária' : 'Total'}</span>
             <span class="total-val">${brl(calc.valor_total)}</span>
           </div>
         </div>`;
     });
 
-    if (periodoMode === 'unico') {
+    if (bandaUnica) {
       unicoRoomsHtml += roomsHtml;
     } else {
       periodsHtml += `${periodLabel}<div class="period-rooms">${roomsHtml}</div>`;
     }
   });
 
-  const unico    = periodoMode === 'unico' && displayPeriodos[0];
+  const unico    = bandaUnica ? displayPeriodos[0] : null;
   const unicoD   = unico ? dias(unico.checkin, unico.checkout) : 0;
   const unicoBand = unico ? `<div class="periodo-band">${dt(unico.checkin)} → ${dt(unico.checkout)} · ${fn(unicoD)}</div>` : '';
 
   const totalRooms = [...new Set(displayPeriodos.flatMap((p) => p.rooms))].length;
   const tipoLabel = totalRooms > 1 ? 'Vários Apartamentos' : 'Apartamento Único';
-  const modoLabel = periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos';
+  const modoLabel = bandaUnica ? 'Período único' : 'Múltiplos períodos';
 
   const titularNome = (solicitante?.nome || (() => {
     for (const p of displayPeriodos) {
@@ -204,8 +218,9 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     .page{max-width:740px;margin:0 auto;padding:32px 28px}
     .doc-title{font-size:20px;font-weight:800;color:#0f172a;margin-bottom:4px}
     .doc-sub{font-size:12px;color:#94a3b8;margin-bottom:24px}
-    .doc-header{margin-bottom:24px;padding-bottom:18px;border-bottom:2px solid #1e293b}
-    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px}
+    .doc-header{margin-bottom:24px;padding-bottom:18px}
+    /* mesma largura da faixa de período, com as colunas centradas */
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;text-align:center}
     .info-item label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:2px;display:block}
     .info-item span{font-size:13px;color:#0f172a;font-weight:500}
     .periodo-band{background:#1e293b;color:#fff;padding:11px 20px;border-radius:8px 8px 0 0;font-size:14px;font-weight:600;letter-spacing:.01em;margin-top:20px}
@@ -256,15 +271,16 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">maishospedagem &nbsp;|&nbsp; ${headerTitle}</div>
+    <div class="doc-title">${NOME_HOTEL} &nbsp;|&nbsp; ${headerTitle}</div>
     <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
-    <div class="info-grid">
+    <div class="info-grid"${titularNome ? ' style="grid-template-columns:repeat(3,1fr)"' : ''}>
+      ${titularNome ? `<div class="info-item"><label>Responsável</label><span>${titularNome}</span></div>` : ''}
       <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>
       <div class="info-item"><label>Modo</label><span>${modoLabel}</span></div>
     </div>
   </div>
-  ${periodoMode === 'unico' ? unicoBand : ''}
-  ${periodoMode === 'unico' ? unicoRoomsHtml : periodsHtml}
+  ${bandaUnica ? unicoBand : ''}
+  ${bandaUnica ? unicoRoomsHtml : periodsHtml}
   ${summaryHtml}
 </div>
 <script>window.onload=()=>{window.print();}<\/script>

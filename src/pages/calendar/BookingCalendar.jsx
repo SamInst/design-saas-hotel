@@ -6371,8 +6371,21 @@ export default function BookingCalendar() {
   };
 
   // Gera um voucher PDF completo com todas as reservas do grupo
-  const handleGroupVoucher = (members) => {
+  const handleGroupVoucher = async (members) => {
     const _u = userStorage.get();
+
+    // O responsável do grupo é grupo_reserva.descricao, que não vem junto das
+    // hospedagens — só em GET /hospedagem/grupos. Sem ele, o voucher cai no
+    // titular da primeira reserva.
+    const grupoId = members[0]?.grupoId ?? members[0]?.grupo_id ?? null;
+    let responsavel = '';
+    if (grupoId != null) {
+      try {
+        const grupos = await hospedagemApi.listarGrupos();
+        responsavel = (Array.isArray(grupos) ? grupos : [])
+          .find((g) => g.grupo_id === grupoId)?.descricao ?? '';
+      } catch { /* mantém o fallback */ }
+    }
     const displayPeriodos = members.map((r) => ({
       checkin: r.dataInicio,
       checkout: r.dataFim,
@@ -6398,7 +6411,10 @@ export default function BookingCalendar() {
       quartosObs,
       roomDescMap,
       userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
-      solicitante: { nome: members[0]?.titularNome ?? '', cpf: members[0]?.hospedes?.[0]?.cpf ?? '' },
+      solicitante: {
+        nome: responsavel || members[0]?.titularNome || '',
+        cpf:  members[0]?.hospedes?.[0]?.cpf ?? '',
+      },
       pagamentos: Array.from(seen.values()),
     });
   };

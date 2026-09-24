@@ -6,7 +6,7 @@ import {
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
   X, Contact, MapPin, CalendarDays, BedDouble,
-  Check, LayoutDashboard,
+  Check, LayoutDashboard, UserPlus,
 } from 'lucide-react';
 
 import { Button }                   from '../../components/ui/Button';
@@ -216,6 +216,9 @@ const fmtDataExtensa = (reg) => {
 };
 
 /** Cadastrado hoje — usado para o selo "Novo" na lista. */
+// Teto da busca única que alimenta a contagem de empresas bloqueadas.
+const TETO_EMPRESAS_STATS = 300;
+
 const isNovo = (item) => {
   const t = new Date();
   const hoje = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -332,6 +335,16 @@ const SEXO_OPTS = [
 ];
 
 const blankVeiculo = () => ({ modelo:'', marca:'', ano:'', placa:'', cor:'' });
+
+/**
+ * Dependente marcado como "usar os dados do titular" só preencheu nome, CPF e
+ * nascimento; contato e endereço vêm do titular na hora de salvar.
+ */
+const comDadosDoTitular = (dep, titular) => {
+  if (dep.usarDadosTitular === false) return dep;
+  const { telefone, email, cep, pais, estado, municipio, bairro, endereco, numero, complemento } = titular;
+  return { ...dep, telefone, email, cep, pais, estado, municipio, bairro, endereco, numero, complemento };
+};
 const blankPessoa  = () => ({
   nome:'', dataNascimento: null, cpf:'', rg:'', email:'', profissao:'',
   telefone:'', sexo:'', pais:'Brasil', estado:'', municipio:'',
@@ -395,16 +408,14 @@ function SkeletonLista({ linhas = 7 }) {
 function SkeletonPainel() {
   return (
     <div role="status" aria-label="Carregando totais">
-      <div className={styles.statGrid} aria-hidden="true">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className={styles.statCard}>
-            <span className={sk(styles.skLabel)} />
-            <span className={sk(styles.skNumero)} />
-          </div>
+      <span className={sk(styles.skBarra)} style={{ marginBottom: 16 }} aria-hidden="true" />
+      <div className={styles.statLine} aria-hidden="true">
+        {Array.from({ length: 5 }, (_, i) => (
+          <span key={i} className={styles.statItem}>
+            <span className={sk(styles.skLabel)} style={{ width: 70 }} />
+            <span className={sk(styles.skNumero)} style={{ width: 34 }} />
+          </span>
         ))}
-      </div>
-      <div className={styles.distBlock} aria-hidden="true">
-        <span className={sk(styles.skBarra)} />
       </div>
     </div>
   );
@@ -544,7 +555,12 @@ function DateMaskInput({ value, onChange, className = '' }) {
 }
 
 // ── Formulário de pessoa ──────────────────────────────────────
-function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null }) {
+/**
+ * `mostrarVeiculos` desliga a seção de veículos. No cadastro novo ela só
+ * aparece quando a caixa "Possui veículo" está marcada; na edição segue
+ * sempre visível.
+ */
+function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null, mostrarVeiculos = true }) {
   const [cepLoading, setCepLoading] = useState(false);
   const [cpfStatus,  setCpfStatus]  = useState(null);
   const [useTitularTel,  setUseTitularTel]  = useState(false);
@@ -627,7 +643,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
     <div className={styles.formBody}>
 
       {/* ── Dados Pessoais ── */}
-      <div className={styles.sectionDivider}><User size={12} /> Dados Pessoais</div>
+      {/*<div className={styles.sectionDivider}><User size={12} /> Dados Pessoais</div>*/}
 
       {/* Foto + campos principais */}
       <div className={styles.photoHeaderRow}>
@@ -725,16 +741,15 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         </FormField>
       </div>
 
-      {/* ── Endereço ── */}
-      <div className={styles.sectionDividerRow}>
-        <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
-        {titular && (
+      {/* ── Endereço (sem título separador) ── */}
+      {titular && (
+        <div className={styles.sectionDividerRow}>
           <label className={styles.useTitularRow} style={{ marginBottom: 0 }}>
             <input type="checkbox" checked={useTitularEnd} onChange={e => toggleTitularEnd(e.target.checked)} />
             <span>Usar endereço do titular</span>
           </label>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className={styles.grid3}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
@@ -775,6 +790,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       </FormField>
 
       {/* ── Veículos ── */}
+      {mostrarVeiculos && (<>
       <div className={styles.sectionDividerRow}>
         <div className={styles.sectionDivider}><Car size={12} /> Veículos</div>
         <Button onClick={addVeiculo}><Plus size={12} /> Veículo</Button>
@@ -824,6 +840,75 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         </div>
       ))}
       <div ref={veiculosEndRef} />
+      </>)}
+    </div>
+  );
+}
+
+/**
+ * Dependente. Por padrão herda contato e endereço do titular, então só pede
+ * nome, CPF e nascimento. Desmarcando "usar os dados do titular" o formulário
+ * completo aparece no lugar.
+ */
+function DependenteForm({ data, onChange, titular, index, onRemove, onFetchCEP, onCheckCPF, showErrors = false }) {
+  const usarTitular = data.usarDadosTitular !== false;
+  const set     = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
+  const hasErr  = field => showErrors && !data[field];
+  const cpfRaw  = unmask(data.cpf ?? '');
+  const cpfRuim = cpfRaw.length === 11 && !validarCPF(cpfRaw);
+
+  return (
+    <div className={styles.subFormBlock}>
+      <div className={styles.subFormTitle}>
+        <span>Dependente {index + 1}</span>
+        <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: 'auto' }}>
+          <input
+            type="checkbox"
+            checked={usarTitular}
+            onChange={e => set('usarDadosTitular', e.target.checked)}
+          />
+          <span>Usar os dados do titular</span>
+        </label>
+        <button className={styles.btnRemove} onClick={() => onRemove(index)} title="Remover dependente">
+          <X size={12} />
+        </button>
+      </div>
+
+      {usarTitular ? (
+        <div className={styles.grid3}>
+          <div className={[styles.reqField, hasErr('cpf') ? styles.reqFieldErr : ''].join(' ')}>
+            <FormField label="CPF *">
+              <Input
+                value={data.cpf}
+                onChange={e => set('cpf', maskCPF(e.target.value))}
+                placeholder="000.000.000-00"
+                className={cpfRuim ? styles.inputErr : ''}
+              />
+            </FormField>
+            {cpfRuim && <span className={styles.cpfMsg} style={{ color: '#ef4444' }}>CPF inválido</span>}
+          </div>
+          <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
+            <FormField label="Nome completo *">
+              <Input value={data.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
+            </FormField>
+          </div>
+          <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
+            <FormField label="Data de Nascimento *">
+              <DateMaskInput value={data.dataNascimento} onChange={d => set('dataNascimento', d)} />
+            </FormField>
+          </div>
+        </div>
+      ) : (
+        <PessoaForm
+          data={data}
+          onChange={onChange}
+          onFetchCEP={onFetchCEP}
+          onCheckCPF={onCheckCPF}
+          showErrors={showErrors}
+          titular={titular}
+          mostrarVeiculos={false}
+        />
+      )}
     </div>
   );
 }
@@ -951,6 +1036,21 @@ export default function RegistersPage() {
   const searchDebounce = useRef(null);
 
   // modais
+  // CPF/CNPJ do que acabou de ser cadastrado — a lista anima essas linhas
+  // quando elas chegam no recarregamento. Limpa sozinho depois da animação.
+  const [recemCriados, setRecemCriados] = useState(() => new Set());
+  const destacarNovos = (docs) => {
+    const limpos = docs.map((d) => unmask(d ?? '')).filter(Boolean);
+    if (!limpos.length) return;
+    setRecemCriados(new Set(limpos));
+    setTimeout(() => setRecemCriados(new Set()), 2600);
+  };
+
+  // caixas do fim do cadastro de hóspede
+  const [temVeiculo,     setTemVeiculo]     = useState(false);
+  const [temDependentes, setTemDependentes] = useState(false);
+  const [temEmpresa,     setTemEmpresa]     = useState(false);
+
   const [showAddPessoa,  setShowAddPessoa]  = useState(false);
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
   const [showEdit,       setShowEdit]       = useState(false);
@@ -985,7 +1085,6 @@ export default function RegistersPage() {
   const linkDebounce = useRef(null);
 
   // novo hóspede — índice ativo no sidebar (-1 = titular, 0..n = dependentes)
-  const [activeRegIdx, setActiveRegIdx] = useState(-1);
 
   // vinculados (detalhe empresa)
   const [vinculSearch,  setVinculSearch]  = useState('');
@@ -1102,13 +1201,20 @@ export default function RegistersPage() {
         cadastroApi.listarPessoas({ size: 1 }),
         cadastroApi.listarPessoas({ size: 1, status: 'HOSPEDADO' }),
         cadastroApi.listarPessoas({ size: 1, status: 'BLOQUEADO' }),
-        cadastroApi.listarEmpresas({ size: 1 }),
+        // GET /empresa não filtra por status, então as bloqueadas são contadas
+        // aqui. O teto evita puxar a base inteira só para o painel.
+        cadastroApi.listarEmpresas({ size: TETO_EMPRESAS_STATS }),
       ]);
       setStats({
         pessoas:    pessoas?.totalElements    ?? 0,
         hospedados: hospedados?.totalElements ?? 0,
         bloqueados: bloqueados?.totalElements ?? 0,
         empresas:   empresas?.totalElements   ?? 0,
+        empresasBloqueadas: (empresas?.content ?? [])
+          .filter((e) => (e.status ?? '').toUpperCase() === 'BLOQUEADO').length,
+        // false quando houver mais empresas que o teto: aí a contagem de
+        // bloqueadas é parcial e a tela não deve afirmar o número.
+        empresasCompleto: (empresas?.totalElements ?? 0) <= TETO_EMPRESAS_STATS,
       });
     } catch {
       setStats(null);
@@ -1288,14 +1394,14 @@ export default function RegistersPage() {
   const handleAddDependente = () => {
     setDependentes(prev => {
       const next = [...prev, blankPessoa()];
-      setActiveRegIdx(next.length - 1);
+
       return next;
     });
   };
 
   const handleRemoveDependente = i => {
     setDependentes(prev => prev.filter((_, j) => j !== i));
-    setActiveRegIdx(prev => (prev >= i ? Math.max(-1, prev - 1) : prev));
+
   };
 
   const setDepData = (i, val) =>
@@ -1303,26 +1409,31 @@ export default function RegistersPage() {
 
   const handlePreviewPessoa = () => {
     if (!titular.nome || !titular.cpf || !titular.dataNascimento || !titular.telefone || !titular.cep) {
-      setActiveRegIdx(-1);
+     
       setShowErrors(true);
       showNotif('Preencha os campos obrigatórios do titular (*).', 'error');
       return;
     }
     if ((titular.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
-      setActiveRegIdx(-1);
+     
       showNotif('Preencha a placa de todos os veículos do titular.', 'error');
       return;
     }
     for (let i = 0; i < dependentes.length; i++) {
       const dep = dependentes[i];
-      if (!dep.nome || !dep.cpf) {
-        setActiveRegIdx(i);
+      if (!dep.nome || !dep.cpf || !dep.dataNascimento) {
         setShowErrors(true);
         showNotif(`Preencha os campos obrigatórios do dependente ${i + 1} (*).`, 'error');
         return;
       }
+      // quem não herda do titular precisa dos próprios contato e endereço
+      if (dep.usarDadosTitular === false && (!dep.telefone || !dep.cep)) {
+        setShowErrors(true);
+        showNotif(`Preencha telefone e CEP do dependente ${i + 1} (*).`, 'error');
+        return;
+      }
       if ((dep.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
-        setActiveRegIdx(i);
+
         showNotif(`Preencha a placa dos veículos do dependente ${i + 1}.`, 'error');
         return;
       }
@@ -1335,7 +1446,7 @@ export default function RegistersPage() {
       const idxs = todos.reduce((acc, p, i) => (unmask(p.cpf) === duplicado ? [...acc, i] : acc), []);
       const nomes = idxs.map(i => i === 0 ? 'Titular' : `Dependente ${i}`).join(' e ');
       showNotif(`CPF duplicado entre ${nomes}.`, 'error');
-      setActiveRegIdx(idxs[1] === 0 ? -1 : idxs[1] - 1);
+
       return;
     }
     setShowErrors(false);
@@ -1344,19 +1455,22 @@ export default function RegistersPage() {
 
   const doSavePessoa = async () => {
     setIsSubmitting(true);
+    // guardado antes de limpar o formulário, para a lista saber quem destacar
+    const cpfsCriados = [titular.cpf, ...dependentes.map((d) => d.cpf)];
     try {
       await cadastroApi.criarPessoa({
         pessoas: [
           buildPessoaBody(titular, { titular: null }),
-          ...dependentes.map(d => buildPessoaBody(d, { titular: null })),
+          ...dependentes.map(d => buildPessoaBody(comDadosDoTitular(d, titular), { titular: null })),
         ],
         empresas: linkEmpresa ? [{ id: linkEmpresa.id }] : [],
       });
       showNotif('Hóspede(s) cadastrado(s) com sucesso!');
       setShowAddPessoa(false);
       setConfirmStep(false); setShowErrors(false);
-      setTitular(blankPessoa()); setDependentes([]); setActiveRegIdx(-1);
+      setTitular(blankPessoa()); setDependentes([]);
       setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+      destacarNovos(cpfsCriados);
       fetchData(searchTerm, filterMode, page);
     } catch (e) { showNotif(e.message || 'Erro ao cadastrar.', 'error'); }
     finally { setIsSubmitting(false); }
@@ -1397,6 +1511,7 @@ export default function RegistersPage() {
         }
         await cadastroApi.criarEmpresa(body);
         showNotif('Empresa cadastrada com sucesso!');
+        destacarNovos([cnpjRaw]);
       }
       setShowAddEmpresa(false); setEmpresa(blankEmpresa()); setEditMode(false);
       fetchData(searchTerm, filterMode, page);
@@ -1571,13 +1686,158 @@ export default function RegistersPage() {
   const resumo    = mockResumoHospede(detailItem?.id);
   const historico = mockHistorico(detailItem?.id, { hospedado: detailItem?.status === 'HOSPEDADO' });
 
+  // Qual formulário ocupa o painel. Os estados são os mesmos de quando eram
+  // modais — só a renderização mudou de lugar.
+  const formMode = showAddPessoa ? 'pessoa-nova'
+    : showEdit ? 'pessoa-edit'
+    : showAddEmpresa ? 'empresa'
+    : null;
+
+  // As três caixas do fim do cadastro. Marcar abre a seção correspondente;
+  // desmarcar descarta o que estava preenchido, para não salvar escondido.
+  const toggleTemVeiculo = (on) => {
+    setTemVeiculo(on);
+    setTitular(prev => ({
+      ...prev,
+      veiculos: on
+        ? (prev.veiculos?.length ? prev.veiculos : [blankVeiculo()])
+        : [],
+    }));
+  };
+
+  const toggleTemDependentes = (on) => {
+    setTemDependentes(on);
+    if (on) { if (dependentes.length === 0) handleAddDependente(); }
+    else setDependentes([]);
+  };
+
+  const toggleTemEmpresa = (on) => {
+    setTemEmpresa(on);
+    if (on) setShowLinkEmpresa(true);
+    else { setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]); }
+  };
+
+  const cancelAddPessoa = () => {
+    const temDados = titular.nome || titular.cpf || dependentes.length > 0;
+    if (temDados && !window.confirm('Deseja descartar o cadastro em andamento?')) return;
+    setShowAddPessoa(false); setShowErrors(false);
+    setConfirmStep(false);
+    setTitular(blankPessoa()); setDependentes([]);
+    setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+    setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
+  };
+
+  // Corpo do cadastro de hóspede: a etapa de confirmação ou o formulário com
+  // a barra lateral de pessoas. Antes era o conteúdo do modal.
+  const addPessoaBody = (
+        confirmStep ? (
+          <div className={styles.confirmWrap}>
+            <p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>
+            <div className={styles.confirmList}>
+              {[titular, ...dependentes].map((p, i) => (
+                <div key={i} className={styles.confirmCard}>
+                  <div className={styles.confirmAvatar}>{(p.nome || '?')[0].toUpperCase()}</div>
+                  <div className={styles.confirmInfo}>
+                    <div className={styles.confirmName}>{p.nome || '—'}</div>
+                    <div className={styles.confirmMeta}>
+                      {maskCPF(p.cpf)} · {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
+                    </div>
+                  </div>
+                  <span className={i === 0 ? styles.confirmBadgeTitular : styles.confirmBadgeDep}>
+                    {i === 0 ? 'Titular' : 'Dependente'}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {linkEmpresa && (
+              <div className={styles.confirmEmpresa}>
+                <Building2 size={13} className={styles.iconViolet} />
+                <span>Vinculado à empresa: <strong>{empresaLabel(linkEmpresa)}</strong></span>
+              </div>
+            )}
+          </div>
+        ) : (
+        <div className={styles.regLayout}>
+          <div className={styles.regFormArea}>
+            <PessoaForm
+              key="reg-titular"
+              data={titular} onChange={setTitular}
+              onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
+              showErrors={showErrors}
+              mostrarVeiculos={temVeiculo}
+            />
+
+            {/* ── O que mais entra neste cadastro ── */}
+            <div className={styles.opcoesBlock}>
+              <label className={styles.opcaoRow}>
+                <input type="checkbox" checked={temVeiculo} onChange={e => toggleTemVeiculo(e.target.checked)} />
+                <Car size={13} /> <span>Possui veículo</span>
+              </label>
+              <label className={styles.opcaoRow}>
+                <input type="checkbox" checked={temDependentes} onChange={e => toggleTemDependentes(e.target.checked)} />
+                <Users size={13} /> <span>Possui dependentes</span>
+              </label>
+              <label className={styles.opcaoRow}>
+                <input type="checkbox" checked={temEmpresa} onChange={e => toggleTemEmpresa(e.target.checked)} />
+                <Building2 size={13} /> <span>Vínculo com empresa registrada</span>
+              </label>
+            </div>
+
+            {/* ── Dependentes ── */}
+            {temDependentes && (
+              <>
+                {dependentes.map((dep, i) => (
+                  <DependenteForm
+                    key={`dep-${i}`}
+                    index={i}
+                    data={dep}
+                    onChange={val => setDepData(i, val)}
+                    titular={titular}
+                    onRemove={handleRemoveDependente}
+                    onFetchCEP={fetchCEP}
+                    onCheckCPF={checkCPF}
+                    showErrors={showErrors}
+                  />
+                ))}
+                <button className={styles.regAddDep} onClick={handleAddDependente}>
+                  <Plus size={13} /> Dependente
+                </button>
+              </>
+            )}
+
+            {/* ── Empresa vinculada ── */}
+            {temEmpresa && (
+              <div className={styles.subFormBlock}>
+                <div className={styles.subFormTitle}>
+                  <span>Empresa vinculada</span>
+                </div>
+                {linkEmpresa ? (
+                  <div className={styles.regSidebarEmpresaSelected}>
+                    <Building2 size={12} className={styles.iconViolet} />
+                    <span className={styles.regSidebarEmpresaName}>{empresaLabel(linkEmpresa)}</span>
+                    <button className={styles.btnRemove} style={{ marginLeft: 'auto' }}
+                      onClick={() => setLinkEmpresa(null)}><X size={11} /></button>
+                  </div>
+                ) : (
+                  <button className={styles.regAddDep} onClick={() => setShowLinkEmpresa(true)}>
+                    <Building2 size={13} /> Escolher empresa
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        )
+  );
+
+
   // ─────────────────────────────────────────────────────────
   return (
     <div className={styles.page}>
       <div className={styles.container}>
         {/* Abaixo de 1024px, com um registro aberto, a ficha toma a tela e a
             lista sai; sem seleção as duas se empilham. */}
-        <main className={[styles.split, detailItem ? styles.splitListHidden : ''].join(' ')}>
+        <main className={[styles.split, (detailItem || formMode) ? styles.splitListHidden : ''].join(' ')}>
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
           <aside className={styles.listPanel}>
@@ -1678,10 +1938,17 @@ export default function RegistersPage() {
               ) : items.map((item, i) => {
                 const name  = nomeListing(item);
                 const ativo = detailItem?.id === item.id && detailItem?._type === item._type;
+                // acabou de ser cadastrado nesta sessão → entra animado
+                const doc = unmask(item.cpf ?? item.cnpj ?? '');
+                const recemCriado = !!doc && recemCriados.has(doc);
                 const local = [item.municipio, item.estado].filter(Boolean).join('/');
                 return (
                   <button key={`${item._type}-${item.id}`} type="button"
-                    className={[styles.listItem, ativo ? styles.listItemActive : ''].join(' ')}
+                    className={[
+                      styles.listItem,
+                      ativo ? styles.listItemActive : '',
+                      recemCriado ? styles.listItemNovo : '',
+                    ].join(' ')}
                     onClick={() => openDetail(item, i)}>
                     <AvatarCircle name={name} size={40} tone={i} />
                     <span className={styles.listItemBody}>
@@ -1719,27 +1986,136 @@ export default function RegistersPage() {
           </aside>
 
           {/* ══ DETALHE ═════════════════════════════════════════ */}
-          {!detailItem ? (
+          {/* Os formulários ocupam o painel no lugar da ficha — antes abriam
+              em modal. Quem manda são os mesmos estados de antes, só que
+              agora lidos aqui em vez de alimentarem um <Modal>. */}
+          {formMode === 'pessoa-nova' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn} onClick={cancelAddPessoa}
+                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <UserPlus size={16} />
+                  <span className={styles.dCardTitle}>
+                    {confirmStep ? 'Confirmar cadastro' : 'Novo hóspede'}
+                  </span>
+                  <div className={styles.dCardActions}>
+                    {!confirmStep ? (
+                      <>
+                        <span className={styles.personCount}>
+                          <Users size={13} />
+                          {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
+                        </span>
+                        <Button className={styles.btnSolid}
+                          onClick={() => setTitular(blankPessoa())}>Limpar</Button>
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                          onClick={handlePreviewPessoa}>Próximo</Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                          onClick={doSavePessoa} disabled={isSubmitting}>
+                          {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
+                        </Button>
+                      </>
+                    )}
+                    <button type="button" className={styles.idClose} onClick={cancelAddPessoa}
+                      title="Cancelar cadastro" aria-label="Cancelar cadastro">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>{addPessoaBody}</div>
+              </section>
+            </div>
+
+          ) : formMode === 'pessoa-edit' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
+                    title="Voltar" aria-label="Voltar">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <Contact size={16} />
+                  <span className={styles.dCardTitle}>Editar hóspede</span>
+                  <div className={styles.dCardActions}>
+                    <Button className={styles.btnSolid} onClick={() => setEditPessoa(blankPessoa())}>Limpar</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleSaveEditPessoa} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                    </Button>
+                    <button type="button" className={styles.idClose} onClick={() => setShowEdit(false)}
+                      title="Cancelar" aria-label="Cancelar">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>
+                  <PessoaForm data={editPessoa} onChange={setEditPessoa} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
+                </div>
+              </section>
+            </div>
+
+          ) : formMode === 'empresa' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn}
+                    onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                    title="Voltar" aria-label="Voltar">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <Building2 size={16} />
+                  <span className={styles.dCardTitle}>{editMode ? 'Editar empresa' : 'Nova empresa'}</span>
+                  <div className={styles.dCardActions}>
+                    <Button className={styles.btnSolid} onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleSaveEmpresa} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                    </Button>
+                    <button type="button" className={styles.idClose}
+                      onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                      title="Cancelar" aria-label="Cancelar">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>
+                  <EmpresaForm data={empresa} onChange={setEmpresa} onFetchCNPJ={fetchCNPJ} onFetchCEP={fetchCEP} editMode={editMode} />
+                </div>
+              </section>
+            </div>
+
+          ) : !detailItem ? (
             /* ── Painel geral (nenhum cadastro selecionado) ── */
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <LayoutDashboard size={16} />
                   <span className={styles.dCardTitle}>Visão geral dos cadastros</span>
+                  {/* cada aba mostra o seu cadastro */}
                   {canCadastrar && (
                     <div className={styles.dCardActions}>
-                      <Button className={styles.btnSolid}
-                        onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
-                        Cadastrar empresa
-                      </Button>
-                      <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={() => {
-                        setTitular(blankPessoa()); setDependentes([]);
-                        setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
-                        setShowErrors(false); setActiveRegIdx(-1);
-                        setShowAddPessoa(true);
-                      }}>
-                        Cadastrar hóspede
-                      </Button>
+                      {isEmpresasTab ? (
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                          onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
+                          Cadastrar empresa
+                        </Button>
+                      ) : (
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={() => {
+                          setTitular(blankPessoa()); setDependentes([]);
+                          setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+                          setShowErrors(false);
+                          setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
+                          setShowAddPessoa(true);
+                        }}>
+                          Cadastrar hóspede
+                        </Button>
+                      )}
                     </div>
                   )}
                 </h3>
@@ -1754,44 +2130,48 @@ export default function RegistersPage() {
                     </div>
                   ) : (
                     <>
-                      <div className={styles.statGrid}>
-                        <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Hóspedes</p>
-                          <p className={styles.statVal}>{stats.pessoas}</p>
+                    {/* Composição da base — hospedados / bloqueados / demais */}
+                    {stats.pessoas > 0 && (() => {
+                      const pct = n => (n / stats.pessoas) * 100;
+                      const demais = Math.max(0, stats.pessoas - stats.hospedados - stats.bloqueados);
+                      return (
+                        <div className={styles.distBar}>
+                          <span className={styles.distHosp}  style={{ width: `${pct(stats.hospedados)}%` }} />
+                          <span className={styles.distBloq}  style={{ width: `${pct(stats.bloqueados)}%` }} />
+                          <span className={styles.distResto} style={{ width: `${pct(demais)}%` }} />
                         </div>
-                        <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Hospedados</p>
-                          <p className={[styles.statVal, styles.statValGreen].join(' ')}>{stats.hospedados}</p>
-                        </div>
-                        <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Bloqueados</p>
-                          <p className={[styles.statVal, styles.statValRed].join(' ')}>{stats.bloqueados}</p>
-                        </div>
-                        <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Empresas</p>
-                          <p className={styles.statVal}>{stats.empresas}</p>
-                        </div>
-                      </div>
+                      );
+                    })()}
 
-                      {/* Composição da base — hospedados / bloqueados / demais */}
-                      {stats.pessoas > 0 && (() => {
-                        const pct = n => (n / stats.pessoas) * 100;
-                        const demais = Math.max(0, stats.pessoas - stats.hospedados - stats.bloqueados);
-                        return (
-                          <div className={styles.distBlock}>
-                            <div className={styles.distBar}>
-                              <span className={styles.distHosp}  style={{ width: `${pct(stats.hospedados)}%` }} />
-                              <span className={styles.distBloq}  style={{ width: `${pct(stats.bloqueados)}%` }} />
-                              <span className={styles.distResto} style={{ width: `${pct(demais)}%` }} />
-                            </div>
-                            <div className={styles.distLegend}>
-                              <span><i className={styles.distHosp} /> Hospedados {stats.hospedados}</span>
-                              <span><i className={styles.distBloq} /> Bloqueados {stats.bloqueados}</span>
-                              <span><i className={styles.distResto} /> Demais {demais}</span>
-                            </div>
-                          </div>
-                        );
-                      })()}
+                    <div className={styles.statLine}>
+                      <span className={styles.statItem}>
+                        <i className={[styles.statDot, styles.dotTotal].join(' ')} />
+                        <span className={styles.statItemLabel}>Cadastrados</span>
+                        <span className={styles.statItemVal}>{stats.pessoas}</span>
+                      </span>
+                      <span className={styles.statItem}>
+                        <i className={[styles.statDot, styles.distHosp].join(' ')} />
+                        <span className={styles.statItemLabel}>Hospedados</span>
+                        <span className={[styles.statItemVal, styles.statValGreen].join(' ')}>{stats.hospedados}</span>
+                      </span>
+                      <span className={styles.statItem}>
+                        <i className={[styles.statDot, styles.distBloq].join(' ')} />
+                        <span className={styles.statItemLabel}>Bloqueados</span>
+                        <span className={[styles.statItemVal, styles.statValRed].join(' ')}>{stats.bloqueados}</span>
+                      </span>
+                      <span className={styles.statItem}>
+                        <i className={[styles.statDot, styles.dotEmpresa].join(' ')} />
+                        <span className={styles.statItemLabel}>Empresas</span>
+                        <span className={styles.statItemVal}>{stats.empresas}</span>
+                      </span>
+                      <span className={styles.statItem}>
+                        <i className={[styles.statDot, styles.distBloq].join(' ')} />
+                        <span className={styles.statItemLabel}>Empresas bloqueadas</span>
+                        <span className={[styles.statItemVal, styles.statValRed].join(' ')}>
+                          {stats.empresasCompleto ? stats.empresasBloqueadas : '—'}
+                        </span>
+                      </span>
+                    </div>
                     </>
                   )}
                 </div>
@@ -2186,172 +2566,6 @@ export default function RegistersPage() {
         </main>
       </div>
 
-      {/* ══ MODAL: EDITAR PESSOA ══════════════════════════════ */}
-      <Modal open={showEdit} onClose={() => setShowEdit(false)} size="lg" title="Editar Hóspede"
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={() => setEditPessoa(blankPessoa())} className={styles.full}>Limpar</Button>
-            <Button variant="primary" onClick={handleSaveEditPessoa} disabled={isSubmitting} className={styles.full}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
-            </Button>
-          </div>
-        }>
-        <PessoaForm data={editPessoa} onChange={setEditPessoa} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
-      </Modal>
-
-      {/* ══ MODAL: ADICIONAR HÓSPEDE ══════════════════════════ */}
-      {/* ══ MODAL: ADICIONAR HÓSPEDE ══════════════════════════ */}
-      <Modal
-        open={showAddPessoa}
-        onClose={() => {
-          const temDados = titular.nome || titular.cpf || dependentes.length > 0;
-          if (temDados && !window.confirm('Deseja descartar o cadastro em andamento?')) return;
-          setShowAddPessoa(false); setShowErrors(false); setActiveRegIdx(-1);
-          setConfirmStep(false);
-          setTitular(blankPessoa()); setDependentes([]);
-          setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
-        }}
-        size="xl"
-        title={confirmStep ? 'Confirmar Cadastro' : 'Novo Hóspede'}
-        footer={
-          <div className={styles.modalFooter}>
-            {!confirmStep ? (
-              <>
-                <div className={styles.personCount}>
-                  <Users size={13} />
-                  <span>{1 + dependentes.length}</span>
-                  pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-                </div>
-                <Button onClick={() => {
-                  if (activeRegIdx === -1) setTitular(blankPessoa());
-                  else setDepData(activeRegIdx, blankPessoa());
-                }}>Limpar</Button>
-                <Button variant="primary" onClick={handlePreviewPessoa}>Próximo →</Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={() => setConfirmStep(false)}>← Voltar</Button>
-                <Button variant="primary" onClick={doSavePessoa} disabled={isSubmitting}>
-                  {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e Salvar'}
-                </Button>
-              </>
-            )}
-          </div>
-        }>
-
-        {confirmStep ? (
-          <div className={styles.confirmWrap}>
-            <p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>
-            <div className={styles.confirmList}>
-              {[titular, ...dependentes].map((p, i) => (
-                <div key={i} className={styles.confirmCard}>
-                  <div className={styles.confirmAvatar}>{(p.nome || '?')[0].toUpperCase()}</div>
-                  <div className={styles.confirmInfo}>
-                    <div className={styles.confirmName}>{p.nome || '—'}</div>
-                    <div className={styles.confirmMeta}>
-                      {maskCPF(p.cpf)} · {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
-                    </div>
-                  </div>
-                  <span className={i === 0 ? styles.confirmBadgeTitular : styles.confirmBadgeDep}>
-                    {i === 0 ? 'Titular' : 'Dependente'}
-                  </span>
-                </div>
-              ))}
-            </div>
-            {linkEmpresa && (
-              <div className={styles.confirmEmpresa}>
-                <Building2 size={13} className={styles.iconViolet} />
-                <span>Vinculado à empresa: <strong>{empresaLabel(linkEmpresa)}</strong></span>
-              </div>
-            )}
-          </div>
-        ) : (
-        <div className={styles.regLayout}>
-          {/* ── Sidebar ── */}
-          <div className={styles.regSidebar}>
-            <div className={styles.regSidebarLabel}>Cadastrando</div>
-            <div className={styles.regPersonList}>
-              {/* Titular */}
-              <button
-                className={[styles.regPersonCard, activeRegIdx === -1 ? styles.regPersonCardActive : ''].join(' ')}
-                onClick={() => setActiveRegIdx(-1)}
-              >
-                <AvatarCircle name={titular.nome || 'T'} size={36} />
-                <div className={styles.regPersonInfo}>
-                  <div className={styles.regPersonName}>{titular.nome || 'Titular'}</div>
-                  <div className={styles.regPersonRole}>Titular</div>
-                </div>
-              </button>
-              {/* Dependentes */}
-              {dependentes.map((dep, i) => (
-                <button
-                  key={i}
-                  className={[styles.regPersonCard, activeRegIdx === i ? styles.regPersonCardActive : ''].join(' ')}
-                  onClick={() => setActiveRegIdx(i)}
-                >
-                  <AvatarCircle name={dep.nome || `D${i + 1}`} size={36} />
-                  <div className={styles.regPersonInfo}>
-                    <div className={styles.regPersonName}>{dep.nome || `Dependente ${i + 1}`}</div>
-                    <div className={styles.regPersonRole}>Dependente {i + 1}</div>
-                  </div>
-                  <span
-                    className={styles.regPersonRemove}
-                    onClick={e => { e.stopPropagation(); handleRemoveDependente(i); }}
-                    role="button"
-                    tabIndex={0}
-                  >
-                    <X size={10} />
-                  </span>
-                </button>
-              ))}
-              <button className={styles.regAddDep} onClick={handleAddDependente}>
-                <Plus size={13} /> Dependente
-              </button>
-              <button className={styles.regAddDep} style={{ color: '#0ea5e9', borderColor: 'rgba(14,165,233,.3)' }} onClick={() => setShowLinkEmpresa(true)}>
-                <Building2 size={13} /> Empresa
-              </button>
-            </div>
-
-            {/* ── Empresa selecionada na sidebar ── */}
-            {linkEmpresa && (
-              <div className={styles.regSidebarEmpresa}>
-                <div className={styles.regSidebarEmpresaLabel}><Building2 size={11} /> Empresa vinculada</div>
-                <div className={styles.regSidebarEmpresaSelected}>
-                  <Building2 size={12} className={styles.iconViolet} />
-                  <span className={styles.regSidebarEmpresaName}>{empresaLabel(linkEmpresa)}</span>
-                  <button className={styles.btnRemove} style={{ marginLeft: 'auto' }} onClick={() => setLinkEmpresa(null)}><X size={11} /></button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Form area ── */}
-          <div className={styles.regFormCol}>
-            <div className={styles.regFormArea}>
-              {activeRegIdx === -1 ? (
-                <PessoaForm
-                  key="reg-titular"
-                  data={titular} onChange={setTitular}
-                  onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
-                  showErrors={showErrors}
-                />
-              ) : (
-                <PessoaForm
-                  key={`reg-dep-${activeRegIdx}`}
-                  data={dependentes[activeRegIdx]}
-                  onChange={val => setDepData(activeRegIdx, val)}
-                  onFetchCEP={fetchCEP}
-                  onCheckCPF={checkCPF}
-                  showErrors={showErrors}
-                  titular={titular}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-        )}
-      </Modal>
-
       {/* ══ MODAL: VINCULAR EMPRESA (cadastro hóspede) ════════ */}
       <Modal
         open={showLinkEmpresa}
@@ -2409,22 +2623,6 @@ export default function RegistersPage() {
         />
       </Modal>
 
-      {/* ══ MODAL: ADICIONAR / EDITAR EMPRESA ════════════════ */}
-      <Modal
-        open={showAddEmpresa}
-        onClose={() => { setShowAddEmpresa(false); setEditMode(false); }}
-        size="lg"
-        title={editMode ? 'Editar Empresa' : 'Nova Empresa'}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
-            <Button variant="primary" onClick={handleSaveEmpresa} disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
-            </Button>
-          </div>
-        }>
-        <EmpresaForm data={empresa} onChange={setEmpresa} onFetchCNPJ={fetchCNPJ} onFetchCEP={fetchCEP} editMode={editMode} />
-      </Modal>
 
       <Notification notification={notification} />
     </div>

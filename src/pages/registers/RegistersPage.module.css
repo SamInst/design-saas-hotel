@@ -110,13 +110,13 @@
 }
 @media (min-width: 1024px) { .listPanel { max-height: 100%; } }
 
-/* Alternador Hóspedes / Empresas
-   flex gap-1 rounded-lg border border-border bg-background p-1 */
+/* Alternador Hóspedes / Empresas — sem preenchimento, só a moldura sobre o
+   cartão; quem marca a aba ativa é a pílula do .segmentedBtnActive. */
 .segmented {
   display: flex; gap: 4px;
   border-radius: var(--l-r-lg);
   border: 1px solid var(--l-border);
-  background: var(--l-bg);
+  background: transparent;
   padding: 4px;
 }
 /* flex-1 rounded-md px-3 py-1.5 text-xs font-semibold */
@@ -141,18 +141,22 @@
   height: 40px; width: 100%;
   border-radius: var(--l-r-lg) !important;
   border: 1px solid var(--l-border) !important;
-  background: var(--l-bg) !important;
+  background: transparent !important;
   color: var(--l-fg) !important;
   padding-right: 12px !important;
   font-size: 14px !important;
   /* o componente Input traz uma sombra de repouso; aqui o campo fica plano */
   box-shadow: none !important;
 }
-/* sem sombra de repouso, mas o anel de foco continua (navegação por teclado) */
+/* O foco dos campos desta tela é azul (o --l-primary), não o violeta que o
+   componente Input traz por padrão. Vale para o formulário e para a busca. */
+.page input:focus,
+.page select:focus,
+.page textarea:focus,
 .searchWrapFull .searchInput:focus {
   outline: none;
-  border-color: var(--l-ring) !important;
-  box-shadow: 0 0 0 2px var(--l-ring) !important;
+  border-color: var(--l-primary) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--l-primary) 18%, transparent) !important;
 }
 .searchSpinner  { position: absolute; right: 12px; color: var(--l-primary); }
 .searchClear {
@@ -236,6 +240,24 @@
   border-color: var(--l-primary);
   background: color-mix(in oklch, var(--l-primary) 5%, transparent);
 }
+
+/* Entrada de quem acabou de ser cadastrado: desliza e o realce verde
+   desaparece sozinho, para o olho achar a linha nova na lista. */
+@keyframes listItemEntra {
+  from {
+    opacity: 0; transform: translateY(-8px);
+    background: color-mix(in oklch, var(--l-emerald-fg) 20%, transparent);
+    border-color: color-mix(in oklch, var(--l-emerald-fg) 45%, transparent);
+  }
+  55% {
+    opacity: 1; transform: none;
+    background: color-mix(in oklch, var(--l-emerald-fg) 20%, transparent);
+    border-color: color-mix(in oklch, var(--l-emerald-fg) 45%, transparent);
+  }
+  to { opacity: 1; transform: none; background: transparent; border-color: transparent; }
+}
+.listItemNovo { animation: listItemEntra 2.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .listItemNovo { animation: none; } }
 .listItemBody { flex: 1; min-width: 0; }
 .listItemName { display: flex; align-items: center; gap: 6px; min-width: 0; }
 /* mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground */
@@ -500,33 +522,54 @@
 .blockHead > button:last-child { margin-left: auto; }
 .blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
 
-/* ── Painel geral (nenhum cadastro selecionado) ── */
-.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 780px) { .statGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* ── Painel geral (nenhum cadastro selecionado) ──
+   A barra de composição fica acima dos números. */
+.distBar {
+  display: flex; height: 8px; border-radius: 999px; overflow: hidden;
+  background: var(--l-secondary);
+  margin-bottom: 16px;
+}
+.distBar > span { display: block; height: 100%; }
+.distHosp  { background: var(--l-bar-emerald); }
+.distBloq  { background: var(--l-destructive); }
+.distResto { background: var(--l-bar-sky); }
+
+/* Uma linha só, sem cartões: o rótulo fica pequeno e o número grande, que é
+   o que se lê de relance. Quebra em duas linhas quando o painel aperta. */
+.statLine {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 10px 32px;
+}
+.statItem {
+  display: inline-flex; align-items: baseline; gap: 8px;
+  min-width: 0;
+}
+/* bolinha na cor do dado, antes do rótulo — as duas primeiras repetem as
+   cores dos segmentos da barra acima, então a linha também serve de legenda */
+.statDot {
+  align-self: center; flex-shrink: 0;
+  width: 8px; height: 8px; border-radius: 999px;
+}
+.dotTotal   { background: var(--l-muted-fg); }
+.dotEmpresa { background: var(--l-bar-teal); }
+.statItemLabel {
+  font-size: 12px; line-height: 16px; font-weight: 500;
+  color: var(--l-muted-fg); white-space: nowrap;
+}
+.statItemVal {
+  font-size: 10px; line-height: 13px; font-weight: 700;
+  color: var(--l-fg); white-space: nowrap;
+}
+.statValGreen { color: var(--l-emerald-fg); }
+.statValRed   { color: var(--l-destructive); }
+
+/* Cartões de total — usados pelos números do histórico da pessoa (.miniStats) */
 .statCard {
   border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
   background: var(--l-bg); padding: 14px 16px;
 }
 .statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
 .statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
-.statValGreen { color: var(--l-emerald-fg); }
-.statValRed   { color: var(--l-destructive); }
-
-.distBlock { margin-top: 18px; }
-.distBar {
-  display: flex; height: 8px; border-radius: 999px; overflow: hidden;
-  background: var(--l-secondary);
-}
-.distBar > span { display: block; height: 100%; }
-.distHosp  { background: var(--l-bar-emerald); }
-.distBloq  { background: var(--l-destructive); }
-.distResto { background: var(--l-bar-sky); }
-.distLegend {
-  display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px;
-  font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
-}
-.distLegend span { display: inline-flex; align-items: center; gap: 6px; }
-.distLegend i { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
 
 
 .detailHint {
@@ -671,8 +714,8 @@
 .full        { flex:1; justify-content:center; }
 .personCount {
   display:flex; align-items:center; gap:5px;
-  font-size:12px; font-weight:600; color:var(--violet);
-  background:rgba(124,58,237,.08); border:1px solid rgba(124,58,237,.2);
+  font-size:12px; font-weight:600; color:var(--l-primary);
+  background:color-mix(in oklch, var(--l-primary) 9%, transparent); border:1px solid color-mix(in oklch, var(--l-primary) 22%, transparent);
   padding:5px 12px; border-radius:5px; margin-right:auto; white-space:nowrap;
 }
 
@@ -687,7 +730,7 @@
 
 /* ── Form layout ── */
 .formBody    { display:flex; flex-direction:column; gap:7px; }
-.formDivider { height:1px; background:var(--border); margin:4px 0; }
+.formDivider { height:1px; background:var(--l-border); margin:4px 0; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 8px; }
 .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px 8px; }
 .spanTwo { grid-column:span 2; }
@@ -742,54 +785,54 @@
 }
 .photoBig {
   position:relative; width:104px; height:104px; border-radius:50%;
-  border:1px dashed var(--border); background:var(--surface-2);
+  border:1px dashed var(--l-border); background:var(--l-bg);
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; transition:border-color .15s;
 }
-.photoBig:hover { border-color:var(--violet); }
-.photoIconBig   { opacity:.35; color:var(--text-2); }
+.photoBig:hover { border-color:var(--l-primary); }
+.photoIconBig   { opacity:.35; color:var(--l-muted-fg); }
 .photoUploadBtn {
   position:absolute; bottom:2px; right:2px;
   width:26px; height:26px; border-radius:50%;
-  background:var(--violet); color:#fff;
+  background:var(--l-primary); color:#fff;
   display:flex; align-items:center; justify-content:center;
 }
 .photoBadgeTop {
-  font-size:10px; color:var(--text-2);
-  background:transparent; border:1px solid var(--border);
+  font-size:10px; color:var(--l-muted-fg);
+  background:transparent; border:1px solid var(--l-border);
   padding:1px 7px; border-radius:5px; white-space:nowrap;
 }
 
 /* ── Required field highlight ── */
 
-.reqFieldErr label { color:#ef4444 !important; }
+.reqFieldErr label { color:var(--l-destructive) !important; }
 .reqFieldErr input,
-.reqFieldErr select { border-color:#ef4444 !important; }
-.labelErr { color:#ef4444 !important; }
+.reqFieldErr select { border-color:var(--l-destructive) !important; }
+.labelErr { color:var(--l-destructive) !important; }
 
 /* ── CPF destacado ── */
 .cpfBlock { display:flex; flex-direction:column; gap:3px; }
-.cpfLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; }
+.cpfLabel { font-size:11px; font-weight:600; color:var(--l-muted-fg); text-transform:uppercase; letter-spacing:.04em; }
 .cpfWrap  { position:relative; display:flex; align-items:center; }
 .cpfIcon  { position:absolute; right:10px; display:flex; align-items:center; pointer-events:none; }
 .cpfMsg   { font-size:11px; font-weight:500; }
 
 .inputOk   { border-color:#10b981 !important; }
 .inputWarn { border-color:#f59e0b !important; }
-.inputErr  { border-color:#ef4444 !important; }
+.inputErr  { border-color:var(--l-destructive) !important; }
 .iconOk    { color:#10b981; }
 .iconWarn  { color:#f59e0b; }
-.iconErr   { color:#ef4444; }
+.iconErr   { color:var(--l-destructive); }
 
 /* ── CEP / CNPJ loading ── */
-.fieldLabel { font-size:10.5px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:3px; }
+.fieldLabel { font-size:10.5px; font-weight:600; color:var(--l-muted-fg); text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:3px; }
 .inputWithSpinner { position:relative; display:flex; align-items:center; }
 .inputWithSpinner input { width:100%; padding-right:30px !important; }
-.inputSpinner { position:absolute; right:10px; color:var(--violet); pointer-events:none; }
+.inputSpinner { position:absolute; right:10px; color:var(--l-primary); pointer-events:none; }
 
 /* ── Add blocks ── */
 .addBlock      { margin-bottom:20px; }
-.addBlockTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:10px; }
+.addBlockTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--l-muted-fg); margin-bottom:10px; }
 .addBlockHead  { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 
 /* ── Dependentes counter badge ── */
@@ -797,34 +840,34 @@
   display:inline-flex; align-items:center; justify-content:center;
   min-width:18px; height:18px; padding:0 5px;
   border-radius:5px; font-size:11px; font-weight:700;
-  background:var(--violet); color:#fff;
+  background:var(--l-primary); color:#fff;
 }
 
 /* ── Sub form blocks ── */
 .subHead      { display:flex; align-items:center; justify-content:space-between; }
-.subHeadTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-2); }
-.subFormBlock { border:1px solid var(--border); border-radius:8px; padding:9px 10px; background:transparent; margin-top:4px; }
-.subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:600; color:var(--text-2); margin-bottom:6px; }
+.subHeadTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--l-muted-fg); }
+.subFormBlock { border:1px solid var(--l-border); border-radius:8px; padding:9px 10px; background:transparent; margin-top:4px; }
+.subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:600; color:var(--l-muted-fg); margin-bottom:6px; }
 
 /* ── Searchable Combobox ── */
 .comboInput {
   width: 100%; padding: 9px 12px; border-radius: 10px;
-  background: var(--surface); border: 1px solid var(--card-border);
-  color: var(--text); font-family: var(--font); font-size: 13px;
+  background: var(--l-card); border: 1px solid var(--card-border);
+  color: var(--l-fg); font-family: var(--font); font-size: 13px;
   outline: none; transition: box-shadow .15s, border-color .15s;
   box-shadow: 0 1px 2px rgba(15,23,42,.05); box-sizing: border-box;
 }
-.comboInput::placeholder { color: var(--text-2); opacity: .6; }
-.comboInput:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(124,58,237,.15); }
+.comboInput::placeholder { color: var(--l-muted-fg); opacity: .6; }
+.comboInput:focus { border-color: var(--l-primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--l-primary) 16%, transparent); }
 .comboDropdown {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  background: var(--l-card); border: 1px solid var(--l-border); border-radius: 10px;
   box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto;
 }
 .comboItem {
   display: block; width: 100%; padding: 8px 12px; background: none; border: none;
-  text-align: left; font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s;
+  text-align: left; font-size: 13px; color: var(--l-fg); cursor: pointer; transition: background .1s;
 }
-.comboItem:hover { background: var(--surface-2); }
+.comboItem:hover { background: var(--l-bg); }
 
 /* ── Empresa link ── */
 .linkEmpresaSearch { display:flex; flex-direction:column; gap:4px; position:relative; }
@@ -854,31 +897,31 @@
 .linkDropdownItem .mono { margin-left:auto; flex-shrink:0; }
 .selectedEmpresa {
   display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:10px;
-  border:1px solid rgba(124,58,237,.3); background:rgba(124,58,237,.06); font-size:13px;
+  border:1px solid color-mix(in oklch, var(--l-primary) 32%, transparent); background:color-mix(in oklch, var(--l-primary) 7%, transparent); font-size:13px;
 }
 .selectedEmpresa .nome { flex:1; }
 
 /* ── Confirmação de cadastro ── */
 .confirmWrap  { display:flex; flex-direction:column; gap:14px; }
-.confirmTitle { font-size:13px; color:var(--text-2); margin:0; }
+.confirmTitle { font-size:13px; color:var(--l-muted-fg); margin:0; }
 .confirmList  { display:flex; flex-direction:column; gap:8px; }
 .confirmCard  {
   display:flex; align-items:center; gap:12px;
   padding:10px 14px; border-radius:10px;
-  border:1px solid var(--border); background:var(--surface-2);
+  border:1px solid var(--l-border); background:var(--l-bg);
 }
 .confirmAvatar {
   width:36px; height:36px; border-radius:50%;
-  background:rgba(124,58,237,.15); color:var(--violet);
+  background:color-mix(in oklch, var(--l-primary) 16%, transparent); color:var(--l-primary);
   font-weight:700; font-size:14px;
   display:flex; align-items:center; justify-content:center; flex-shrink:0;
 }
 .confirmInfo { flex:1; }
-.confirmName { font-size:13px; font-weight:600; color:var(--text); }
-.confirmMeta { font-size:11px; color:var(--text-2); margin-top:2px; }
+.confirmName { font-size:13px; font-weight:600; color:var(--l-fg); }
+.confirmMeta { font-size:11px; color:var(--l-muted-fg); margin-top:2px; }
 .confirmBadgeTitular {
   font-size:11px; font-weight:600; padding:2px 9px; border-radius:5px;
-  background:rgba(124,58,237,.12); color:var(--violet); white-space:nowrap;
+  background:color-mix(in oklch, var(--l-primary) 13%, transparent); color:var(--l-primary); white-space:nowrap;
 }
 .confirmBadgeDep {
   font-size:11px; font-weight:600; padding:2px 9px; border-radius:5px;
@@ -887,8 +930,8 @@
 .confirmEmpresa {
   display:flex; align-items:center; gap:8px;
   padding:4px 10px; border-radius:999px;
-  background:rgba(124,58,237,.06); border:1px solid rgba(124,58,237,.15);
-  font-size:12px; color:var(--text-2);
+  background:color-mix(in oklch, var(--l-primary) 7%, transparent); border:1px solid color-mix(in oklch, var(--l-primary) 16%, transparent);
+  font-size:12px; color:var(--l-muted-fg);
 }
 
 /* ── Section divider (blue) ── */
@@ -898,21 +941,21 @@
 .sectionDividerRow .sectionDivider { flex: 1; margin: 0; }
 .sectionDivider {
   display: flex; align-items: center; gap: 7px;
-  color: var(--text-2);
+  color: var(--l-muted-fg);
   font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   margin: 12px 0 2px;
 }
 .sectionDivider::after {
   content: ''; flex: 1; height: 1px;
-  background: var(--border);
+  background: var(--l-border);
 }
 
 /* ── Radio group ── */
 .radioGroup { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .radioOpt {
   display: flex; align-items: center; gap: 5px;
-  padding: 5px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); color: var(--text-2);
+  padding: 5px 14px; border-radius: 8px; border: 1px solid var(--l-border);
+  background: var(--l-card); color: var(--l-muted-fg);
   font-size: 12px; font-weight: 500; cursor: pointer; transition: all .12s;
   user-select: none;
 }
@@ -933,20 +976,20 @@
 }
 .modalPeoplePanel {
   width: 160px; flex-shrink: 0;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--l-border);
   padding: 8px 12px;
   display: flex; flex-direction: column; gap: 8px;
-  background: var(--surface-2);
+  background: var(--l-bg);
 }
 .peoplePanelTitle {
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--text-2); margin-bottom: 2px;
+  letter-spacing: .05em; color: var(--l-muted-fg); margin-bottom: 2px;
 }
 .personCard {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: 10px 8px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface);
+  border: 1px solid var(--l-border); background: var(--l-card);
   text-align: center;
 }
 .personCardAvatar {
@@ -955,111 +998,65 @@
   font-size: 13px; font-weight: 700; flex-shrink: 0;
 }
 .personCardName {
-  font-size: 11px; font-weight: 600; color: var(--text);
+  font-size: 11px; font-weight: 600; color: var(--l-fg);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   max-width: 130px; width: 100%;
 }
 .personCardEmpty {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
-  padding: 16px 8px; color: var(--text-2); font-size: 11px; text-align: center;
-  border: 1px dashed var(--border); border-radius: 10px;
+  padding: 16px 8px; color: var(--l-muted-fg); font-size: 11px; text-align: center;
+  border: 1px dashed var(--l-border); border-radius: 10px;
 }
 
-/* ── Registro com sidebar ── */
+/* ── O que mais entra no cadastro (veículo / dependentes / empresa) ── */
+.opcoesBlock {
+  display: flex; flex-wrap: wrap; gap: 8px 22px;
+  margin-top: 6px; padding-top: 12px;
+  border-top: 1px solid var(--l-border);
+}
+.opcaoRow {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 500; color: var(--l-fg);
+  cursor: pointer; user-select: none;
+}
+.opcaoRow input { accent-color: var(--l-primary); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+.opcaoRow svg { color: var(--l-muted-fg); flex-shrink: 0; }
+
+/* ── Registro ── */
 .regLayout {
-  display: flex; gap: 0;
-  margin: 0 -16px;
+  display: flex; flex-direction: column; gap: 0;
+  /* sangra até as bordas do .dCard (padding 20px) */
+  margin: 0 -20px -20px;
   min-height: 0;
 }
-.regSidebar {
-  width: 260px; flex-shrink: 0;
-  border-right: 1px solid var(--border);
-  background: var(--surface-2);
-  padding: 14px 10px 10px;
-  display: flex; flex-direction: column; gap: 8px;
-}
-.regSidebarLabel {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2);
-  padding: 0 4px; margin-bottom: 2px;
-}
-.regPersonList {
-  display: flex; flex-direction: column; gap: 6px;
-  flex: 1;
-}
-.regPersonCard {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 10px;
-  border: 1px solid var(--border); background: var(--surface);
-  cursor: pointer; text-align: left; width: 100%;
-  transition: border-color .12s, background .12s;
-  position: relative;
-}
-.regPersonCard:hover { border-color: var(--violet); }
-.regPersonCardActive {
-  border-color: var(--violet);
-  background: rgba(124,58,237,.07);
-}
-.regPersonInfo {
-  flex: 1; min-width: 0;
-}
-.regPersonName {
-  font-size: 12px; font-weight: 600; color: var(--text);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  text-transform: uppercase;
-}
-.regPersonRole {
-  font-size: 10px; color: var(--text-2); margin-top: 1px;
-}
-.regPersonRemove {
-  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-  width: 18px; height: 18px; border-radius: 5px;
-  color: var(--text-2); cursor: pointer; transition: all .12s;
-  margin-left: auto;
-}
-.regPersonRemove:hover { background: rgba(239,68,68,.12); color: #ef4444; }
+/* Botão tracejado de "adicionar" — dependente, empresa */
 .regAddDep {
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 8px; border-radius: 8px;
-  border: 1px dashed var(--border); background: transparent;
-  color: var(--violet); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: all .12s; width: 100%;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 14px; border-radius: 8px;
+  border: 1px dashed var(--l-border); background: transparent;
+  color: var(--l-primary); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all .12s;
+  align-self: flex-start; white-space: nowrap;
 }
-.regAddDep:hover { border-color: var(--violet); background: rgba(124,58,237,.06); }
-.regSidebarEmpresa {
-  border-top: 1px solid var(--border);
-  padding: 10px 4px 4px;
-  margin-top: 4px;
-  flex-shrink: 0;
-}
-.regSidebarEmpresaLabel {
-  display: flex; align-items: center; gap: 4px;
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2); margin-bottom: 6px;
-}
+.regAddDep:hover { border-color: var(--l-primary); background: color-mix(in oklch, var(--l-primary) 7%, transparent); }
+
 .regSidebarEmpresaSelected {
   display: flex; align-items: center; gap: 6px;
   padding: 7px 8px; border-radius: 8px;
-  border: 1px solid rgba(124,58,237,.3);
-  background: rgba(124,58,237,.06);
+  border: 1px solid color-mix(in oklch, var(--l-primary) 32%, transparent);
+  background: color-mix(in oklch, var(--l-primary) 7%, transparent);
 }
 .regSidebarEmpresaName {
-  font-size: 11px; font-weight: 600; color: var(--text);
-  flex: 1; min-width: 0;
+  font-size: 11px; font-weight: 600; color: var(--l-fg);
+  min-width: 0; max-width: 200px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.regSidebarEmpresaNone {
-  font-size: 11px; color: var(--text-2); font-style: italic;
-}
-.regFormCol {
-  flex: 1; min-width: 0;
-  display: flex; flex-direction: column;
-}
+/* Sem altura fixa: quem rola é o .detailPanel, então o formulário usa a
+   altura que a tela tiver. O 55vh de antes vinha do modal e deixava o
+   formulário baixo mesmo em telas grandes. */
 .regFormArea {
   flex: 1; min-width: 0;
-  padding: 0 16px;
-  overflow-y: auto;
-  max-height: 55vh;
+  padding: 16px 20px 20px;
 }
 
 
@@ -1071,28 +1068,18 @@
   .photoRightCol { width:100%; }
   /* layout de campos (CPF+Nascimento / Nome) já é o padrão em .photoFields */
   .modalTwoCol { flex-direction:column; }
-  .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--border); }
+  .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--l-border); }
 }
 
-/* Registro de hóspede: em telas < 727px o painel "Cadastrando" (pessoas + botões)
-   vai para o topo e fica fixo acima dos campos enquanto o formulário rola. */
 @media (max-width:727px) {
-  /* o .regLayout é flex item do corpo do modal (que é quem rola). Sem isto o
-     flexbox o encolhe abaixo da altura do conteúdo e a sidebar sticky "solta"
-     no meio, pois o sticky é limitado pelo bloco que o contém. */
-  .regLayout { flex-direction: column; flex-shrink: 0; min-height: auto; }
-  .regSidebar {
-    width: 100%; border-right: none;
-    border-bottom: 1px solid var(--border);
-    padding: 10px;
-    position: sticky; top: 0; z-index: 2;
-    background: var(--surface-2);
-    box-shadow: 0 6px 12px -8px rgba(0,0,0,.28);
-  }
-  .regPersonList { flex-direction: row; flex-wrap: wrap; gap: 6px; }
-  .regPersonCard { width: auto; flex: 1 1 140px; }
-  .regFormArea { max-height: none; padding: 12px 16px; }
-  .regEmpresaBar { padding: 12px 16px; }
+  .regLayout { flex-shrink: 0; min-height: auto; }
+  .opcoesBlock { gap: 8px 16px; }
+}
+
+/* mesma quebra do .dCard (padding 14px), para a sangria bater com a borda */
+@media (max-width:640px) {
+  .regLayout   { margin: 0 -14px -14px; }
+  .regFormArea { padding: 12px 14px 14px; }
 }
 
 /* Foto no topo e campos abaixo também na faixa 694–825px */
@@ -1110,6 +1097,8 @@
   background: rgba(16,185,129,.12); color: #10b981;
   border: 1px solid rgba(16,185,129,.25);
   white-space: nowrap; flex-shrink: 0;
+  /* encostado na direita da linha, longe do nome e das outras pílulas */
+  margin-left: auto;
 }
 
 /* ── Sort select ── */
@@ -1126,10 +1115,10 @@
 .useTitularRow {
   display: inline-flex; align-items: center; gap: 5px;
   margin-top: 5px; cursor: pointer;
-  font-size: 11px; color: var(--text-2);
+  font-size: 11px; color: var(--l-muted-fg);
   user-select: none;
 }
 .useTitularRow input[type="checkbox"] {
-  width: 13px; height: 13px; accent-color: var(--violet); cursor: pointer;
+  width: 13px; height: 13px; accent-color: var(--l-primary); cursor: pointer;
 }
 .useTitularRow:hover { color: var(--violet); }
