@@ -6,7 +6,7 @@ import {
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
   X, Contact, MapPin, CalendarDays, BedDouble,
-  Check, LayoutDashboard, UserPlus,
+  Check, LayoutDashboard, UserPlus, Pencil,
 } from 'lucide-react';
 
 import { Button }                   from '../../components/ui/Button';
@@ -19,48 +19,44 @@ import iconWhatsapp from '../../assets/whatsapp.png';
 import iconGmail    from '../../assets/gmail.png';
 // MOCK — campos que o back-end ainda não devolve. Ver registersMocks.js.
 import {
-  mockCategoria, mockResumoHospede, mockVaga, mockVinculoEmpresa, mockHistorico,
+  mockCategoria, mockResumoHospede, mockVinculoEmpresa, mockHistorico,
 } from './registersMocks';
 
 import styles from './RegistersPage.module.css';
 
 // ── Listas de veículos ────────────────────────────────────────
-const MARCAS_VEICULO = [
-  // Populares no Brasil
-  'Fiat','Volkswagen','Chevrolet','Toyota','Hyundai','Honda','Jeep','Renault','Nissan','Ford',
-  'Peugeot','Citroën',
-  // Globais
-  'BMW','Mercedes-Benz','Audi','Kia','Volvo','Subaru','Mazda','Mitsubishi','Suzuki',
-  'Land Rover','Jaguar','Porsche',
-  // Luxo
-  'Ferrari','Lamborghini','Bugatti','Rolls-Royce','Bentley','Maserati','Aston Martin','McLaren',
-  // Elétricas
-  'Tesla','BYD','Rivian','Lucid Motors','NIO','XPeng',
-  // Chinesas
-  'Chery','Great Wall Motors','Geely','JAC Motors',
-  // Brasileiras
-  'Troller','Agrale',
-  // Outras
-  'Alfa Romeo','Dodge','Chrysler','Cadillac','Infiniti','Acura','Genesis',
+const TIPOS_VEICULO = [
+  'Carro','Moto','Pickup','SUV','Van','Caminhão','Ônibus','Microônibus','Quadriciclo','Trator',
 ];
+
+const MARCAS_POR_TIPO = {
+  'Carro':       ['Fiat','Volkswagen','Chevrolet','Toyota','Hyundai','Honda','Jeep','Renault','Nissan','Ford','Peugeot','Citroën','BMW','Mercedes-Benz','Audi','Kia','Volvo','Subaru','Mazda','Mitsubishi','Suzuki','Land Rover','Jaguar','Porsche','Tesla','BYD','Chery','Troller','Alfa Romeo','Dodge'],
+  'Moto':        ['Honda','Yamaha','Suzuki','Kawasaki','BMW','Ducati','Harley-Davidson','Royal Enfield','Triumph','KTM','Dafra','Shineray','Haojue','Kasinski','Hero'],
+  'Pickup':      ['Fiat','Chevrolet','Ford','Toyota','Volkswagen','Renault','Nissan','Mitsubishi','Dodge','Ram','Mercedes-Benz'],
+  'SUV':         ['Toyota','Hyundai','Jeep','Honda','Kia','BMW','Mercedes-Benz','Audi','Volvo','Land Rover','Ford','Chevrolet','Nissan','Renault','Mitsubishi','BYD','Peugeot','Citroën'],
+  'Van':         ['Mercedes-Benz','Renault','Volkswagen','Ford','Fiat','Peugeot','Citroën','Toyota','Iveco'],
+  'Caminhão':    ['Mercedes-Benz','Volvo','Scania','MAN','DAF','Iveco','Ford','Volkswagen','Renault','Agrale'],
+  'Ônibus':      ['Mercedes-Benz','Volvo','Scania','MAN','Agrale'],
+  'Microônibus': ['Mercedes-Benz','Volkswagen','Agrale','Iveco','Fiat'],
+  'Quadriciclo': ['Honda','Yamaha','Kawasaki','Polaris','Can-Am','CF Moto'],
+  'Trator':      ['John Deere','Massey Ferguson','New Holland','Valtra','Case','Agrale'],
+};
 
 const CORES_VEICULO = [
-  // Mais comuns
-  'Branco','Preto','Prata','Cinza',
-  // Comuns
-  'Vermelho','Azul','Bege','Marrom','Verde',
-  // Menos comuns
-  'Amarelo','Laranja','Azul Claro','Verde Claro','Vinho','Roxo',
-  // Esportivas
-  'Amarelo Neon','Verde Limão','Azul Elétrico','Laranja Metálico',
-  // Premium
-  'Preto Perolizado','Branco Perolizado','Cinza Fosco','Azul Marinho','Verde Britânico',
-  // Raras
-  'Dourado','Cromado','Camaleão','Rosa','Turquesa','Roxo Metálico','Verde Neon',
+  'Branco','Preto','Prata','Cinza','Vermelho','Azul','Bege','Marrom','Verde',
+  'Amarelo','Laranja','Vinho','Roxo','Dourado','Rosa',
 ];
 
-const currentYear = new Date().getFullYear();
-const ANOS_VEICULO = Array.from({ length: currentYear - 1999 }, (_, i) => String(currentYear - i));
+const slugVeiculo = v => (v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase().replace(/\s+/g, '-');
+const byFileSlug  = mods => Object.fromEntries(
+  Object.entries(mods).map(([path, url]) => [path.split('/').pop().replace(/\.\w+$/, ''), url]),
+);
+const LOGOS_MARCA = byFileSlug(import.meta.glob('../../assets/veiculos/marcas/*.{png,svg}', { eager: true, import: 'default' }));
+const IMGS_TIPO   = byFileSlug(import.meta.glob('../../assets/veiculos/tipos/*.png', { eager: true, import: 'default' }));
+const tipoCanon   = t => TIPOS_VEICULO.find(x => slugVeiculo(x) === slugVeiculo(t)) ?? '';
+const tipoEnum    = t => slugVeiculo(tipoCanon(t)).replace(/-/g, '').toUpperCase() || null;
+const codigoCor   = c => { const i = CORES_VEICULO.findIndex(x => slugVeiculo(x) === slugVeiculo(c)); return i < 0 ? null : i + 1; };
+const imgTipo     = (t, cod) => { const k = (tipoEnum(t) ?? 'CARRO').toLowerCase(); return IMGS_TIPO[cod ? `${k}-${cod}` : k] ?? IMGS_TIPO[k] ?? IMGS_TIPO.carro; };
 
 // ── SearchableCombobox ────────────────────────────────────────
 function SearchableCombobox({ value, onChange, options, placeholder, hasError = false }) {
@@ -174,6 +170,8 @@ const unmask    = v => (v ?? '').replace(/\D/g,'');
 
 const up         = v => (v ?? '').toUpperCase().trim();
 const cleanPlaca = v => (v ?? '').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+// ABC1234 → ABC-1234 · ABC1D23 → ABC-1D23
+const fmtPlaca   = v => { const c = cleanPlaca(v); return c.length > 3 ? `${c.slice(0, 3)}-${c.slice(3)}` : c; };
 
 // ── Avatar helpers ────────────────────────────────────────────
 // Círculo sólido com as iniciais em branco, no ciclo de cores das faixas do
@@ -216,9 +214,6 @@ const fmtDataExtensa = (reg) => {
 };
 
 /** Cadastrado hoje — usado para o selo "Novo" na lista. */
-// Teto da busca única que alimenta a contagem de empresas bloqueadas.
-const TETO_EMPRESAS_STATS = 300;
-
 const isNovo = (item) => {
   const t = new Date();
   const hoje = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -276,8 +271,17 @@ const buildPessoaBody = (p, overrides = {}) => {
     return d;
   };
   const rawNasc = toApiDate(p.dataNascimento ?? p.data_nascimento);
+  const veiculos = (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
+    ...(v.id ? { id: v.id } : {}),
+    tipo: tipoEnum(v.tipo),
+    codigo_cor: codigoCor(v.cor),
+    modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
+    ano: Number(v.ano) || 0,
+    placa: cleanPlaca(v.placa),
+    cor: up(v.cor ?? ''),
+  }));
   return {
-    nome:            up(p.nome),
+    nome:            up(p.nome).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' '),
     data_nascimento: rawNasc,
     cpf:             unmask(p.cpf),
     rg:              up(p.rg),
@@ -292,17 +296,15 @@ const buildPessoaBody = (p, overrides = {}) => {
     cep:             unmask(p.cep),
     bairro:          up(p.bairro),
     sexo:            Number(p.sexo) || 1,
+    // TODO parentesco: a coluna ainda não existe no back-end. Quando existir,
+    // descomentar — o valor já é preenchido no formulário do dependente.
+    // parentesco:   p.parentesco || null,
     numero:          up(p.numero),
     status:          p.status ?? 'ATIVO',
     titular:         titularId ? { id: titularId } : null,
     empresas:        (p.empresasVinculadas ?? p.empresas_vinculadas ?? []).map(e => ({ id: e.id })),
-    veiculos_vinculados: (p.veiculos ?? p.veiculos_vinculados ?? []).map(v => ({
-      ...(v.id ? { id: v.id } : {}),
-      modelo: up(v.modelo ?? ''), marca: up(v.marca ?? ''),
-      ano: Number(v.ano) || 0,
-      placa: cleanPlaca(v.placa),
-      cor: up(v.cor ?? ''),
-    })),
+    veiculos,
+    veiculos_vinculados: veiculos,
     funcionario:     { id: currentUser?.id },
     ...overrides,
   };
@@ -334,7 +336,37 @@ const SEXO_OPTS = [
   { value: '3', label: 'Outro'     },
 ];
 
-const blankVeiculo = () => ({ modelo:'', marca:'', ano:'', placa:'', cor:'' });
+/**
+ * Parentesco do dependente com o titular. Campo opcional e, por enquanto, só
+ * do front: o back-end ainda não tem a coluna, então buildPessoaBody não
+ * manda esse valor (ver o TODO lá).
+ */
+const PARENTESCO_OPTS = [
+  { value: '',          label: 'Selecione'              },
+  { value: 'CONJUGE',   label: 'Cônjuge / Companheiro'  },
+  { value: 'FILHO',     label: 'Filho(a)'               },
+  { value: 'ENTEADO',   label: 'Enteado(a)'             },
+  { value: 'PAI_MAE',   label: 'Pai / Mãe'              },
+  { value: 'IRMAO',     label: 'Irmão / Irmã'           },
+  { value: 'AVO',       label: 'Avô / Avó'              },
+  { value: 'NETO',      label: 'Neto(a)'                },
+  { value: 'TIO',       label: 'Tio(a)'                 },
+  { value: 'SOBRINHO',  label: 'Sobrinho(a)'            },
+  { value: 'PRIMO',     label: 'Primo(a)'               },
+  { value: 'AMIGO',     label: 'Amigo(a)'               },
+  { value: 'OUTRO',     label: 'Outro'                  },
+];
+const parentescoLabel = (v) => PARENTESCO_OPTS.find(o => o.value === v && o.value)?.label ?? '—';
+
+const blankVeiculo = () => ({ tipo:'', modelo:'', marca:'', ano:'', placa:'', cor:'' });
+
+/** "Honda Civic" / "Civic" — o que aparece na linha da lista de veículos. */
+const veiculoLabel = (v) => [v.marca, v.modelo].filter(Boolean).join(' ') || 'Veículo';
+/** "2024 · Preto" — os dados secundários da mesma linha. */
+const veiculoSub = (v) => [v.ano, v.cor].filter(Boolean).join(' · ');
+
+/** "12/03/1990" a partir do que o formulário guarda (Date ou string). */
+const nascLabel = (d) => (d instanceof Date ? d.toLocaleDateString('pt-BR') : (d || '—'));
 
 /**
  * Dependente marcado como "usar os dados do titular" só preencheu nome, CPF e
@@ -350,6 +382,7 @@ const blankPessoa  = () => ({
   telefone:'', sexo:'', pais:'Brasil', estado:'', municipio:'',
   endereco:'', complemento:'', cep:'', bairro:'', numero:'',
   veiculos:[], status:'ATIVO', titularId: null, empresasVinculadas: [],
+  parentesco:'',
 });
 const blankEmpresa = () => ({
   cnpj:'', razaoSocial:'', nomeFantasia:'', telefone:'', email:'',
@@ -410,7 +443,7 @@ function SkeletonPainel() {
     <div role="status" aria-label="Carregando totais">
       <span className={sk(styles.skBarra)} style={{ marginBottom: 16 }} aria-hidden="true" />
       <div className={styles.statLine} aria-hidden="true">
-        {Array.from({ length: 5 }, (_, i) => (
+        {Array.from({ length: 4 }, (_, i) => (
           <span key={i} className={styles.statItem}>
             <span className={sk(styles.skLabel)} style={{ width: 70 }} />
             <span className={sk(styles.skNumero)} style={{ width: 34 }} />
@@ -445,6 +478,26 @@ function ContatoBotao({ tipo, href, title, children }) {
       <img src={tipo === 'whatsapp' ? iconWhatsapp : iconGmail} alt="" className={styles.quickIcon} />
       <span className={styles.contatoTexto}>{children}</span>
     </a>
+  );
+}
+
+// ── Placa Mercosul em miniatura ───────────────────────────────
+function PlacaMercosul({ placa }) {
+  const txt = fmtPlaca(placa);
+  if (!txt) return <span className={styles.vMeta}>—</span>;
+  return (
+    <span className={styles.placa} aria-label={`Placa ${txt}`}>
+      <span className={styles.placaBand}>
+        <span className={styles.placaMerco} aria-hidden="true" />
+        <span className={styles.placaPais}>BRASIL</span>
+        <svg className={styles.placaFlag} viewBox="0 0 20 14" aria-hidden="true">
+          <rect width="20" height="14" fill="#009b3a" />
+          <path d="M10 1.6 18.2 7 10 12.4 1.8 7z" fill="#fedf00" />
+          <circle cx="10" cy="7" r="3.1" fill="#002776" />
+        </svg>
+      </span>
+      <span className={styles.placaNum}>{txt}</span>
+    </span>
   );
 }
 
@@ -616,14 +669,52 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
     }
   };
 
+  // Veículo entra por um editor: "+ Veículo" abre os campos e só o "Confirmar"
+  // joga o veículo na lista. O rascunho fica em data.veiculoEdit — no mesmo
+  // objeto da pessoa, para quem salva poder ver que há edição aberta;
+  // buildPessoaBody monta o corpo campo a campo, então essa chave não vaza
+  // para a API. { index: null } = veículo novo; index n = editando o n-ésimo.
   const veiculosEndRef = useRef(null);
-  const addVeiculo    = () => {
-    onChange(p => ({ ...p, veiculos: [...p.veiculos, blankVeiculo()] }));
+  const vEdit  = data.veiculoEdit ?? null;
+  const [vErr, setVErr] = useState(false);
+
+  const abrirVeiculo = (i = null) => {
+    setVErr(false);
+    set('veiculoEdit', { index: i, value: i == null ? blankVeiculo() : { ...(data.veiculos ?? [])[i] } });
     setTimeout(() => veiculosEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
   };
-  const removeVeiculo = i  => onChange(p => ({ ...p, veiculos: p.veiculos.filter((_,j) => j !== i) }));
-  const setVeiculo    = (i, field, val) =>
-    onChange(p => ({ ...p, veiculos: p.veiculos.map((v,j) => j === i ? { ...v, [field]: val } : v) }));
+  const setVeiculo = (field, val) =>
+    onChange(p => ({ ...p, veiculoEdit: { ...p.veiculoEdit, value: { ...p.veiculoEdit.value, [field]: val } } }));
+  const cancelarVeiculo = () => { setVErr(false); set('veiculoEdit', null); };
+  const confirmarVeiculo = () => {
+    const v = vEdit.value;
+    if (!v.modelo || !v.marca || !cleanPlaca(v.placa)) { setVErr(true); return; }
+    onChange(p => ({
+      ...p,
+      veiculos: vEdit.index == null
+        ? [...(p.veiculos ?? []), v]
+        : (p.veiculos ?? []).map((x, k) => (k === vEdit.index ? v : x)),
+      veiculoEdit: null,
+    }));
+    setVErr(false);
+  };
+  const removeVeiculo = (i) => onChange(p => ({
+    ...p,
+    veiculos: (p.veiculos ?? []).filter((_, k) => k !== i),
+    // editando justamente esse: o editor fecha junto
+    veiculoEdit: p.veiculoEdit?.index === i ? null : p.veiculoEdit,
+  }));
+
+  // A caixa "Possui veículo" acabou de ser marcada e não há nenhum na lista:
+  // o editor já abre, para a seção não nascer vazia. Só no momento em que a
+  // caixa muda — na edição de um hóspede a seção começa fechada.
+  const veicAntes = useRef(mostrarVeiculos);
+  useEffect(() => {
+    if (mostrarVeiculos && !veicAntes.current && (data.veiculos?.length ?? 0) === 0) abrirVeiculo();
+    if (!mostrarVeiculos && data.veiculoEdit) set('veiculoEdit', null);
+    veicAntes.current = mostrarVeiculos;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarVeiculos]);
 
   const cpfIcon = cpfStatus === 'loading' ? <Loader2 size={14} className={styles.spinInline} />
                 : cpfStatus === 'ok'      ? <CheckCircle2 size={14} className={styles.iconOk} />
@@ -742,6 +833,8 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       </div>
 
       {/* ── Endereço (sem título separador) ── */}
+      {/* o endereço não tem título próprio, então um respiro marca a virada */}
+      <div className={styles.formGap} aria-hidden="true" />
       {titular && (
         <div className={styles.sectionDividerRow}>
           <label className={styles.useTitularRow} style={{ marginBottom: 0 }}>
@@ -790,55 +883,99 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
       </FormField>
 
       {/* ── Veículos ── */}
+      {/* A seção é aberta pela linha divisória; os campos seguem no mesmo
+          fluxo do formulário da pessoa, sem caixa em volta. */}
       {mostrarVeiculos && (<>
-      <div className={styles.sectionDividerRow}>
-        <div className={styles.sectionDivider}><Car size={12} /> Veículos</div>
-        <Button onClick={addVeiculo}><Plus size={12} /> Veículo</Button>
-      </div>
+      <div className={styles.optTitle}><Car size={16} /> Veículos</div>
 
-      {data.veiculos.map((v, i) => (
-        <div key={i} className={styles.subFormBlock}>
-          <div className={styles.subFormTitle}>
-            <span>Veículo {i + 1}</span>
-            <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={12} /></button>
+      {/* os já confirmados, em tabela — mesma leitura do histórico */}
+      {(data.veiculos ?? []).length > 0 && (
+        <div className={styles.hScroll}>
+          <table className={[styles.hTable, styles.optTable].join(' ')}>
+            <thead><tr>
+              <th>Veículo</th><th>Tipo</th><th>Cor</th><th>Placa</th><th aria-label="Ações" />
+            </tr></thead>
+            <tbody>
+              {data.veiculos.map((v, i) => (
+                <tr key={i} className={vEdit?.index === i ? styles.trEditando : ''}>
+                  <td><span className={styles.hQuarto}><Car size={15} /> {veiculoLabel(v)}</span></td>
+                  <td>{tipoCanon(v.tipo) || '—'}</td>
+                  <td>{v.cor || '—'}</td>
+                  <td><span className={styles.itemRowPlaca}>{v.placa}</span></td>
+                  <td>
+                    <span className={styles.tdAcoes}>
+                      <button type="button" className={styles.btnEdit} onClick={() => abrirVeiculo(i)}
+                        title="Editar veículo"><Pencil size={12} /></button>
+                      <button type="button" className={styles.btnRemove} onClick={() => removeVeiculo(i)}
+                        title="Remover veículo"><X size={12} /></button>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* o editor, aberto pelo "+ Veículo" ou pelo lápis de uma linha */}
+      {vEdit && (
+        <div className={styles.optItem}>
+          <div className={styles.optItemHead}>
+            {/*<span>{vEdit.index == null ? 'Novo veículo' : `Editando ${veiculoLabel(vEdit.value)}`}</span>*/}
           </div>
           <div className={styles.grid3}>
-            <FormField label="Modelo *">
-              <Input
-                value={v.modelo}
-                onChange={e => setVeiculo(i,'modelo',e.target.value)}
-                placeholder="Ex: Civic"
-                className={showErrors && !v.modelo ? styles.inputErr : ''}
-              />
+            <FormField label="Tipo">
+              <Select value={tipoCanon(vEdit.value.tipo)}
+                onChange={e => onChange(p => ({ ...p, veiculoEdit: { ...p.veiculoEdit, value: { ...p.veiculoEdit.value, tipo: e.target.value, marca: '' } } }))}>
+                <option value="">Selecione</option>
+                {TIPOS_VEICULO.map(t => <option key={t} value={t}>{t}</option>)}
+              </Select>
             </FormField>
             <FormField label="Marca *">
               <SearchableCombobox
-                value={v.marca}
-                onChange={val => setVeiculo(i,'marca',val)}
-                options={MARCAS_VEICULO}
-                placeholder="Ex: Honda"
-                hasError={showErrors && !v.marca}
+                value={vEdit.value.marca}
+                onChange={val => setVeiculo('marca', val)}
+                options={MARCAS_POR_TIPO[tipoCanon(vEdit.value.tipo)] ?? []}
+                placeholder={tipoCanon(vEdit.value.tipo) ? 'Selecione a marca' : 'Selecione o tipo antes'}
+                hasError={vErr && !vEdit.value.marca}
               />
             </FormField>
-            <FormField label="Ano">
-              <SearchableCombobox value={v.ano} onChange={val => setVeiculo(i,'ano',val)} options={ANOS_VEICULO} placeholder="Ex: 2024" />
+            <FormField label="Modelo *">
+              <Input
+                value={vEdit.value.modelo}
+                onChange={e => setVeiculo('modelo', e.target.value)}
+                placeholder="Ex: Civic"
+                className={vErr && !vEdit.value.modelo ? styles.inputErr : ''}
+              />
             </FormField>
           </div>
           <div className={styles.grid2}>
             <FormField label="Placa *">
               <Input
-                value={v.placa}
-                onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
+                value={vEdit.value.placa}
+                onChange={e => setVeiculo('placa', maskPlaca(e.target.value))}
                 placeholder="AAA0A00"
-                className={showErrors && !cleanPlaca(v.placa) ? styles.inputErr : ''}
+                className={vErr && !cleanPlaca(vEdit.value.placa) ? styles.inputErr : ''}
               />
             </FormField>
             <FormField label="Cor">
-              <SearchableCombobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)} options={CORES_VEICULO} placeholder="Ex: Preto" />
+              <SearchableCombobox value={vEdit.value.cor} onChange={val => setVeiculo('cor', val)} options={CORES_VEICULO} placeholder="Ex: Preto" />
             </FormField>
           </div>
+          <div className={styles.editorFoot}>
+            <button type="button" className={styles.optAdd} onClick={confirmarVeiculo}>
+              <Check size={13} /> Confirmar veículo
+            </button>
+            <button type="button" className={styles.btnGhost} onClick={cancelarVeiculo}>Cancelar</button>
+          </div>
         </div>
-      ))}
+      )}
+
+      {!vEdit && (
+        <button type="button" className={styles.optAdd} onClick={() => abrirVeiculo()}>
+          <Plus size={13} /> Veículo
+        </button>
+      )}
       <div ref={veiculosEndRef} />
       </>)}
     </div>
@@ -850,7 +987,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
  * nome, CPF e nascimento. Desmarcando "usar os dados do titular" o formulário
  * completo aparece no lugar.
  */
-function DependenteForm({ data, onChange, titular, index, onRemove, onFetchCEP, onCheckCPF, showErrors = false }) {
+function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF, showErrors = false }) {
   const usarTitular = data.usarDadosTitular !== false;
   const set     = (field, val) => onChange(prev => ({ ...prev, [field]: val }));
   const hasErr  = field => showErrors && !data[field];
@@ -858,9 +995,9 @@ function DependenteForm({ data, onChange, titular, index, onRemove, onFetchCEP, 
   const cpfRuim = cpfRaw.length === 11 && !validarCPF(cpfRaw);
 
   return (
-    <div className={styles.subFormBlock}>
-      <div className={styles.subFormTitle}>
-        <span>Dependente {index + 1}</span>
+    <div className={styles.optItem}>
+      <div className={styles.optItemHead}>
+        <span>{index == null ? 'Novo dependente' : `Editando dependente ${index + 1}`}</span>
         <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: 'auto' }}>
           <input
             type="checkbox"
@@ -869,9 +1006,6 @@ function DependenteForm({ data, onChange, titular, index, onRemove, onFetchCEP, 
           />
           <span>Usar os dados do titular</span>
         </label>
-        <button className={styles.btnRemove} onClick={() => onRemove(index)} title="Remover dependente">
-          <X size={12} />
-        </button>
       </div>
 
       {usarTitular ? (
@@ -897,17 +1031,37 @@ function DependenteForm({ data, onChange, titular, index, onRemove, onFetchCEP, 
               <DateMaskInput value={data.dataNascimento} onChange={d => set('dataNascimento', d)} />
             </FormField>
           </div>
+          <FormField label="Sexo">
+            <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
+              {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </FormField>
+          <FormField label="Parentesco">
+            <Select value={data.parentesco ?? ''} onChange={e => set('parentesco', e.target.value)}>
+              {PARENTESCO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </FormField>
         </div>
       ) : (
-        <PessoaForm
-          data={data}
-          onChange={onChange}
-          onFetchCEP={onFetchCEP}
-          onCheckCPF={onCheckCPF}
-          showErrors={showErrors}
-          titular={titular}
-          mostrarVeiculos={false}
-        />
+        <>
+          {/* o PessoaForm já traz o Sexo; o parentesco é só do dependente */}
+          <div className={styles.grid3}>
+            <FormField label="Parentesco">
+              <Select value={data.parentesco ?? ''} onChange={e => set('parentesco', e.target.value)}>
+                {PARENTESCO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+            </FormField>
+          </div>
+          <PessoaForm
+            data={data}
+            onChange={onChange}
+            onFetchCEP={onFetchCEP}
+            onCheckCPF={onCheckCPF}
+            showErrors={showErrors}
+            titular={titular}
+            mostrarVeiculos={false}
+          />
+        </>
       )}
     </div>
   );
@@ -1050,6 +1204,12 @@ export default function RegistersPage() {
   const [temVeiculo,     setTemVeiculo]     = useState(false);
   const [temDependentes, setTemDependentes] = useState(false);
   const [temEmpresa,     setTemEmpresa]     = useState(false);
+
+  // Dependente entra por um editor, como o veículo: "+ Dependente" abre o
+  // formulário e só o "Confirmar" joga a pessoa na lista.
+  // { index: null } = dependente novo; index n = editando o n-ésimo.
+  const [depEdit, setDepEdit] = useState(null);
+  const [depErr,  setDepErr]  = useState(false);
 
   const [showAddPessoa,  setShowAddPessoa]  = useState(false);
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
@@ -1201,20 +1361,13 @@ export default function RegistersPage() {
         cadastroApi.listarPessoas({ size: 1 }),
         cadastroApi.listarPessoas({ size: 1, status: 'HOSPEDADO' }),
         cadastroApi.listarPessoas({ size: 1, status: 'BLOQUEADO' }),
-        // GET /empresa não filtra por status, então as bloqueadas são contadas
-        // aqui. O teto evita puxar a base inteira só para o painel.
-        cadastroApi.listarEmpresas({ size: TETO_EMPRESAS_STATS }),
+        cadastroApi.listarEmpresas({ size: 1 }),
       ]);
       setStats({
         pessoas:    pessoas?.totalElements    ?? 0,
         hospedados: hospedados?.totalElements ?? 0,
         bloqueados: bloqueados?.totalElements ?? 0,
         empresas:   empresas?.totalElements   ?? 0,
-        empresasBloqueadas: (empresas?.content ?? [])
-          .filter((e) => (e.status ?? '').toUpperCase() === 'BLOQUEADO').length,
-        // false quando houver mais empresas que o teto: aí a contagem de
-        // bloqueadas é parcial e a tela não deve afirmar o número.
-        empresasCompleto: (empresas?.totalElements ?? 0) <= TETO_EMPRESAS_STATS,
       });
     } catch {
       setStats(null);
@@ -1391,23 +1544,67 @@ export default function RegistersPage() {
     setPage(0); fetchData(searchTerm, filterMode, 0);
   };
 
-  const handleAddDependente = () => {
-    setDependentes(prev => {
-      const next = [...prev, blankPessoa()];
+  const abrirDependente = (i = null) => {
+    setDepErr(false);
+    setDepEdit({ index: i, value: i == null ? blankPessoa() : { ...dependentes[i] } });
+  };
 
-      return next;
-    });
+  const cancelarDependente = () => { setDepEdit(null); setDepErr(false); };
+
+  const setDepEditData = (val) =>
+    setDepEdit(prev => ({ ...prev, value: typeof val === 'function' ? val(prev.value) : val }));
+
+  const confirmarDependente = () => {
+    const d = depEdit.value;
+    const cpfRaw = unmask(d.cpf ?? '');
+    if (!d.nome || !d.dataNascimento || !cpfRaw) {
+      setDepErr(true);
+      showNotif('Preencha CPF, nome e data de nascimento do dependente.', 'error');
+      return;
+    }
+    if (cpfRaw.length !== 11 || !validarCPF(cpfRaw)) {
+      setDepErr(true);
+      showNotif('CPF do dependente inválido.', 'error');
+      return;
+    }
+    // quem não herda do titular precisa dos próprios contato e endereço
+    if (d.usarDadosTitular === false && (!d.telefone || !d.cep)) {
+      setDepErr(true);
+      showNotif('Preencha telefone e CEP do dependente.', 'error');
+      return;
+    }
+    // o mesmo CPF não pode aparecer duas vezes no cadastro
+    const jaUsados = [
+      unmask(titular.cpf ?? ''),
+      ...dependentes.filter((_, j) => j !== depEdit.index).map(x => unmask(x.cpf ?? '')),
+    ].filter(Boolean);
+    if (jaUsados.includes(cpfRaw)) {
+      showNotif('Esse CPF já está neste cadastro.', 'error');
+      return;
+    }
+    setDependentes(prev => depEdit.index == null
+      ? [...prev, d]
+      : prev.map((x, j) => (j === depEdit.index ? d : x)));
+    setDepEdit(null); setDepErr(false);
   };
 
   const handleRemoveDependente = i => {
     setDependentes(prev => prev.filter((_, j) => j !== i));
-
+    // editando justamente esse: o editor fecha junto
+    setDepEdit(prev => (prev && prev.index === i ? null : prev));
   };
 
-  const setDepData = (i, val) =>
-    setDependentes(prev => prev.map((d, j) => j === i ? (typeof val === 'function' ? val(d) : val) : d));
-
   const handlePreviewPessoa = () => {
+    // Um editor aberto guarda dados que ainda não entraram na lista; avançar
+    // agora perderia o que foi digitado.
+    if (titular.veiculoEdit) {
+      showNotif('Confirme ou cancele o veículo em edição.', 'error');
+      return;
+    }
+    if (depEdit) {
+      showNotif('Confirme ou cancele o dependente em edição.', 'error');
+      return;
+    }
     if (!titular.nome || !titular.cpf || !titular.dataNascimento || !titular.telefone || !titular.cep) {
      
       setShowErrors(true);
@@ -1554,6 +1751,7 @@ export default function RegistersPage() {
       empresasVinculadas: p.empresas_vinculadas ?? p.empresasVinculadas ?? [],
       veiculos:           (p.veiculos_vinculados ?? p.veiculos ?? []).map(v => ({
         ...(v.id ? { id: v.id } : {}),
+        tipo: tipoCanon(v.tipo),
         modelo: v.modelo ?? '', marca: v.marca ?? '',
         ano: String(v.ano ?? ''), placa: v.placa ?? '', cor: v.cor ?? '',
       })),
@@ -1562,6 +1760,10 @@ export default function RegistersPage() {
   };
 
   const handleSaveEditPessoa = async () => {
+    if (editPessoa.veiculoEdit) {
+      showNotif('Confirme ou cancele o veículo em edição.', 'error');
+      return;
+    }
     if ((editPessoa.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
       showNotif('Preencha a placa de todos os veículos.', 'error');
       return;
@@ -1571,7 +1773,7 @@ export default function RegistersPage() {
       await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(editPessoa) });
       showNotif('Pessoa atualizada!');
       setShowEdit(false);
-      fetchData(searchTerm, filterMode, page);
+      await refreshDetailPessoa();
     } catch (e) { showNotif(e.message || 'Erro ao editar.', 'error'); }
     finally { setIsSubmitting(false); }
   };
@@ -1695,26 +1897,22 @@ export default function RegistersPage() {
 
   // As três caixas do fim do cadastro. Marcar abre a seção correspondente;
   // desmarcar descarta o que estava preenchido, para não salvar escondido.
+  // Marcar não cria item nenhum: quem abre o editor é o próprio PessoaForm
+  // (veículo) ou o abrirDependente daqui. Desmarcar joga a lista fora.
   const toggleTemVeiculo = (on) => {
     setTemVeiculo(on);
-    setTitular(prev => ({
-      ...prev,
-      veiculos: on
-        ? (prev.veiculos?.length ? prev.veiculos : [blankVeiculo()])
-        : [],
-    }));
+    if (!on) setTitular(prev => ({ ...prev, veiculos: [], veiculoEdit: null }));
   };
 
   const toggleTemDependentes = (on) => {
     setTemDependentes(on);
-    if (on) { if (dependentes.length === 0) handleAddDependente(); }
-    else setDependentes([]);
+    if (on) { if (dependentes.length === 0) abrirDependente(); }
+    else { setDependentes([]); setDepEdit(null); setDepErr(false); }
   };
 
   const toggleTemEmpresa = (on) => {
     setTemEmpresa(on);
-    if (on) setShowLinkEmpresa(true);
-    else { setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]); }
+    if (!on) { setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]); }
   };
 
   const cancelAddPessoa = () => {
@@ -1723,6 +1921,7 @@ export default function RegistersPage() {
     setShowAddPessoa(false); setShowErrors(false);
     setConfirmStep(false);
     setTitular(blankPessoa()); setDependentes([]);
+    setDepEdit(null); setDepErr(false);
     setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
     setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
   };
@@ -1786,45 +1985,134 @@ export default function RegistersPage() {
             {/* ── Dependentes ── */}
             {temDependentes && (
               <>
-                {dependentes.map((dep, i) => (
-                  <DependenteForm
-                    key={`dep-${i}`}
-                    index={i}
-                    data={dep}
-                    onChange={val => setDepData(i, val)}
-                    titular={titular}
-                    onRemove={handleRemoveDependente}
-                    onFetchCEP={fetchCEP}
-                    onCheckCPF={checkCPF}
-                    showErrors={showErrors}
-                  />
-                ))}
-                <button className={styles.regAddDep} onClick={handleAddDependente}>
-                  <Plus size={13} /> Dependente
-                </button>
+                <div className={styles.optTitle}><Users size={16} /> Dependentes</div>
+
+                {/* os já confirmados, em tabela — mesma leitura do histórico */}
+                {dependentes.length > 0 && (
+                  <div className={styles.hScroll}>
+                    <table className={[styles.hTable, styles.optTable].join(' ')}>
+                      <thead><tr>
+                        <th>Dependente</th><th>CPF</th><th>Nascimento</th><th>Parentesco</th>
+                        <th>Contato e endereço</th><th aria-label="Ações" />
+                      </tr></thead>
+                      <tbody>
+                        {dependentes.map((dep, i) => (
+                          <tr key={i} className={depEdit?.index === i ? styles.trEditando : ''}>
+                            <td>
+                              <span className={styles.hQuarto}>
+                                <AvatarCircle name={dep.nome || `D${i + 1}`} size={24} tone={i + 1} fontSize={10} />
+                                {dep.nome || `Dependente ${i + 1}`}
+                              </span>
+                            </td>
+                            <td>{maskCPF(dep.cpf) || '—'}</td>
+                            <td>{nascLabel(dep.dataNascimento)}</td>
+                            <td>{parentescoLabel(dep.parentesco)}</td>
+                            <td>
+                              <span className={styles.optTag}>
+                                {dep.usarDadosTitular !== false ? 'Do titular' : 'Próprios'}
+                              </span>
+                            </td>
+                            <td>
+                              <span className={styles.tdAcoes}>
+                                <button type="button" className={styles.btnEdit} onClick={() => abrirDependente(i)}
+                                  title="Editar dependente"><Pencil size={12} /></button>
+                                <button type="button" className={styles.btnRemove} onClick={() => handleRemoveDependente(i)}
+                                  title="Remover dependente"><X size={12} /></button>
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* o editor, aberto pelo "+ Dependente" ou pelo lápis */}
+                {depEdit && (
+                  <>
+                    <DependenteForm
+                      key={`dep-edit-${depEdit.index ?? 'novo'}`}
+                      index={depEdit.index}
+                      data={depEdit.value}
+                      onChange={setDepEditData}
+                      titular={titular}
+                      onFetchCEP={fetchCEP}
+                      onCheckCPF={checkCPF}
+                      showErrors={depErr}
+                    />
+                    <div className={styles.editorFoot}>
+                      <button type="button" className={styles.optAdd} onClick={confirmarDependente}>
+                        <Check size={13} /> Confirmar dependente
+                      </button>
+                      <button type="button" className={styles.btnGhost} onClick={cancelarDependente}>Cancelar</button>
+                    </div>
+                  </>
+                )}
+
+                {!depEdit && (
+                  <button type="button" className={styles.optAdd} onClick={() => abrirDependente()}>
+                    <Plus size={13} /> Dependente
+                  </button>
+                )}
               </>
             )}
 
-            {/* ── Empresa vinculada ── */}
+            {/* ── Empresa vinculada ──
+                A busca acontece aqui mesmo: escolher na lista de resultados já
+                vincula, sem abrir modal. */}
             {temEmpresa && (
-              <div className={styles.subFormBlock}>
-                <div className={styles.subFormTitle}>
-                  <span>Empresa vinculada</span>
-                </div>
+              <>
+                <div className={styles.optTitle}><Building2 size={16} /> Empresa vinculada</div>
                 {linkEmpresa ? (
-                  <div className={styles.regSidebarEmpresaSelected}>
-                    <Building2 size={12} className={styles.iconViolet} />
-                    <span className={styles.regSidebarEmpresaName}>{empresaLabel(linkEmpresa)}</span>
-                    <button className={styles.btnRemove} style={{ marginLeft: 'auto' }}
-                      onClick={() => setLinkEmpresa(null)}><X size={11} /></button>
+                  <div className={styles.itemLista}>
+                    <div className={styles.itemRow}>
+                      <Building2 size={14} className={styles.itemRowIcon} />
+                      <span className={styles.itemRowMain}>
+                        <span className={styles.itemRowTitle}>{empresaLabel(linkEmpresa)}</span>
+                        <span className={styles.itemRowSub}>{maskCNPJ(linkEmpresa.cnpj ?? '')}</span>
+                      </span>
+                      <span className={styles.itemRowActions}>
+                        <button type="button" className={styles.btnRemove}
+                          onClick={() => setLinkEmpresa(null)} title="Desvincular empresa"><X size={12} /></button>
+                      </span>
+                    </div>
                   </div>
                 ) : (
-                  <button className={styles.regAddDep} onClick={() => setShowLinkEmpresa(true)}>
-                    <Building2 size={13} /> Escolher empresa
-                  </button>
+                  <div className={styles.optItem}>
+                    <div className={styles.searchWrap}>
+                      <Search size={13} className={styles.searchIcon} />
+                      <Input
+                        value={linkSearch}
+                        onChange={e => setLinkSearch(e.target.value)}
+                        placeholder="Buscar por nome ou CNPJ (mín. 3 caracteres)..."
+                        className={styles.searchInput}
+                      />
+                      {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
+                    </div>
+                    {linkResults.length > 0 && (
+                      <div className={[styles.linkDropdown, styles.linkDropdownInline].join(' ')}>
+                        {linkResults.map(e => (
+                          <button key={e.id} type="button" className={styles.linkDropdownItem}
+                            onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); }}>
+                            <Building2 size={12} className={styles.iconViolet} />
+                            <span className={styles.nome}>{empresaLabel(e)}</span>
+                            <span className={styles.mono}>{maskCNPJ(e.cnpj ?? '')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
+              </>
             )}
+
+            {/* ── Fim do cadastro ── */}
+            <div className={styles.formFoot}>
+              <Button className={styles.btnSolid}
+                onClick={() => setTitular(blankPessoa())}>Limpar</Button>
+              <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                onClick={handlePreviewPessoa}>Próximo</Button>
+            </div>
           </div>
         </div>
         )
@@ -2003,16 +2291,12 @@ export default function RegistersPage() {
                   </span>
                   <div className={styles.dCardActions}>
                     {!confirmStep ? (
-                      <>
-                        <span className={styles.personCount}>
-                          <Users size={13} />
-                          {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-                        </span>
-                        <Button className={styles.btnSolid}
-                          onClick={() => setTitular(blankPessoa())}>Limpar</Button>
-                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                          onClick={handlePreviewPessoa}>Próximo</Button>
-                      </>
+                      /* Limpar e Próximo ficam no fim do formulário, depois de
+                         tudo o que se cadastra; aqui em cima só a contagem. */
+                      <span className={styles.personCount}>
+                        <Users size={13} />
+                        {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
+                      </span>
                     ) : (
                       <>
                         <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
@@ -2164,22 +2448,15 @@ export default function RegistersPage() {
                         <span className={styles.statItemLabel}>Empresas</span>
                         <span className={styles.statItemVal}>{stats.empresas}</span>
                       </span>
-                      <span className={styles.statItem}>
-                        <i className={[styles.statDot, styles.distBloq].join(' ')} />
-                        <span className={styles.statItemLabel}>Empresas bloqueadas</span>
-                        <span className={[styles.statItemVal, styles.statValRed].join(' ')}>
-                          {stats.empresasCompleto ? stats.empresasBloqueadas : '—'}
-                        </span>
-                      </span>
                     </div>
                     </>
                   )}
                 </div>
               </section>
 
-              <div className={styles.detailHint}>
-                Escolha um registro na lista ao lado para ver a ficha completa.
-              </div>
+              {/*<div className={styles.detailHint}>*/}
+              {/*  Escolha um registro na lista ao lado para ver a ficha completa.*/}
+              {/*</div>*/}
             </div>
           ) : detailType === 'pessoa' ? (
             <div className={styles.detailPanel}>
@@ -2275,16 +2552,23 @@ export default function RegistersPage() {
                       <ul className={styles.vList}>
                         {veiculosList.map((v, i) => (
                           <li key={v.id ?? i} className={styles.vRow}>
-                            <p className={styles.vModelo}>{[v.modelo, v.marca].filter(Boolean).join(' ') || '—'}</p>
-                            <p className={styles.vMeta}>
-                              {[
-                                v.cor ? `Cor ${v.cor}` : null,
-                                v.ano ? `Ano ${v.ano}` : null,
-                                /* MOCK — vaga de estacionamento */
-                                `Vaga ${mockVaga(v.placa ?? i)}`,
-                              ].filter(Boolean).join(' · ')}
-                            </p>
-                            <span className={styles.vPlaca}>{v.placa || '—'}</span>
+                            <img className={styles.vTipoImg} src={imgTipo(v.tipo, v.codigo_cor ?? codigoCor(v.cor))} alt={tipoCanon(v.tipo) || 'Veículo'} />
+                            <div className={styles.vInfo}>
+                              <p className={styles.vModelo}>
+                                {[v.marca, v.modelo].filter(Boolean).join(' ') || '—'}
+                              </p>
+                              <p className={styles.vMeta}>
+                                {[
+                                  tipoCanon(v.tipo) || null,
+                                  v.cor || null,
+                                  Number(v.ano) ? `Ano ${v.ano}` : null,
+                                ].filter(Boolean).join(' · ') || '—'}
+                              </p>
+                            </div>
+                            {LOGOS_MARCA[slugVeiculo(v.marca)] && (
+                              <img className={styles.vMarcaLogo} src={LOGOS_MARCA[slugVeiculo(v.marca)]} alt={v.marca} />
+                            )}
+                            <PlacaMercosul placa={v.placa} />
                           </li>
                         ))}
                       </ul>
@@ -2565,40 +2849,6 @@ export default function RegistersPage() {
           )}
         </main>
       </div>
-
-      {/* ══ MODAL: VINCULAR EMPRESA (cadastro hóspede) ════════ */}
-      <Modal
-        open={showLinkEmpresa}
-        onClose={() => { setShowLinkEmpresa(false); setLinkSearch(''); setLinkResults([]); }}
-        size="md"
-        title="Vincular Empresa"
-      >
-        <div className={styles.linkEmpresaSearch}>
-          <div className={styles.searchWrap}>
-            <Search size={13} className={styles.searchIcon} />
-            <Input
-              value={linkSearch}
-              onChange={e => setLinkSearch(e.target.value)}
-              placeholder="Buscar por nome ou CNPJ (mín. 3 caracteres)..."
-              className={styles.searchInput}
-              autoFocus
-            />
-            {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
-          </div>
-          {linkResults.length > 0 && (
-            <div className={styles.linkDropdown} style={{ position: 'static', marginTop: 8, boxShadow: 'none', border: '1px solid var(--border)' }}>
-              {linkResults.map(e => (
-                <button key={e.id} className={styles.linkDropdownItem}
-                  onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); setShowLinkEmpresa(false); }}>
-                  <Building2 size={12} className={styles.iconViolet} />
-                  <span className={styles.nome}>{empresaLabel(e)}</span>
-                  <span className={styles.mono}>{maskCNPJ(e.cnpj ?? '')}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </Modal>
 
       {/* ══ MODAL: NOVO DEPENDENTE (criar + vincular) ══════════ */}
       <Modal

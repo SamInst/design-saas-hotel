@@ -1,8 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { authApi } from '../services/api';
 import styles from './LoginPage.module.css';
-import logo from '../assets/logo-hospedagem-simbolo.png';
+
+// Fotos 4K (Unsplash) do carrossel de fundo — ordem = ordem de exibição.
+const SLIDES = Object.values(
+  import.meta.glob('../assets/login/*.jpg', { eager: true, import: 'default' })
+);
+const SLIDE_MS = 7000;
+
+// "+" da marca: duas barras arredondadas em gradiente dourado→terra,
+// com um brilho no cruzamento — lê como "mais" e como uma estrela/cruz de guia.
+function PlusMark({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <linearGradient id="plusGold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0"    stopColor="#f6d9a8" />
+          <stop offset="0.45" stopColor="#e3ac6b" />
+          <stop offset="1"    stopColor="#c25a36" />
+        </linearGradient>
+        <radialGradient id="plusGlow" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="#fff6e6" stopOpacity="0.95" />
+          <stop offset="1" stopColor="#fff6e6" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <rect x="39" y="8"  width="22" height="84" rx="11" fill="url(#plusGold)" />
+      <rect x="8"  y="39" width="84" height="22" rx="11" fill="url(#plusGold)" />
+      <circle cx="50" cy="50" r="17" fill="url(#plusGlow)" />
+    </svg>
+  );
+}
 
 export default function LoginPage({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -10,6 +38,18 @@ export default function LoginPage({ onLogin }) {
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
+  const [slide,    setSlide]    = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setSlide(i => (i + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearInterval(t);
+  }, []);
+
+  // pré-carrega a próxima foto para o crossfade não piscar
+  useEffect(() => {
+    const img = new Image();
+    img.src = SLIDES[(slide + 1) % SLIDES.length];
+  }, [slide]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,45 +91,57 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className={styles.page}>
 
+      {/* ── BACKGROUND CAROUSEL ─────────────────────────────────────── */}
+      <div className={styles.carousel} aria-hidden="true">
+        {SLIDES.map((src, i) => (
+          <div
+            key={src}
+            className={`${styles.slide} ${i === slide ? styles.slideActive : ''}`}
+            style={{ backgroundImage: i === slide || i === (slide + SLIDES.length - 1) % SLIDES.length ? `url(${src})` : undefined }}
+          />
+        ))}
+        <div className={styles.shade} />
+        <div className={styles.grain} />
+      </div>
+
       {/* ── IMMERSIVE STAGE ─────────────────────────────────────────── */}
       <aside className={styles.stage} aria-hidden="true">
-        <div className={styles.photo} />
-        <div className={styles.tint} />
-        <div className={styles.sun} />
-        <div className={styles.grain} />
-
         <div className={styles.stageBody}>
           <span className={styles.kicker}>Sistema de Gestão Hoteleira</span>
           <h2 className={styles.wordmark}>
-            mais<em>hospedagem</em>.
+            <PlusMark className={styles.plus} /><em>hospedagem</em>
           </h2>
-          <p className={styles.lede}>
-            Onde cada reserva vira uma estadia, e cada estadia, uma história
-            à beira-mar.
+          <p className={styles.features}>
+            Reservas, pernoites e meias-diárias num só calendário. Recepção com
+            check-in e check-out em tempo real, cadastro de hóspedes e empresas,
+            tarifas por temporada, controle financeiro com vouchers e orçamentos,
+            equipe e permissões por cargo, tudo integrado num único painel.
           </p>
+          <div className={styles.dots}>
+            {SLIDES.map((src, i) => (
+              <span
+                key={src}
+                className={`${styles.dot} ${i === slide ? styles.dotActive : ''}`}
+                style={i === slide ? { animationDuration: `${SLIDE_MS}ms` } : undefined}
+              />
+            ))}
+          </div>
+          {/*<p className={styles.lede}>*/}
+          {/*  Onde cada reserva vira uma estadia, e cada estadia, uma história*/}
+          {/*  à beira-mar.*/}
+          {/*</p>*/}
         </div>
-
-        <ul className={styles.features}>
-          <li><span className={styles.featNum}>01</span> Reservas &amp; pernoites num só calendário</li>
-          <li><span className={styles.featNum}>02</span> Financeiro, vouchers e orçamentos</li>
-          <li><span className={styles.featNum}>03</span> Recepção em tempo real</li>
-        </ul>
       </aside>
 
       {/* ── FORM ────────────────────────────────────────────────────── */}
       <main className={styles.panel}>
-        <div className={styles.panelInner}>
-
-          <header className={styles.brand}>
-            <span className={styles.monogram}>
-              <img className={styles.monogramImg} src={logo} alt="" />
-            </span>
-            <span className={styles.brandText}>maishospedagem</span>
-          </header>
+        <div className={styles.glass}>
+          <span className={styles.glassSheen} aria-hidden="true" />
+          <div className={styles.panelInner}>
 
           <div className={styles.intro}>
             <h1 className={styles.title}>Bem-vindo de volta</h1>
-            <p className={styles.sub}>Entre para gerenciar a operação da hospedagem.</p>
+            {/*<p className={styles.sub}>Entre para gerenciar a operação da hospedagem.</p>*/}
           </div>
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
@@ -157,8 +209,9 @@ export default function LoginPage({ onLogin }) {
           </form>
 
           <footer className={styles.legal}>
-            maishospedagem © {new Date().getFullYear()} · Painel interno
+            +hospedagem © {new Date().getFullYear()} · Painel interno
           </footer>
+          </div>
         </div>
       </main>
     </div>

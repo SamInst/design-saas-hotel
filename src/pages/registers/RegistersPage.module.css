@@ -149,14 +149,15 @@
   box-shadow: none !important;
 }
 /* O foco dos campos desta tela é azul (o --l-primary), não o violeta que o
-   componente Input traz por padrão. Vale para o formulário e para a busca. */
+   componente Input traz por padrão. Vale para o formulário e para a busca.
+   Só a borda muda de cor: o halo do componente Input é desligado aqui. */
 .page input:focus,
 .page select:focus,
 .page textarea:focus,
 .searchWrapFull .searchInput:focus {
   outline: none;
   border-color: var(--l-primary) !important;
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--l-primary) 18%, transparent) !important;
+  box-shadow: none !important;
 }
 .searchSpinner  { position: absolute; right: 12px; color: var(--l-primary); }
 .searchClear {
@@ -466,15 +467,49 @@
 
 /* Veículos — ul space-y-2.5 / li flex flex-wrap items-center justify-between gap-x-3 gap-y-1 */
 .vList { display: flex; flex-direction: column; gap: 10px; }
-.vRow  { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
-.vModelo { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); }
+.vRow  { display: flex; align-items: center; gap: 12px; }
+.vInfo { flex: 1; min-width: 0; }
+.vTipoImg { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
+.vMarcaLogo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
+.vModelo { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vMeta   { font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
-/* rounded-md bg-secondary px-2 py-0.5 font-mono text-xs font-bold */
-.vPlaca {
-  border-radius: var(--l-r-md); padding: 2px 8px;
-  background: var(--l-secondary); color: var(--l-secondary-fg);
-  font-family: var(--font-mono); font-size: 12px; line-height: 16px; font-weight: 700;
-  white-space: nowrap;
+/* Placa Mercosul em miniatura — faixa azul "BRASIL" + caracteres pretos */
+.placa {
+  display: inline-flex; flex-direction: column; flex-shrink: 0;
+  width: 104px;
+  border: 1.5px solid #1a1a1a; border-radius: 5px;
+  background: #fff; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(255,255,255,0.6);
+}
+.placaBand {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  height: 10px;
+  background: linear-gradient(180deg, #1a4fb5, #003399);
+}
+.placaPais {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 6.5px; line-height: 1; font-weight: 700; letter-spacing: .12em;
+  color: #fff;
+}
+/* bandeirinha do Brasil (canto direito) */
+.placaFlag {
+  position: absolute; right: 3px; top: 2px;
+  width: 8px; height: 6px; display: block;
+}
+/* círculo com estrelas do Mercosul (canto esquerdo) */
+.placaMerco {
+  position: absolute; left: 3px; top: 2px;
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.85);
+}
+.placaNum {
+  display: block;
+  padding: 1px 0 2px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 15px; line-height: 17px; font-weight: 700; letter-spacing: .06em;
+  color: #111;
 }
 
 /* Histórico — overflow-x-auto / table w-full min-w-[520px] text-sm */
@@ -553,11 +588,11 @@
 .dotTotal   { background: var(--l-muted-fg); }
 .dotEmpresa { background: var(--l-bar-teal); }
 .statItemLabel {
-  font-size: 12px; line-height: 16px; font-weight: 500;
+  font-size: 13px; line-height: 17px; font-weight: 500;
   color: var(--l-muted-fg); white-space: nowrap;
 }
 .statItemVal {
-  font-size: 10px; line-height: 13px; font-weight: 700;
+  font-size: 12px; line-height: 16px; font-weight: 700;
   color: var(--l-fg); white-space: nowrap;
 }
 .statValGreen { color: var(--l-emerald-fg); }
@@ -731,6 +766,8 @@
 /* ── Form layout ── */
 .formBody    { display:flex; flex-direction:column; gap:7px; }
 .formDivider { height:1px; background:var(--l-border); margin:4px 0; }
+/* respiro entre dois blocos do formulário, sem fio no meio */
+.formGap { height:10px; }
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 8px; }
 .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px 8px; }
 .spanTwo { grid-column:span 2; }
@@ -846,8 +883,109 @@
 /* ── Sub form blocks ── */
 .subHead      { display:flex; align-items:center; justify-content:space-between; }
 .subHeadTitle { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--l-muted-fg); }
-.subFormBlock { border:1px solid var(--l-border); border-radius:8px; padding:9px 10px; background:transparent; margin-top:4px; }
-.subFormTitle { display:flex; align-items:center; justify-content:space-between; font-size:11px; font-weight:600; color:var(--l-muted-fg); margin-bottom:6px; }
+
+/* ── Seções opcionais do cadastro (veículos, dependentes, empresa) ──
+   Cada seção abre com a linha divisória do .sectionDivider e os campos correm
+   no mesmo fluxo do formulário da pessoa, sem moldura própria. */
+.optItem { display:flex; flex-direction:column; gap:7px; margin-top:6px; }
+.optItemHead {
+  display:flex; align-items:center; gap:10px;
+  font-size:11px; font-weight:600; color:var(--l-muted-fg);
+  margin-bottom:-1px;
+}
+/* Título das seções opcionais — mesmo desenho do título do cartão
+   ("Novo hóspede"), sem linha ao lado. */
+.optTitle {
+  display:flex; align-items:center; gap:8px;
+  font-size:14px; line-height:20px; font-weight:700; color:var(--l-fg);
+  margin:18px 0 4px;
+}
+.optTitle > svg { color:var(--l-primary); flex-shrink:0; }
+
+/* ── Tabela dos itens já confirmados (veículos, dependentes) ──
+   Mesma tabela do histórico de hospedagem, um pouco mais compacta e sem a
+   largura mínima dele, que forçaria rolagem dentro do formulário. */
+.optTable { min-width:0; font-size:13px; line-height:18px; }
+.optTable th { font-size:11px; }
+.optTable td { padding:8px 0; }
+/* a linha que está aberta no editor logo abaixo */
+.trEditando td { background:color-mix(in oklch, var(--l-primary) 7%, transparent); }
+.optTable tbody tr:last-child td { padding-bottom:0; }
+.tdAcoes { display:flex; align-items:center; justify-content:flex-end; gap:4px; }
+.optTag {
+  display:inline-block; padding:2px 8px; border-radius:999px;
+  background:var(--l-muted); color:var(--l-muted-fg);
+  font-size:10.5px; font-weight:600;
+}
+
+/* ── Empresa vinculada, em linha única ── */
+.itemLista { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+.itemRow {
+  display:flex; align-items:center; gap:10px;
+  padding:7px 10px; border-radius:8px;
+  border:1px solid var(--l-border); background:var(--l-card);
+}
+.itemRowIcon  { color:var(--l-primary); flex-shrink:0; }
+.itemRowMain  { display:flex; flex-direction:column; min-width:0; }
+.itemRowTitle { font-size:12.5px; font-weight:600; color:var(--l-fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.itemRowSub   { font-size:11px; color:var(--l-muted-fg); white-space:nowrap; }
+.itemRowPlaca {
+  margin-left:auto; flex-shrink:0;
+  padding:2px 8px; border-radius:5px;
+  border:1px solid var(--l-border); background:var(--l-muted);
+  font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--l-fg);
+  letter-spacing:.04em;
+}
+.itemRowActions { display:flex; align-items:center; gap:4px; margin-left:auto; flex-shrink:0; }
+.itemRowActions .btnRemove,
+.btnEdit { width:26px; height:26px; margin-left:0; }
+.btnEdit {
+  display:inline-flex; align-items:center; justify-content:center;
+  border-radius:var(--l-r-md); border:1px solid var(--l-border); background:transparent;
+  color:var(--l-muted-fg); cursor:pointer; transition:all .15s; flex-shrink:0;
+}
+.btnEdit:hover {
+  background:color-mix(in oklch, var(--l-primary) 10%, transparent);
+  border-color:var(--l-primary); color:var(--l-primary);
+}
+
+/* rodapé do formulário de cadastro: Limpar e Próximo, depois de tudo */
+.formFoot {
+  display:flex; align-items:center; justify-content:flex-end; gap:8px;
+  margin-top:20px;
+}
+
+/* rodapé do editor: confirmar (colorido) e cancelar */
+.editorFoot { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.editorFoot .optAdd { margin-top:0; }
+.btnGhost {
+  padding:7px 13px; border-radius:8px;
+  border:1px solid var(--l-border); background:transparent;
+  color:var(--l-muted-fg);
+  font-family:inherit; font-size:12px; font-weight:600;
+  cursor:pointer; transition:background-color .15s, color .15s;
+}
+.btnGhost:hover { background:var(--l-secondary); color:var(--l-fg); }
+
+/* a busca de empresa fica na própria seção, logo abaixo do campo */
+.linkDropdownInline { position:static; margin-top:6px; box-shadow:none; }
+
+/* acrescentar mais um: embaixo e à esquerda dos campos da seção */
+.optAdd {
+  display:inline-flex; align-items:center; gap:6px;
+  align-self:flex-start; margin-top:8px;
+  padding:7px 13px; border-radius:8px;
+  border:1px solid color-mix(in oklch, var(--l-primary) 30%, transparent);
+  background:color-mix(in oklch, var(--l-primary) 9%, transparent);
+  color:var(--l-primary);
+  font-family:inherit; font-size:12px; font-weight:600;
+  cursor:pointer; white-space:nowrap;
+  transition:background-color .15s, border-color .15s;
+}
+.optAdd:hover {
+  background:color-mix(in oklch, var(--l-primary) 16%, transparent);
+  border-color:var(--l-primary);
+}
 
 /* ── Searchable Combobox ── */
 .comboInput {
@@ -858,7 +996,7 @@
   box-shadow: 0 1px 2px rgba(15,23,42,.05); box-sizing: border-box;
 }
 .comboInput::placeholder { color: var(--l-muted-fg); opacity: .6; }
-.comboInput:focus { border-color: var(--l-primary); box-shadow: 0 0 0 3px color-mix(in oklch, var(--l-primary) 16%, transparent); }
+.comboInput:focus { border-color: var(--l-primary); box-shadow: none; }
 .comboDropdown {
   background: var(--l-card); border: 1px solid var(--l-border); border-radius: 10px;
   box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto;
@@ -1011,8 +1149,7 @@
 /* ── O que mais entra no cadastro (veículo / dependentes / empresa) ── */
 .opcoesBlock {
   display: flex; flex-wrap: wrap; gap: 8px 22px;
-  margin-top: 6px; padding-top: 12px;
-  border-top: 1px solid var(--l-border);
+  margin-top: 14px;
 }
 .opcaoRow {
   display: inline-flex; align-items: center; gap: 7px;
@@ -1028,28 +1165,6 @@
   /* sangra até as bordas do .dCard (padding 20px) */
   margin: 0 -20px -20px;
   min-height: 0;
-}
-/* Botão tracejado de "adicionar" — dependente, empresa */
-.regAddDep {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 8px 14px; border-radius: 8px;
-  border: 1px dashed var(--l-border); background: transparent;
-  color: var(--l-primary); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: all .12s;
-  align-self: flex-start; white-space: nowrap;
-}
-.regAddDep:hover { border-color: var(--l-primary); background: color-mix(in oklch, var(--l-primary) 7%, transparent); }
-
-.regSidebarEmpresaSelected {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 8px; border-radius: 8px;
-  border: 1px solid color-mix(in oklch, var(--l-primary) 32%, transparent);
-  background: color-mix(in oklch, var(--l-primary) 7%, transparent);
-}
-.regSidebarEmpresaName {
-  font-size: 11px; font-weight: 600; color: var(--l-fg);
-  min-width: 0; max-width: 200px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Sem altura fixa: quem rola é o .detailPanel, então o formulário usa a
    altura que a tela tiver. O 55vh de antes vinha do modal e deixava o
