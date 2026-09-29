@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, Calendar,
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
-  X, Contact, MapPin, CalendarDays, BedDouble,
+  X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Wallet,
   Check, LayoutDashboard, UserPlus, Pencil,
 } from 'lucide-react';
 
@@ -13,13 +13,16 @@ import { Button }                   from '../../components/ui/Button';
 import { Modal }                    from '../../components/ui/Modal';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }             from '../../components/ui/Notification';
-import { cadastroApi, userStorage } from '../../services/api';
+import { cadastroApi, hospedagemApi, userStorage } from '../../services/api';
 import { usePermissions }           from '../../hooks/usePermissions';
 import iconWhatsapp from '../../assets/whatsapp.png';
 import iconGmail    from '../../assets/gmail.png';
+import imgHospedagens from '../../assets/historico/hospedagens.png';
+import imgDiarias     from '../../assets/historico/diarias.png';
+import imgValorTotal  from '../../assets/historico/valor-total.png';
 // MOCK — campos que o back-end ainda não devolve. Ver registersMocks.js.
 import {
-  mockCategoria, mockResumoHospede, mockVinculoEmpresa, mockHistorico,
+  mockCategoria, mockVinculoEmpresa,
 } from './registersMocks';
 
 import styles from './RegistersPage.module.css';
@@ -190,6 +193,9 @@ const getInitials = (name) => {
 // ── Formatadores do painel de detalhe ─────────────────────────
 const fmtBRL = (v) =>
   (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+/** 7 → "07"; de 10 para cima fica como está. */
+const pad2 = (n) => String(n ?? 0).padStart(2, '0');
 
 const MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -513,8 +519,89 @@ function Field({ label, value, mono = false }) {
   );
 }
 
-// ── Cartão do histórico de hospedagem ─────────────────────────
-function HistoricoCard({ registros, resumo }) {
+// ── Histórico de hospedagem ───────────────────────────────────
+// Status do back-end → rótulo e tom do selo na tabela.
+const STATUS_HOSPEDAGEM = {
+  RESERVA_SOLICITADA:                     { label: 'Reserva solicitada', tom: 'hStatusReserva' },
+  RESERVA_ATIVA:                          { label: 'Reservada',          tom: 'hStatusReserva' },
+  RESERVA_CANCELADA:                      { label: 'Cancelada',          tom: 'hStatusCancelada' },
+  RESERVA_AUSENTE:                        { label: 'Não compareceu',     tom: 'hStatusCancelada' },
+  PERNOITE_ATIVO:                         { label: 'Em andamento',       tom: 'hStatusAtiva' },
+  PERNOITE_CANCELADO:                     { label: 'Cancelada',          tom: 'hStatusCancelada' },
+  PERNOITE_FINALIZADO:                    { label: 'Finalizada',         tom: 'hStatusFinalizada' },
+  PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE: { label: 'Pagamento pendente', tom: 'hStatusPendente' },
+  DAY_USE_SOLICITADO:                     { label: 'Day use solicitado', tom: 'hStatusReserva' },
+  DAY_USE_ATIVO:                          { label: 'Day use ativo',      tom: 'hStatusAtiva' },
+  DAY_USE_CANCELADO:                      { label: 'Cancelada',          tom: 'hStatusCancelada' },
+  DAY_USE_FINALIZADO:                     { label: 'Finalizada',         tom: 'hStatusFinalizada' },
+  DAY_USE_FINALIZADO_PAGAMENTO_PENDENTE:  { label: 'Pagamento pendente', tom: 'hStatusPendente' },
+  DAY_USE_AUSENTE:                        { label: 'Não compareceu',     tom: 'hStatusCancelada' },
+};
+const statusHosp = (s) => STATUS_HOSPEDAGEM[s] ?? { label: s ?? '—', tom: 'hStatusFinalizada' };
+
+// Canceladas e ausências ficam na lista, mas não entram nos totais.
+const foraDosTotais = (s) => /CANCELAD|AUSENTE/.test(s ?? '');
+
+/** "12/03/2025 14:00" → "12/03/2025" */
+const soData = (dh) => (dh ?? '').slice(0, 10);
+/** "12/03/2025 14:00" → "14:00" */
+const soHora = (dh) => (dh ?? '').slice(11, 16);
+
+/** Quartos por onde a hospedagem passou (troca de quarto no meio da estadia). */
+/** "101 - Suíte Casal" — o número do quarto é o id, como no restante do sistema. */
+const nomeQuarto = (q) => (q?.id ? [q.id, q.descricao].filter(Boolean).join(' - ') : '');
+
+const quartosHosp = (h) => {
+  const nomes = (h.diarias ?? []).map(d => nomeQuarto(d.quarto)).filter(Boolean);
+  const unicos = [...new Set(nomes.length ? nomes : [nomeQuarto(h.quarto)].filter(Boolean))];
+  return unicos.join(', ') || '—';
+};
+
+// Consumo: `valor` é o preço unitário; a linha vale valor × quantidade.
+const totalConsumo = (c) => (Number(c.valor) || 0) * (Number(c.quantidade) || 0);
+
+/** Totais de uma hospedagem, pela mesma regra do resumo de grupo do back-end. */
+const contasHosp = (h) => {
+  const consumo = (h.consumos ?? []).filter(c => !c.cancelado).reduce((s, c) => s + totalConsumo(c), 0);
+  const total   = (Number(h.valor_total) || 0) + consumo;
+  const pago    = (h.pagamentos ?? [])
+    .filter(p => !p.cancelado && (p.tipo_pagamento?.descricao ?? '').toUpperCase() !== 'PENDENTE')
+    .reduce((s, p) => s + (Number(p.valor) || 0), 0);
+  return { consumo, total, pago, pendente: Math.max(0, total - pago) };
+};
+
+function HistoricoCard({ tipo, id }) {
+  const [registros, setRegistros] = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [erro,      setErro]      = useState(false);
+  const [busca,     setBusca]     = useState('');
+  const [aberta,    setAberta]    = useState(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let vivo = true;
+    setLoading(true); setErro(false); setBusca(''); setAberta(null);
+    (tipo === 'empresa' ? hospedagemApi.buscarPorEmpresa(id) : hospedagemApi.buscarPorPessoa(id))
+      .then(res => { if (vivo) setRegistros(Array.isArray(res) ? res : []); })
+      .catch(() => { if (vivo) { setRegistros([]); setErro(true); } })
+      .finally(() => { if (vivo) setLoading(false); });
+    return () => { vivo = false; };
+  }, [tipo, id]);
+
+  const validas = registros.filter(h => !foraDosTotais(h.status));
+  const resumo = {
+    hospedagens: validas.length,
+    diarias:     validas.reduce((s, h) => s + (Number(h.quantidade_diarias) || 0), 0),
+    totalGasto:  validas.reduce((s, h) => s + contasHosp(h).total, 0),
+  };
+
+  // quarto, datas (dd/mm/aaaa ou só parte, como "03/2025") ou status
+  const termo = busca.trim().toLowerCase();
+  const filtrados = !termo ? registros : registros.filter(h =>
+    [quartosHosp(h), soData(h.data_hora_checkin), soData(h.data_hora_checkout), statusHosp(h.status).label]
+      .some(v => String(v ?? '').toLowerCase().includes(termo)),
+  );
+
   return (
     <section className={styles.dCard}>
       <h3 className={styles.dCardHead}>
@@ -522,55 +609,222 @@ function HistoricoCard({ registros, resumo }) {
         <span className={styles.dCardTitle}>Histórico de hospedagem</span>
       </h3>
       <div className={styles.dCardBody}>
-        {/* MOCK — totais desta pessoa, antes da listagem */}
         <div className={styles.miniStats}>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Hospedagens</p>
-            <p className={styles.statVal}>{resumo.hospedagens}</p>
+          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
+            <img src={imgHospedagens} alt="" className={styles.statImg} />
+            <div>
+              <p className={styles.statLabel}>Hospedagens</p>
+              <p className={styles.statVal}>{loading ? '—' : pad2(resumo.hospedagens)}</p>
+            </div>
           </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Diárias</p>
-            <p className={styles.statVal}>{resumo.diarias}</p>
+          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
+            <img src={imgDiarias} alt="" className={styles.statImg} />
+            <div>
+              <p className={styles.statLabel}>Diárias</p>
+              <p className={styles.statVal}>{loading ? '—' : pad2(resumo.diarias)}</p>
+            </div>
           </div>
-          <div className={styles.statCard}>
-            <p className={styles.statLabel}>Valor total investido</p>
-            <p className={styles.statVal}>{fmtBRL(resumo.totalGasto)}</p>
+          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
+            <img src={imgValorTotal} alt="" className={styles.statImg} />
+            <div>
+              <p className={styles.statLabel}>Valor total investido</p>
+              <p className={styles.statVal}>{loading ? '—' : fmtBRL(resumo.totalGasto)}</p>
+            </div>
           </div>
         </div>
 
-        {registros.length === 0 ? (
+        {registros.length > 0 && (
+          <div className={[styles.searchWrap, styles.hBusca].join(' ')}>
+            <Search size={14} className={styles.searchIcon} />
+            <Input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar por quarto, data ou status..."
+              className={styles.searchInput}
+              aria-label="Buscar no histórico"
+            />
+            {busca && (
+              <button type="button" className={styles.searchClear} onClick={() => setBusca('')} aria-label="Limpar busca">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {loading ? (
+          <div className={styles.empty}>
+            <Loader2 size={22} className={styles.spinInline} /><span>Carregando hospedagens...</span>
+          </div>
+        ) : erro ? (
+          <div className={styles.empty}>
+            <AlertCircle size={24} opacity={0.3} /><span>Não foi possível carregar o histórico.</span>
+          </div>
+        ) : registros.length === 0 ? (
           <div className={styles.empty}>
             <CalendarDays size={26} opacity={0.2} /><span>Nenhuma hospedagem registrada.</span>
+          </div>
+        ) : filtrados.length === 0 ? (
+          <div className={styles.empty}>
+            <AlertCircle size={24} opacity={0.3} /><span>Nenhuma hospedagem encontrada.</span>
           </div>
         ) : (
           <div className={styles.hScroll}>
             <table className={styles.hTable}>
               <thead><tr>
-                <th>Quarto</th><th>Check-in</th><th>Check-out</th>
+                <th>Quarto</th><th>Período</th><th>Pessoas</th>
                 <th>Diárias</th><th>Total</th><th>Status</th>
               </tr></thead>
               <tbody>
-                {registros.map(h => (
-                  <tr key={h.id}>
-                    <td><span className={styles.hQuarto}><BedDouble size={16} /> {h.quarto}</span></td>
-                    <td>{h.checkin}</td>
-                    <td>{h.checkout}</td>
-                    <td>{h.diarias}</td>
-                    <td className={styles.hTotal}>{fmtBRL(h.total)}</td>
-                    <td>
-                      <span className={[
-                        styles.hStatus,
-                        h.status === 'Em andamento' ? styles.hStatusAtiva : styles.hStatusFinalizada,
-                      ].join(' ')}>{h.status}</span>
+                {filtrados.map(h => {
+                  const st = statusHosp(h.status);
+                  return (
+                    <tr key={h.id} className={styles.hRow} tabIndex={0} role="button"
+                      title="Ver detalhes da hospedagem"
+                      onClick={() => setAberta(h)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAberta(h); } }}>
+                      <td><span className={styles.hQuarto}>{quartosHosp(h)}</span></td>
+                      <td><span className={styles.hPeriodo}>{soData(h.data_hora_checkin)} <ArrowRight size={13} className={styles.hSeta} /> {soData(h.data_hora_checkout)}</span></td>
+                      <td>{pad2((h.pessoas ?? []).length)}</td>
+                      <td>{pad2(h.quantidade_diarias)}</td>
+                      <td className={styles.hTotal}>{fmtBRL(contasHosp(h).total)}</td>
+                      <td><span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <HospedagemDetalheModal hospedagem={aberta} onClose={() => setAberta(null)} />
+    </section>
+  );
+}
+
+// ── Detalhe de uma hospedagem do histórico ────────────────────
+function HospedagemDetalheModal({ hospedagem: h, onClose }) {
+  if (!h) return null;
+  const st     = statusHosp(h.status);
+  const contas = contasHosp(h);
+  const pessoas    = h.pessoas ?? [];
+  const diarias    = [...(h.diarias ?? [])].sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
+  const consumos   = h.consumos ?? [];
+  const pagamentos = h.pagamentos ?? [];
+
+  return (
+    <Modal open onClose={onClose} size="lg" closeOnBackdrop
+      title={<span className={styles.hdTitulo}>Hospedagem #{h.id} <span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span></span>}>
+      <div className={styles.hdBody}>
+        <div className={styles.fieldGrid}>
+          <Field label="Quarto" value={quartosHosp(h)} />
+          <Field label="Check-in"  value={`${soData(h.data_hora_checkin)} às ${soHora(h.data_hora_checkin)}`} />
+          <Field label="Check-out" value={`${soData(h.data_hora_checkout)} às ${soHora(h.data_hora_checkout)}`} />
+          <Field label="Diárias" value={pad2(h.quantidade_diarias)} />
+          <Field label="Registrada em" value={h.data_hora_registro} />
+          <Field label="Registrada por" value={h.funcionario?.nome} />
+        </div>
+
+        <div className={styles.hdContas}>
+          <div><span>Hospedagem</span><strong>{fmtBRL(h.valor_total)}</strong></div>
+          <div><span>Consumo</span><strong>{fmtBRL(contas.consumo)}</strong></div>
+          <div><span>Total</span><strong>{fmtBRL(contas.total)}</strong></div>
+          <div><span>Pago</span><strong className={styles.hdPago}>{fmtBRL(contas.pago)}</strong></div>
+          <div><span>Pendente</span><strong className={contas.pendente > 0 ? styles.hdPendente : ''}>{fmtBRL(contas.pendente)}</strong></div>
+        </div>
+
+        <h4 className={styles.hdSecao}><Users size={14} /> Hóspedes ({pad2(pessoas.length)})</h4>
+        {pessoas.length === 0 ? <p className={styles.hdVazio}>Nenhum hóspede informado.</p> : (
+          <ul className={styles.hdPessoas}>
+            {pessoas.map(p => (
+              <li key={p.id}>
+                <AvatarCircle name={p.nome} size={28} muted />
+                <span className={styles.nome}>{p.nome}</span>
+                {p.titular && <span className={styles.hdTitular}>Titular</span>}
+                <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {diarias.length > 0 && (<>
+          <h4 className={styles.hdSecao}><BedDouble size={14} /> Diárias</h4>
+          <div className={styles.hScroll}>
+            <table className={[styles.hTable, styles.hdTable].join(' ')}>
+              <thead><tr><th>Nº</th><th>Quarto</th><th>Período</th><th>Ocupação</th><th>Valor</th></tr></thead>
+              <tbody>
+                {diarias.map(d => (
+                  <tr key={d.id}>
+                    <td>{pad2(d.numero)}</td>
+                    <td>{nomeQuarto(d.quarto) || '—'}</td>
+                    <td><span className={styles.hPeriodo}>{soData(d.checkin)} <ArrowRight size={13} className={styles.hSeta} /> {soData(d.checkout)}</span></td>
+                    <td className={styles.hdQuebra}>
+                      {d.ocupacao?.descricao ?? `${pad2((d.pessoas ?? []).length)} pessoa(s)`}
+                      {d.meia_diaria && <span className={styles.hdTag}>Meia diária</span>}
+                      {d.sazonalidade?.descricao && <span className={styles.hdTag}>{d.sazonalidade.descricao}</span>}
                     </td>
+                    <td className={styles.hTotal}>{fmtBRL(d.valor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+
+        {consumos.length > 0 && (<>
+          <h4 className={styles.hdSecao}><Package size={14} /> Consumo</h4>
+          <div className={styles.hScroll}>
+            <table className={[styles.hTable, styles.hdTable].join(' ')}>
+              <thead><tr><th>Item</th><th>Qtd.</th><th>Unitário</th><th>Total</th><th>Data</th></tr></thead>
+              <tbody>
+                {consumos.map(c => (
+                  <tr key={c.id} className={c.cancelado ? styles.hdCancelado : ''}>
+                    <td>{c.item?.descricao ?? '—'}{c.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
+                    <td>{pad2(c.quantidade)}</td>
+                    <td>{fmtBRL(c.valor)}</td>
+                    <td className={styles.hTotal}>{fmtBRL(totalConsumo(c))}</td>
+                    <td>{c.data_hora_registro}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>)}
+
+        <h4 className={styles.hdSecao}><Wallet size={14} /> Pagamentos</h4>
+        {pagamentos.length === 0 ? <p className={styles.hdVazio}>Nenhum pagamento registrado.</p> : (
+          <div className={styles.hScroll}>
+            <table className={[styles.hTable, styles.hdTable].join(' ')}>
+              <thead><tr><th>Forma</th><th>Pagador</th><th>Data</th><th>Valor</th></tr></thead>
+              <tbody>
+                {pagamentos.map(p => (
+                  <tr key={p.uuid} className={p.cancelado ? styles.hdCancelado : ''}>
+                    <td>{p.tipo_pagamento?.descricao ?? '—'}{p.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
+                    <td>{p.nome_pagador || '—'}</td>
+                    <td>{p.data_hora_registro}</td>
+                    <td className={styles.hTotal}>{fmtBRL(p.valor)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        {h.observacao && (<>
+          <h4 className={styles.hdSecao}>Observação</h4>
+          <p className={styles.hdTexto}>{h.observacao}</p>
+        </>)}
+
+        {h.motivo_cancelamento?.motivo_cancelamento && (<>
+          <h4 className={styles.hdSecao}>Motivo do cancelamento</h4>
+          <p className={styles.hdTexto}>
+            {h.motivo_cancelamento.motivo_cancelamento}
+            {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
+            {h.motivo_cancelamento.data_hora_registro && `, ${h.motivo_cancelamento.data_hora_registro}`}
+          </p>
+        </>)}
       </div>
-    </section>
+    </Modal>
   );
 }
 
@@ -1885,8 +2139,6 @@ export default function RegistersPage() {
   // ── Campos que o back-end ainda não devolve. // MOCK ──
   // Derivados do id (valores estáveis, mas fictícios). Ver registersMocks.js.
   const categoria = mockCategoria(detailItem?.id);
-  const resumo    = mockResumoHospede(detailItem?.id);
-  const historico = mockHistorico(detailItem?.id, { hospedado: detailItem?.status === 'HOSPEDADO' });
 
   // Qual formulário ocupa o painel. Os estados são os mesmos de quando eram
   // modais — só a renderização mudou de lugar.
@@ -2277,106 +2529,10 @@ export default function RegistersPage() {
           {/* Os formulários ocupam o painel no lugar da ficha — antes abriam
               em modal. Quem manda são os mesmos estados de antes, só que
               agora lidos aqui em vez de alimentarem um <Modal>. */}
-          {formMode === 'pessoa-nova' ? (
-            <div className={styles.detailPanel}>
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <button type="button" className={styles.backBtn} onClick={cancelAddPessoa}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
-                    <ChevronLeft size={17} />
-                  </button>
-                  <UserPlus size={16} />
-                  <span className={styles.dCardTitle}>
-                    {confirmStep ? 'Confirmar cadastro' : 'Novo hóspede'}
-                  </span>
-                  <div className={styles.dCardActions}>
-                    {!confirmStep ? (
-                      /* Limpar e Próximo ficam no fim do formulário, depois de
-                         tudo o que se cadastra; aqui em cima só a contagem. */
-                      <span className={styles.personCount}>
-                        <Users size={13} />
-                        {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-                      </span>
-                    ) : (
-                      <>
-                        <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
-                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                          onClick={doSavePessoa} disabled={isSubmitting}>
-                          {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
-                        </Button>
-                      </>
-                    )}
-                    <button type="button" className={styles.idClose} onClick={cancelAddPessoa}
-                      title="Cancelar cadastro" aria-label="Cancelar cadastro">
-                      <X size={16} />
-                    </button>
-                  </div>
-                </h3>
-                <div className={styles.dCardBody}>{addPessoaBody}</div>
-              </section>
-            </div>
-
-          ) : formMode === 'pessoa-edit' ? (
-            <div className={styles.detailPanel}>
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
-                    title="Voltar" aria-label="Voltar">
-                    <ChevronLeft size={17} />
-                  </button>
-                  <Contact size={16} />
-                  <span className={styles.dCardTitle}>Editar hóspede</span>
-                  <div className={styles.dCardActions}>
-                    <Button className={styles.btnSolid} onClick={() => setEditPessoa(blankPessoa())}>Limpar</Button>
-                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                      onClick={handleSaveEditPessoa} disabled={isSubmitting}>
-                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
-                    </Button>
-                    <button type="button" className={styles.idClose} onClick={() => setShowEdit(false)}
-                      title="Cancelar" aria-label="Cancelar">
-                      <X size={16} />
-                    </button>
-                  </div>
-                </h3>
-                <div className={styles.dCardBody}>
-                  <PessoaForm data={editPessoa} onChange={setEditPessoa} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
-                </div>
-              </section>
-            </div>
-
-          ) : formMode === 'empresa' ? (
-            <div className={styles.detailPanel}>
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <button type="button" className={styles.backBtn}
-                    onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
-                    title="Voltar" aria-label="Voltar">
-                    <ChevronLeft size={17} />
-                  </button>
-                  <Building2 size={16} />
-                  <span className={styles.dCardTitle}>{editMode ? 'Editar empresa' : 'Nova empresa'}</span>
-                  <div className={styles.dCardActions}>
-                    <Button className={styles.btnSolid} onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
-                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                      onClick={handleSaveEmpresa} disabled={isSubmitting}>
-                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
-                    </Button>
-                    <button type="button" className={styles.idClose}
-                      onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
-                      title="Cancelar" aria-label="Cancelar">
-                      <X size={16} />
-                    </button>
-                  </div>
-                </h3>
-                <div className={styles.dCardBody}>
-                  <EmpresaForm data={empresa} onChange={setEmpresa} onFetchCNPJ={fetchCNPJ} onFetchCEP={fetchCEP} editMode={editMode} />
-                </div>
-              </section>
-            </div>
-
-          ) : !detailItem ? (
-            /* ── Painel geral (nenhum cadastro selecionado) ── */
-            <div className={styles.detailPanel}>
+          <div className={styles.detailCol}>
+            {/* Visão geral fixa no topo; a ficha ou o formulário rolam embaixo dela.
+                Abaixo de 1024px só aparece quando nada está aberto. */}
+            <div className={[styles.overviewFixed, (detailItem || formMode) ? styles.overviewSecundaria : ''].join(' ')}>
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <LayoutDashboard size={16} />
@@ -2386,11 +2542,12 @@ export default function RegistersPage() {
                     <div className={styles.dCardActions}>
                       {isEmpresasTab ? (
                         <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                          disabled={!!formMode}
                           onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
                           Cadastrar empresa
                         </Button>
                       ) : (
-                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={() => {
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} disabled={!!formMode} onClick={() => {
                           setTitular(blankPessoa()); setDependentes([]);
                           setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
                           setShowErrors(false);
@@ -2453,12 +2610,111 @@ export default function RegistersPage() {
                   )}
                 </div>
               </section>
-
-              {/*<div className={styles.detailHint}>*/}
-              {/*  Escolha um registro na lista ao lado para ver a ficha completa.*/}
-              {/*</div>*/}
             </div>
-          ) : detailType === 'pessoa' ? (
+
+          {formMode === 'pessoa-nova' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn} onClick={cancelAddPessoa}
+                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <UserPlus size={16} />
+                  <span className={styles.dCardTitle}>
+                    {confirmStep ? 'Confirmar cadastro' : 'Novo hóspede'}
+                  </span>
+                  <div className={styles.dCardActions}>
+                    {!confirmStep ? (
+                      /* Limpar e Próximo ficam no fim do formulário, depois de
+                         tudo o que se cadastra; aqui em cima só a contagem. */
+                      <span className={styles.personCount}>
+                        <Users size={13} />
+                        {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <>
+                        <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
+                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                          onClick={doSavePessoa} disabled={isSubmitting}>
+                          {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
+                        </Button>
+                      </>
+                    )}
+                    <button type="button" className={styles.idClose} onClick={cancelAddPessoa}
+                      title="Cancelar cadastro" aria-label="Cancelar cadastro">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>{addPessoaBody}</div>
+              </section>
+            </div>
+
+          ) : formMode === 'pessoa-edit' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
+                    title="Voltar" aria-label="Voltar">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <Contact size={16} />
+                  <span className={styles.dCardTitle}>Editar hóspede</span>
+                  <div className={styles.dCardActions}>
+                    <button type="button" className={styles.idClose} onClick={() => setShowEdit(false)}
+                      title="Cancelar" aria-label="Cancelar">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>
+                  <PessoaForm data={editPessoa} onChange={setEditPessoa} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
+                  <div className={styles.formFoot}>
+                    <Button className={styles.btnSolid} onClick={() => setEditPessoa(blankPessoa())}>Limpar</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleSaveEditPessoa} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+          ) : formMode === 'empresa' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={styles.dCardHead}>
+                  <button type="button" className={styles.backBtn}
+                    onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                    title="Voltar" aria-label="Voltar">
+                    <ChevronLeft size={17} />
+                  </button>
+                  <Building2 size={16} />
+                  <span className={styles.dCardTitle}>{editMode ? 'Editar empresa' : 'Nova empresa'}</span>
+                  <div className={styles.dCardActions}>
+                    <button type="button" className={styles.idClose}
+                      onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                      title="Cancelar" aria-label="Cancelar">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>
+                  <EmpresaForm data={empresa} onChange={setEmpresa} onFetchCNPJ={fetchCNPJ} onFetchCEP={fetchCEP} editMode={editMode} />
+                  <div className={styles.formFoot}>
+                    <Button className={styles.btnSolid} onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleSaveEmpresa} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+          ) : !detailItem ? null
+          : detailType === 'pessoa' ? (
             <div className={styles.detailPanel}>
 
               {/* ── Dados de cadastro (inclui veículos e empresa) ── */}
@@ -2580,9 +2836,13 @@ export default function RegistersPage() {
                     <div className={styles.blockHead}>
                       <Building2 size={15} />
                       <span>Empresa</span>
-                      <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
-                        onClick={() => setShowLinkEmpresa(v => !v)}>
-                        Vincular
+                      {/* com a busca aberta vira "Cancelar", que fecha e descarta a busca */}
+                      <Button className={[styles.btnSolid, styles.btnSm, showLinkEmpresa ? styles.btnDanger : ''].join(' ')}
+                        onClick={() => {
+                          if (showLinkEmpresa) { setEmpSearch(''); setEmpSearchResults([]); }
+                          setShowLinkEmpresa(v => !v);
+                        }}>
+                        {showLinkEmpresa ? 'Cancelar' : 'Vincular'}
                       </Button>
                     </div>
 
@@ -2644,7 +2904,7 @@ export default function RegistersPage() {
               </section>
 
               {/* ── Histórico de hospedagem ── */}
-              {canHistorico && <HistoricoCard registros={historico} resumo={resumo} />}
+              {canHistorico && <HistoricoCard tipo="pessoa" id={detailItem.id} />}
 
               {/* ── Dependentes ── */}
               {detailItem.titularId == null && (
@@ -2844,9 +3104,10 @@ export default function RegistersPage() {
               </section>
 
               {/* ── Histórico de hospedagem ── */}
-              {canHistorico && <HistoricoCard registros={historico} resumo={resumo} />}
+              {canHistorico && <HistoricoCard tipo="empresa" id={detailItem.id} />}
             </div>
           )}
+          </div>
         </main>
       </div>
 

@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────
-   TOPBAR — logo + nome da tela · menu de telas + perfil
+   TOPBAR — ícone + nome da tela · menu de telas + perfil
    ───────────────────────────────────────────────────────────── */
 .topbar {
   height: 64px;
@@ -20,27 +20,7 @@
   gap: 8px;  min-width: 0;
 }
 
-.logo {
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  display: block;
-  object-fit: contain;
-}
-/* O símbolo é azul-marinho e sumiria no fundo escuro: pastilha clara atrás. */
-:root[data-theme="dark"] .logo {
-  background: #fff;
-  border-radius: 9px;
-  padding: 3px;
-}
-
-.brandDivider {
-  width: 1px;
-  height: 26px;
-  background: var(--border);
-  flex-shrink: 0;
-}
-
+.pageIcon { width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; }
 .pageName {
   font-size: 18px;
   font-weight: 700;
@@ -214,25 +194,22 @@
 .menuItemDanger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
 
 .menuIcon {
-  width: 18px;
+  width: 24px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+/* Ícone no tom pastel do item, sem fundo. */
+.menuIconPastel { color: var(--tone); }
+:root[data-theme="dark"] .menuIconPastel { color: color-mix(in srgb, var(--tone) 80%, #fff); }
+.menuIcon3d { width: 24px; height: 24px; object-fit: contain; }
 .menuLabel {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.menuPip {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--violet);
-  flex-shrink: 0;
 }
 
 .profileHead {
@@ -246,8 +223,6 @@
 /* ── Mobile ── */
 @media (max-width: 600px) {
   .topbar { height: 56px; padding: 0 12px; gap: 10px; }
-  .logo { height: 24px; }
-  .brandDivider { display: none; }
   .pageName { font-size: 15px; }
   .profileText { display: none; }
   .chevron { display: none; }

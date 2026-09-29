@@ -4,20 +4,27 @@ import {
   UserCog, Users, ShieldCheck, Building2,
 } from 'lucide-react';
 import styles from './TopBar.module.css';
-import logo from '../../assets/logo-hospedagem-simbolo.png';
+import img3dRecepcao     from '../../assets/menu/recepcao.png';
+import img3dReservas     from '../../assets/menu/reservas.png';
+import img3dFinanceiro   from '../../assets/menu/financeiro.png';
+import img3dItens        from '../../assets/menu/itens.png';
+import img3dCadastros    from '../../assets/menu/cadastros.png';
+import img3dPrecos       from '../../assets/menu/precos.png';
+import img3dFuncionarios from '../../assets/menu/funcionarios.png';
+import img3dPermissoes   from '../../assets/menu/permissoes.png';
 import { usePermissions } from '../../hooks/usePermissions';
 
 // tela: nome exato da tela no backend (cargo.telas[].nome)
 // tela: 'ADMIN' = tela de administrador total (vê tudo)
 const NAV_ITEMS = [
-  { id: 'reception',   label: 'Recepção',            icon: Building2,  tela: 'DASHBOARD'          },
-  { id: 'bookings',    label: 'Reservas',             icon: CalendarDays,tela: 'RESERVAS'          },
-  { id: 'financial',   label: 'Financeiro',           icon: Wallet,     tela: 'FINANCEIRO'         },
-  { id: 'inventory',   label: 'Itens',                icon: Package,    tela: 'ITENS'              },
-  { id: 'registers',   label: 'Cadastros',            icon: Users,      tela: 'CADASTRO'           },
-  { id: 'pricing',     label: 'Preços',               icon: Tag,        tela: 'PRECOS'             },
-  { id: 'employees',   label: 'Funcionários',         icon: UserCog,    tela: 'FUNCIONARIOS'       },
-  { id: 'permissions', label: 'Cargos e Permissões',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES'},
+  { id: 'reception',   label: 'Recepção',            icon: Building2,  tela: 'DASHBOARD', img: img3dRecepcao, tone: '#f28b6d' },
+  { id: 'bookings',    label: 'Reservas',             icon: CalendarDays,tela: 'RESERVAS', img: img3dReservas, tone: '#6fa8f5' },
+  { id: 'financial',   label: 'Financeiro',           icon: Wallet,     tela: 'FINANCEIRO', img: img3dFinanceiro, tone: '#5fc79a' },
+  { id: 'inventory',   label: 'Itens',                icon: Package,    tela: 'ITENS', img: img3dItens, tone: '#f5b75a' },
+  { id: 'registers',   label: 'Cadastros',            icon: Users,      tela: 'CADASTRO', img: img3dCadastros, tone: '#9b8cf0' },
+  { id: 'pricing',     label: 'Preços',               icon: Tag,        tela: 'PRECOS', img: img3dPrecos, tone: '#f07fa6' },
+  { id: 'employees',   label: 'Funcionários',         icon: UserCog,    tela: 'FUNCIONARIOS', img: img3dFuncionarios, tone: '#4fc2c9' },
+  { id: 'permissions', label: 'Cargos e Permissões',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES', img: img3dPermissoes, tone: '#8a9bb5' },
 ];
 
 /** Ícone do menu de telas — SVG próprio, herda a cor do botão. */
@@ -82,7 +89,8 @@ export default function TopBar({
     onNavigate(firstAvailable);
   }
 
-  const pageLabel = NAV_ITEMS.find((i) => i.id === currentPage)?.label ?? '';
+  const pageItem  = NAV_ITEMS.find((i) => i.id === currentPage);
+  const pageLabel = pageItem?.label ?? '';
 
   const go = (id) => { setMenuOpen(false); onNavigate(id); };
 
@@ -90,8 +98,7 @@ export default function TopBar({
     <header className={styles.topbar}>
       {/* ── Logo + nome da tela ── */}
       <div className={styles.brand}>
-        <img className={styles.logo} src={logo} alt="maishospedagem" />
-        <span className={styles.brandDivider} />
+        {pageItem?.img && <img className={styles.pageIcon} src={pageItem.img} alt="" />}
         <h1 className={styles.pageName}>{pageLabel}</h1>
       </div>
 
@@ -113,7 +120,7 @@ export default function TopBar({
           {menuOpen && (
             <div className={styles.dropdown} role="menu">
               <span className={styles.dropdownLabel}>Menu</span>
-              {visibleItems.map(({ id, label, icon: Icon }, i) => {
+              {visibleItems.map(({ id, label, icon: Icon, img, tone }, i) => {
                 const active = currentPage === id;
                 return (
                   <button
@@ -124,9 +131,14 @@ export default function TopBar({
                     style={{ animationDelay: `${i * 22}ms` }}
                     onClick={() => go(id)}
                   >
-                    <span className={styles.menuIcon}><Icon size={17} /></span>
+                    {img ? (
+                      <span className={styles.menuIcon}><img src={img} alt="" className={styles.menuIcon3d} /></span>
+                    ) : (
+                      <span className={[styles.menuIcon, styles.menuIconPastel].join(' ')} style={{ '--tone': tone }}>
+                        <Icon size={16} strokeWidth={2.2} />
+                      </span>
+                    )}
                     <span className={styles.menuLabel}>{label}</span>
-                    {active && <span className={styles.menuPip} />}
                   </button>
                 );
               })}

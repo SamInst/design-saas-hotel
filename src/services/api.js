@@ -573,6 +573,16 @@ export const hospedagemApi = {
     return request(`/hospedagem/${hospedagemId}`);
   },
 
+  /** GET /hospedagem/pessoa/{pessoaId} — histórico da pessoa (sem orçamentos), mais recente primeiro. */
+  buscarPorPessoa(pessoaId) {
+    return request(`/hospedagem/pessoa/${pessoaId}`);
+  },
+
+  /** GET /hospedagem/empresa/{empresaId} — histórico dos hóspedes vinculados à empresa. */
+  buscarPorEmpresa(empresaId) {
+    return request(`/hospedagem/empresa/${empresaId}`);
+  },
+
   /** GET /hospedagem/grupo/{grupoId}/resumo — totais consolidados do grupo ({ grupo_id, count, total, pago, pendente }). */
   resumoGrupo(grupoId) {
     return request(`/hospedagem/grupo/${grupoId}/resumo`);

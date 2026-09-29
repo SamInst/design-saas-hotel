@@ -396,7 +396,15 @@
   min-height: 0;
   display: flex; flex-direction: column; gap: 16px;
 }
-@media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+.detailCol {
+  min-height: 0;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.overviewFixed { flex-shrink: 0; }
+@media (min-width: 1024px) {
+  .detailCol { max-height: 100%; }
+  .detailPanel { flex: 1 1 auto; overflow-y: auto; padding-right: 2px; }
+}
 
 .dCard {
   border-radius: var(--l-r-xl);
@@ -603,6 +611,8 @@
   border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
   background: var(--l-bg); padding: 14px 16px;
 }
+.statCardIcon { display: flex; align-items: center; gap: 12px; background: transparent; }
+.statImg { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; }
 .statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
 .statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
 
@@ -637,7 +647,8 @@
   .split { padding: 8px 16px 16px; gap: 16px; }
   /* Empilhado, o painel geral vem primeiro: é dele que saem os botões de
      cadastro, que não podem ficar depois de uma lista inteira. */
-  .detailPanel { order: 1; }
+  .detailCol   { order: 1; }
+  .overviewSecundaria { display: none; }
   .listPanel   { order: 2; }
   /* O painel deixa de ter altura fixa aqui, então `flex: 1` zeraria a lista:
      ela passa a crescer com o conteúdo, limitada a meia tela. */
@@ -1237,3 +1248,41 @@
   width: 13px; height: 13px; accent-color: var(--l-primary); cursor: pointer;
 }
 .useTitularRow:hover { color: var(--violet); }
+
+/* Histórico: check-in → check-out numa célula só */
+.hPeriodo { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.hSeta    { color: var(--l-muted-fg); flex-shrink: 0; }
+.hBusca    { margin-bottom: 12px; }
+
+/* Histórico: linha clicável abre o detalhe da hospedagem */
+.hRow { cursor: pointer; transition: background-color .12s; }
+.hRow:hover, .hRow:focus-visible { background: var(--l-secondary); outline: none; }
+.hRow td:first-child { border-radius: 8px 0 0 8px; padding-left: 8px; }
+.hRow td:last-child  { border-radius: 0 8px 8px 0; padding-right: 8px; }
+.hStatusReserva   { background: color-mix(in srgb, #3b82f6 14%, transparent); color: #2563eb; }
+.hStatusPendente  { background: color-mix(in srgb, #f59e0b 16%, transparent); color: #b45309; }
+.hStatusCancelada { background: color-mix(in srgb, #ef4444 12%, transparent); color: #dc2626; }
+
+/* Modal de detalhe da hospedagem */
+.hdTitulo  { display: inline-flex; align-items: center; gap: 10px; }
+.hdBody    { display: flex; flex-direction: column; gap: 14px; }
+.hdContas  { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+             border: 1px solid var(--l-border); border-radius: var(--l-r-lg); padding: 12px 14px; }
+.hdContas div    { display: flex; flex-direction: column; gap: 2px; }
+.hdContas span   { font-size: 12px; color: var(--l-muted-fg); }
+.hdContas strong { font-size: 15px; color: var(--l-fg); }
+.hdPago     { color: var(--l-emerald-fg) !important; }
+.hdPendente { color: #dc2626 !important; }
+.hdSecao   { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 13px; font-weight: 700; color: var(--l-fg); }
+.hdSecao svg { color: var(--l-muted-fg); }
+.hdVazio   { font-size: 13px; color: var(--l-muted-fg); }
+.hdTexto   { font-size: 13px; line-height: 19px; color: var(--l-fg); white-space: pre-wrap; }
+.hdPessoas { display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0; }
+.hdPessoas li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.hdPessoas .mono { margin-left: auto; }
+.hdTitular { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
+.hdTable   { min-width: 0; font-size: 13px; }
+.hdQuebra  { white-space: normal !important; }
+.hdTag     { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--l-secondary); color: var(--l-secondary-fg); }
+.hdCancelado td { color: var(--l-muted-fg); text-decoration: line-through; }
+.hdCancelado .hdTag { text-decoration: none; }
