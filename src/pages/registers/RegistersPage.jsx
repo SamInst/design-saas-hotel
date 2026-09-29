@@ -5,7 +5,7 @@ import {
   Loader2, AlertCircle, Calendar,
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
-  X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Wallet,
+  X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Moon, Receipt, FileText,
   Check, LayoutDashboard, UserPlus, Pencil,
 } from 'lucide-react';
 
@@ -549,7 +549,7 @@ const soHora = (dh) => (dh ?? '').slice(11, 16);
 
 /** Quartos por onde a hospedagem passou (troca de quarto no meio da estadia). */
 /** "101 - Suíte Casal" — o número do quarto é o id, como no restante do sistema. */
-const nomeQuarto = (q) => (q?.id ? [q.id, q.descricao].filter(Boolean).join(' - ') : '');
+const nomeQuarto = (q) => (q?.id ? [q.id, q.descricao].filter(Boolean).join(' – ') : '');
 
 const quartosHosp = (h) => {
   const nomes = (h.diarias ?? []).map(d => nomeQuarto(d.quarto)).filter(Boolean);
@@ -703,126 +703,185 @@ function HistoricoCard({ tipo, id }) {
 }
 
 // ── Detalhe de uma hospedagem do histórico ────────────────────
+/** "Reserva" / "Pernoite" / "Day use", pelo prefixo do status. */
+const tipoHosp = (s) => (/^RESERVA/.test(s ?? '') ? 'Reserva' : /^DAY_USE/.test(s ?? '') ? 'Day use' : 'Pernoite');
+
+/** "27/08/2026 12:00" → "27/08" */
+const diaMes = (dh) => (dh ?? '').slice(0, 5);
+
+/** "1 adulto", "2 adultos"; com criança, a descrição que o back-end já monta. */
+const ocupacaoLabel = (d) => {
+  const oc = d.ocupacao;
+  if (oc?.descricao && /crian/i.test(oc.descricao)) return oc.descricao;
+  const n = oc?.adultos ?? (d.pessoas ?? []).length;
+  return n ? `${n} adulto${n !== 1 ? 's' : ''}` : '—';
+};
+
+function HdSecao({ icon: Icon, titulo, children }) {
+  return (
+    <section className={styles.hdCard}>
+      <h4 className={styles.hdCardHead}><Icon size={16} /> {titulo}</h4>
+      {children}
+    </section>
+  );
+}
+
 function HospedagemDetalheModal({ hospedagem: h, onClose }) {
   if (!h) return null;
   const st     = statusHosp(h.status);
   const contas = contasHosp(h);
-  const pessoas    = h.pessoas ?? [];
+  const pessoas    = [...(h.pessoas ?? [])].sort((a, b) => Number(!!b.titular) - Number(!!a.titular));
   const diarias    = [...(h.diarias ?? [])].sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
   const consumos   = h.consumos ?? [];
   const pagamentos = h.pagamentos ?? [];
+  const quartos    = quartosHosp(h);
 
   return (
-    <Modal open onClose={onClose} size="lg" closeOnBackdrop
-      title={<span className={styles.hdTitulo}>Hospedagem #{h.id} <span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span></span>}>
+    <Modal open onClose={onClose} size="lg" closeOnBackdrop hideHeader>
       <div className={styles.hdBody}>
-        <div className={styles.fieldGrid}>
-          <Field label="Quarto" value={quartosHosp(h)} />
-          <Field label="Check-in"  value={`${soData(h.data_hora_checkin)} às ${soHora(h.data_hora_checkin)}`} />
-          <Field label="Check-out" value={`${soData(h.data_hora_checkout)} às ${soHora(h.data_hora_checkout)}`} />
-          <Field label="Diárias" value={pad2(h.quantidade_diarias)} />
-          <Field label="Registrada em" value={h.data_hora_registro} />
-          <Field label="Registrada por" value={h.funcionario?.nome} />
+
+        {/* Cabeçalho */}
+        <div className={styles.hdHead}>
+          <span className={styles.hdHeadIcon}><BedDouble size={20} /></span>
+          <div className={styles.hdHeadMain}>
+            <h3 className={styles.hdHeadTitle}>
+              {tipoHosp(h.status)} · {quartos.includes(',') ? 'Quartos' : 'Quarto'} {quartos}
+            </h3>
+            <p className={styles.hdHeadSub}>
+              Registrada em {(h.data_hora_registro ?? '').slice(0, 16)}
+              {h.funcionario?.nome && ` por ${h.funcionario.nome}`}
+            </p>
+          </div>
+          <span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span>
+          <button type="button" className={styles.idClose} onClick={onClose} aria-label="Fechar" title="Fechar">
+            <X size={16} />
+          </button>
         </div>
 
-        <div className={styles.hdContas}>
-          <div><span>Hospedagem</span><strong>{fmtBRL(h.valor_total)}</strong></div>
-          <div><span>Consumo</span><strong>{fmtBRL(contas.consumo)}</strong></div>
-          <div><span>Total</span><strong>{fmtBRL(contas.total)}</strong></div>
-          <div><span>Pago</span><strong className={styles.hdPago}>{fmtBRL(contas.pago)}</strong></div>
-          <div><span>Pendente</span><strong className={contas.pendente > 0 ? styles.hdPendente : ''}>{fmtBRL(contas.pendente)}</strong></div>
+        {/* Datas */}
+        <div className={[styles.hdBox, styles.hdDatas].join(' ')}>
+          <div className={styles.hdDataItem}>
+            <span className={styles.hdMiniIcon}><CalendarDays size={15} /></span>
+            <div><p className={styles.hdLbl}>Check-in</p><p className={styles.hdVal}>{soData(h.data_hora_checkin)} às {soHora(h.data_hora_checkin)}</p></div>
+          </div>
+          <div className={styles.hdDataItem}>
+            <span className={styles.hdMiniIcon}><CalendarDays size={15} /></span>
+            <div><p className={styles.hdLbl}>Check-out</p><p className={styles.hdVal}>{soData(h.data_hora_checkout)} às {soHora(h.data_hora_checkout)}</p></div>
+          </div>
+          <div className={styles.hdDataItem}>
+            <span className={styles.hdMiniIcon}><Moon size={15} /></span>
+            <div><p className={styles.hdLbl}>Diárias</p><p className={styles.hdVal}>{pad2(h.quantidade_diarias)}</p></div>
+          </div>
         </div>
 
-        <h4 className={styles.hdSecao}><Users size={14} /> Hóspedes ({pad2(pessoas.length)})</h4>
-        {pessoas.length === 0 ? <p className={styles.hdVazio}>Nenhum hóspede informado.</p> : (
-          <ul className={styles.hdPessoas}>
-            {pessoas.map(p => (
-              <li key={p.id}>
-                <AvatarCircle name={p.nome} size={28} muted />
-                <span className={styles.nome}>{p.nome}</span>
-                {p.titular && <span className={styles.hdTitular}>Titular</span>}
-                <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
-              </li>
-            ))}
-          </ul>
+        {/* Financeiro */}
+        <div>
+          <p className={styles.hdGrupo}>Financeiro</p>
+          <div className={[styles.hdBox, styles.hdContas].join(' ')}>
+            <div><p className={styles.hdLbl}>Hospedagem</p><p className={styles.hdVal}>{fmtBRL(h.valor_total)}</p></div>
+            <div><p className={styles.hdLbl}>Consumo</p><p className={[styles.hdVal, styles.hdMuted].join(' ')}>{fmtBRL(contas.consumo)}</p></div>
+            <div><p className={styles.hdLbl}>Pago</p><p className={[styles.hdVal, styles.hdPago].join(' ')}>{fmtBRL(contas.pago)}</p></div>
+            <div><p className={styles.hdLbl}>Pendente</p><p className={[styles.hdVal, contas.pendente > 0 ? styles.hdPendente : styles.hdMuted].join(' ')}>{fmtBRL(contas.pendente)}</p></div>
+          </div>
+          <p className={styles.hdTotal}>Total: {fmtBRL(contas.total)}</p>
+        </div>
+
+        <HdSecao icon={Users} titulo="Hóspedes">
+          {pessoas.length === 0 ? <p className={styles.hdVazio}>Nenhum hóspede informado.</p> : (
+            <ul className={styles.hdPessoas}>
+              {pessoas.map(p => (
+                <li key={p.id}>
+                  <span className={styles.hdIniciais}>{getInitials(p.nome)}</span>
+                  <span className={styles.hdNome}>{p.nome}</span>
+                  {p.titular && <span className={styles.hdTitular}>Titular</span>}
+                  <span className={styles.hdCpf}>{maskCPF(p.cpf ?? '')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </HdSecao>
+
+        {diarias.length > 0 && (
+          <HdSecao icon={Moon} titulo="Diárias">
+            <div className={styles.hScroll}>
+              <table className={styles.hdTable}>
+                <thead><tr><th>Nº</th><th>Quarto</th><th>Período</th><th>Ocupação</th><th className={styles.hdDir}>Valor</th></tr></thead>
+                <tbody>
+                  {diarias.map(d => (
+                    <tr key={d.id}>
+                      <td>{pad2(d.numero)}</td>
+                      <td>{nomeQuarto(d.quarto) || '—'}</td>
+                      <td>{diaMes(d.checkin)} → {diaMes(d.checkout)}</td>
+                      <td>
+                        {ocupacaoLabel(d)}
+                        {d.meia_diaria && <span className={styles.hdTag}>Meia diária</span>}
+                        {d.sazonalidade?.descricao && <span className={styles.hdTag}>{d.sazonalidade.descricao}</span>}
+                      </td>
+                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(d.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </HdSecao>
         )}
 
-        {diarias.length > 0 && (<>
-          <h4 className={styles.hdSecao}><BedDouble size={14} /> Diárias</h4>
-          <div className={styles.hScroll}>
-            <table className={[styles.hTable, styles.hdTable].join(' ')}>
-              <thead><tr><th>Nº</th><th>Quarto</th><th>Período</th><th>Ocupação</th><th>Valor</th></tr></thead>
-              <tbody>
-                {diarias.map(d => (
-                  <tr key={d.id}>
-                    <td>{pad2(d.numero)}</td>
-                    <td>{nomeQuarto(d.quarto) || '—'}</td>
-                    <td><span className={styles.hPeriodo}>{soData(d.checkin)} <ArrowRight size={13} className={styles.hSeta} /> {soData(d.checkout)}</span></td>
-                    <td className={styles.hdQuebra}>
-                      {d.ocupacao?.descricao ?? `${pad2((d.pessoas ?? []).length)} pessoa(s)`}
-                      {d.meia_diaria && <span className={styles.hdTag}>Meia diária</span>}
-                      {d.sazonalidade?.descricao && <span className={styles.hdTag}>{d.sazonalidade.descricao}</span>}
-                    </td>
-                    <td className={styles.hTotal}>{fmtBRL(d.valor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>)}
-
-        {consumos.length > 0 && (<>
-          <h4 className={styles.hdSecao}><Package size={14} /> Consumo</h4>
-          <div className={styles.hScroll}>
-            <table className={[styles.hTable, styles.hdTable].join(' ')}>
-              <thead><tr><th>Item</th><th>Qtd.</th><th>Unitário</th><th>Total</th><th>Data</th></tr></thead>
-              <tbody>
-                {consumos.map(c => (
-                  <tr key={c.id} className={c.cancelado ? styles.hdCancelado : ''}>
-                    <td>{c.item?.descricao ?? '—'}{c.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
-                    <td>{pad2(c.quantidade)}</td>
-                    <td>{fmtBRL(c.valor)}</td>
-                    <td className={styles.hTotal}>{fmtBRL(totalConsumo(c))}</td>
-                    <td>{c.data_hora_registro}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>)}
-
-        <h4 className={styles.hdSecao}><Wallet size={14} /> Pagamentos</h4>
-        {pagamentos.length === 0 ? <p className={styles.hdVazio}>Nenhum pagamento registrado.</p> : (
-          <div className={styles.hScroll}>
-            <table className={[styles.hTable, styles.hdTable].join(' ')}>
-              <thead><tr><th>Forma</th><th>Pagador</th><th>Data</th><th>Valor</th></tr></thead>
-              <tbody>
-                {pagamentos.map(p => (
-                  <tr key={p.uuid} className={p.cancelado ? styles.hdCancelado : ''}>
-                    <td>{p.tipo_pagamento?.descricao ?? '—'}{p.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
-                    <td>{p.nome_pagador || '—'}</td>
-                    <td>{p.data_hora_registro}</td>
-                    <td className={styles.hTotal}>{fmtBRL(p.valor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {consumos.length > 0 && (
+          <HdSecao icon={Package} titulo="Consumo">
+            <div className={styles.hScroll}>
+              <table className={styles.hdTable}>
+                <thead><tr><th>Item</th><th>Qtd.</th><th>Unitário</th><th>Data</th><th className={styles.hdDir}>Total</th></tr></thead>
+                <tbody>
+                  {consumos.map(c => (
+                    <tr key={c.id} className={c.cancelado ? styles.hdCancelado : ''}>
+                      <td>{c.item?.descricao ?? '—'}{c.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
+                      <td>{pad2(c.quantidade)}</td>
+                      <td>{fmtBRL(c.valor)}</td>
+                      <td>{(c.data_hora_registro ?? '').slice(0, 16)}</td>
+                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(totalConsumo(c))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </HdSecao>
         )}
 
-        {h.observacao && (<>
-          <h4 className={styles.hdSecao}>Observação</h4>
-          <p className={styles.hdTexto}>{h.observacao}</p>
-        </>)}
+        <HdSecao icon={Receipt} titulo="Pagamentos">
+          {pagamentos.length === 0 ? <p className={styles.hdVazio}>Nenhum pagamento registrado.</p> : (
+            <div className={styles.hScroll}>
+              <table className={styles.hdTable}>
+                <thead><tr><th>Forma</th><th>Pagador</th><th>Data</th><th className={styles.hdDir}>Valor</th></tr></thead>
+                <tbody>
+                  {pagamentos.map(p => (
+                    <tr key={p.uuid} className={p.cancelado ? styles.hdCancelado : ''}>
+                      <td>{p.tipo_pagamento?.descricao ?? '—'}{p.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
+                      <td>{p.nome_pagador || '—'}</td>
+                      <td>{(p.data_hora_registro ?? '').slice(0, 16)}</td>
+                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(p.valor)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </HdSecao>
 
-        {h.motivo_cancelamento?.motivo_cancelamento && (<>
-          <h4 className={styles.hdSecao}>Motivo do cancelamento</h4>
-          <p className={styles.hdTexto}>
-            {h.motivo_cancelamento.motivo_cancelamento}
-            {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
-            {h.motivo_cancelamento.data_hora_registro && `, ${h.motivo_cancelamento.data_hora_registro}`}
-          </p>
-        </>)}
+        {h.observacao && (
+          <HdSecao icon={FileText} titulo="Observação">
+            <p className={styles.hdTexto}>{h.observacao}</p>
+          </HdSecao>
+        )}
+
+        {h.motivo_cancelamento?.motivo_cancelamento && (
+          <HdSecao icon={XCircle} titulo="Motivo do cancelamento">
+            <p className={styles.hdTexto}>
+              {h.motivo_cancelamento.motivo_cancelamento}
+              {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
+              {h.motivo_cancelamento.data_hora_registro && `, ${h.motivo_cancelamento.data_hora_registro}`}
+            </p>
+          </HdSecao>
+        )}
       </div>
     </Modal>
   );

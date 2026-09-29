@@ -1264,25 +1264,81 @@
 .hStatusCancelada { background: color-mix(in srgb, #ef4444 12%, transparent); color: #dc2626; }
 
 /* Modal de detalhe da hospedagem */
-.hdTitulo  { display: inline-flex; align-items: center; gap: 10px; }
-.hdBody    { display: flex; flex-direction: column; gap: 14px; }
-.hdContas  { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-             border: 1px solid var(--l-border); border-radius: var(--l-r-lg); padding: 12px 14px; }
-.hdContas div    { display: flex; flex-direction: column; gap: 2px; }
-.hdContas span   { font-size: 12px; color: var(--l-muted-fg); }
-.hdContas strong { font-size: 15px; color: var(--l-fg); }
-.hdPago     { color: var(--l-emerald-fg) !important; }
-.hdPendente { color: #dc2626 !important; }
-.hdSecao   { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 13px; font-weight: 700; color: var(--l-fg); }
-.hdSecao svg { color: var(--l-muted-fg); }
-.hdVazio   { font-size: 13px; color: var(--l-muted-fg); }
-.hdTexto   { font-size: 13px; line-height: 19px; color: var(--l-fg); white-space: pre-wrap; }
-.hdPessoas { display: flex; flex-direction: column; gap: 8px; list-style: none; margin: 0; padding: 0; }
-.hdPessoas li { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.hdPessoas .mono { margin-left: auto; }
-.hdTitular { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
-.hdTable   { min-width: 0; font-size: 13px; }
-.hdQuebra  { white-space: normal !important; }
-.hdTag     { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--l-secondary); color: var(--l-secondary-fg); }
-.hdCancelado td { color: var(--l-muted-fg); text-decoration: line-through; }
+.hdBody { display: flex; flex-direction: column; gap: 16px; color: var(--l-fg); }
+
+.hdHead     { display: flex; align-items: center; gap: 12px; }
+.hdHeadIcon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 10px;
+  background: color-mix(in srgb, #3b82f6 12%, transparent); color: #2563eb;
+}
+.hdHeadMain  { flex: 1; min-width: 0; }
+.hdHeadTitle { margin: 0; font-size: 17px; line-height: 22px; font-weight: 700; }
+.hdHeadSub   { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+
+.hdBox { border: 1px solid var(--l-border); border-radius: 12px; background: var(--l-card); }
+
+.hdDatas    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hdDataItem { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-width: 0; }
+.hdDataItem + .hdDataItem { border-left: 1px solid var(--l-border); }
+.hdMiniIcon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 8px;
+  background: var(--l-secondary); color: var(--l-muted-fg);
+}
+
+.hdLbl { margin: 0; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+.hdVal { margin: 2px 0 0; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg); white-space: nowrap; }
+.hdMuted    { color: var(--l-muted-fg); }
+.hdPago     { color: #15803d; }
+.hdPendente { color: #dc2626; }
+
+.hdGrupo  { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--l-muted-fg); }
+.hdContas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.hdContas > div { padding: 12px 14px; min-width: 0; }
+.hdContas > div + div { border-left: 1px solid var(--l-border); }
+.hdTotal  { margin: 8px 0 0; text-align: right; font-size: 14px; font-weight: 700; }
+
+.hdCard     { border: 1px solid var(--l-border); border-radius: 12px; overflow: hidden; background: var(--l-card); }
+.hdCardHead {
+  display: flex; align-items: center; gap: 8px; margin: 0;
+  padding: 10px 14px; font-size: 14px; font-weight: 700;
+  background: var(--l-secondary); border-bottom: 1px solid var(--l-border);
+}
+.hdCardHead svg { color: var(--l-muted-fg); }
+
+.hdPessoas    { list-style: none; margin: 0; padding: 0; }
+.hdPessoas li { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 14px; }
+.hdPessoas li + li { border-top: 1px solid var(--l-border); }
+.hdIniciais {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--l-secondary); color: var(--l-muted-fg); font-size: 11px; font-weight: 600;
+}
+.hdNome    { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hdTitular { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--l-border); color: var(--l-fg); }
+.hdCpf     { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+
+.hdTable { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
+.hdTable th {
+  padding: 8px 14px; text-align: left; white-space: nowrap;
+  font-size: 12px; font-weight: 500; color: var(--l-muted-fg);
+  border-bottom: 1px solid var(--l-border);
+}
+.hdTable td { padding: 10px 14px; color: var(--l-muted-fg); white-space: nowrap; }
+.hdTable tbody tr + tr td { border-top: 1px solid var(--l-border); }
+.hdDir   { text-align: right !important; }
+.hdForte { color: var(--l-fg) !important; font-weight: 700; }
+
+.hdVazio { margin: 0; padding: 12px 14px; font-size: 13px; color: var(--l-muted-fg); }
+.hdTexto { margin: 0; padding: 12px 14px; font-size: 13px; line-height: 19px; white-space: pre-wrap; }
+.hdTag   { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--l-secondary); color: var(--l-secondary-fg); }
+.hdCancelado td { text-decoration: line-through; }
 .hdCancelado .hdTag { text-decoration: none; }
+
+@media (max-width: 640px) {
+  .hdDatas, .hdContas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hdDataItem + .hdDataItem, .hdContas > div + div { border-left: none; }
+  .hdDatas > :nth-child(n+3), .hdContas > :nth-child(n+3) { border-top: 1px solid var(--l-border); }
+  .hdDatas > :nth-child(2n), .hdContas > :nth-child(2n) { border-left: 1px solid var(--l-border); }
+}
