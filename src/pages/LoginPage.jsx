@@ -9,6 +9,12 @@ const SLIDES = Object.values(
 );
 const SLIDE_MS = 7000;
 
+const SLIDES_READY = Promise.all(SLIDES.map(src => {
+  const img = new Image();
+  img.src = src;
+  return img.decode().catch(() => {});
+}));
+
 // "+" da marca: duas barras arredondadas em gradiente dourado→terra,
 // com um brilho no cruzamento — lê como "mais" e como uma estrela/cruz de guia.
 function PlusMark({ className }) {
@@ -40,16 +46,19 @@ export default function LoginPage({ onLogin }) {
   const [error,    setError]    = useState('');
   const [slide,    setSlide]    = useState(0);
 
+  const [ready,    setReady]    = useState(false);
+
   useEffect(() => {
-    const t = setInterval(() => setSlide(i => (i + 1) % SLIDES.length), SLIDE_MS);
-    return () => clearInterval(t);
+    let alive = true;
+    SLIDES_READY.then(() => { if (alive) setReady(true); });
+    return () => { alive = false; };
   }, []);
 
-  // pré-carrega a próxima foto para o crossfade não piscar
   useEffect(() => {
-    const img = new Image();
-    img.src = SLIDES[(slide + 1) % SLIDES.length];
-  }, [slide]);
+    if (!ready) return;
+    const t = setInterval(() => setSlide(i => (i + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearInterval(t);
+  }, [ready]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -97,7 +106,7 @@ export default function LoginPage({ onLogin }) {
           <div
             key={src}
             className={`${styles.slide} ${i === slide ? styles.slideActive : ''}`}
-            style={{ backgroundImage: i === slide || i === (slide + SLIDES.length - 1) % SLIDES.length ? `url(${src})` : undefined }}
+            style={{ backgroundImage: `url(${src})` }}
           />
         ))}
         <div className={styles.shade} />
@@ -121,7 +130,7 @@ export default function LoginPage({ onLogin }) {
             {SLIDES.map((src, i) => (
               <span
                 key={src}
-                className={`${styles.dot} ${i === slide ? styles.dotActive : ''}`}
+                className={`${styles.dot} ${i === slide && ready ? styles.dotActive : ''}`}
                 style={i === slide ? { animationDuration: `${SLIDE_MS}ms` } : undefined}
               />
             ))}
