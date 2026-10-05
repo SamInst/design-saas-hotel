@@ -172,6 +172,8 @@ const maskPlaca = v => v.replace(/[^A-Za-z0-9]/g,'').slice(0,7).toUpperCase();
 const unmask    = v => (v ?? '').replace(/\D/g,'');
 
 const up         = v => (v ?? '').toUpperCase().trim();
+// nome digitado já sai em maiúsculas e sem acento, igual ao que vai para a API
+const maskNome   = v => (v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase();
 const cleanPlaca = v => (v ?? '').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
 // ABC1234 → ABC-1234 · ABC1D23 → ABC-1D23
 const fmtPlaca   = v => { const c = cleanPlaca(v); return c.length > 3 ? `${c.slice(0, 3)}-${c.slice(3)}` : c; };
@@ -395,6 +397,98 @@ const blankEmpresa = () => ({
   cep:'', endereco:'', bairro:'', complemento:'', numero:'',
   pais:'Brasil', estado:'', municipio:'', tipoEmpresa: 'CLIENTE',
 });
+
+const idadeDe = (d) => {
+  if (!(d instanceof Date)) return null;
+  const hoje = new Date();
+  let anos = hoje.getFullYear() - d.getFullYear();
+  if (hoje < new Date(hoje.getFullYear(), d.getMonth(), d.getDate())) anos--;
+  return anos;
+};
+
+function ConfirmRow({ label, value }) {
+  if (!value) return null;
+  return (
+    <div className={styles.cfRow}>
+      <span className={styles.cfLabel}>{label}:</span>
+      <span className={styles.cfValue}>{value}</span>
+    </div>
+  );
+}
+
+function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome }) {
+  const idade = idadeDe(pessoa.dataNascimento);
+  const nasc  = pessoa.dataNascimento
+    ? `${nascLabel(pessoa.dataNascimento)}${idade != null ? ` (${idade} anos)` : ''}`
+    : '';
+  const local = [pessoa.municipio, pessoa.estado].filter(Boolean).join(', ');
+  const veiculos = pessoa.veiculos ?? [];
+
+  return (
+    <div className={styles.cfCard}>
+      <div className={styles.cfTop}>
+        <AvatarCircle name={pessoa.nome} size={64} tone={dependente ? 1 : 0} />
+        <div className={styles.cfTopBody}>
+          <div className={styles.cfNameRow}>
+            <span className={styles.cfName}>{pessoa.nome || '—'}</span>
+            <span className={dependente ? styles.confirmBadgeDep : styles.confirmBadgeTitular}>
+              {dependente ? 'Dependente' : 'Titular'}
+            </span>
+          </div>
+          <div className={styles.cfGrid}>
+            <ConfirmRow label="CPF"         value={maskCPF(pessoa.cpf ?? '')} />
+            <ConfirmRow label="Nascimento"  value={nasc} />
+            <ConfirmRow label="RG"          value={pessoa.rg} />
+            <ConfirmRow label="Gênero"      value={sexoLabel(pessoa.sexo)} />
+            {dependente && <ConfirmRow label="Parentesco" value={pessoa.parentesco ? parentescoLabel(pessoa.parentesco) : ''} />}
+            <ConfirmRow label="Profissão"   value={pessoa.profissao} />
+            {!usaTitular && <ConfirmRow label="Telefone" value={pessoa.telefone} />}
+            {!usaTitular && <ConfirmRow label="Email"    value={pessoa.email} />}
+          </div>
+        </div>
+      </div>
+
+      {((!usaTitular && pessoa.cep) || empresa || veiculos.length > 0) && (
+        <div className={styles.cfBottom}>
+          {!usaTitular && (
+            <div className={styles.cfCol}>
+              <span className={styles.cfSecTitle}>Endereço</span>
+              <ConfirmRow label="Logradouro"  value={pessoa.endereco} />
+              <ConfirmRow label="Número"      value={pessoa.numero} />
+              <ConfirmRow label="CEP"         value={pessoa.cep} />
+              <ConfirmRow label="Complemento" value={pessoa.complemento} />
+              <ConfirmRow label="Bairro"      value={pessoa.bairro} />
+              <ConfirmRow label="Município"   value={local} />
+              <ConfirmRow label="País"        value={pessoa.pais} />
+            </div>
+          )}
+          {(empresa || veiculos.length > 0) && (
+            <div className={styles.cfCol}>
+              {empresa && (
+                <div className={styles.cfSec}>
+                  <span className={styles.cfSecTitle}>Empresa</span>
+                  <ConfirmRow label="Nome/Razão" value={empresaNome} />
+                  <ConfirmRow label="CNPJ"       value={maskCNPJ(empresa.cnpj ?? '')} />
+                  <ConfirmRow label="Telefone"   value={empresa.telefone} />
+                  <ConfirmRow label="Email"      value={empresa.email} />
+                </div>
+              )}
+              {veiculos.length > 0 && (
+                <div className={styles.cfSec}>
+                  <span className={styles.cfSecTitle}>{veiculos.length > 1 ? 'Veículos' : 'Veículo'}</span>
+                  {veiculos.map((v, k) => (
+                    <ConfirmRow key={k} label={v.placa || 'Sem placa'}
+                      value={[v.tipo, veiculoLabel(v), v.ano, v.cor].filter(Boolean).join(' · ')} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Utilitários visuais ───────────────────────────────────────
 // size-10 → 12px; size-14 → 16px; size-9 (dependentes) → 12px, em cinza.
@@ -924,9 +1018,10 @@ function DateMaskInput({ value, onChange, className = '' }) {
 /**
  * `mostrarVeiculos` desliga a seção de veículos. No cadastro novo ela só
  * aparece quando a caixa "Possui veículo" está marcada; na edição segue
- * sempre visível.
+ * sempre visível. `opcoes` (as caixas "Possui veículo"…) entra antes dos
+ * veículos, para que eles abram abaixo da caixa que os ligou.
  */
-function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null, mostrarVeiculos = true }) {
+function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false, titular = null, mostrarVeiculos = true, opcoes = null }) {
   const [cepLoading, setCepLoading] = useState(false);
   const [cpfStatus,  setCpfStatus]  = useState(null);
   const [useTitularTel,  setUseTitularTel]  = useState(false);
@@ -1011,12 +1106,16 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
     }));
     setVErr(false);
   };
-  const removeVeiculo = (i) => onChange(p => ({
-    ...p,
-    veiculos: (p.veiculos ?? []).filter((_, k) => k !== i),
-    // editando justamente esse: o editor fecha junto
-    veiculoEdit: p.veiculoEdit?.index === i ? null : p.veiculoEdit,
-  }));
+  const removeVeiculo = (i) => {
+    const placa = data.veiculos?.[i]?.placa;
+    if (!window.confirm(`Tem certeza que deseja remover ${placa ? `o veículo ${placa}` : 'este veículo'}?`)) return;
+    onChange(p => ({
+      ...p,
+      veiculos: (p.veiculos ?? []).filter((_, k) => k !== i),
+      // editando justamente esse: o editor fecha junto
+      veiculoEdit: p.veiculoEdit?.index === i ? null : p.veiculoEdit,
+    }));
+  };
 
   // A caixa "Possui veículo" acabou de ser marcada e não há nenhum na lista:
   // o editor já abre, para a seção não nascer vazia. Só no momento em que a
@@ -1088,7 +1187,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
 
             <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
               <FormField label="Nome completo *">
-                <Input value={data.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
+                <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
               </FormField>
             </div>
 
@@ -1195,15 +1294,18 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
       </FormField>
 
+      {opcoes}
+
       {/* ── Veículos ── */}
       {/* A seção é aberta pela linha divisória; os campos seguem no mesmo
           fluxo do formulário da pessoa, sem caixa em volta. */}
       {mostrarVeiculos && (<>
-      <div className={styles.optTitle}><Car size={16} /> Veículos</div>
+      {/* linha só no cadastro do primeiro veículo */}
+      {(data.veiculos ?? []).length === 0 && <hr className={styles.optSep} />}
 
       {/* os já confirmados, em tabela — mesma leitura do histórico */}
       {(data.veiculos ?? []).length > 0 && (
-        <div className={styles.hScroll}>
+        <div className={styles.hScroll} style={{ marginTop: 16 }}>
           <table className={[styles.hTable, styles.optTable].join(' ')}>
             <thead><tr>
               <th>Veículo</th><th>Tipo</th><th>Cor</th><th>Placa</th><th aria-label="Ações" />
@@ -1211,12 +1313,12 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
             <tbody>
               {data.veiculos.map((v, i) => (
                 <tr key={i} className={vEdit?.index === i ? styles.trEditando : ''}>
-                  <td><span className={styles.hQuarto}><Car size={15} /> {veiculoLabel(v)}</span></td>
-                  <td>{tipoCanon(v.tipo) || '—'}</td>
-                  <td>{v.cor || '—'}</td>
-                  <td><span className={styles.itemRowPlaca}>{v.placa}</span></td>
+                  <td><span className={styles.hQuarto}>{veiculoLabel(v).toUpperCase()}</span></td>
+                  <td>{tipoCanon(v.tipo)?.toUpperCase() || '—'}</td>
+                  <td>{v.cor?.toUpperCase() || '—'}</td>
+                  <td>{fmtPlaca(v.placa) || '—'}</td>
                   <td>
-                    <span className={styles.tdAcoes}>
+                    <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
                       <button type="button" className={styles.btnEdit} onClick={() => abrirVeiculo(i)}
                         title="Editar veículo"><Pencil size={12} /></button>
                       <button type="button" className={styles.btnRemove} onClick={() => removeVeiculo(i)}
@@ -1309,9 +1411,9 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
 
   return (
     <div className={styles.optItem}>
-      <div className={styles.optItemHead}>
-        <span>{index == null ? 'Novo dependente' : `Editando dependente ${index + 1}`}</span>
-        <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: 'auto' }}>
+      <div className={styles.optItemHead} style={{ marginBottom: 6 }}>
+        {index != null && <span>{`Editando dependente ${index + 1}`}</span>}
+        <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: index == null ? 0 : 'auto' }}>
           <input
             type="checkbox"
             checked={usarTitular}
@@ -1336,7 +1438,7 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
           </div>
           <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
             <FormField label="Nome completo *">
-              <Input value={data.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
+              <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
             </FormField>
           </div>
           <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
@@ -1902,6 +2004,8 @@ export default function RegistersPage() {
   };
 
   const handleRemoveDependente = i => {
+    const nome = dependentes[i]?.nome;
+    if (!window.confirm(`Tem certeza que deseja remover ${nome ? `o dependente ${nome}` : 'este dependente'}?`)) return;
     setDependentes(prev => prev.filter((_, j) => j !== i));
     // editando justamente esse: o editor fecha junto
     setDepEdit(prev => (prev && prev.index === i ? null : prev));
@@ -2093,6 +2197,8 @@ export default function RegistersPage() {
 
   const handleToggleStatus = async () => {
     const novoStatus = detailItem.status === 'BLOQUEADO' ? 'ATIVO' : 'BLOQUEADO';
+    if (novoStatus === 'BLOQUEADO'
+      && !window.confirm(`Tem certeza que deseja bloquear o cadastro de ${detailItem.nome || 'este hóspede'}?`)) return;
     setIsSubmitting(true);
     try {
       await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(detailItem, { status: novoStatus }) });
@@ -2242,29 +2348,24 @@ export default function RegistersPage() {
   const addPessoaBody = (
         confirmStep ? (
           <div className={styles.confirmWrap}>
-            <p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>
-            <div className={styles.confirmList}>
-              {[titular, ...dependentes].map((p, i) => (
-                <div key={i} className={styles.confirmCard}>
-                  <div className={styles.confirmAvatar}>{(p.nome || '?')[0].toUpperCase()}</div>
-                  <div className={styles.confirmInfo}>
-                    <div className={styles.confirmName}>{p.nome || '—'}</div>
-                    <div className={styles.confirmMeta}>
-                      {maskCPF(p.cpf)} · {p.dataNascimento instanceof Date ? p.dataNascimento.toLocaleDateString('pt-BR') : '—'}
-                    </div>
-                  </div>
-                  <span className={i === 0 ? styles.confirmBadgeTitular : styles.confirmBadgeDep}>
-                    {i === 0 ? 'Titular' : 'Dependente'}
-                  </span>
-                </div>
+            {/*<p className={styles.confirmTitle}>Revise as pessoas que serão cadastradas:</p>*/}
+            <div className={styles.cfBox}>
+              <ConfirmPessoa pessoa={titular} empresa={linkEmpresa} empresaNome={empresaLabel(linkEmpresa)} />
+              {dependentes.map((d, i) => (
+                <ConfirmPessoa key={i} pessoa={d} dependente usaTitular={d.usarDadosTitular !== false} />
               ))}
             </div>
-            {linkEmpresa && (
-              <div className={styles.confirmEmpresa}>
-                <Building2 size={13} className={styles.iconViolet} />
-                <span>Vinculado à empresa: <strong>{empresaLabel(linkEmpresa)}</strong></span>
-              </div>
-            )}
+            <div className={styles.formFoot}>
+              <span className={styles.personCount}>
+                <Users size={13} />
+                {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
+              </span>
+              <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
+              <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                onClick={doSavePessoa} disabled={isSubmitting}>
+                {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
+              </Button>
+            </div>
           </div>
         ) : (
         <div className={styles.regLayout}>
@@ -2275,36 +2376,39 @@ export default function RegistersPage() {
               onFetchCEP={fetchCEP} onCheckCPF={checkCPF}
               showErrors={showErrors}
               mostrarVeiculos={temVeiculo}
+              opcoes={
+                /* ── O que mais entra neste cadastro ── */
+                <div className={styles.opcoesBlock}>
+                  <label className={styles.opcaoRow}>
+                    <input type="checkbox" checked={temVeiculo} onChange={e => toggleTemVeiculo(e.target.checked)} />
+                    <Car size={13} /> <span>Possui veículo</span>
+                  </label>
+                  <label className={styles.opcaoRow}>
+                    <input type="checkbox" checked={temDependentes} onChange={e => toggleTemDependentes(e.target.checked)} />
+                    <Users size={13} /> <span>Possui dependentes</span>
+                  </label>
+                  <label className={styles.opcaoRow}>
+                    <input type="checkbox" checked={temEmpresa} onChange={e => toggleTemEmpresa(e.target.checked)} />
+                    <Building2 size={13} /> <span>Vínculo com empresa registrada</span>
+                  </label>
+                </div>
+              }
             />
-
-            {/* ── O que mais entra neste cadastro ── */}
-            <div className={styles.opcoesBlock}>
-              <label className={styles.opcaoRow}>
-                <input type="checkbox" checked={temVeiculo} onChange={e => toggleTemVeiculo(e.target.checked)} />
-                <Car size={13} /> <span>Possui veículo</span>
-              </label>
-              <label className={styles.opcaoRow}>
-                <input type="checkbox" checked={temDependentes} onChange={e => toggleTemDependentes(e.target.checked)} />
-                <Users size={13} /> <span>Possui dependentes</span>
-              </label>
-              <label className={styles.opcaoRow}>
-                <input type="checkbox" checked={temEmpresa} onChange={e => toggleTemEmpresa(e.target.checked)} />
-                <Building2 size={13} /> <span>Vínculo com empresa registrada</span>
-              </label>
-            </div>
 
             {/* ── Dependentes ── */}
             {temDependentes && (
               <>
-                <div className={styles.optTitle}><Users size={16} /> Dependentes</div>
-
+                {/* linha só no cadastro do primeiro dependente */}
+                {dependentes.length === 0 && <hr className={styles.optSep} />}
                 {/* os já confirmados, em tabela — mesma leitura do histórico */}
                 {dependentes.length > 0 && (
                   <div className={styles.hScroll}>
                     <table className={[styles.hTable, styles.optTable].join(' ')}>
                       <thead><tr>
                         <th>Dependente</th><th>CPF</th><th>Nascimento</th><th>Parentesco</th>
-                        <th>Contato e endereço</th><th aria-label="Ações" />
+                        {/* só aparece se algum dependente tem contato e endereço próprios */}
+                        {dependentes.some(d => d.usarDadosTitular === false) && <th>Contato e endereço</th>}
+                        <th aria-label="Ações" />
                       </tr></thead>
                       <tbody>
                         {dependentes.map((dep, i) => (
@@ -2318,13 +2422,13 @@ export default function RegistersPage() {
                             <td>{maskCPF(dep.cpf) || '—'}</td>
                             <td>{nascLabel(dep.dataNascimento)}</td>
                             <td>{parentescoLabel(dep.parentesco)}</td>
+                            {dependentes.some(d => d.usarDadosTitular === false) && (
+                              <td>
+                                {dep.usarDadosTitular === false && <span className={styles.optTag}>Próprios</span>}
+                              </td>
+                            )}
                             <td>
-                              <span className={styles.optTag}>
-                                {dep.usarDadosTitular !== false ? 'Do titular' : 'Próprios'}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={styles.tdAcoes}>
+                              <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
                                 <button type="button" className={styles.btnEdit} onClick={() => abrirDependente(i)}
                                   title="Editar dependente"><Pencil size={12} /></button>
                                 <button type="button" className={styles.btnRemove} onClick={() => handleRemoveDependente(i)}
@@ -2361,7 +2465,7 @@ export default function RegistersPage() {
                 )}
 
                 {!depEdit && (
-                  <button type="button" className={styles.optAdd} onClick={() => abrirDependente()}>
+                  <button type="button" className={styles.optAdd} style={{ marginTop: 12 }} onClick={() => abrirDependente()}>
                     <Plus size={13} /> Dependente
                   </button>
                 )}
@@ -2373,23 +2477,34 @@ export default function RegistersPage() {
                 vincula, sem abrir modal. */}
             {temEmpresa && (
               <>
-                <div className={styles.optTitle}><Building2 size={16} /> Empresa vinculada</div>
                 {linkEmpresa ? (
-                  <div className={styles.itemLista}>
-                    <div className={styles.itemRow}>
-                      <Building2 size={14} className={styles.itemRowIcon} />
-                      <span className={styles.itemRowMain}>
-                        <span className={styles.itemRowTitle}>{empresaLabel(linkEmpresa)}</span>
-                        <span className={styles.itemRowSub}>{maskCNPJ(linkEmpresa.cnpj ?? '')}</span>
-                      </span>
-                      <span className={styles.itemRowActions}>
-                        <button type="button" className={styles.btnRemove}
-                          onClick={() => setLinkEmpresa(null)} title="Desvincular empresa"><X size={12} /></button>
-                      </span>
-                    </div>
+                  <div className={[styles.hScroll, styles.empresaBloco].join(' ')}>
+                    <table className={[styles.hTable, styles.optTable].join(' ')}>
+                      <thead><tr>
+                        <th>Empresa</th><th>CNPJ</th>
+                        <th aria-label="Ações" />
+                      </tr></thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <span className={styles.hQuarto}>
+                              <Building2 size={14} className={styles.iconViolet} />
+                              {empresaLabel(linkEmpresa)}
+                            </span>
+                          </td>
+                          <td>{maskCNPJ(linkEmpresa.cnpj ?? '') || '—'}</td>
+                          <td>
+                            <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
+                              <button type="button" className={styles.btnRemove}
+                                onClick={() => setLinkEmpresa(null)} title="Desvincular empresa"><X size={12} /></button>
+                            </span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
                 ) : (
-                  <div className={styles.optItem}>
+                  <div className={[styles.optItem, styles.empresaSearch, styles.empresaBloco].join(' ')}>
                     <div className={styles.searchWrap}>
                       <Search size={13} className={styles.searchIcon} />
                       <Input
@@ -2401,9 +2516,9 @@ export default function RegistersPage() {
                       {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                     </div>
                     {linkResults.length > 0 && (
-                      <div className={[styles.linkDropdown, styles.linkDropdownInline].join(' ')}>
+                      <div className={[styles.linkDropdown, styles.linkListbox].join(' ')} role="listbox">
                         {linkResults.map(e => (
-                          <button key={e.id} type="button" className={styles.linkDropdownItem}
+                          <button key={e.id} type="button" role="option" className={styles.linkDropdownItem}
                             onClick={() => { setLinkEmpresa(e); setLinkSearch(''); setLinkResults([]); }}>
                             <Building2 size={12} className={styles.iconViolet} />
                             <span className={styles.nome}>{empresaLabel(e)}</span>
@@ -2419,6 +2534,10 @@ export default function RegistersPage() {
 
             {/* ── Fim do cadastro ── */}
             <div className={styles.formFoot}>
+              <span className={styles.personCount}>
+                <Users size={13} />
+                {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
+              </span>
               <Button className={styles.btnSolid}
                 onClick={() => setTitular(blankPessoa())}>Limpar</Button>
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
@@ -2681,25 +2800,9 @@ export default function RegistersPage() {
                   </button>
                   <UserPlus size={16} />
                   <span className={styles.dCardTitle}>
-                    {confirmStep ? 'Confirmar cadastro' : 'Novo hóspede'}
+                    {confirmStep ? 'Revisar Dados' : 'Novo hóspede'}
                   </span>
                   <div className={styles.dCardActions}>
-                    {!confirmStep ? (
-                      /* Limpar e Próximo ficam no fim do formulário, depois de
-                         tudo o que se cadastra; aqui em cima só a contagem. */
-                      <span className={styles.personCount}>
-                        <Users size={13} />
-                        {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-                      </span>
-                    ) : (
-                      <>
-                        <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
-                        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                          onClick={doSavePessoa} disabled={isSubmitting}>
-                          {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
-                        </Button>
-                      </>
-                    )}
                     <button type="button" className={styles.idClose} onClick={cancelAddPessoa}
                       title="Cancelar cadastro" aria-label="Cancelar cadastro">
                       <X size={16} />

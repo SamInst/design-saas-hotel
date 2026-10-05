@@ -261,6 +261,7 @@
 @media (prefers-reduced-motion: reduce) { .listItemNovo { animation: none; } }
 .listItemBody { flex: 1; min-width: 0; }
 .listItemName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.listItemName .nome { margin-right: auto; }
 /* mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground */
 .listItemLoc {
   display: flex; align-items: center; gap: 4px;
@@ -912,6 +913,8 @@
   margin:18px 0 4px;
 }
 .optTitle > svg { color:var(--l-primary); flex-shrink:0; }
+/* abre veículos, dependentes e empresa só enquanto a seção ainda está vazia */
+.optSep { border:0; height:1px; background:var(--l-border); margin:18px 0 4px; }
 
 /* ── Tabela dos itens já confirmados (veículos, dependentes) ──
    Mesma tabela do histórico de hospedagem, um pouco mais compacta e sem a
@@ -923,6 +926,13 @@
 .trEditando td { background:color-mix(in oklch, var(--l-primary) 7%, transparent); }
 .optTable tbody tr:last-child td { padding-bottom:0; }
 .tdAcoes { display:flex; align-items:center; justify-content:flex-end; gap:4px; }
+/* veículos e dependentes: só o ícone, sem a moldura, juntos logo depois da
+   última coluna — a coluna de ações fica com a sobra da largura */
+.optTable th:last-child, .optTable td:last-child { width:100%; }
+.acoesSemBorda { justify-content:flex-start; gap:0; }
+.acoesSemBorda .btnRemove { margin-left:0; }
+.acoesSemBorda .btnEdit, .acoesSemBorda .btnRemove { border-color:transparent; width:20px; height:24px; }
+.acoesSemBorda .btnEdit:hover, .acoesSemBorda .btnRemove:hover { border-color:transparent; background:transparent; }
 .optTag {
   display:inline-block; padding:2px 8px; border-radius:999px;
   background:var(--l-muted); color:var(--l-muted-fg);
@@ -979,7 +989,10 @@
 .btnGhost:hover { background:var(--l-secondary); color:var(--l-fg); }
 
 /* a busca de empresa fica na própria seção, logo abaixo do campo */
-.linkDropdownInline { position:static; margin-top:6px; box-shadow:none; }
+.linkDropdown.linkDropdownInline { position:static; margin-top:6px; box-shadow:none; }
+.empresaSearch { width:100%; max-width:440px; position:relative; }
+.linkDropdown.linkListbox { z-index:30; max-height:264px; overflow-y:auto; }
+.empresaBloco { margin-top:20px; }
 
 /* acrescentar mais um: embaixo e à esquerda dos campos da seção */
 .optAdd {
@@ -1223,8 +1236,6 @@
   background: rgba(16,185,129,.12); color: #10b981;
   border: 1px solid rgba(16,185,129,.25);
   white-space: nowrap; flex-shrink: 0;
-  /* encostado na direita da linha, longe do nome e das outras pílulas */
-  margin-left: auto;
 }
 
 /* ── Sort select ── */
@@ -1341,4 +1352,27 @@
   .hdDataItem + .hdDataItem, .hdContas > div + div { border-left: none; }
   .hdDatas > :nth-child(n+3), .hdContas > :nth-child(n+3) { border-top: 1px solid var(--l-border); }
   .hdDatas > :nth-child(2n), .hdContas > :nth-child(2n) { border-left: 1px solid var(--l-border); }
+}
+
+.cfBox { border:1px solid var(--l-border); border-radius:10px; overflow:hidden; }
+.cfCard + .cfCard { border-top:1px solid var(--l-border); }
+.cfTop { display:flex; gap:20px; padding:18px 20px; align-items:flex-start; }
+.cfTopBody { flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; }
+.cfNameRow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cfName { font-size:18px; font-weight:600; color:var(--l-fg); }
+.cfGrid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:4px 24px; }
+.cfRow { display:flex; gap:6px; font-size:12.5px; line-height:1.5; min-width:0; }
+.cfLabel { color:var(--l-fg); font-weight:500; white-space:nowrap; }
+.cfValue { color:var(--l-muted-fg); overflow-wrap:anywhere; font-size:12.5px; }
+.cfBottom {
+  display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px 24px;
+  padding:14px 20px; border-top:1px solid var(--l-border);
+}
+.cfCol { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.cfSec { display:flex; flex-direction:column; gap:2px; }
+.cfSec + .cfSec { margin-top:12px; }
+.cfSecTitle { font-size:13px; font-weight:700; color:var(--l-fg); margin-bottom:4px; }
+@media (max-width: 640px) {
+  .cfTop { flex-direction:column; align-items:center; }
+  .cfGrid, .cfBottom { grid-template-columns:1fr; }
 }
