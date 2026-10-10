@@ -6,7 +6,7 @@ import {
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
   X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Moon, Receipt, FileText,
-  Check, LayoutDashboard, UserPlus, Pencil,
+  Check, LayoutDashboard, UserPlus, Pencil, Sparkles, Mail, Download,
 } from 'lucide-react';
 
 import { Button }                   from '../../components/ui/Button';
@@ -17,15 +17,19 @@ import { cadastroApi, hospedagemApi, userStorage } from '../../services/api';
 import { usePermissions }           from '../../hooks/usePermissions';
 import iconWhatsapp from '../../assets/whatsapp.png';
 import iconGmail    from '../../assets/gmail.png';
-import imgHospedagens from '../../assets/historico/hospedagens.png';
-import imgDiarias     from '../../assets/historico/diarias.png';
-import imgValorTotal  from '../../assets/historico/valor-total.png';
+import imgUsuario     from '../../assets/avatar/usuario.png';
+import imgMasculino   from '../../assets/avatar/masculino.png';
+import imgFeminino    from '../../assets/avatar/feminino.png';
+import imgEmpresa     from '../../assets/avatar/empresa.png';
 // MOCK — campos que o back-end ainda não devolve. Ver registersMocks.js.
 import {
   mockCategoria, mockVinculoEmpresa,
 } from './registersMocks';
 
 import styles from './RegistersPage.module.css';
+
+// Teste: painel "Visão geral dos cadastros" desligado; os totais foram para a lista.
+const MOSTRAR_VISAO_GERAL = false;
 
 // ── Listas de veículos ────────────────────────────────────────
 const TIPOS_VEICULO = [
@@ -54,7 +58,6 @@ const slugVeiculo = v => (v ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, 
 const byFileSlug  = mods => Object.fromEntries(
   Object.entries(mods).map(([path, url]) => [path.split('/').pop().replace(/\.\w+$/, ''), url]),
 );
-const LOGOS_MARCA = byFileSlug(import.meta.glob('../../assets/veiculos/marcas/*.{png,svg}', { eager: true, import: 'default' }));
 const IMGS_TIPO   = byFileSlug(import.meta.glob('../../assets/veiculos/tipos/*.png', { eager: true, import: 'default' }));
 const tipoCanon   = t => TIPOS_VEICULO.find(x => slugVeiculo(x) === slugVeiculo(t)) ?? '';
 const tipoEnum    = t => slugVeiculo(tipoCanon(t)).replace(/-/g, '').toUpperCase() || null;
@@ -179,11 +182,6 @@ const cleanPlaca = v => (v ?? '').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
 const fmtPlaca   = v => { const c = cleanPlaca(v); return c.length > 3 ? `${c.slice(0, 3)}-${c.slice(3)}` : c; };
 
 // ── Avatar helpers ────────────────────────────────────────────
-// Círculo sólido com as iniciais em branco, no ciclo de cores das faixas do
-// calendário (bg-bar-*). A cor vem da posição na lista, como no protótipo.
-const AVATAR_TONES = ['avTeal', 'avAmber', 'avCoral', 'avIndigo', 'avSky', 'avEmerald'];
-const avatarTone = (i) => styles[AVATAR_TONES[((i % AVATAR_TONES.length) + AVATAR_TONES.length) % AVATAR_TONES.length]];
-
 const getInitials = (name) => {
   if (!name) return '?';
   const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
@@ -221,6 +219,9 @@ const fmtDataExtensa = (reg) => {
   return `${Number(d)} ${MESES_CURTOS[Number(m) - 1] ?? ''} ${y}`;
 };
 
+/** "18/04/2021 14:32" (ou ISO) → "14:32" */
+const horaDe = (reg) => (String(reg ?? '').match(/[T ](\d{2}:\d{2})/) ?? [])[1] ?? '';
+
 /** Cadastrado hoje — usado para o selo "Novo" na lista. */
 const isNovo = (item) => {
   const t = new Date();
@@ -246,12 +247,27 @@ const catTomClass = (tom) => ({
 }[tom] ?? styles.catRegular);
 
 // ── Smart search ──────────────────────────────────────────────
+/** Dígitos da busca com a máscara de CPF (até 11) ou de CNPJ (12 a 14). */
+const maskDocBusca = d => (d.length > 11 ? maskCNPJ(d) : maskCPF(d));
+
+/**
+ * Busca aceita só letras, números e espaços; se sobrar só número, aplica a máscara.
+ * Hóspedes buscam por nome, CPF ou placa: ali o número para no CPF (11 dígitos) e a placa ganha o hífen.
+ */
+const limparBusca = (v, hospedes = false) => {
+  const limpo = v.replace(/[^\p{L}\p{N} ]/gu, '').replace(/ {2,}/g, ' ').replace(/^ /, '');
+  // começo de placa (3 letras + dígito) → ABC-1234 / ABC-1D23; o hífen é só visual
+  if (hospedes && /^[A-Za-z]{3}\d[A-Za-z0-9]{0,3}$/.test(limpo)) return fmtPlaca(limpo);
+  if (!/^\d+$/.test(limpo)) return limpo;
+  return hospedes ? maskCPF(limpo) : maskDocBusca(limpo);
+};
+
 const buildSearchParams = raw => {
   const stripped = raw.replace(/[\s.,\-\/]/g,'').toUpperCase();
   if (!stripped) return {};
   if (/^[A-Z]{3}\d{4}$/.test(stripped) || /^[A-Z]{3}\d[A-Z]\d{2}$/.test(stripped)) return { placa: stripped };
+  // só números → a máscara fica só na tela; o back recebe os dígitos
   if (/^\d+$/.test(stripped)) {
-    if (stripped.length === 11) return { termo: stripped };
     if (stripped.length === 14) return { cnpj: stripped };
     return { termo: stripped };
   }
@@ -427,7 +443,7 @@ function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome })
   return (
     <div className={styles.cfCard}>
       <div className={styles.cfTop}>
-        <AvatarCircle name={pessoa.nome} size={64} tone={dependente ? 1 : 0} />
+        <AvatarCircle sexo={pessoa.sexo} size={64} />
         <div className={styles.cfTopBody}>
           <div className={styles.cfNameRow}>
             <span className={styles.cfName}>{pessoa.nome || '—'}</span>
@@ -441,7 +457,6 @@ function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome })
             <ConfirmRow label="RG"          value={pessoa.rg} />
             <ConfirmRow label="Gênero"      value={sexoLabel(pessoa.sexo)} />
             {dependente && <ConfirmRow label="Parentesco" value={pessoa.parentesco ? parentescoLabel(pessoa.parentesco) : ''} />}
-            <ConfirmRow label="Profissão"   value={pessoa.profissao} />
             {!usaTitular && <ConfirmRow label="Telefone" value={pessoa.telefone} />}
             {!usaTitular && <ConfirmRow label="Email"    value={pessoa.email} />}
           </div>
@@ -491,15 +506,15 @@ function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome })
 }
 
 // ── Utilitários visuais ───────────────────────────────────────
-// size-10 → 12px; size-14 → 16px; size-9 (dependentes) → 12px, em cinza.
-function AvatarCircle({ name, size = 40, tone = 0, muted = false, fontSize }) {
+// sexo 1 = masculino, 2 = feminino; sem sexo definido (ou "Outro") usa o avatar neutro
+function AvatarCircle({ empresa = false, sexo, size = 40 }) {
+  const img = empresa ? imgEmpresa
+    : Number(sexo) === 2 ? imgFeminino
+    : Number(sexo) === 1 ? imgMasculino
+    : imgUsuario;
   return (
-    <span
-      className={[styles.avatar, muted ? styles.avatarMuted : avatarTone(tone)].join(' ')}
-      style={{ width: size, height: size, fontSize: fontSize ?? (size >= 56 ? 16 : 12) }}
-    >
-      {getInitials(name)}
-    </span>
+    <img src={img} alt="" className={styles.avatar}
+      width={size} height={size} draggable={false} />
   );
 }
 
@@ -550,6 +565,31 @@ function SkeletonPainel() {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SkeletonHistorico({ linhas = 4 }) {
+  return (
+    <div className={styles.hScroll} role="status" aria-label="Carregando hospedagens">
+      <table className={styles.hTable} aria-hidden="true">
+        <thead><tr>
+          <th>Quarto</th><th>Período</th><th>Pessoas</th>
+          <th>Diárias</th><th>Total</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          {Array.from({ length: linhas }, (_, i) => (
+            <tr key={i}>
+              <td><span className={sk(styles.skCel)} style={{ width: 36 + ((i * 11) % 20) }} /></td>
+              <td><span className={sk(styles.skCel)} style={{ width: 150 }} /></td>
+              <td><span className={sk(styles.skCel)} style={{ width: 20 }} /></td>
+              <td><span className={sk(styles.skCel)} style={{ width: 20 }} /></td>
+              <td><span className={sk(styles.skCel)} style={{ width: 70 + ((i * 17) % 24) }} /></td>
+              <td><span className={sk(styles.skPill)} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -633,9 +673,6 @@ const STATUS_HOSPEDAGEM = {
 };
 const statusHosp = (s) => STATUS_HOSPEDAGEM[s] ?? { label: s ?? '—', tom: 'hStatusFinalizada' };
 
-// Canceladas e ausências ficam na lista, mas não entram nos totais.
-const foraDosTotais = (s) => /CANCELAD|AUSENTE/.test(s ?? '');
-
 /** "12/03/2025 14:00" → "12/03/2025" */
 const soData = (dh) => (dh ?? '').slice(0, 10);
 /** "12/03/2025 14:00" → "14:00" */
@@ -651,6 +688,37 @@ const quartosHosp = (h) => {
   return unicos.join(', ') || '—';
 };
 
+/** Quartos da hospedagem como objetos, sem repetir, na ordem das diárias. */
+const quartosObjHosp = (h) => {
+  const lista = (h.diarias ?? []).map(d => d.quarto).filter(q => q?.id);
+  const base  = lista.length ? lista : [h.quarto].filter(q => q?.id);
+  return base.filter((q, i) => base.findIndex(x => x.id === q.id) === i);
+};
+
+/** Relatório do histórico em CSV (";" e BOM, para o Excel abrir com acento). */
+const exportarHistoricoCSV = (lista, nomeArquivo) => {
+  const cel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
+  const linhas = [
+    ['Quarto', 'Check-in', 'Check-out', 'Pessoas', 'Diárias', 'Consumo', 'Total', 'Pago', 'Pendente', 'Status'],
+    ...lista.map(h => {
+      const c = contasHosp(h);
+      return [
+        quartosHosp(h), h.data_hora_checkin, h.data_hora_checkout,
+        (h.pessoas ?? []).length, h.quantidade_diarias ?? 0,
+        num(c.consumo), num(c.total), num(c.pago), num(c.pendente),
+        statusHosp(h.status).label,
+      ];
+    }),
+  ];
+  const csv  = '\uFEFF' + linhas.map(l => l.map(cel).join(';')).join('\r\n');
+  const url  = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  const a    = document.createElement('a');
+  a.href = url; a.download = nomeArquivo;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+};
+
 // Consumo: `valor` é o preço unitário; a linha vale valor × quantidade.
 const totalConsumo = (c) => (Number(c.valor) || 0) * (Number(c.quantidade) || 0);
 
@@ -664,17 +732,33 @@ const contasHosp = (h) => {
   return { consumo, total, pago, pendente: Math.max(0, total - pago) };
 };
 
-function HistoricoCard({ tipo, id }) {
+function HistoricoCard({ tipo, id, embutido = false }) {
   const [registros, setRegistros] = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [erro,      setErro]      = useState(false);
   const [busca,     setBusca]     = useState('');
   const [aberta,    setAberta]    = useState(null);
+  // filtro por status: guarda o rótulo, já que vários códigos viram o mesmo selo
+  const [statusFiltro, setStatusFiltro] = useState('');
+  const [menuStatus,   setMenuStatus]   = useState(false);
+  const menuStatusRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuStatus) return;
+    const onDown = e => { if (menuStatusRef.current && !menuStatusRef.current.contains(e.target)) setMenuStatus(false); };
+    const onKey  = e => { if (e.key === 'Escape') setMenuStatus(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuStatus]);
 
   useEffect(() => {
     if (!id) return;
     let vivo = true;
-    setLoading(true); setErro(false); setBusca(''); setAberta(null);
+    setLoading(true); setErro(false); setBusca(''); setAberta(null); setStatusFiltro('');
     (tipo === 'empresa' ? hospedagemApi.buscarPorEmpresa(id) : hospedagemApi.buscarPorPessoa(id))
       .then(res => { if (vivo) setRegistros(Array.isArray(res) ? res : []); })
       .catch(() => { if (vivo) { setRegistros([]); setErro(true); } })
@@ -682,73 +766,78 @@ function HistoricoCard({ tipo, id }) {
     return () => { vivo = false; };
   }, [tipo, id]);
 
-  const validas = registros.filter(h => !foraDosTotais(h.status));
-  const resumo = {
-    hospedagens: validas.length,
-    diarias:     validas.reduce((s, h) => s + (Number(h.quantidade_diarias) || 0), 0),
-    totalGasto:  validas.reduce((s, h) => s + contasHosp(h).total, 0),
-  };
 
   // quarto, datas (dd/mm/aaaa ou só parte, como "03/2025") ou status
   const termo = busca.trim().toLowerCase();
-  const filtrados = !termo ? registros : registros.filter(h =>
-    [quartosHosp(h), soData(h.data_hora_checkin), soData(h.data_hora_checkout), statusHosp(h.status).label]
-      .some(v => String(v ?? '').toLowerCase().includes(termo)),
+  const filtrados = registros.filter(h =>
+    (!statusFiltro || statusHosp(h.status).label === statusFiltro) &&
+    (!termo || [quartosHosp(h), soData(h.data_hora_checkin), soData(h.data_hora_checkout), statusHosp(h.status).label]
+      .some(v => String(v ?? '').toLowerCase().includes(termo))),
   );
 
-  return (
-    <section className={styles.dCard}>
-      <h3 className={styles.dCardHead}>
-        <CalendarDays size={16} />
-        <span className={styles.dCardTitle}>Histórico de hospedagem</span>
-      </h3>
-      <div className={styles.dCardBody}>
-        <div className={styles.miniStats}>
-          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
-            <img src={imgHospedagens} alt="" className={styles.statImg} />
-            <div>
-              <p className={styles.statLabel}>Hospedagens</p>
-              <p className={styles.statVal}>{loading ? '—' : pad2(resumo.hospedagens)}</p>
-            </div>
-          </div>
-          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
-            <img src={imgDiarias} alt="" className={styles.statImg} />
-            <div>
-              <p className={styles.statLabel}>Diárias</p>
-              <p className={styles.statVal}>{loading ? '—' : pad2(resumo.diarias)}</p>
-            </div>
-          </div>
-          <div className={[styles.statCard, styles.statCardIcon].join(' ')}>
-            <img src={imgValorTotal} alt="" className={styles.statImg} />
-            <div>
-              <p className={styles.statLabel}>Valor total investido</p>
-              <p className={styles.statVal}>{loading ? '—' : fmtBRL(resumo.totalGasto)}</p>
-            </div>
-          </div>
-        </div>
+  // só os status que aparecem no histórico, com a quantidade de cada um
+  const qtdStatus = registros.reduce((m, h) => {
+    const l = statusHosp(h.status).label;
+    m[l] = (m[l] ?? 0) + 1;
+    return m;
+  }, {});
 
+  const conteudo = (
+    <>
         {registros.length > 0 && (
-          <div className={[styles.searchWrap, styles.hBusca].join(' ')}>
-            <Search size={14} className={styles.searchIcon} />
-            <Input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por quarto, data ou status..."
-              className={styles.searchInput}
-              aria-label="Buscar no histórico"
-            />
-            {busca && (
-              <button type="button" className={styles.searchClear} onClick={() => setBusca('')} aria-label="Limpar busca">
-                <X size={14} />
+          <div className={[styles.searchRow, styles.hBusca].join(' ')}>
+            <div className={[styles.searchWrap, styles.hBuscaCampo].join(' ')}>
+              <Search size={14} className={styles.searchIcon} />
+              <Input
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                placeholder="Buscar por quarto, data ou status..."
+                className={styles.searchInput}
+                aria-label="Buscar no histórico"
+              />
+              {busca && (
+                <button type="button" className={styles.searchClear} onClick={() => setBusca('')} aria-label="Limpar busca">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className={styles.filterWrap} ref={menuStatusRef}>
+              <button type="button"
+                className={[styles.filterBtn, statusFiltro ? styles.filterBtnOn : ''].join(' ')}
+                onClick={() => setMenuStatus(v => !v)}
+                aria-haspopup="menu" aria-expanded={menuStatus}
+                title={`Filtrar por status — ${statusFiltro || 'Todos'}`}>
+                <FilterIcon size={18} />
+                {statusFiltro && <span className={styles.filterDot} />}
               </button>
-            )}
+
+              {menuStatus && (
+                <div className={styles.filterMenu} role="menu">
+                  <span className={styles.filterMenuLabel}>Status</span>
+                  {[['', 'Todos', registros.length], ...Object.entries(qtdStatus).map(([l, q]) => [l, l, q])].map(([val, label, qtd]) => (
+                    <button key={label} type="button" role="menuitem"
+                      className={[styles.filterMenuItem, statusFiltro === val ? styles.filterMenuItemOn : ''].join(' ')}
+                      onClick={() => { setStatusFiltro(val); setMenuStatus(false); }}>
+                      <span>{label}<span className={styles.filterMenuQtd}> ({qtd})</span></span>
+                      {statusFiltro === val && <Check size={14} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Button className={styles.btnSolid}
+              onClick={() => exportarHistoricoCSV(filtrados, `historico-hospedagens-${tipo}-${id}.csv`)}
+              disabled={filtrados.length === 0}
+              title="Exportar relatório das hospedagens listadas">
+              <Download size={14} /> Exportar
+            </Button>
           </div>
         )}
 
         {loading ? (
-          <div className={styles.empty}>
-            <Loader2 size={22} className={styles.spinInline} /><span>Carregando hospedagens...</span>
-          </div>
+          <SkeletonHistorico />
         ) : erro ? (
           <div className={styles.empty}>
             <AlertCircle size={24} opacity={0.3} /><span>Não foi possível carregar o histórico.</span>
@@ -766,22 +855,34 @@ function HistoricoCard({ tipo, id }) {
             <table className={styles.hTable}>
               <thead><tr>
                 <th>Quarto</th><th>Período</th><th>Pessoas</th>
-                <th>Diárias</th><th>Total</th><th>Status</th>
+                <th>Diárias</th><th>Total</th><th>Status</th><th aria-label="Abrir" />
               </tr></thead>
               <tbody>
                 {filtrados.map(h => {
                   const st = statusHosp(h.status);
+                  const qs = quartosObjHosp(h);
                   return (
                     <tr key={h.id} className={styles.hRow} tabIndex={0} role="button"
                       title="Ver detalhes da hospedagem"
                       onClick={() => setAberta(h)}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAberta(h); } }}>
-                      <td><span className={styles.hQuarto}>{quartosHosp(h)}</span></td>
+                      <td>
+                        <span className={styles.hQuartoCel}>
+                          <span className={styles.hQuartoNum}><BedDouble size={14} /></span>
+                          <span className={styles.hQuartoTxt}>
+                            <span className={styles.hQuartoDesc}>
+                              {qs.length > 1 ? `Quartos ${qs.map(q => q.id).join(', ')}` : qs[0] ? `Quarto ${qs[0].id}` : '—'}
+                            </span>
+                            {qs[0]?.descricao && <span className={styles.hQuartoSub}>{qs[0].descricao}</span>}
+                          </span>
+                        </span>
+                      </td>
                       <td><span className={styles.hPeriodo}>{soData(h.data_hora_checkin)} <ArrowRight size={13} className={styles.hSeta} /> {soData(h.data_hora_checkout)}</span></td>
                       <td>{pad2((h.pessoas ?? []).length)}</td>
                       <td>{pad2(h.quantidade_diarias)}</td>
                       <td className={styles.hTotal}>{fmtBRL(contasHosp(h).total)}</td>
-                      <td><span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span></td>
+                      <td><span className={[styles.hStatus, styles.hStatusDot, styles[st.tom]].join(' ')}>{st.label}</span></td>
+                      <td className={styles.hChevron}><ChevRight size={16} /></td>
                     </tr>
                   );
                 })}
@@ -789,9 +890,21 @@ function HistoricoCard({ tipo, id }) {
             </table>
           </div>
         )}
-      </div>
 
       <HospedagemDetalheModal hospedagem={aberta} onClose={() => setAberta(null)} />
+    </>
+  );
+
+  // dentro da ficha do hóspede vira o conteúdo de uma aba, sem cartão próprio
+  if (embutido) return conteudo;
+
+  return (
+    <section className={styles.dCard}>
+      <h3 className={styles.dCardHead}>
+        <CalendarDays size={16} />
+        <span className={styles.dCardTitle}>Histórico de hospedagem</span>
+      </h3>
+      <div className={styles.dCardBody}>{conteudo}</div>
     </section>
   );
 }
@@ -1165,33 +1278,31 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         </div>
 
         <div className={styles.photoRightCol}>
-          <div className={styles.photoFields}>
-            {/* Row 1: CPF | Nome | Data de Nascimento */}
-            <div className={styles.cpfBlock}>
-              <label className={[styles.fieldLabel, hasErr('cpf') && !cpfStatus ? styles.labelErr : ''].join(' ')}>
-                CPF *
-              </label>
-              <div className={styles.cpfWrap}>
-                <Input
-                  value={data.cpf}
-                  onChange={e => handleCPF(e.target.value)}
-                  placeholder="000.000.000-00"
-                  className={cpfInputCls}
-                />
-                {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
-              </div>
+          <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
+            <FormField label="Nome completo *">
+              <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
+            </FormField>
+          </div>
+
+          <div className={styles.gridFix}>
+            <div className={[styles.cpfBlock, hasErr('cpf') && !cpfStatus ? styles.reqFieldErr : ''].join(' ')}>
+              <FormField label="CPF *">
+                <div className={styles.cpfWrap}>
+                  <Input
+                    value={data.cpf}
+                    onChange={e => handleCPF(e.target.value)}
+                    placeholder="000.000.000-00"
+                    className={cpfInputCls}
+                  />
+                  {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
+                </div>
+              </FormField>
               {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>CPF inválido</span>}
               {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>CPF já cadastrado</span>}
               {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>CPF disponível</span>}
             </div>
 
-            <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-              <FormField label="Nome completo *">
-                <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
-              </FormField>
-            </div>
-
-            <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')} style={{ width: 150 }}>
+            <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
               <FormField label="Data de Nascimento *">
                 <DateMaskInput
                   value={data.dataNascimento}
@@ -1199,10 +1310,11 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                 />
               </FormField>
             </div>
-          </div>
-
-          {/* Row 2: Telefone | Sexo | RG */}
-          <div className={styles.grid3}>
+            <FormField label="Sexo">
+              <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
+                {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </Select>
+            </FormField>
             <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
               <FormField label="Telefone *">
                 <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" disabled={useTitularTel} />
@@ -1214,20 +1326,15 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                 </label>
               )}
             </div>
-            <FormField label="Sexo">
-              <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
-                {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </Select>
-            </FormField>
-            <FormField label="RG">
-              <Input value={data.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
-            </FormField>
           </div>
 
         </div>
       </div>
 
-      <div className={styles.grid2}>
+      <div className={styles.rgEmailRow}>
+        <FormField label="RG">
+          <Input value={data.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
+        </FormField>
         <div>
           <FormField label="Email">
             <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" disabled={useTitularEmail} />
@@ -1239,60 +1346,55 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
             </label>
           )}
         </div>
-        <FormField label="Profissão">
-          <Input value={data.profissao ?? ''} onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
-        </FormField>
       </div>
 
-      {/* ── Endereço (sem título separador) ── */}
-      {/* o endereço não tem título próprio, então um respiro marca a virada */}
-      <div className={styles.formGap} aria-hidden="true" />
-      {titular && (
-        <div className={styles.sectionDividerRow}>
+      {/* ── Endereço ── */}
+      <div className={styles.sectionDividerRow} style={{ marginTop: 10 }}>
+        <div className={styles.sectionDivider}><MapPin size={12} /> Endereço</div>
+        {titular && (
           <label className={styles.useTitularRow} style={{ marginBottom: 0 }}>
             <input type="checkbox" checked={useTitularEnd} onChange={e => toggleTitularEnd(e.target.checked)} />
             <span>Usar endereço do titular</span>
           </label>
-        </div>
-      )}
+        )}
+      </div>
 
-      <div className={styles.grid3}>
+      <div className={styles.addrRow1}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
-          <label className={[styles.fieldLabel, hasErr('cep') ? styles.labelErr : ''].join(' ')}>CEP *</label>
-          <div className={styles.inputWithSpinner}>
-            <Input value={data.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
-              className={hasErr('cep') ? styles.inputErr : ''} disabled={useTitularEnd} />
-            {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
-          </div>
+          <FormField label="CEP *">
+            <div className={styles.inputWithSpinner}>
+              <Input value={data.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
+                className={hasErr('cep') ? styles.inputErr : ''} disabled={useTitularEnd} />
+              {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
+            </div>
+          </FormField>
         </div>
-        <FormField label="País">
-          <Input value={data.pais} onChange={e => set('pais', e.target.value)} placeholder="Brasil" />
+        <FormField label="Endereço">
+          <Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
+        </FormField>
+        <FormField label="Número">
+          <Input value={data.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
+        </FormField>
+      </div>
+      <div className={styles.addrRow2}>
+        <FormField label="Bairro">
+          <Input value={data.bairro} onChange={e => set('bairro', e.target.value)} />
+        </FormField>
+        <FormField label="Município">
+          <Input value={data.municipio} onChange={e => set('municipio', e.target.value)} />
         </FormField>
         <FormField label="Estado">
           <Input value={data.estado} onChange={e => set('estado', e.target.value)} placeholder="UF" />
         </FormField>
       </div>
-      <div className={styles.grid2}>
-        <FormField label="Município">
-          <Input value={data.municipio} onChange={e => set('municipio', e.target.value)} />
+      <div className={styles.addrRow3}>
+        <FormField label="País">
+          <Input value={data.pais} onChange={e => set('pais', e.target.value)} placeholder="Brasil" />
         </FormField>
-        <FormField label="Bairro">
-          <Input value={data.bairro} onChange={e => set('bairro', e.target.value)} />
-        </FormField>
-      </div>
-      <div className={styles.grid3}>
-        <div className={styles.spanTwo}>
-          <FormField label="Endereço">
-            <Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
-          </FormField>
-        </div>
-        <FormField label="Número">
-          <Input value={data.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
+        <FormField label="Complemento">
+          <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
         </FormField>
       </div>
-      <FormField label="Complemento">
-        <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
-      </FormField>
 
       {opcoes}
 
@@ -1410,7 +1512,7 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
   const cpfRuim = cpfRaw.length === 11 && !validarCPF(cpfRaw);
 
   return (
-    <div className={styles.optItem}>
+    <div className={[styles.optItem, styles.formBody].join(' ')}>
       <div className={styles.optItemHead} style={{ marginBottom: 6 }}>
         {index != null && <span>{`Editando dependente ${index + 1}`}</span>}
         <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: index == null ? 0 : 'auto' }}>
@@ -1423,8 +1525,13 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
         </label>
       </div>
 
-      {usarTitular ? (
-        <div className={styles.grid3}>
+      {usarTitular ? (<>
+        <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
+          <FormField label="Nome completo *">
+            <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
+          </FormField>
+        </div>
+        <div className={styles.gridFix}>
           <div className={[styles.reqField, hasErr('cpf') ? styles.reqFieldErr : ''].join(' ')}>
             <FormField label="CPF *">
               <Input
@@ -1435,11 +1542,6 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
               />
             </FormField>
             {cpfRuim && <span className={styles.cpfMsg} style={{ color: '#ef4444' }}>CPF inválido</span>}
-          </div>
-          <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-            <FormField label="Nome completo *">
-              <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
-            </FormField>
           </div>
           <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
             <FormField label="Data de Nascimento *">
@@ -1457,7 +1559,7 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
             </Select>
           </FormField>
         </div>
-      ) : (
+      </>) : (
         <>
           {/* o PessoaForm já traz o Sexo; o parentesco é só do dependente */}
           <div className={styles.grid3}>
@@ -1626,12 +1728,18 @@ export default function RegistersPage() {
   const [depEdit, setDepEdit] = useState(null);
   const [depErr,  setDepErr]  = useState(false);
 
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = e => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
   const [showAddPessoa,  setShowAddPessoa]  = useState(false);
   const [showAddEmpresa, setShowAddEmpresa] = useState(false);
   const [showEdit,       setShowEdit]       = useState(false);
   const [detailItem,     setDetailItem]     = useState(null);
   const [detailType,     setDetailType]     = useState('pessoa');
-  const [detailTone,     setDetailTone]     = useState(0);
 
   // menu do botão de filtro (ao lado da busca)
   const [statusMenu,  setStatusMenu]  = useState(false);
@@ -1640,6 +1748,8 @@ export default function RegistersPage() {
   // painel geral, exibido enquanto nenhum cadastro está selecionado
   const [stats,        setStats]        = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  // aba aberta na ficha do hóspede: dados | dependentes | empresa | veiculos | historico
+  const [abaFicha, setAbaFicha] = useState('dados');
   const [editMode,       setEditMode]       = useState(false);
 
   // forms
@@ -1681,7 +1791,6 @@ export default function RegistersPage() {
 
   // novo dependente (criar + vincular)
   const [showNewDep,      setShowNewDep]      = useState(false);
-  const [showLinkEmpresa, setShowLinkEmpresa] = useState(false);
   const [newDepData,   setNewDepData]   = useState(blankPessoa());
   const [savingNewDep, setSavingNewDep] = useState(false);
 
@@ -1693,7 +1802,10 @@ export default function RegistersPage() {
   const fetchCEP = async (cep, setter) => {
     const raw = unmask(cep);
     if (raw.length !== 8) return;
-    const d = await cadastroApi.buscarCEP(raw);
+    let d;
+    try { d = await cadastroApi.buscarCEP(raw); }
+    catch { showNotif('CEP não encontrado.', 'error'); return; }
+    if (!d) { showNotif('CEP não encontrado.', 'error'); return; }
     // O back-end pode devolver estado/municipio/pais como string ("MARANHÃO")
     // ou como objeto ({ descricao: "MARANHÃO" }). Normaliza os dois formatos.
     const desc = v => (v && typeof v === 'object' ? v.descricao : v) || '';
@@ -1706,6 +1818,8 @@ export default function RegistersPage() {
       estado:      desc(d.estado)    || prev.estado,
       municipio:   desc(d.municipio) || prev.municipio,
     }));
+    if (d.endereco || desc(d.municipio)) showNotif('CEP encontrado!');
+    else showNotif('CEP não encontrado.', 'error');
   };
 
   const fetchCNPJ = async (cnpj) => {
@@ -1745,8 +1859,9 @@ export default function RegistersPage() {
       let res;
       if (mode === 'empresas' || sp.cnpj) {
         const params = { ...base };
-        if (sp.cnpj)       params.cnpj  = sp.cnpj;
-        else if (sp.termo) params.termo = sp.termo;
+        // o back só tem `termo`; com só dígitos ele compara pelo CNPJ
+        const termo = sp.cnpj ?? sp.termo;
+        if (termo) params.termo = termo;
         res = await cadastroApi.listarEmpresas(params);
         setItems((res?.content ?? []).map(e => ({ ...e, _type: 'empresa' })));
       } else {
@@ -1909,7 +2024,8 @@ export default function RegistersPage() {
     finally { setSavingNewDep(false); }
   };
 
-  const handleVincularDependente = async pessoaId => {
+  const handleVincularDependente = async (pessoaId, nome) => {
+    if (!window.confirm(`Vincular ${nome || 'esta pessoa'} como dependente de ${detailItem.nome || 'este hóspede'}?`)) return;
     try {
       await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: pessoaId }, vinculo: true });
       showNotif('Dependente vinculado!');
@@ -1927,7 +2043,8 @@ export default function RegistersPage() {
     } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
   };
 
-  const handleVincularEmpresa = async empresaId => {
+  const handleVincularEmpresa = async (empresaId, nome) => {
+    if (!window.confirm(`Vincular ${detailItem.nome || 'este hóspede'} à empresa ${nome || 'selecionada'}?`)) return;
     try {
       await cadastroApi.vincularPessoa({ empresa: { id: empresaId }, pessoa: { id: detailItem.id }, ativo: true });
       showNotif('Empresa vinculada!');
@@ -2209,16 +2326,35 @@ export default function RegistersPage() {
     finally { setIsSubmitting(false); }
   };
 
-  // `tone` mantém o avatar do detalhe na mesma cor do item da lista.
-  const openDetail = (item, tone = 0) => {
+  const openDetail = (item) => {
+    // um cadastro aberto na direita sai da frente; se já tinha algo digitado, pergunta antes
+    if (formAtivo) {
+      const pessoaDigitada = [titular.nome, titular.cpf, titular.telefone, titular.email, titular.rg,
+        titular.cep, titular.endereco, titular.dataNascimento].some(Boolean)
+        || (titular.veiculos?.length ?? 0) > 0 || dependentes.length > 0;
+      const empresaDigitada = !editMode && [empresa.cnpj, empresa.razaoSocial, empresa.nomeFantasia].some(Boolean);
+      const sujo = formAtivo === 'pessoa-nova' ? pessoaDigitada
+        : formAtivo === 'empresa' ? empresaDigitada
+        : true;
+      const msg = formAtivo === 'pessoa-edit' || (formAtivo === 'empresa' && editMode)
+        ? 'Deseja descartar as alterações em andamento?'
+        : 'Deseja descartar o cadastro em andamento?';
+      if (sujo && !window.confirm(msg)) return;
+      setShowAddPessoa(false); setShowErrors(false); setConfirmStep(false);
+      setTitular(blankPessoa()); setDependentes([]);
+      setDepEdit(null); setDepErr(false);
+      setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+      setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
+      setShowEdit(false);
+      setShowAddEmpresa(false); setEditMode(false); setEmpresa(blankEmpresa());
+    }
     setDetailItem(item);
-    setDetailTone(tone);
     setDetailType(item._type === 'empresa' ? 'empresa' : 'pessoa');
+    setAbaFicha('dados');
     // limpa as buscas de vínculo do registro anterior
     setVinculSearch(''); setVinculResults([]);
     setEmpSearch('');    setEmpSearchResults([]);
     setDepSearch('');    setDepSearchResults([]);
-    setShowLinkEmpresa(false);
   };
 
   const closeDetail = () => setDetailItem(null);
@@ -2278,6 +2414,8 @@ export default function RegistersPage() {
   ];
   const isEmpresasTab = filterMode === 'empresas';
   const filtroAtual = statusFilters.find(f => f.id === filterMode) ?? statusFilters[0];
+  // quantidade de cada status, mostrada entre parênteses no menu do filtro
+  const qtdFiltro = { todos: stats?.pessoas ?? 0, hospedados: stats?.hospedados ?? 0, bloqueados: stats?.bloqueados ?? 0 };
 
   const vinculadosList   = detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? [];
   const veiculosList     = detailItem?.veiculos_vinculados ?? detailItem?.veiculos ?? [];
@@ -2300,6 +2438,7 @@ export default function RegistersPage() {
 
   // Data de cadastro no formato "18 Abr 2021" usado no subtítulo do detalhe.
   const cadastradoEm = fmtDataExtensa(detailItem?.data_hora_registro) || '—';
+  const horaRegistro = horaDe(detailItem?.data_hora_registro);
 
   // ── Campos que o back-end ainda não devolve. // MOCK ──
   // Derivados do id (valores estáveis, mas fictícios). Ver registersMocks.js.
@@ -2311,6 +2450,11 @@ export default function RegistersPage() {
     : showEdit ? 'pessoa-edit'
     : showAddEmpresa ? 'empresa'
     : null;
+
+  // Teste: no desktop, sem ficha aberta, o cadastro da aba atual já fica aberto
+  // na coluna da direita. ROLLBACK: trocar `formAtivo` por `formMode` no render.
+  const formAtivo = formMode
+    ?? (!detailItem && isDesktop ? (isEmpresasTab ? 'empresa' : 'pessoa-nova') : null);
 
   // As três caixas do fim do cadastro. Marcar abre a seção correspondente;
   // desmarcar descarta o que estava preenchido, para não salvar escondido.
@@ -2356,10 +2500,6 @@ export default function RegistersPage() {
               ))}
             </div>
             <div className={styles.formFoot}>
-              <span className={styles.personCount}>
-                <Users size={13} />
-                {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-              </span>
               <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                 onClick={doSavePessoa} disabled={isSubmitting}>
@@ -2415,7 +2555,7 @@ export default function RegistersPage() {
                           <tr key={i} className={depEdit?.index === i ? styles.trEditando : ''}>
                             <td>
                               <span className={styles.hQuarto}>
-                                <AvatarCircle name={dep.nome || `D${i + 1}`} size={24} tone={i + 1} fontSize={10} />
+                                <AvatarCircle sexo={dep.sexo} size={24} />
                                 {dep.nome || `Dependente ${i + 1}`}
                               </span>
                             </td>
@@ -2534,10 +2674,6 @@ export default function RegistersPage() {
 
             {/* ── Fim do cadastro ── */}
             <div className={styles.formFoot}>
-              <span className={styles.personCount}>
-                <Users size={13} />
-                {1 + dependentes.length} pessoa{(1 + dependentes.length) !== 1 ? 's' : ''}
-              </span>
               <Button className={styles.btnSolid}
                 onClick={() => setTitular(blankPessoa())}>Limpar</Button>
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
@@ -2558,165 +2694,16 @@ export default function RegistersPage() {
         <main className={[styles.split, (detailItem || formMode) ? styles.splitListHidden : ''].join(' ')}>
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
-          <aside className={styles.listPanel}>
-            {/* Hóspedes / Empresas */}
-            <div className={styles.segmented}>
-              <button type="button"
-                className={[styles.segmentedBtn, !isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
-                onClick={() => changeFilter('todos')}>
-                Hóspedes
-              </button>
-              <button type="button"
-                className={[styles.segmentedBtn, isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
-                onClick={() => changeFilter('empresas')}>
-                Empresas
-              </button>
-            </div>
-
-            {/* Busca + filtro de status */}
-            <div className={styles.searchRow}>
-              <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
-                <Search size={16} className={styles.searchIcon} />
-                <Input
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  placeholder={isEmpresasTab ? 'Buscar razão social ou CNPJ...' : 'Buscar por nome, CPF ou e-mail...'}
-                  className={styles.searchInput}
-                  aria-label="Buscar"
-                />
-                {loading && searchTerm.length >= 3
-                  ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
-                  : searchTerm.length > 0 &&
-                    <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
-                      <X size={14} />
-                    </button>
-                }
-              </div>
-
-              {!isEmpresasTab && (
-                <div className={styles.filterWrap} ref={statusMenuRef}>
-                  <button type="button"
-                    className={[styles.filterBtn, filterMode !== 'todos' ? styles.filterBtnOn : ''].join(' ')}
-                    onClick={() => setStatusMenu(v => !v)}
-                    aria-haspopup="menu" aria-expanded={statusMenu}
-                    title={`Filtrar por status — ${filtroAtual.label}`}>
-                    <FilterIcon size={18} />
-                    {filterMode !== 'todos' && <span className={styles.filterDot} />}
-                  </button>
-
-                  {statusMenu && (
-                    <div className={styles.filterMenu} role="menu">
-                      <span className={styles.filterMenuLabel}>Status</span>
-                      {statusFilters.map(({ id, label }) => (
-                        <button key={id} type="button" role="menuitem"
-                          className={[styles.filterMenuItem, filterMode === id ? styles.filterMenuItemOn : ''].join(' ')}
-                          onClick={() => { changeFilter(id); setStatusMenu(false); }}>
-                          {label}
-                          {filterMode === id && <Check size={14} />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className={styles.listMeta}>
-              <span>
-                {loading
-                  ? 'Carregando...'
-                  : `${totalElements} ${isEmpresasTab
-                      ? `empresa${totalElements !== 1 ? 's' : ''}`
-                      : `hóspede${totalElements !== 1 ? 's' : ''}`}`}
-                {!isEmpresasTab && filterMode !== 'todos' && ` · ${filtroAtual.label}`}
-              </span>
-              {!isEmpresasTab && (
-                <select
-                  className={styles.sortSelect}
-                  value={`${ordenacao}|${direcao}`}
-                  onChange={e => { const [ord, dir] = e.target.value.split('|'); changeSort(ord, dir); }}
-                  aria-label="Ordenação"
-                >
-                  <option value="DATA_CADASTRO|DESC">Mais recentes</option>
-                  <option value="DATA_CADASTRO|ASC">Mais antigos</option>
-                  <option value="NOME|ASC">Nome A→Z</option>
-                  <option value="NOME|DESC">Nome Z→A</option>
-                </select>
-              )}
-            </div>
-
-            <div className={styles.listScroll}>
-              {loading ? (
-                <SkeletonLista />
-              ) : items.length === 0 ? (
-                <div className={styles.empty}>
-                  <AlertCircle size={24} opacity={0.3} />
-                  <span>Nenhum resultado encontrado.</span>
-                </div>
-              ) : items.map((item, i) => {
-                const name  = nomeListing(item);
-                const ativo = detailItem?.id === item.id && detailItem?._type === item._type;
-                // acabou de ser cadastrado nesta sessão → entra animado
-                const doc = unmask(item.cpf ?? item.cnpj ?? '');
-                const recemCriado = !!doc && recemCriados.has(doc);
-                const local = [item.municipio, item.estado].filter(Boolean).join('/');
-                return (
-                  <button key={`${item._type}-${item.id}`} type="button"
-                    className={[
-                      styles.listItem,
-                      ativo ? styles.listItemActive : '',
-                      recemCriado ? styles.listItemNovo : '',
-                    ].join(' ')}
-                    onClick={() => openDetail(item, i)}>
-                    <AvatarCircle name={name} size={40} tone={i} />
-                    <span className={styles.listItemBody}>
-                      <span className={styles.listItemName}>
-                        <span className={styles.nome}>{name}</span>
-                        {item.status === 'BLOQUEADO' && <span className={styles.badgeBloqueado}>Bloqueado</span>}
-                        {item.status === 'HOSPEDADO' && <span className={styles.badgeHospedado}>Hospedado</span>}
-                        {isNovo(item) && <span className={styles.badgeNovo}>Novo</span>}
-                      </span>
-                      {local && (
-                        <span className={styles.listItemLoc}>
-                          <MapPin size={12} /> {local}
-                        </span>
-                      )}
-                    </span>
-                    <ChevRight size={16} className={styles.listChevron} />
-                  </button>
-                );
-              })}
-            </div>
-
-            {totalPages > 1 && (
-              <div className={styles.pagination}>
-                <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}
-                  aria-label="Página anterior">
-                  <ChevronLeft size={16} />
-                </button>
-                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
-                <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}
-                  aria-label="Próxima página">
-                  <ChevRight size={16} />
-                </button>
-              </div>
-            )}
-          </aside>
-
-          {/* ══ DETALHE ═════════════════════════════════════════ */}
-          {/* Os formulários ocupam o painel no lugar da ficha — antes abriam
-              em modal. Quem manda são os mesmos estados de antes, só que
-              agora lidos aqui em vez de alimentarem um <Modal>. */}
-          <div className={styles.detailCol}>
-            {/* Visão geral fixa no topo; a ficha ou o formulário rolam embaixo dela.
-                Abaixo de 1024px só aparece quando nada está aberto. */}
+          <div className={styles.listCol}>
+            {/* ROLLBACK (teste): visão geral desligada — trocar MOSTRAR_VISAO_GERAL para true. */}
+            {MOSTRAR_VISAO_GERAL && (
             <div className={[styles.overviewFixed, (detailItem || formMode) ? styles.overviewSecundaria : ''].join(' ')}>
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <LayoutDashboard size={16} />
                   <span className={styles.dCardTitle}>Visão geral dos cadastros</span>
-                  {/* cada aba mostra o seu cadastro */}
-                  {canCadastrar && (
+                  {/* cada aba mostra o seu cadastro; some quando o formulário já está aberto */}
+                  {canCadastrar && !formAtivo && (
                     <div className={styles.dCardActions}>
                       {isEmpresasTab ? (
                         <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
@@ -2762,38 +2749,225 @@ export default function RegistersPage() {
                       );
                     })()}
 
+                    {/* ROLLBACK (teste): as bolinhas antes de cada rótulo e o total de empresas
+                        estão comentados abaixo — é só descomentar para voltar. */}
                     <div className={styles.statLine}>
                       <span className={styles.statItem}>
-                        <i className={[styles.statDot, styles.dotTotal].join(' ')} />
+                        {/* <i className={[styles.statDot, styles.dotTotal].join(' ')} /> */}
                         <span className={styles.statItemLabel}>Cadastrados</span>
                         <span className={styles.statItemVal}>{stats.pessoas}</span>
                       </span>
                       <span className={styles.statItem}>
-                        <i className={[styles.statDot, styles.distHosp].join(' ')} />
+                        {/* <i className={[styles.statDot, styles.distHosp].join(' ')} /> */}
                         <span className={styles.statItemLabel}>Hospedados</span>
                         <span className={[styles.statItemVal, styles.statValGreen].join(' ')}>{stats.hospedados}</span>
                       </span>
                       <span className={styles.statItem}>
-                        <i className={[styles.statDot, styles.distBloq].join(' ')} />
+                        {/* <i className={[styles.statDot, styles.distBloq].join(' ')} /> */}
                         <span className={styles.statItemLabel}>Bloqueados</span>
                         <span className={[styles.statItemVal, styles.statValRed].join(' ')}>{stats.bloqueados}</span>
                       </span>
-                      <span className={styles.statItem}>
+                      {/* <span className={styles.statItem}>
                         <i className={[styles.statDot, styles.dotEmpresa].join(' ')} />
                         <span className={styles.statItemLabel}>Empresas</span>
                         <span className={styles.statItemVal}>{stats.empresas}</span>
-                      </span>
+                      </span> */}
                     </div>
                     </>
                   )}
                 </div>
               </section>
             </div>
+            )}
 
-          {formMode === 'pessoa-nova' ? (
+          <aside className={styles.listPanel}>
+            {/* Hóspedes / Empresas — e o cadastro, que antes ficava na visão geral;
+                some quando o formulário já está aberto na direita */}
+            <div className={styles.listTopo}>
+            <div className={styles.segmented}>
+              <button type="button"
+                className={[styles.segmentedBtn, !isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
+                onClick={() => changeFilter('todos')}>
+                Hóspedes
+              </button>
+              <button type="button"
+                className={[styles.segmentedBtn, isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
+                onClick={() => changeFilter('empresas')}>
+                Empresas
+              </button>
+            </div>
+            {canCadastrar && !formAtivo && (
+              <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                onClick={() => {
+                  if (isEmpresasTab) { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); return; }
+                  setTitular(blankPessoa()); setDependentes([]);
+                  setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
+                  setShowErrors(false);
+                  setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
+                  setShowAddPessoa(true);
+                }}>
+                Cadastrar
+              </Button>
+            )}
+            </div>
+
+            {/* Busca + filtro de status */}
+            <div className={styles.searchRow}>
+              <div className={[styles.searchWrap, styles.searchWrapFull, searchTerm ? styles.searchAtiva : ''].join(' ')}>
+                <Search size={16} className={styles.searchIcon} />
+                <Input
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(limparBusca(e.target.value, !isEmpresasTab))}
+                  placeholder={isEmpresasTab ? 'Buscar razão social ou CNPJ...' : 'Buscar por nome, CPF ou placa...'}
+                  className={styles.searchInput}
+                  aria-label="Buscar"
+                />
+                {loading && searchTerm.length >= 3
+                  ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
+                  : searchTerm.length > 0 &&
+                    <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                      <X size={14} />
+                    </button>
+                }
+              </div>
+
+              {!isEmpresasTab && (
+                <div className={styles.filterWrap} ref={statusMenuRef}>
+                  <button type="button"
+                    className={[styles.filterBtn, filterMode !== 'todos' ? styles.filterBtnOn : ''].join(' ')}
+                    onClick={() => setStatusMenu(v => !v)}
+                    aria-haspopup="menu" aria-expanded={statusMenu}
+                    title={`Filtrar por status — ${filtroAtual.label}`}>
+                    <FilterIcon size={18} />
+                    {filterMode !== 'todos' && <span className={styles.filterDot} />}
+                  </button>
+
+                  {statusMenu && (
+                    <div className={styles.filterMenu} role="menu">
+                      <span className={styles.filterMenuLabel}>Status</span>
+                      {statusFilters.map(({ id, label }) => (
+                        <button key={id} type="button" role="menuitem"
+                          className={[styles.filterMenuItem, filterMode === id ? styles.filterMenuItemOn : ''].join(' ')}
+                          onClick={() => { changeFilter(id); setStatusMenu(false); }}>
+                          <span>{label}{stats && <span className={styles.filterMenuQtd}> ({qtdFiltro[id]})</span>}</span>
+                          {filterMode === id && <Check size={14} />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* filtro de status aplicado, com o x que volta para "todos" */}
+            {!isEmpresasTab && filterMode !== 'todos' && (
+              <div className={styles.filtroChips}>
+                <span className={styles.filtroChip}>
+                  <span className={styles.filtroChipRot}>Status:</span> {filtroAtual.label}
+                  <button type="button" className={styles.filtroChipX}
+                    onClick={() => changeFilter('todos')}
+                    title="Remover filtro" aria-label={`Remover filtro ${filtroAtual.label}`}>
+                    <X size={12} />
+                  </button>
+                </span>
+              </div>
+            )}
+
+            <div className={styles.listMeta}>
+              <span>
+                {loading
+                  ? 'Carregando...'
+                  : `${totalElements} ${isEmpresasTab
+                      ? `empresa${totalElements !== 1 ? 's' : ''}`
+                      : `hóspede${totalElements !== 1 ? 's' : ''}`}`}
+                {!loading && !isEmpresasTab && stats && ` · ${stats.hospedados} hospedado${stats.hospedados !== 1 ? 's' : ''}`}
+              </span>
+              {!isEmpresasTab && (
+                <select
+                  className={styles.sortSelect}
+                  value={`${ordenacao}|${direcao}`}
+                  onChange={e => { const [ord, dir] = e.target.value.split('|'); changeSort(ord, dir); }}
+                  aria-label="Ordenação"
+                >
+                  <option value="DATA_CADASTRO|DESC">Mais recentes</option>
+                  <option value="DATA_CADASTRO|ASC">Mais antigos</option>
+                  <option value="NOME|ASC">Nome A→Z</option>
+                  <option value="NOME|DESC">Nome Z→A</option>
+                </select>
+              )}
+            </div>
+
+            <div className={styles.listScroll}>
+              {loading ? (
+                <SkeletonLista />
+              ) : items.length === 0 ? (
+                <div className={styles.empty}>
+                  <AlertCircle size={24} opacity={0.3} />
+                  <span>Nenhum resultado encontrado.</span>
+                </div>
+              ) : items.map((item, i) => {
+                const name  = nomeListing(item);
+                const ativo = detailItem?.id === item.id && detailItem?._type === item._type;
+                // acabou de ser cadastrado nesta sessão → entra animado
+                const doc = unmask(item.cpf ?? item.cnpj ?? '');
+                const recemCriado = !!doc && recemCriados.has(doc);
+                const local = [item.municipio, item.estado].filter(Boolean).join('/');
+                return (
+                  <button key={`${item._type}-${item.id}`} type="button"
+                    className={[
+                      styles.listItem,
+                      ativo ? styles.listItemActive : '',
+                      recemCriado ? styles.listItemNovo : '',
+                    ].join(' ')}
+                    onClick={() => openDetail(item)}>
+                    <AvatarCircle empresa={item._type === 'empresa'} sexo={item.sexo} size={40} />
+                    <span className={styles.listItemBody}>
+                      <span className={styles.listItemName}>
+                        <span className={styles.nome}>{name}</span>
+                        {item.status === 'BLOQUEADO' && <span className={styles.badgeBloqueado}>Bloqueado</span>}
+                        {item.status === 'HOSPEDADO' && <span className={styles.badgeHospedado}>Hospedado</span>}
+                        {isNovo(item) && <span className={styles.badgeNovo}>Novo</span>}
+                      </span>
+                      {local && (
+                        <span className={styles.listItemLoc}>
+                          <MapPin size={12} /> {local}
+                        </span>
+                      )}
+                    </span>
+                    <ChevRight size={16} className={styles.listChevron} />
+                  </button>
+                );
+              })}
+            </div>
+
+            {totalPages > 1 && (
+              <div className={styles.pagination}>
+                <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}
+                  aria-label="Página anterior">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}
+                  aria-label="Próxima página">
+                  <ChevRight size={16} />
+                </button>
+              </div>
+            )}
+          </aside>
+          </div>
+
+          {/* ══ DETALHE ═════════════════════════════════════════ */}
+          {/* Os formulários ocupam o painel no lugar da ficha — antes abriam
+              em modal. Quem manda são os mesmos estados de antes, só que
+              agora lidos aqui em vez de alimentarem um <Modal>. */}
+          <div className={styles.detailCol}>
+            {/* ROLLBACK (teste): a visão geral ficava aqui, no topo desta coluna. Para voltar,
+                mova o bloco "Visão geral" de dentro do .listCol para cá e desfaça o .listCol. */}
+
+          {formAtivo === 'pessoa-nova' ? (
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
+                <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn} onClick={cancelAddPessoa}
                     title="Voltar para a lista" aria-label="Voltar para a lista">
                     <ChevronLeft size={17} />
@@ -2802,21 +2976,15 @@ export default function RegistersPage() {
                   <span className={styles.dCardTitle}>
                     {confirmStep ? 'Revisar Dados' : 'Novo hóspede'}
                   </span>
-                  <div className={styles.dCardActions}>
-                    <button type="button" className={styles.idClose} onClick={cancelAddPessoa}
-                      title="Cancelar cadastro" aria-label="Cancelar cadastro">
-                      <X size={16} />
-                    </button>
-                  </div>
                 </h3>
                 <div className={styles.dCardBody}>{addPessoaBody}</div>
               </section>
             </div>
 
-          ) : formMode === 'pessoa-edit' ? (
+          ) : formAtivo === 'pessoa-edit' ? (
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
+                <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
                     title="Voltar" aria-label="Voltar">
                     <ChevronLeft size={17} />
@@ -2843,12 +3011,12 @@ export default function RegistersPage() {
               </section>
             </div>
 
-          ) : formMode === 'empresa' ? (
+          ) : formAtivo === 'empresa' ? (
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
+                <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn}
-                    onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                    onClick={() => { setShowAddEmpresa(false); setEditMode(false); setEmpresa(blankEmpresa()); }}
                     title="Voltar" aria-label="Voltar">
                     <ChevronLeft size={17} />
                   </button>
@@ -2856,7 +3024,7 @@ export default function RegistersPage() {
                   <span className={styles.dCardTitle}>{editMode ? 'Editar empresa' : 'Nova empresa'}</span>
                   <div className={styles.dCardActions}>
                     <button type="button" className={styles.idClose}
-                      onClick={() => { setShowAddEmpresa(false); setEditMode(false); }}
+                      onClick={() => { setShowAddEmpresa(false); setEditMode(false); setEmpresa(blankEmpresa()); }}
                       title="Cancelar" aria-label="Cancelar">
                       <X size={16} />
                     </button>
@@ -2879,20 +3047,20 @@ export default function RegistersPage() {
           : detailType === 'pessoa' ? (
             <div className={styles.detailPanel}>
 
-              {/* ── Dados de cadastro (inclui veículos e empresa) ── */}
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
+              {/* ── Ficha do hóspede: dados, dependentes, empresa, veículos e histórico ── */}
+              <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+                <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
                   {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
                     title="Voltar para a lista" aria-label="Voltar para a lista">
                     <ChevronLeft size={17} />
                   </button>
                   <Contact size={16} />
-                  <span className={styles.dCardTitle}>Dados de cadastro</span>
+                  <span className={styles.dCardTitle}>Ficha do hóspede</span>
                   <div className={styles.dCardActions}>
-                    {isBloqueado && (
-                      <span className={styles.blockedNotice}>Bloqueado</span>
-                    )}
+                    <span className={[styles.fichaStatus, isBloqueado ? styles.fichaStatusBloq : ''].join(' ')}>
+                      {isBloqueado ? 'Cadastro bloqueado' : 'Cadastro ativo'}
+                    </span>
                     {canAtualizar && (
                       <Button className={styles.btnSolid} onClick={() => openEditPessoa(detailItem)} disabled={isBloqueado}>
                         Editar
@@ -2912,178 +3080,51 @@ export default function RegistersPage() {
                   </div>
                 </h3>
 
-                <div className={styles.dCardBody}>
-                  <div className={styles.idHead}>
-                    <AvatarCircle name={detailItem.nome} size={56} tone={detailTone} />
+                <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
+                  <div className={styles.fichaTopo}>
+                  <div className={styles.fichaId}>
+                    <AvatarCircle sexo={detailItem.sexo} size={72} />
                     <div className={styles.idHeadMain}>
-                      <div className={styles.idName}>
-                        <h2 style={{ margin: 0, font: 'inherit' }}>{detailItem.nome ?? '—'}</h2>
+                      <h2 className={styles.fichaNome}>{detailItem.nome ?? '—'}</h2>
+                      <p className={styles.fichaSub}>
+                        <span>Cliente desde {cadastradoEm}</span>
+                        {detailItem.titularNome && <><span aria-hidden="true">·</span><span>Dep. de {detailItem.titularNome}</span></>}
+                        <span aria-hidden="true">·</span>
                         {/* MOCK — categoria de fidelidade */}
-                        <span className={[styles.catBadge, catTomClass(categoria.tom)].join(' ')}>{categoria.nome}</span>
-                      </div>
-                      <p className={styles.idSub}>
-                        Cliente desde {cadastradoEm}
-                        {detailItem.titularNome && ` · Dep. de ${detailItem.titularNome}`}
+                        <span className={[styles.fichaCat, catTomClass(categoria.tom)].join(' ')}>
+                          <Sparkles size={12} /> {categoria.nome}
+                        </span>
                       </p>
-                      <p className={styles.idSub}>
-                        Registrado por: {detailItem.funcionario?.nome || '—'}
+                      <p className={styles.fichaSub}>
+                        {/* sem funcionário = veio do site de autocadastro */}
+                        {detailItem.funcionario?.nome
+                          ? `Registrado por ${detailItem.funcionario.nome}`
+                          : 'Autocadastro feito'}
+                        {horaRegistro && ` às ${horaRegistro}`}
                       </p>
                     </div>
-
                   </div>
 
-                  <div className={styles.fieldGrid}>
-                    <Field label="CPF" value={maskCPF(detailItem.cpf ?? '')} mono />
-                    <Field label="Data de nascimento" value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
-                    <Field label="E-mail" value={detailItem.email ? (
-                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title="Enviar e-mail">
-                        {detailItem.email}
-                      </ContatoBotao>
-                    ) : ''} />
-                    <Field label="Telefone" value={detailItem.telefone ? (
-                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title="WhatsApp">
-                        {maskPhone(detailItem.telefone)}
-                      </ContatoBotao>
-                    ) : ''} />
-                    <Field label="Endereço" value={[
-                      [detailItem.endereco, detailItem.numero].filter(Boolean).join(', '),
-                      detailItem.bairro,
-                    ].filter(Boolean).join(' — ')} />
-                    <Field label="Cidade / UF" value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
-                    <Field label="Nacionalidade" value={nacionalidade(detailItem.pais)} />
-                    <Field label="Categoria" value={categoria.nome} />
-                    <Field label="RG" value={detailItem.rg} mono />
-                    <Field label="Profissão" value={detailItem.profissao} />
-                    <Field label="Sexo" value={sexoLabel(detailItem.sexo)} />
-                    <Field label="CEP" value={maskCEP(detailItem.cep ?? '')} mono />
+                  <div className={styles.fichaTabs} role="tablist">
+                    {[
+                      ['dados', 'Dados cadastrais'],
+                      ...(detailItem.titularId == null ? [['dependentes', 'Dependentes']] : []),
+                      ['empresa', 'Empresa'],
+                      ['veiculos', 'Veículos'],
+                      ...(canHistorico ? [['historico', 'Histórico de Hospedagem']] : []),
+                    ].map(([k, label]) => (
+                      <button key={k} type="button" role="tab" aria-selected={abaFicha === k}
+                        className={[styles.fichaTab, abaFicha === k ? styles.fichaTabAtiva : ''].join(' ')}
+                        onClick={() => setAbaFicha(k)}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   </div>
 
-                  {/* ── Veículos ── */}
-                  <div className={styles.subBlock}>
-                    <div className={styles.blockHead}>
-                      <Car size={15} />
-                      <span>Veículos</span>
-                    </div>
-                    {veiculosList.length === 0 ? (
-                      <p className={styles.blockEmpty}>Sem veículos cadastrados.</p>
-                    ) : (
-                      <ul className={styles.vList}>
-                        {veiculosList.map((v, i) => (
-                          <li key={v.id ?? i} className={styles.vRow}>
-                            <img className={styles.vTipoImg} src={imgTipo(v.tipo, v.codigo_cor ?? codigoCor(v.cor))} alt={tipoCanon(v.tipo) || 'Veículo'} />
-                            <div className={styles.vInfo}>
-                              <p className={styles.vModelo}>
-                                {[v.marca, v.modelo].filter(Boolean).join(' ') || '—'}
-                              </p>
-                              <p className={styles.vMeta}>
-                                {[
-                                  tipoCanon(v.tipo) || null,
-                                  v.cor || null,
-                                  Number(v.ano) ? `Ano ${v.ano}` : null,
-                                ].filter(Boolean).join(' · ') || '—'}
-                              </p>
-                            </div>
-                            {LOGOS_MARCA[slugVeiculo(v.marca)] && (
-                              <img className={styles.vMarcaLogo} src={LOGOS_MARCA[slugVeiculo(v.marca)]} alt={v.marca} />
-                            )}
-                            <PlacaMercosul placa={v.placa} />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {/* ── Empresa ── */}
-                  <div className={styles.subBlock}>
-                    <div className={styles.blockHead}>
-                      <Building2 size={15} />
-                      <span>Empresa</span>
-                      {/* com a busca aberta vira "Cancelar", que fecha e descarta a busca */}
-                      <Button className={[styles.btnSolid, styles.btnSm, showLinkEmpresa ? styles.btnDanger : ''].join(' ')}
-                        onClick={() => {
-                          if (showLinkEmpresa) { setEmpSearch(''); setEmpSearchResults([]); }
-                          setShowLinkEmpresa(v => !v);
-                        }}>
-                        {showLinkEmpresa ? 'Cancelar' : 'Vincular'}
-                      </Button>
-                    </div>
-
-                    {showLinkEmpresa && (
-                      <div className={styles.linkEmpresaSearch} style={{ marginBottom: 14 }}>
-                        <div className={styles.searchWrap}>
-                          <Search size={13} className={styles.searchIcon} />
-                          <Input value={empSearch} onChange={e => setEmpSearch(e.target.value)}
-                            placeholder="Buscar empresa para vincular..." className={styles.searchInput} />
-                          {empSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
-                        </div>
-                        {(empSearchLoading || empSearchResults.length > 0) && (
-                          <div className={styles.linkDropdown}>
-                            {empSearchLoading ? <SkeletonVinculo /> : empSearchResults.map(emp => {
-                              const jaVinculado = empresasList.some(ev => ev.id === emp.id);
-                              return (
-                                <button key={emp.id}
-                                  className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
-                                  onClick={() => { if (!jaVinculado) handleVincularEmpresa(emp.id); }}
-                                  disabled={jaVinculado}>
-                                  <Building2 size={14} className={styles.iconViolet} />
-                                  <span className={styles.nome}>{empresaLabel(emp)}</span>
-                                  <span className={styles.mono}>{maskCNPJ(emp.cnpj ?? '')}</span>
-                                  {jaVinculado
-                                    ? <span className={styles.jaVinculadoBadge}>Já vinculada</span>
-                                    : <span className={styles.vincularHint}>Vincular</span>}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {empresasList.length === 0 ? (
-                      <p className={styles.blockEmpty}>Sem empresas vinculadas.</p>
-                    ) : empresasList.map((e, i) => {
-                      /* MOCK — cargo, faturamento e contato financeiro */
-                      const vinculo = mockVinculoEmpresa(detailItem.id, e.id);
-                      return (
-                        <div key={e.id} className={styles.fieldGridEmpresa}
-                          style={i > 0 ? { marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--l-border)' } : undefined}>
-                          <Field label="Razão social" value={e.razaoSocial ?? e.razao_social} />
-                          <Field label="CNPJ" value={maskCNPJ(e.cnpj ?? '')} mono />
-                          <Field label="Cargo" value={vinculo.cargo} />
-                          <Field label="Faturamento" value={vinculo.faturamento} />
-                          <Field label="Contato financeiro" value={e.email || vinculo.contatoFinanceiro} />
-                          <Field label="Vínculo" value={
-                            <button className={styles.btnRemove} onClick={() => handleDesvincularEmpresa(e.id)}
-                              title="Desvincular" style={{ marginLeft: 0 }}>
-                              <Trash2 size={13} />
-                            </button>
-                          } />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </section>
-
-              {/* ── Histórico de hospedagem ── */}
-              {canHistorico && <HistoricoCard tipo="pessoa" id={detailItem.id} />}
-
-              {/* ── Dependentes ── */}
-              {detailItem.titularId == null && (
-                <section className={styles.dCard}>
-                  <h3 className={styles.dCardHead}>
-                    <Users size={16} />
-                    <span className={styles.dCardTitle}>Dependentes</span>
-                    <div className={styles.dCardActions}>
-                      <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(" ")}
-                        onClick={() => { setNewDepData(blankPessoa()); setShowNewDep(true); }}>
-                        Novo
-                      </Button>
-                    </div>
-                  </h3>
-
-                  <div className={styles.dCardBody}>
-                    <div className={styles.linkEmpresaSearch} style={{ marginBottom: 16 }}>
+                  {abaFicha === 'dependentes' && detailItem.titularId == null ? (<>
+                  <div className={styles.fichaTabBar}>
+                    <div className={[styles.linkEmpresaSearch, styles.fichaTabBusca].join(' ')}>
                       <div className={styles.searchWrap}>
                         <Search size={13} className={styles.searchIcon} />
                         <Input value={depSearch} onChange={e => setDepSearch(e.target.value)}
@@ -3097,9 +3138,9 @@ export default function RegistersPage() {
                             return (
                               <button key={p.id}
                                 className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
-                                onClick={() => { if (!jaVinculado) handleVincularDependente(p.id); }}
+                                onClick={() => { if (!jaVinculado) handleVincularDependente(p.id, p.nome); }}
                                 disabled={jaVinculado}>
-                                <AvatarCircle name={p.nome} size={24} muted />
+                                <AvatarCircle sexo={p.sexo} size={24} />
                                 <span className={styles.nome}>{p.nome}</span>
                                 <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
                                 {jaVinculado
@@ -3111,28 +3152,158 @@ export default function RegistersPage() {
                         </div>
                       )}
                     </div>
-
-                    {dependentesList.length === 0 ? (
-                      <p className={styles.blockEmpty}>Sem dependentes vinculados.</p>
-                    ) : (
-                      <ul className={styles.dList}>
-                        {dependentesList.map(dep => (
-                          <li key={dep.id} className={styles.depCard}>
-                            <AvatarCircle name={dep.nome} size={36} muted />
-                            <div className={styles.depCardBody} onClick={() => openDetail({ ...dep, _type: 'pessoa' })}>
-                              <p className={styles.nome}>{dep.nome}</p>
-                              <p className={styles.sub}>{maskCPF(dep.cpf ?? '')} · {dep.status}</p>
-                            </div>
-                            <button className={styles.btnRemove} onClick={() => handleDesvincularDependente(dep.id)} title="Desvincular">
-                              <Trash2 size={13} />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
                   </div>
-                </section>
-              )}
+
+                  {dependentesList.length === 0 ? (
+                    <p className={styles.blockEmpty}>Sem dependentes vinculados.</p>
+                  ) : (
+                    <ul className={styles.dList}>
+                      {dependentesList.map(dep => (
+                        <li key={dep.id} className={styles.depCard}>
+                          <button className={[styles.btnRemove, styles.btnRemoveSolto].join(' ')}
+                            onClick={() => handleDesvincularDependente(dep.id)} title="Desvincular" aria-label="Desvincular dependente">
+                            <Trash2 size={15} />
+                          </button>
+                          <AvatarCircle sexo={dep.sexo} size={36} />
+                          <div className={styles.depCardBody} onClick={() => openDetail({ ...dep, _type: 'pessoa' })}>
+                            <p className={styles.nome}>{dep.nome}</p>
+                            <p className={styles.sub}>{maskCPF(dep.cpf ?? '')} · {dep.status}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  </>) : abaFicha === 'historico' && canHistorico ? (
+                    <HistoricoCard tipo="pessoa" id={detailItem.id} embutido />
+                  ) : abaFicha === 'empresa' ? (<>
+                  <div className={styles.fichaTabBar}>
+                    <div className={[styles.linkEmpresaSearch, styles.fichaTabBusca].join(' ')}>
+                      <div className={styles.searchWrap}>
+                        <Search size={13} className={styles.searchIcon} />
+                        <Input value={empSearch} onChange={e => setEmpSearch(e.target.value)}
+                          placeholder="Buscar empresa para vincular..." className={styles.searchInput} />
+                        {empSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
+                      </div>
+                      {(empSearchLoading || empSearchResults.length > 0) && (
+                        <div className={styles.linkDropdown}>
+                          {empSearchLoading ? <SkeletonVinculo /> : empSearchResults.map(emp => {
+                            const jaVinculado = empresasList.some(ev => ev.id === emp.id);
+                            return (
+                              <button key={emp.id}
+                                className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
+                                onClick={() => { if (!jaVinculado) handleVincularEmpresa(emp.id, empresaLabel(emp)); }}
+                                disabled={jaVinculado}>
+                                <Building2 size={14} className={styles.iconViolet} />
+                                <span className={styles.nome}>{empresaLabel(emp)}</span>
+                                <span className={styles.mono}>{maskCNPJ(emp.cnpj ?? '')}</span>
+                                {jaVinculado
+                                  ? <span className={styles.jaVinculadoBadge}>Já vinculada</span>
+                                  : <span className={styles.vincularHint}>Vincular</span>}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {empresasList.length === 0 ? (
+                    <p className={styles.blockEmpty}>Sem empresas vinculadas.</p>
+                  ) : (
+                    <div className={styles.hScroll}>
+                      <table className={styles.hTable}>
+                        <thead><tr>
+                          <th aria-label="Desvincular" />
+                          <th>Razão social</th><th>CNPJ</th><th>Contato financeiro</th>
+                        </tr></thead>
+                        <tbody>
+                          {empresasList.map(e => {
+                            /* MOCK — contato financeiro quando a empresa não tem e-mail */
+                            const vinculo = mockVinculoEmpresa(detailItem.id, e.id);
+                            return (
+                              <tr key={e.id}>
+                                <td className={styles.tdAcao}>
+                                  <button className={[styles.btnRemove, styles.btnRemoveSolto].join(' ')}
+                                    onClick={() => handleDesvincularEmpresa(e.id)} title="Desvincular" aria-label="Desvincular empresa">
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                                <td className={styles.hTotal}>{e.razaoSocial ?? e.razao_social ?? '—'}</td>
+                                <td className={styles.mono}>{maskCNPJ(e.cnpj ?? '') || '—'}</td>
+                                <td>{e.email || vinculo.contatoFinanceiro || '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  </>) : abaFicha === 'veiculos' ? (<>
+                  {veiculosList.length === 0 ? (
+                    <p className={styles.blockEmpty}>Sem veículos cadastrados.</p>
+                  ) : (
+                    <ul className={styles.vList}>
+                      {veiculosList.map((v, i) => (
+                        <li key={v.id ?? i} className={styles.vRow}>
+                          <img className={styles.vTipoImg} src={imgTipo(v.tipo, v.codigo_cor ?? codigoCor(v.cor))} alt={tipoCanon(v.tipo) || 'Veículo'} />
+                          <div className={styles.vInfo}>
+                            <p className={styles.vModelo}>
+                              {[v.marca, v.modelo].filter(Boolean).join(' ') || '—'}
+                            </p>
+                            <p className={styles.vMeta}>
+                              {[
+                                tipoCanon(v.tipo) || null,
+                                v.cor || null,
+                                Number(v.ano) ? `Ano ${v.ano}` : null,
+                              ].filter(Boolean).join(' · ') || '—'}
+                            </p>
+                          </div>
+                          <PlacaMercosul placa={v.placa} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  </>) : (<>
+                  <div className={styles.fieldGrid}>
+                    <Field label="CPF" value={maskCPF(detailItem.cpf ?? '')} mono />
+                    <Field label="RG" value={detailItem.rg} mono />
+                    <Field label="Data de nascimento" value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
+                    <Field label="Sexo" value={sexoLabel(detailItem.sexo)} />
+                    <Field label="Nacionalidade" value={nacionalidade(detailItem.pais)} />
+                    <Field label="Profissão" value={detailItem.profissao} />
+                  </div>
+
+                  <div className={styles.dadosGrupoSep}>
+                    <div className={styles.dadosHead}><Mail size={16} /><span>Contato</span></div>
+                    <div className={styles.fieldGrid}>
+                      <Field label="E-mail" value={detailItem.email ? (
+                        <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title="Enviar e-mail">
+                          {detailItem.email}
+                        </ContatoBotao>
+                      ) : ''} />
+                      <Field label="Telefone" value={detailItem.telefone ? (
+                        <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title="WhatsApp">
+                          {maskPhone(detailItem.telefone)}
+                        </ContatoBotao>
+                      ) : ''} />
+                    </div>
+                  </div>
+
+                  <div className={styles.dadosGrupoSep}>
+                    <div className={styles.dadosHead}><MapPin size={16} /><span>Endereço</span></div>
+                    <div className={styles.fieldGrid}>
+                      <Field label="Endereço" value={[
+                        [detailItem.endereco, detailItem.numero].filter(Boolean).join(', '),
+                        detailItem.bairro,
+                      ].filter(Boolean).join(' — ')} />
+                      <Field label="Cidade / UF" value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
+                      <Field label="CEP" value={maskCEP(detailItem.cep ?? '')} mono />
+                    </div>
+                  </div>
+                  </>)}
+                </div>
+              </section>
+
             </div>
           ) : (
             /* ══ DETALHE — EMPRESA ═════════════════════════════ */
@@ -3163,7 +3334,7 @@ export default function RegistersPage() {
 
                 <div className={styles.dCardBody}>
                   <div className={styles.idHead}>
-                    <AvatarCircle name={nomeListing(detailItem)} size={56} tone={detailTone} />
+                    <AvatarCircle empresa size={56} />
                     <div className={styles.idHeadMain}>
                       <div className={styles.idName}>
                         <h2 style={{ margin: 0, font: 'inherit' }}>
@@ -3231,7 +3402,7 @@ export default function RegistersPage() {
                               className={[styles.linkDropdownItem, jaVinculado ? styles.linkDropdownItemLinked : ''].join(' ')}
                               onClick={() => { if (!jaVinculado) { handleVincular(p.id); setVinculSearch(''); setVinculResults([]); } }}
                               disabled={jaVinculado}>
-                              <AvatarCircle name={p.nome} size={24} muted />
+                              <AvatarCircle sexo={p.sexo} size={24} />
                               <span className={styles.nome}>{p.nome}</span>
                               <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
                               {jaVinculado
@@ -3250,7 +3421,7 @@ export default function RegistersPage() {
                     <ul className={styles.dList}>
                       {vinculadosList.map(p => (
                         <li key={p.id} className={styles.depCard}>
-                          <AvatarCircle name={p.nome} size={36} muted />
+                          <AvatarCircle sexo={p.sexo} size={36} />
                           <div className={styles.depCardBody} onClick={() => openDetail({ ...p, _type: 'pessoa' })}>
                             <p className={styles.nome}>{p.nome}</p>
                             <p className={styles.sub}>{maskCPF(p.cpf ?? '')}</p>

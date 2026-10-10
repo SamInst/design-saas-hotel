@@ -4,10 +4,10 @@
    e ficam no escopo da página para não afetar as outras telas.
    Escalas seguem o Tailwind do protótipo: 1=4px … 6=24px;
    text-xs=12px, text-sm=14px, text-base=16px, text-lg=18px, text-xl=20px;
-   radius 0.75rem → md 10px, lg 12px, xl 16px.
+   radius 0.5rem → md 6px, lg 8px, xl 10px (menos arredondado que o protótipo).
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.988 0.003 250);
+  --l-bg:            oklch(0.955 0.01 255);   /* fundo cinza-azulado: destaca os cartões brancos */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
   --l-muted:         oklch(0.965 0.008 255);
@@ -37,10 +37,10 @@
   --l-emerald-bg: oklch(0.95 0.052 163.051);
   --l-emerald-fg: oklch(0.432 0.095 166.913);
 
-  --l-radius: 0.75rem;                       /* 12px */
-  --l-r-md: calc(var(--l-radius) - 2px);     /* 10px */
-  --l-r-lg: var(--l-radius);                 /* 12px */
-  --l-r-xl: calc(var(--l-radius) + 4px);     /* 16px */
+  --l-radius: 0.5rem;                        /* 8px */
+  --l-r-md: calc(var(--l-radius) - 2px);     /* 6px */
+  --l-r-lg: var(--l-radius);                 /* 8px */
+  --l-r-xl: calc(var(--l-radius) + 2px);     /* 10px */
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* O <main> do AppLayout tem padding 18px 22px; a margem negativa faz o fundo
@@ -84,7 +84,7 @@
 .split {
   flex: 1; min-height: 0;
   width: 100%;
-  display: grid; gap: 20px;
+  display: grid; gap: 12px;
   grid-template-columns: minmax(0, 1fr);
   overflow-y: auto;
   /* recuo superior menor: o conteúdo começa logo abaixo do cabeçalho */
@@ -93,6 +93,7 @@
 @media (min-width: 1024px) {
   .split {
     grid-template-columns: 400px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     align-items: start;
     overflow: hidden;
   }
@@ -108,7 +109,16 @@
   padding: 16px;
   box-shadow: var(--l-shadow);
 }
-@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+/* Teste: coluna da esquerda com a visão geral em cima e a lista embaixo.
+   ROLLBACK: apagar o .listCol e voltar a regra comentada do .listPanel. */
+.listCol { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+/* desktop: a coluna ocupa a altura toda da tela e a lista preenche o resto,
+   sem encolher quando a busca traz poucos resultados — quem rola é o .listScroll */
+/* @media (min-width: 1024px) { .listPanel { height: 100%; align-self: stretch; } } */
+@media (min-width: 1024px) {
+  .listCol   { height: 100%; align-self: stretch; }
+  .listPanel { flex: 1 1 auto; min-height: 0; }
+}
 
 /* Alternador Hóspedes / Empresas — sem preenchimento, só a moldura sobre o
    cartão; quem marca a aba ativa é a pílula do .segmentedBtnActive. */
@@ -135,7 +145,7 @@
 /* Busca — relative mt-3 / input h-10 rounded-lg border pl-9 pr-3 text-sm */
 .searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
 .searchWrapFull { min-width: 0; width: 100%; margin-top: 12px; }
-.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchIcon     { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
 .searchInput    { padding-left: 36px !important; }
 .searchWrapFull .searchInput {
   height: 40px; width: 100%;
@@ -172,6 +182,11 @@
 /* Busca + botão de filtro, lado a lado */
 .searchRow { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .searchRow .searchWrapFull { margin-top: 0; flex: 1; }
+/* busca preenchida: borda e lupa em tom de destaque, para ver que ela está filtrando a lista */
+.searchAtiva .searchInput {
+  border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border)) !important;
+}
+.searchAtiva .searchIcon { color: var(--l-primary); }
 
 .filterWrap { position: relative; flex-shrink: 0; }
 /* Só o ícone: sem fundo, sem borda. */
@@ -217,6 +232,9 @@
 .listMeta {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   margin-top: 12px;
+  /* mesmo recuo do item da lista (12px + 1px de borda): o total fica na linha
+     da lupa da busca e das fotos */
+  padding: 0 13px;
   font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
 }
 
@@ -301,20 +319,10 @@
   background: color-mix(in oklch, var(--l-destructive) 88%, black); color: var(--l-primary-fg);
 }
 
-/* ── Avatares (bg-bar-* / text-bar-foreground) ── */
+/* ── Avatares ── */
 .avatar {
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; flex-shrink: 0;
-  font-weight: 700; color: var(--l-bar-fg);
+  display: block; flex-shrink: 0; object-fit: contain;
 }
-.avTeal    { background: var(--l-bar-teal);    }
-.avAmber   { background: var(--l-bar-amber);   }
-.avCoral   { background: var(--l-bar-coral);   }
-.avIndigo  { background: var(--l-bar-indigo);  }
-.avSky     { background: var(--l-bar-sky);     }
-.avEmerald { background: var(--l-bar-emerald); }
-/* dependentes: size-9 rounded-full bg-secondary text-secondary-foreground */
-.avatarMuted { background: var(--l-secondary); color: var(--l-secondary-fg); }
 
 /* ── Texto compartilhado ── */
 .nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -385,6 +393,9 @@
 .skLabel    { width: 58%; height: 10px; }
 .skNumero   { width: 46%; height: 22px; margin-top: 8px; }
 .skBarra    { width: 100%; height: 8px; border-radius: 999px; }
+.skStatVal  { height: 24px; margin-top: 3px; }
+.skCel      { height: 12px; margin: 4px 0; }
+.skPill     { width: 78px; height: 24px; border-radius: 999px; }
 
 /* ── Empty / loading ── */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; }
@@ -395,11 +406,11 @@
    div.space-y-4 com sections rounded-xl border bg-card p-5 shadow-sm */
 .detailPanel {
   min-height: 0;
-  display: flex; flex-direction: column; gap: 16px;
+  display: flex; flex-direction: column; gap: 12px;
 }
 .detailCol {
   min-height: 0;
-  display: flex; flex-direction: column; gap: 16px;
+  display: flex; flex-direction: column; gap: 12px;
 }
 .overviewFixed { flex-shrink: 0; }
 @media (min-width: 1024px) {
@@ -419,7 +430,7 @@
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
 }
-.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
 .dCardTitle { font-weight: 700; }
 .dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .dCardBody { margin-top: 16px; }
@@ -464,9 +475,6 @@
 .fieldGrid { display: grid; gap: 16px 24px; }
 @media (min-width: 640px)  { .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .fieldGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-/* empresa: grid gap-3 sm:grid-cols-2 */
-.fieldGridEmpresa { display: grid; gap: 12px; }
-@media (min-width: 640px) { .fieldGridEmpresa { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* `fieldLabel` já existe nos formulários desta página (caixa alta, 10.5px);
    os campos do painel de detalhe usam nomes próprios para não colidir. */
@@ -477,9 +485,11 @@
 /* Veículos — ul space-y-2.5 / li flex flex-wrap items-center justify-between gap-x-3 gap-y-1 */
 .vList { display: flex; flex-direction: column; gap: 10px; }
 .vRow  { display: flex; align-items: center; gap: 12px; }
-.vInfo { flex: 1; min-width: 0; }
+/* sem flex: 1 — a placa fica logo ao lado do modelo, não empurrada para a direita */
+.vInfo { min-width: 0; margin-right: 8px; }
+/* celular: a linha é estreita, então a placa vai para a direita */
+@media (max-width: 639.98px) { .vInfo { flex: 1; } }
 .vTipoImg { width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
-.vMarcaLogo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
 .vModelo { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vMeta   { font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
 /* Placa Mercosul em miniatura — faixa azul "BRASIL" + caracteres pretos */
@@ -562,7 +572,7 @@
   margin-bottom: 14px;
   font-size: 13px; font-weight: 700; color: var(--l-fg);
 }
-.blockHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.blockHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
 .blockHead > button:last-child { margin-left: auto; }
 .blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
 
@@ -645,7 +655,8 @@
    empilhados — é de onde saem os botões de cadastro. */
 @media (max-width: 1023px) {
   .splitListHidden .listPanel { display: none; }
-  .split { padding: 8px 16px 16px; gap: 16px; }
+  .listCol { order: 2; }
+  .split { padding: 8px 16px 16px; gap: 12px; }
   /* Empilhado, o painel geral vem primeiro: é dele que saem os botões de
      cadastro, que não podem ficar depois de uma lista inteira. */
   .detailCol   { order: 1; }
@@ -732,7 +743,7 @@
 
 /* ── Veículo row (existing, in KV sections) ── */
 .veiculoRow { display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:8px; background:var(--surface-2); font-size:12px; color:var(--text); margin-bottom:4px; flex-wrap:wrap; }
-.iconViolet { color:var(--l-primary); flex-shrink:0; }
+.iconViolet { color:var(--l-muted-fg); flex-shrink:0; }
 .iconMuted  { color:var(--text-2); flex-shrink:0; margin-left:auto; }
 
 
@@ -755,6 +766,8 @@
   flex-shrink:0; margin-left:auto;
 }
 .btnRemove:hover { background:color-mix(in oklch, var(--l-destructive) 10%, transparent); border-color:var(--l-destructive); color:var(--l-destructive); }
+/* sem contorno e no começo da linha (dependentes e empresas vinculadas) */
+.btnRemoveSolto { border:none; margin-left:0; }
 
 /* ── Modal footer ── */
 .modalFooter { display:flex; gap:8px; align-items:center; }
@@ -783,6 +796,11 @@
 .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 8px; }
 .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px 8px; }
 .spanTwo { grid-column:span 2; }
+.gridFix  { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:7px 8px; align-items:start; }
+.addrRow1 { display:grid; grid-template-columns:120px 1fr 90px; gap:7px 8px; align-items:start; }
+.addrRow2 { display:grid; grid-template-columns:1fr 1fr 80px; gap:7px 8px; align-items:start; }
+.addrRow3 { display:grid; grid-template-columns:180px 1fr; gap:7px 8px; align-items:start; }
+.rgEmailRow { display:grid; grid-template-columns:150px 1fr; gap:7px 8px; align-items:start; }
 
 /* ── Campos compactos e sem adornos (só dentro dos formulários desta página) ── */
 .formBody input:not([type="checkbox"]),
@@ -793,6 +811,10 @@
   box-shadow:none;
 }
 .formBody select { padding-right:28px; background-position:right 9px center; }
+/* mesma altura para input, select e combobox, para as linhas alinharem */
+.formBody input:not([type="checkbox"]),
+.formBody select,
+.formBody .comboInput { box-sizing:border-box; height:34px; }
 /* rótulos mais leves e colados no campo */
 .formBody label:not(.useTitularRow):not(.fieldLabel) {
   font-size:10.5px; font-weight:600; letter-spacing:.03em;
@@ -830,7 +852,6 @@
   .photoFields > *:nth-child(3) {
     grid-column:1; grid-row:auto; width:auto !important;
   }
-  .grid3 { grid-template-columns:1fr; }
 }
 .photoBig {
   position:relative; width:104px; height:104px; border-radius:50%;
@@ -912,7 +933,7 @@
   font-size:14px; line-height:20px; font-weight:700; color:var(--l-fg);
   margin:18px 0 4px;
 }
-.optTitle > svg { color:var(--l-primary); flex-shrink:0; }
+.optTitle > svg { color:var(--l-muted-fg); flex-shrink:0; stroke-width:1.75; }
 /* abre veículos, dependentes e empresa só enquanto a seção ainda está vazia */
 .optSep { border:0; height:1px; background:var(--l-border); margin:18px 0 4px; }
 
@@ -1021,15 +1042,19 @@
 }
 .comboInput::placeholder { color: var(--l-muted-fg); opacity: .6; }
 .comboInput:focus { border-color: var(--l-primary); box-shadow: none; }
+/* A lista vai por portal para o <body>, fora do .page: os tokens --l-* não
+   chegam lá, então usa os globais do app (sem eles o fundo ficava transparente). */
 .comboDropdown {
-  background: var(--l-card); border: 1px solid var(--l-border); border-radius: 10px;
-  box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px -6px rgb(0 0 0 / .18); max-height: 200px; overflow-y: auto;
+  padding: 4px;
 }
 .comboItem {
   display: block; width: 100%; padding: 8px 12px; background: none; border: none;
-  text-align: left; font-size: 13px; color: var(--l-fg); cursor: pointer; transition: background .1s;
+  text-align: left; font-size: 13px; color: var(--text); cursor: pointer; transition: background .1s;
+  border-radius: 6px;
 }
-.comboItem:hover { background: var(--l-bg); }
+.comboItem:hover { background: var(--surface-2); }
 
 /* ── Empresa link ── */
 .linkEmpresaSearch { display:flex; flex-direction:column; gap:4px; position:relative; }
@@ -1200,14 +1225,25 @@
 
 
 @media (max-width:700px) {
-  .grid2, .grid3 { grid-template-columns:1fr; }
+  /* em vez de empilhar tudo, os campos dividem a linha e vão quebrando
+     conforme a largura diminui */
+  .grid2 { grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); }
+  .grid3 { grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); }
+  .gridFix { grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); }
   .spanTwo { grid-column:auto; }
+  .addrRow1, .addrRow2, .addrRow3, .rgEmailRow { display:flex; flex-wrap:wrap; }
+  .addrRow1 > *, .addrRow2 > *, .addrRow3 > *, .rgEmailRow > * { flex:1 1 110px; min-width:0; }
+  .addrRow1 > :nth-child(2),
+  .addrRow3 > :nth-child(2),
+  .rgEmailRow > :nth-child(2) { flex:3 1 200px; }
+  .addrRow2 > :nth-child(-n+2) { flex:2 1 150px; }
   .detailHead { flex-wrap:wrap; }
-  .photoHeaderRow { flex-direction:column; align-items:center; }
-  .photoRightCol { width:100%; }
-  /* layout de campos (CPF+Nascimento / Nome) já é o padrão em .photoFields */
   .modalTwoCol { flex-direction:column; }
   .modalPeoplePanel { width:100%; border-left:none; border-top:1px solid var(--l-border); }
+}
+@media (max-width:480px) {
+  .photoHeaderRow { flex-direction:column; align-items:center; }
+  .photoRightCol { width:100%; }
 }
 
 @media (max-width:727px) {
@@ -1287,7 +1323,7 @@
 .hdHeadTitle { margin: 0; font-size: 17px; line-height: 22px; font-weight: 700; }
 .hdHeadSub   { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
 
-.hdBox { border: 1px solid var(--l-border); border-radius: 12px; background: var(--l-card); }
+.hdBox { border: 1px solid var(--l-border); border-radius: var(--l-r-lg, 8px); background: var(--l-card); }
 
 .hdDatas    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .hdDataItem { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-width: 0; }
@@ -1310,7 +1346,7 @@
 .hdContas > div + div { border-left: 1px solid var(--l-border); }
 .hdTotal  { margin: 8px 0 0; text-align: right; font-size: 14px; font-weight: 700; }
 
-.hdCard     { border: 1px solid var(--l-border); border-radius: 12px; overflow: hidden; background: var(--l-card); }
+.hdCard     { border: 1px solid var(--l-border); border-radius: var(--l-r-lg, 8px); overflow: hidden; background: var(--l-card); }
 .hdCardHead {
   display: flex; align-items: center; gap: 8px; margin: 0;
   padding: 10px 14px; font-size: 14px; font-weight: 700;
@@ -1375,4 +1411,175 @@
 @media (max-width: 640px) {
   .cfTop { flex-direction:column; align-items:center; }
   .cfGrid, .cfBottom { grid-template-columns:1fr; }
+}
+
+/* ── Ficha do hóspede ──
+   Cabeçalho separado por um fio de ponta a ponta, identificação grande e
+   abas sublinhadas (Dados cadastrais · Dependentes · Empresa · Veículos · Histórico). */
+/* No celular a página toda rola, o cartão mantém a altura natural e só o
+   cabeçalho gruda no alto.
+   No desktop o cabeçalho (título, status e botões) fica fixo e só o corpo,
+   da primeira divisória para baixo, rola dentro do cartão. */
+.fichaCard { padding: 0; flex-shrink: 0; }
+@media (max-width: 1023.98px) {
+  /* celular: quem rola é a página (.split); o topo da ficha com os botões gruda no alto */
+  .fichaHead {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (min-width: 1024px) {
+  .fichaCard {
+    flex: 0 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fichaHead { flex-shrink: 0; }
+  .fichaBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* foto, nome e abas ficam presos no alto; só o conteúdo da aba rola */
+  .fichaCard .fichaBody { padding-top: 0; }
+  .fichaTopo {
+    position: sticky; top: 0; z-index: 4;
+    padding-top: 24px;
+    background: var(--l-card);
+  }
+}
+.fichaHead {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--l-border);
+  font-weight: 600;
+}
+.fichaHead > svg { color: var(--l-muted-fg); }
+.fichaHead .dCardTitle { font-weight: 600; }
+.fichaBody { margin-top: 0; padding: 24px 20px 20px; }
+
+.fichaStatus {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; line-height: 16px; font-weight: 500;
+  color: var(--l-emerald-fg); white-space: nowrap;
+}
+.fichaStatus::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+.fichaStatusBloq { color: var(--l-destructive); }
+
+.fichaId { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.fichaNome {
+  margin: 0; font-size: 22px; line-height: 30px; font-weight: 700;
+  color: var(--l-fg); overflow-wrap: anywhere;
+}
+.fichaSub {
+  margin-top: 4px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+.fichaCat {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: var(--l-r-sm, 6px);
+  border: 1px solid var(--l-border);
+  font-size: 12px; line-height: 16px; font-weight: 500;
+}
+
+.fichaTabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+  scrollbar-width: none;
+}
+.fichaTab {
+  position: relative; flex-shrink: 0;
+  padding: 0 0 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--l-muted-fg);
+  transition: color .15s;
+}
+.fichaTab:hover { color: var(--l-fg); }
+.fichaTabAtiva { color: var(--l-fg); }
+.fichaTabAtiva::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--l-fg);
+}
+.fichaTab:focus-visible { outline: 2px solid var(--l-ring, var(--l-primary)); outline-offset: 2px; border-radius: 4px; }
+
+
+/* abas Dependentes e Empresa: busca curta; em Dependentes o "Novo" fica ao lado */
+.fichaTabBar { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; }
+.fichaTabBusca { flex: 0 1 360px; max-width: 360px; min-width: 0; }
+
+/* Dados cadastrais: grupos (pessoais · contato · endereço) separados por um fio */
+.dadosGrupoSep { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--l-border); }
+.dadosHead {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px;
+  font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg);
+}
+.dadosHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
+
+/* Dentro da ficha o corpo rola (overflow), então um popup absoluto seria
+   cortado pela borda: aqui a lista de resultados entra no fluxo, logo abaixo
+   do campo, e empurra o conteúdo. */
+.fichaTabBusca .linkDropdown { position: static; margin-top: 4px; }
+
+/* coluna da lixeira, no começo da tabela de empresas vinculadas */
+.hTable td.tdAcao { width: 1%; padding-top: 4px; padding-bottom: 4px; }
+
+/* Filtro aplicado, logo abaixo da busca */
+.filtroChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.filtroChip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 10px; border-radius: var(--l-r-md);
+  background: var(--l-accent); color: var(--l-accent-fg);
+  font-size: 12px; line-height: 16px; font-weight: 600;
+}
+.filtroChipRot { font-weight: 500; color: var(--l-muted-fg); }
+.filtroChipX {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-left: 2px;
+  border: none; border-radius: 4px; background: transparent;
+  color: inherit; cursor: pointer;
+}
+.filtroChipX:hover { background: color-mix(in oklch, var(--l-fg) 10%, transparent); }
+
+/* Topo da lista: abas Hóspedes/Empresas e o botão de cadastrar ao lado */
+.listTopo { display: flex; align-items: stretch; gap: 8px; }
+.listTopo .segmented { flex: 1; min-width: 0; }
+/* quantidade entre parênteses no menu do filtro de status */
+.filterMenuQtd { font-weight: 500; color: var(--l-muted-fg); }
+
+/* ── Histórico: busca + filtro + exportar, e linha com o quarto em destaque ── */
+.hBuscaCampo { flex: 1; min-width: 0; }
+.hBusca .btnSolid { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.hTable td { vertical-align: middle; }
+.hRow td { padding-top: 14px; padding-bottom: 14px; }
+.hQuartoCel  { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.hQuartoNum  {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 18px;
+  color: var(--l-muted-fg);
+}
+.hQuartoTxt  { display: flex; flex-direction: column; min-width: 0; }
+.hQuartoDesc { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--l-fg); overflow: hidden; text-overflow: ellipsis; }
+.hQuartoSub  { font-size: 11px; line-height: 15px; color: var(--l-muted-fg); }
+.hStatusDot  { gap: 6px; border-radius: 4px; padding: 3px 8px; font-size: 11px; }
+.hStatusDot::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; flex-shrink: 0;
+}
+.hChevron { width: 1%; color: var(--l-muted-fg); }
+.hChevron svg { display: block; }
+
+/* Celular/tablet: quem rola é a página; o título dos formulários com o
+   "voltar" gruda no alto, como o topo da ficha */
+@media (max-width: 1023.98px) {
+  .formHead {
+    position: sticky; top: 0; z-index: 5;
+    margin: -20px -20px 0; padding: 16px 20px 12px;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (max-width: 640px) {
+  .formHead { margin: -14px -14px 0; padding: 12px 14px 10px; }
 }
