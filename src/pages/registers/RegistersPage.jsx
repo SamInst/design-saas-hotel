@@ -5,8 +5,9 @@ import {
   Loader2, AlertCircle, Calendar,
   Users, Trash2, CheckCircle2, XCircle,
   AlertTriangle, Camera, ChevronLeft, ChevronRight as ChevRight,
-  X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Moon, Receipt, FileText,
+  X, Contact, MapPin, CalendarDays, ArrowRight, BedDouble, Package, Moon, FileText,
   Check, LayoutDashboard, UserPlus, Pencil, Sparkles, Mail, Download,
+  Clock, ShieldCheck, Printer,
 } from 'lucide-react';
 
 import { Button }                   from '../../components/ui/Button';
@@ -21,6 +22,13 @@ import imgUsuario     from '../../assets/avatar/usuario.png';
 import imgMasculino   from '../../assets/avatar/masculino.png';
 import imgFeminino    from '../../assets/avatar/feminino.png';
 import imgEmpresa     from '../../assets/avatar/empresa.png';
+import icoPix           from '../../assets/pagamento/pix.png';
+import icoCartao        from '../../assets/pagamento/cartao.png';
+import icoDinheiro      from '../../assets/pagamento/dinheiro.png';
+import icoTransferencia from '../../assets/pagamento/transferencia.png';
+import icoLink          from '../../assets/pagamento/link.png';
+import icoBoleto        from '../../assets/pagamento/boleto.png';
+import icoOk            from '../../assets/pagamento/ok.webp';
 // MOCK — campos que o back-end ainda não devolve. Ver registersMocks.js.
 import {
   mockCategoria, mockVinculoEmpresa,
@@ -396,10 +404,13 @@ const nascLabel = (d) => (d instanceof Date ? d.toLocaleDateString('pt-BR') : (d
  * Dependente marcado como "usar os dados do titular" só preencheu nome, CPF e
  * nascimento; contato e endereço vêm do titular na hora de salvar.
  */
+// O email é único no back-end: o dependente nunca leva o mesmo email do titular,
+// nem quando usa os dados dele — vai sem email (null no buildPessoaBody).
 const comDadosDoTitular = (dep, titular) => {
-  if (dep.usarDadosTitular === false) return dep;
-  const { telefone, email, cep, pais, estado, municipio, bairro, endereco, numero, complemento } = titular;
-  return { ...dep, telefone, email, cep, pais, estado, municipio, bairro, endereco, numero, complemento };
+  const mesmoEmail = (e) => (e ?? '').trim().toLowerCase() === (titular.email ?? '').trim().toLowerCase();
+  if (dep.usarDadosTitular === false) return mesmoEmail(dep.email) ? { ...dep, email: '' } : dep;
+  const { telefone, cep, pais, estado, municipio, bairro, endereco, numero, complemento } = titular;
+  return { ...dep, telefone, email: '', cep, pais, estado, municipio, bairro, endereco, numero, complemento };
 };
 const blankPessoa  = () => ({
   nome:'', dataNascimento: null, cpf:'', rg:'', email:'', profissao:'',
@@ -738,6 +749,8 @@ function HistoricoCard({ tipo, id, embutido = false }) {
   const [erro,      setErro]      = useState(false);
   const [busca,     setBusca]     = useState('');
   const [aberta,    setAberta]    = useState(null);
+  // voltando do detalhe: a lista entra deslizando da esquerda
+  const [voltou,    setVoltou]    = useState(false);
   // filtro por status: guarda o rótulo, já que vários códigos viram o mesmo selo
   const [statusFiltro, setStatusFiltro] = useState('');
   const [menuStatus,   setMenuStatus]   = useState(false);
@@ -758,7 +771,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
   useEffect(() => {
     if (!id) return;
     let vivo = true;
-    setLoading(true); setErro(false); setBusca(''); setAberta(null); setStatusFiltro('');
+    setLoading(true); setErro(false); setBusca(''); setAberta(null); setVoltou(false); setStatusFiltro('');
     (tipo === 'empresa' ? hospedagemApi.buscarPorEmpresa(id) : hospedagemApi.buscarPorPessoa(id))
       .then(res => { if (vivo) setRegistros(Array.isArray(res) ? res : []); })
       .catch(() => { if (vivo) { setRegistros([]); setErro(true); } })
@@ -782,8 +795,12 @@ function HistoricoCard({ tipo, id, embutido = false }) {
     return m;
   }, {});
 
-  const conteudo = (
-    <>
+  const conteudo = aberta ? (
+    <div className={styles.hSlideBox}>
+      <HospedagemDetalhe hospedagem={aberta} onClose={() => { setAberta(null); setVoltou(true); }} />
+    </div>
+  ) : (
+    <div className={[styles.hSlideBox, voltou ? styles.hVolta : ''].join(' ')}>
         {registros.length > 0 && (
           <div className={[styles.searchRow, styles.hBusca].join(' ')}>
             <div className={[styles.searchWrap, styles.hBuscaCampo].join(' ')}>
@@ -890,9 +907,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
             </table>
           </div>
         )}
-
-      <HospedagemDetalheModal hospedagem={aberta} onClose={() => setAberta(null)} />
-    </>
+    </div>
   );
 
   // dentro da ficha do hóspede vira o conteúdo de uma aba, sem cartão próprio
@@ -924,16 +939,73 @@ const ocupacaoLabel = (d) => {
   return n ? `${n} adulto${n !== 1 ? 's' : ''}` : '—';
 };
 
-function HdSecao({ icon: Icon, titulo, children }) {
+// "27/06/2026 12:00" → Date (só o dia)
+const dataBR = (dh) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(dh ?? '');
+  return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+};
+const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MESES_AB = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+/** "sáb 27/06/2026" */
+const diaSemanaData = (dh) => { const d = dataBR(dh); return d ? `${DIAS_SEM[d.getDay()]} ${soData(dh)}` : '—'; };
+/** "27 jun. 2026" */
+const dataExtenso = (dh) => { const d = dataBR(dh); return d ? `${d.getDate()} ${MESES_AB[d.getMonth()]} ${d.getFullYear()}` : ''; };
+
+const pagamentoValido = (p) => !p.cancelado && (p.tipo_pagamento?.descricao ?? '').toUpperCase() !== 'PENDENTE';
+
+const iconePagamento = (desc) => {
+  const d = (desc ?? '').toUpperCase();
+  const src = d.includes('PIX') ? icoPix
+    : /CART|CR[EÉ]DITO|D[EÉ]BITO/.test(d) ? icoCartao
+    : /DINHEIRO|ESP[EÉ]CIE/.test(d) ? icoDinheiro
+    : /TRANSFER|TED|DOC/.test(d) ? icoTransferencia
+    : /LINK/.test(d) ? icoLink
+    : icoBoleto;
+  return <img src={src} alt="" draggable={false} />;
+};
+
+function RvSecao({ icon: Icon, titulo, extra, children }) {
   return (
-    <section className={styles.hdCard}>
-      <h4 className={styles.hdCardHead}><Icon size={16} /> {titulo}</h4>
+    <section className={styles.rvSecao}>
+      {titulo && (
+        <div className={styles.rvSecaoHead}>
+          <h4><Icon size={16} /> {titulo}</h4>
+          {extra && <span className={styles.rvSecaoExtra}>{extra}</span>}
+        </div>
+      )}
       {children}
     </section>
   );
 }
 
-function HospedagemDetalheModal({ hospedagem: h, onClose }) {
+/** Resumo em texto, para o "Baixar resumo". */
+const resumoTexto = (h, contas) => {
+  const linhas = [
+    `${tipoHosp(h.status).toUpperCase()} DE HOSPEDAGEM — ${statusHosp(h.status).label}`,
+    `Quarto(s): ${quartosHosp(h)}`,
+    `Check-in: ${h.data_hora_checkin ?? '—'}   Check-out: ${h.data_hora_checkout ?? '—'}   Diárias: ${h.quantidade_diarias ?? 0}`,
+    '',
+    'Hóspedes:',
+    ...(h.pessoas ?? []).map(p => `  - ${p.nome}${p.titular ? ' (titular)' : ''}  CPF ${maskCPF(p.cpf ?? '')}`),
+    '',
+    'Diárias:',
+    ...(h.diarias ?? []).map(d => `  ${pad2(d.numero)}  ${nomeQuarto(d.quarto)}  ${diaMes(d.checkin)} → ${diaMes(d.checkout)}  ${fmtBRL(d.valor)}`),
+    ...((h.consumos ?? []).length ? ['', 'Consumo:', ...h.consumos.map(c => `  ${c.item?.descricao ?? '—'} x${c.quantidade}  ${fmtBRL(totalConsumo(c))}${c.cancelado ? ' (cancelado)' : ''}`)] : []),
+    '',
+    'Pagamentos:',
+    ...(h.pagamentos ?? []).map(p => `  ${p.tipo_pagamento?.descricao ?? '—'}  ${p.data_hora_registro ?? ''}  ${p.nome_pagador ?? ''}  ${fmtBRL(p.valor)}${p.cancelado ? ' (cancelado)' : ''}`),
+    '',
+    `Hospedagem: ${fmtBRL(h.valor_total)}`,
+    `Consumo:    ${fmtBRL(contas.consumo)}`,
+    `Total:      ${fmtBRL(contas.total)}`,
+    `Pago:       ${fmtBRL(contas.pago)}`,
+    `Pendente:   ${fmtBRL(contas.pendente)}`,
+  ];
+  return linhas.join('\r\n');
+};
+
+function HospedagemDetalhe({ hospedagem: h, onClose }) {
+  const conteudoRef = useRef(null);
   if (!h) return null;
   const st     = statusHosp(h.status);
   const contas = contasHosp(h);
@@ -941,156 +1013,231 @@ function HospedagemDetalheModal({ hospedagem: h, onClose }) {
   const diarias    = [...(h.diarias ?? [])].sort((a, b) => (a.numero ?? 0) - (b.numero ?? 0));
   const consumos   = h.consumos ?? [];
   const pagamentos = h.pagamentos ?? [];
-  const quartos    = quartosHosp(h);
+  const qs         = quartosObjHosp(h);
+  const recebidos  = pagamentos.filter(pagamentoValido).length;
+  const quitado    = contas.pendente <= 0;
+  const nDiarias = Number(h.quantidade_diarias) || 0;
+
+  const baixarResumo = () => {
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + resumoTexto(h, contas)], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `resumo-hospedagem-${h.id}.txt`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // abre só o conteúdo do modal numa janela própria, com os mesmos estilos
+  const imprimir = () => {
+    const w = window.open('', '_blank', 'width=1000,height=800');
+    if (!w || !conteudoRef.current) return;
+    const css = [...document.querySelectorAll('style, link[rel="stylesheet"]')].map(n => n.outerHTML).join('');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Hospedagem ${h.id}</title>${css}
+      <style>body{margin:0;background:#fff}[data-noprint]{display:none!important}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
+      </head><body><div class="${styles.page}">${conteudoRef.current.outerHTML}</div></body></html>`);
+    w.document.close();
+    w.onload = () => { w.focus(); w.print(); };
+  };
 
   return (
-    <Modal open onClose={onClose} size="lg" closeOnBackdrop hideHeader>
-      <div className={styles.hdBody}>
+    <div className={[styles.rv, styles.rvInline].join(' ')} ref={conteudoRef}>
 
-        {/* Cabeçalho */}
-        <div className={styles.hdHead}>
-          <span className={styles.hdHeadIcon}><BedDouble size={20} /></span>
-          <div className={styles.hdHeadMain}>
-            <h3 className={styles.hdHeadTitle}>
-              {tipoHosp(h.status)} · {quartos.includes(',') ? 'Quartos' : 'Quarto'} {quartos}
+      {/* Cabeçalho */}
+      <header className={styles.rvHead}>
+        <div className={styles.rvHeadQuarto}>
+          <div className={styles.rvTituloLinha}>
+            <button type="button" className={styles.rvVoltar} onClick={onClose}
+              aria-label="Voltar ao histórico" title="Voltar ao histórico" data-noprint>
+              <ChevronLeft size={20} />
+            </button>
+            <h3 className={styles.rvTitulo}>
+              {qs.length > 1 ? `Quartos ${qs.map(q => pad2(q.id)).join(', ')}` : `Quarto ${qs[0] ? pad2(qs[0].id) : '—'}`}
             </h3>
-            <p className={styles.hdHeadSub}>
-              Registrada em {(h.data_hora_registro ?? '').slice(0, 16)}
-              {h.funcionario?.nome && ` por ${h.funcionario.nome}`}
-            </p>
+            <span className={[styles.hStatus, styles.hStatusDot, styles.rvStatus, styles[st.tom]].join(' ')}>{st.label}</span>
           </div>
-          <span className={[styles.hStatus, styles[st.tom]].join(' ')}>{st.label}</span>
-          <button type="button" className={styles.idClose} onClick={onClose} aria-label="Fechar" title="Fechar">
-            <X size={16} />
+        </div>
+
+        {/* período: check-in → check-out; em espaço estreito vira um quadro próprio */}
+        <div className={styles.rvPeriodo}>
+          <div className={styles.rvPerEntrada}>
+            <CalendarDays size={20} className={styles.rvPerIcone} />
+            <div className={styles.rvPerData}>
+              <p className={styles.rvPerDia}>{diaSemanaData(h.data_hora_checkin)}</p>
+              <p className={styles.rvPerHora}>Check-in <b>{soHora(h.data_hora_checkin) || '—'}</b></p>
+            </div>
+          </div>
+          <ArrowRight size={18} className={styles.rvPerSeta} />
+          <div className={[styles.rvPerData, styles.rvPerSaida].join(' ')}>
+            <p className={styles.rvPerDia}>{diaSemanaData(h.data_hora_checkout)}</p>
+            <p className={styles.rvPerHora}>Check-out <b>{soHora(h.data_hora_checkout) || '—'}</b></p>
+          </div>
+          <div className={[styles.rvPerData, styles.rvPerDiarias].join(' ')}>
+            <p className={styles.rvPerDia}>{pad2(nDiarias)}</p>
+            <p className={styles.rvPerHora}>Diária{nDiarias !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+      </header>
+
+        <div className={styles.rvMain}>
+
+          <RvSecao icon={Users}>
+            {pessoas.length === 0 ? <p className={styles.rvVazio}>Nenhum hóspede informado.</p> : (
+              <ul className={styles.rvPessoas}>
+                {pessoas.map(p => (
+                  <li key={p.id}>
+                    <span className={styles.rvIniciais}>{getInitials(p.nome)}</span>
+                    <div className={styles.rvPessoaTxt}>
+                      <p className={styles.rvPessoaNome}>
+                        {p.nome}
+                        {p.titular && <span className={styles.rvTag}>Titular</span>}
+                      </p>
+                      <p className={styles.rvPessoaSub}>CPF {maskCPF(p.cpf ?? '') || '—'}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </RvSecao>
+
+          {diarias.length > 0 && (
+            <RvSecao icon={Moon}>
+              <div className={styles.hScroll}>
+                <table className={styles.rvTable}>
+                  <thead><tr><th>Nº / Quarto</th><th>Período</th><th>Ocupação</th><th className={styles.rvDir}>Valor</th></tr></thead>
+                  <tbody>
+                    {diarias.map(d => (
+                      <tr key={d.id}>
+                        <td>
+                          <span className={styles.rvQuartoCel}>
+                            <span className={styles.rvNumBox}>{d.quarto?.id ? pad2(d.quarto.id) : '—'}</span>
+                            <span>
+                              <span className={styles.rvCelTit}>{d.quarto?.descricao || `Quarto ${d.quarto?.id ?? '—'}`}</span>
+                              <span className={styles.rvCelSub}>Diária {pad2(d.numero)}</span>
+                            </span>
+                          </span>
+                        </td>
+                        <td>{diaMes(d.checkin)} → {diaMes(d.checkout)}</td>
+                        <td>
+                          {ocupacaoLabel(d)}
+                          {d.meia_diaria && <span className={styles.rvTag}>Meia diária</span>}
+                          {d.sazonalidade?.descricao && <span className={styles.rvTag}>{d.sazonalidade.descricao}</span>}
+                        </td>
+                        <td className={[styles.rvDir, styles.rvForte].join(' ')}>{fmtBRL(d.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </RvSecao>
+          )}
+
+          {/* consumo sempre aparece, logo abaixo das diárias */}
+          <RvSecao icon={Package}>
+            <div className={styles.hScroll}>
+              <table className={styles.rvTable}>
+                <thead><tr><th>Consumo</th><th>Qtd.</th><th>Data</th><th className={styles.rvDir}>Total</th></tr></thead>
+                <tbody>
+                  {consumos.length === 0 && (
+                    <tr><td colSpan={4} className={styles.rvTdVazio}>Nenhum consumo registrado.</td></tr>
+                  )}
+                  {consumos.map(c => (
+                    <tr key={c.id} className={c.cancelado ? styles.rvCancelado : ''}>
+                      <td>
+                        <span className={styles.rvCelTit}>{c.item?.descricao ?? '—'}</span>
+                        <span className={styles.rvCelSub}>{fmtBRL(c.valor)} cada{c.cancelado ? ' · cancelado' : ''}</span>
+                      </td>
+                      <td>{pad2(c.quantidade)}</td>
+                      <td>{(c.data_hora_registro ?? '').slice(0, 16)}</td>
+                      <td className={[styles.rvDir, styles.rvForte].join(' ')}>{fmtBRL(totalConsumo(c))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </RvSecao>
+
+          {h.observacao && (
+            <RvSecao icon={FileText} titulo="Observação">
+              <p className={styles.rvTexto}>{h.observacao}</p>
+            </RvSecao>
+          )}
+
+          {h.motivo_cancelamento?.motivo_cancelamento && (
+            <RvSecao icon={XCircle} titulo="Motivo do cancelamento">
+              <p className={styles.rvTexto}>
+                {h.motivo_cancelamento.motivo_cancelamento}
+                {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
+                {h.motivo_cancelamento.data_hora_registro && `, ${h.motivo_cancelamento.data_hora_registro}`}
+              </p>
+            </RvSecao>
+          )}
+        </div>
+
+        {/* Resumo financeiro */}
+        <aside className={styles.rvResumo}>
+          <h4 className={styles.rvResumoTit}>Resumo financeiro</h4>
+          <div className={styles.rvLinha}><span>Hospedagem</span><b>{fmtBRL(h.valor_total)}</b></div>
+          <div className={styles.rvLinha}><span>Consumo</span><b>{fmtBRL(contas.consumo)}</b></div>
+          <hr className={styles.rvSep} />
+          <div className={[styles.rvLinha, styles.rvLinhaTotal].join(' ')}><span>Total da {tipoHosp(h.status).toLowerCase()}</span><b>{fmtBRL(contas.total)}</b></div>
+          {quitado ? (
+            <p className={styles.rvQuitado}><img src={icoOk} alt="" /> Pago integralmente</p>
+          ) : (<>
+            <div className={[styles.rvLinha, styles.rvLinhaPend].join(' ')}>
+              <span>Saldo pendente</span><b>{fmtBRL(contas.pendente)}</b>
+            </div>
+            <p className={styles.rvSituacao}><Clock size={14} /> {contas.pago > 0 ? 'Pagamento parcial' : 'Aguardando pagamento'}</p>
+          </>)}
+          <div className={styles.rvPgBloco}>
+            <div className={styles.rvPgHead}>
+              <h5>Pagamentos</h5>
+              {recebidos > 0 && <span className={styles.rvRecebidos}><Check size={13} /> {recebidos} recebido{recebidos !== 1 ? 's' : ''}</span>}
+            </div>
+            {pagamentos.length === 0 ? <p className={styles.rvVazio}>Nenhum pagamento registrado.</p> : (
+              <ul className={styles.rvPagamentos}>
+                {pagamentos.map(p => {
+                  const valido = pagamentoValido(p);
+                  return (
+                    <li key={p.uuid ?? p.id} className={p.cancelado ? styles.rvCancelado : ''}>
+                      <span className={[styles.rvPgIcon, valido ? '' : styles.rvPgIconOff].join(' ')}>
+                        {iconePagamento(p.tipo_pagamento?.descricao)}
+                      </span>
+                      <div className={styles.rvPgTxt}>
+                        <p className={styles.rvPgTit}>
+                          <b>{p.tipo_pagamento?.descricao ?? '—'}</b>
+                          {p.data_hora_registro && <span>{dataExtenso(p.data_hora_registro)} · {soHora(p.data_hora_registro)}</span>}
+                        </p>
+                        <p className={styles.rvPgSub}>{p.nome_pagador || '—'}</p>
+                      </div>
+                      <div className={styles.rvPgValor}>
+                        <p className={styles.rvForte}>{fmtBRL(p.valor)}</p>
+                        {!valido && <p className={styles.rvPgSub}>{p.cancelado ? 'Cancelado' : 'Pendente'}</p>}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </aside>
+
+      <footer className={styles.rvFoot}>
+        <ShieldCheck size={16} className={styles.rvInfoIcon} />
+        <div>
+          <p className={styles.rvFootTxt}>
+            Registrada em {dataExtenso(h.data_hora_registro) || '—'}{soHora(h.data_hora_registro) && `, às ${soHora(h.data_hora_registro)}`}
+          </p>
+          {h.funcionario?.nome && <p className={styles.rvPgSub}>por {h.funcionario.nome}</p>}
+        </div>
+        <div className={styles.rvAcoes} data-noprint>
+          <button type="button" className={styles.rvBtnResumo} onClick={baixarResumo}>
+            <Download size={15} /> Baixar resumo
+          </button>
+          <button type="button" className={styles.rvBtnResumo} onClick={imprimir}>
+            <Printer size={15} /> Imprimir
           </button>
         </div>
-
-        {/* Datas */}
-        <div className={[styles.hdBox, styles.hdDatas].join(' ')}>
-          <div className={styles.hdDataItem}>
-            <span className={styles.hdMiniIcon}><CalendarDays size={15} /></span>
-            <div><p className={styles.hdLbl}>Check-in</p><p className={styles.hdVal}>{soData(h.data_hora_checkin)} às {soHora(h.data_hora_checkin)}</p></div>
-          </div>
-          <div className={styles.hdDataItem}>
-            <span className={styles.hdMiniIcon}><CalendarDays size={15} /></span>
-            <div><p className={styles.hdLbl}>Check-out</p><p className={styles.hdVal}>{soData(h.data_hora_checkout)} às {soHora(h.data_hora_checkout)}</p></div>
-          </div>
-          <div className={styles.hdDataItem}>
-            <span className={styles.hdMiniIcon}><Moon size={15} /></span>
-            <div><p className={styles.hdLbl}>Diárias</p><p className={styles.hdVal}>{pad2(h.quantidade_diarias)}</p></div>
-          </div>
-        </div>
-
-        {/* Financeiro */}
-        <div>
-          <p className={styles.hdGrupo}>Financeiro</p>
-          <div className={[styles.hdBox, styles.hdContas].join(' ')}>
-            <div><p className={styles.hdLbl}>Hospedagem</p><p className={styles.hdVal}>{fmtBRL(h.valor_total)}</p></div>
-            <div><p className={styles.hdLbl}>Consumo</p><p className={[styles.hdVal, styles.hdMuted].join(' ')}>{fmtBRL(contas.consumo)}</p></div>
-            <div><p className={styles.hdLbl}>Pago</p><p className={[styles.hdVal, styles.hdPago].join(' ')}>{fmtBRL(contas.pago)}</p></div>
-            <div><p className={styles.hdLbl}>Pendente</p><p className={[styles.hdVal, contas.pendente > 0 ? styles.hdPendente : styles.hdMuted].join(' ')}>{fmtBRL(contas.pendente)}</p></div>
-          </div>
-          <p className={styles.hdTotal}>Total: {fmtBRL(contas.total)}</p>
-        </div>
-
-        <HdSecao icon={Users} titulo="Hóspedes">
-          {pessoas.length === 0 ? <p className={styles.hdVazio}>Nenhum hóspede informado.</p> : (
-            <ul className={styles.hdPessoas}>
-              {pessoas.map(p => (
-                <li key={p.id}>
-                  <span className={styles.hdIniciais}>{getInitials(p.nome)}</span>
-                  <span className={styles.hdNome}>{p.nome}</span>
-                  {p.titular && <span className={styles.hdTitular}>Titular</span>}
-                  <span className={styles.hdCpf}>{maskCPF(p.cpf ?? '')}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </HdSecao>
-
-        {diarias.length > 0 && (
-          <HdSecao icon={Moon} titulo="Diárias">
-            <div className={styles.hScroll}>
-              <table className={styles.hdTable}>
-                <thead><tr><th>Nº</th><th>Quarto</th><th>Período</th><th>Ocupação</th><th className={styles.hdDir}>Valor</th></tr></thead>
-                <tbody>
-                  {diarias.map(d => (
-                    <tr key={d.id}>
-                      <td>{pad2(d.numero)}</td>
-                      <td>{nomeQuarto(d.quarto) || '—'}</td>
-                      <td>{diaMes(d.checkin)} → {diaMes(d.checkout)}</td>
-                      <td>
-                        {ocupacaoLabel(d)}
-                        {d.meia_diaria && <span className={styles.hdTag}>Meia diária</span>}
-                        {d.sazonalidade?.descricao && <span className={styles.hdTag}>{d.sazonalidade.descricao}</span>}
-                      </td>
-                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(d.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </HdSecao>
-        )}
-
-        {consumos.length > 0 && (
-          <HdSecao icon={Package} titulo="Consumo">
-            <div className={styles.hScroll}>
-              <table className={styles.hdTable}>
-                <thead><tr><th>Item</th><th>Qtd.</th><th>Unitário</th><th>Data</th><th className={styles.hdDir}>Total</th></tr></thead>
-                <tbody>
-                  {consumos.map(c => (
-                    <tr key={c.id} className={c.cancelado ? styles.hdCancelado : ''}>
-                      <td>{c.item?.descricao ?? '—'}{c.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
-                      <td>{pad2(c.quantidade)}</td>
-                      <td>{fmtBRL(c.valor)}</td>
-                      <td>{(c.data_hora_registro ?? '').slice(0, 16)}</td>
-                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(totalConsumo(c))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </HdSecao>
-        )}
-
-        <HdSecao icon={Receipt} titulo="Pagamentos">
-          {pagamentos.length === 0 ? <p className={styles.hdVazio}>Nenhum pagamento registrado.</p> : (
-            <div className={styles.hScroll}>
-              <table className={styles.hdTable}>
-                <thead><tr><th>Forma</th><th>Pagador</th><th>Data</th><th className={styles.hdDir}>Valor</th></tr></thead>
-                <tbody>
-                  {pagamentos.map(p => (
-                    <tr key={p.uuid} className={p.cancelado ? styles.hdCancelado : ''}>
-                      <td>{p.tipo_pagamento?.descricao ?? '—'}{p.cancelado && <span className={styles.hdTag}>Cancelado</span>}</td>
-                      <td>{p.nome_pagador || '—'}</td>
-                      <td>{(p.data_hora_registro ?? '').slice(0, 16)}</td>
-                      <td className={[styles.hdDir, styles.hdForte].join(' ')}>{fmtBRL(p.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </HdSecao>
-
-        {h.observacao && (
-          <HdSecao icon={FileText} titulo="Observação">
-            <p className={styles.hdTexto}>{h.observacao}</p>
-          </HdSecao>
-        )}
-
-        {h.motivo_cancelamento?.motivo_cancelamento && (
-          <HdSecao icon={XCircle} titulo="Motivo do cancelamento">
-            <p className={styles.hdTexto}>
-              {h.motivo_cancelamento.motivo_cancelamento}
-              {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
-              {h.motivo_cancelamento.data_hora_registro && `, ${h.motivo_cancelamento.data_hora_registro}`}
-            </p>
-          </HdSecao>
-        )}
-      </div>
-    </Modal>
+      </footer>
+    </div>
   );
 }
 

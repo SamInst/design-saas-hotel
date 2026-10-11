@@ -1310,86 +1310,6 @@
 .hStatusPendente  { background: color-mix(in srgb, #f59e0b 16%, transparent); color: #b45309; }
 .hStatusCancelada { background: color-mix(in srgb, #ef4444 12%, transparent); color: #dc2626; }
 
-/* Modal de detalhe da hospedagem */
-.hdBody { display: flex; flex-direction: column; gap: 16px; color: var(--l-fg); }
-
-.hdHead     { display: flex; align-items: center; gap: 12px; }
-.hdHeadIcon {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 40px; height: 40px; border-radius: 10px;
-  background: color-mix(in srgb, #3b82f6 12%, transparent); color: #2563eb;
-}
-.hdHeadMain  { flex: 1; min-width: 0; }
-.hdHeadTitle { margin: 0; font-size: 17px; line-height: 22px; font-weight: 700; }
-.hdHeadSub   { margin: 2px 0 0; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
-
-.hdBox { border: 1px solid var(--l-border); border-radius: var(--l-r-lg, 8px); background: var(--l-card); }
-
-.hdDatas    { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.hdDataItem { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-width: 0; }
-.hdDataItem + .hdDataItem { border-left: 1px solid var(--l-border); }
-.hdMiniIcon {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 28px; height: 28px; border-radius: 8px;
-  background: var(--l-secondary); color: var(--l-muted-fg);
-}
-
-.hdLbl { margin: 0; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
-.hdVal { margin: 2px 0 0; font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg); white-space: nowrap; }
-.hdMuted    { color: var(--l-muted-fg); }
-.hdPago     { color: #15803d; }
-.hdPendente { color: #dc2626; }
-
-.hdGrupo  { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--l-muted-fg); }
-.hdContas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.hdContas > div { padding: 12px 14px; min-width: 0; }
-.hdContas > div + div { border-left: 1px solid var(--l-border); }
-.hdTotal  { margin: 8px 0 0; text-align: right; font-size: 14px; font-weight: 700; }
-
-.hdCard     { border: 1px solid var(--l-border); border-radius: var(--l-r-lg, 8px); overflow: hidden; background: var(--l-card); }
-.hdCardHead {
-  display: flex; align-items: center; gap: 8px; margin: 0;
-  padding: 10px 14px; font-size: 14px; font-weight: 700;
-  background: var(--l-secondary); border-bottom: 1px solid var(--l-border);
-}
-.hdCardHead svg { color: var(--l-muted-fg); }
-
-.hdPessoas    { list-style: none; margin: 0; padding: 0; }
-.hdPessoas li { display: flex; align-items: center; gap: 10px; padding: 10px 14px; font-size: 14px; }
-.hdPessoas li + li { border-top: 1px solid var(--l-border); }
-.hdIniciais {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  width: 28px; height: 28px; border-radius: 50%;
-  background: var(--l-secondary); color: var(--l-muted-fg); font-size: 11px; font-weight: 600;
-}
-.hdNome    { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hdTitular { font-size: 12px; font-weight: 500; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--l-border); color: var(--l-fg); }
-.hdCpf     { margin-left: auto; font-family: var(--font-mono); font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
-
-.hdTable { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 18px; }
-.hdTable th {
-  padding: 8px 14px; text-align: left; white-space: nowrap;
-  font-size: 12px; font-weight: 500; color: var(--l-muted-fg);
-  border-bottom: 1px solid var(--l-border);
-}
-.hdTable td { padding: 10px 14px; color: var(--l-muted-fg); white-space: nowrap; }
-.hdTable tbody tr + tr td { border-top: 1px solid var(--l-border); }
-.hdDir   { text-align: right !important; }
-.hdForte { color: var(--l-fg) !important; font-weight: 700; }
-
-.hdVazio { margin: 0; padding: 12px 14px; font-size: 13px; color: var(--l-muted-fg); }
-.hdTexto { margin: 0; padding: 12px 14px; font-size: 13px; line-height: 19px; white-space: pre-wrap; }
-.hdTag   { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--l-secondary); color: var(--l-secondary-fg); }
-.hdCancelado td { text-decoration: line-through; }
-.hdCancelado .hdTag { text-decoration: none; }
-
-@media (max-width: 640px) {
-  .hdDatas, .hdContas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hdDataItem + .hdDataItem, .hdContas > div + div { border-left: none; }
-  .hdDatas > :nth-child(n+3), .hdContas > :nth-child(n+3) { border-top: 1px solid var(--l-border); }
-  .hdDatas > :nth-child(2n), .hdContas > :nth-child(2n) { border-left: 1px solid var(--l-border); }
-}
-
 .cfBox { border:1px solid var(--l-border); border-radius:10px; overflow:hidden; }
 .cfCard + .cfCard { border-top:1px solid var(--l-border); }
 .cfTop { display:flex; gap:20px; padding:18px 20px; align-items:flex-start; }
@@ -1583,3 +1503,223 @@
 @media (max-width: 640px) {
   .formHead { margin: -14px -14px 0; padding: 12px 14px 10px; }
 }
+
+/* ── Modal de detalhe da hospedagem (histórico) ── */
+.rv {
+  position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-areas: "head head" "main resumo" "foot foot";
+  color: var(--l-fg); background: var(--l-card);
+}
+.rvHead   { grid-area: head; }
+.rvMain   { grid-area: main; }
+.rvResumo { grid-area: resumo; }
+.rvFoot   { grid-area: foot; }
+.rvStatus { margin: 0; }
+.rv p, .rv h3, .rv h4 { margin: 0; }
+
+.rvHead {
+  display: flex; align-items: center; gap: 16px 28px;
+  padding: 26px 20px 22px 28px;
+  border-bottom: 1px solid var(--l-border);
+}
+.rvHeadQuarto {
+  display: flex; align-items: center; flex-shrink: 0;
+  padding-right: 28px; border-right: 1px solid var(--l-border);
+  align-self: stretch;
+}
+.rvEyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--l-muted-fg); }
+.rvTituloLinha { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; }
+.rvTitulo { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; }
+.rvInfoIcon { color: var(--l-muted-fg); flex-shrink: 0; margin-top: 3px; }
+
+/* Período: check-in → check-out + diárias */
+.rvPeriodo {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 6px 14px;
+}
+.rvPerEntrada { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.rvPerIcone { color: var(--l-muted-fg); flex-shrink: 0; }
+.rvPerData  { min-width: 0; }
+.rvPerDia   { font-size: 16px; line-height: 22px; font-weight: 600; white-space: nowrap; }
+.rvPerHora  { margin-top: 2px !important; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); white-space: nowrap; }
+.rvPerHora b { font-weight: 600; color: var(--l-fg); }
+.rvPerSeta  { color: var(--l-muted-fg); flex-shrink: 0; }
+.rvPerDiarias { flex-shrink: 0; padding-left: 14px; margin-left: 4px; border-left: 1px solid var(--l-border); text-align: center; }
+.rvVoltar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; margin-left: -8px; margin-right: -4px;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg); cursor: pointer;
+}
+.rvVoltar:hover { background: var(--l-accent); }
+
+.rvMain { padding: 4px 24px 8px 16px; min-width: 0; }
+.rvSecao { padding: 12px 0; }
+.rvSecao:first-child { padding-top: 18px; }
+.rvSecaoHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.rvSecaoHead h4 { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; }
+.rvSecaoHead h4 svg { color: var(--l-muted-fg); }
+.rvSecaoExtra { font-size: 11px; color: var(--l-muted-fg); white-space: nowrap; }
+.rvRecebidos { display: inline-flex; align-items: center; gap: 4px; color: var(--l-emerald-fg); }
+
+.rvPessoas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rvPessoas li { display: flex; align-items: center; gap: 12px; }
+.rvIniciais {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--l-emerald-bg); color: var(--l-emerald-fg);
+  font-size: 12px; font-weight: 600;
+}
+.rvPessoaTxt { min-width: 0; }
+.rvPessoaNome { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; font-weight: 500; }
+.rvPessoaSub, .rvPgSub { font-size: 11px; line-height: 16px; color: var(--l-muted-fg); }
+.rvTag {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+  border: 1px solid var(--l-border); font-size: 10.5px; font-weight: 500; color: var(--l-muted-fg);
+}
+.rvPessoaNome .rvTag { margin-left: 0; }
+
+.rvTable { width: 100%; border-collapse: collapse; font-size: 12.5px; line-height: 18px; }
+/* cabeçalho pintado, para separar as tabelas do bloco de cima */
+.rvTable th {
+  padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--l-muted-fg);
+  background: var(--l-secondary); white-space: nowrap;
+}
+.rvTable th:first-child { border-radius: 6px 0 0 6px; }
+.rvTable th:last-child  { border-radius: 0 6px 6px 0; }
+.rvTable td { padding: 12px; color: var(--l-muted-fg); white-space: nowrap; vertical-align: middle; }
+.rvTable tbody tr + tr td { border-top: 1px solid var(--l-border); }
+.rvDir { text-align: right !important; }
+.rvForte { color: var(--l-fg) !important; font-weight: 700; }
+.rvQuartoCel { display: flex; align-items: center; gap: 10px; }
+.rvNumBox {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 5px;
+  border: 1px solid var(--l-border); background: var(--l-secondary);
+  font-size: 11.5px; font-weight: 700; color: var(--l-fg);
+}
+.rvCelTit { display: block; font-size: 12.5px; font-weight: 500; color: var(--l-fg); }
+.rvCelSub { display: block; font-size: 10.5px; line-height: 14px; color: var(--l-muted-fg); }
+.rvCancelado { opacity: .55; }
+.rvCancelado .rvCelTit, .rvCancelado .rvForte { text-decoration: line-through; }
+
+/* pagamentos, dentro do resumo financeiro */
+.rvPgBloco { margin-top: 8px; padding-top: 14px; border-top: 1px solid var(--l-border); }
+.rvPgHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.rvPgHead h5 { margin: 0; font-size: 12.5px; font-weight: 600; }
+.rvPgHead .rvRecebidos { font-size: 11px; }
+.rvPagamentos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rvPagamentos li { display: flex; align-items: center; gap: 10px; }
+.rvPgTxt { flex: 1; min-width: 0; }
+.rvPgTit { font-size: 12.5px; line-height: 17px; }
+.rvPgTit b { font-weight: 600; }
+.rvPgTit span { display: block; font-size: 10.5px; line-height: 15px; color: var(--l-muted-fg); }
+.rvPgValor { text-align: right; flex-shrink: 0; }
+.rvPgValor .rvForte { font-size: 13px; }
+.rvPgIcon {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 32px; height: 32px; border-radius: 7px;
+  background: color-mix(in srgb, #3b82f6 10%, transparent);
+}
+.rvPgIcon img { width: 20px; height: 20px; object-fit: contain; display: block; }
+.rvPgIconOff { background: var(--l-secondary); }
+.rvPgIconOff img { filter: grayscale(1); opacity: .6; }
+
+.rvVazio, .rvTexto { font-size: 13px; line-height: 19px; color: var(--l-muted-fg); white-space: pre-wrap; }
+.rvTexto { color: var(--l-fg); }
+
+/* caixa própria, com a altura do seu conteúdo */
+.rvResumo {
+  align-self: start;
+  display: flex; flex-direction: column; gap: 12px;
+  margin: 18px 20px 20px 0; padding: 20px 22px 22px;
+  background: var(--l-bg); border: 1px solid var(--l-border); border-radius: var(--l-r-xl);
+}
+.rvAcoes { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.rvResumoTit { font-size: 13px; line-height: 18px; font-weight: 600; margin-bottom: 10px !important; }
+.rvLinha { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--l-muted-fg); }
+.rvLinha b { font-weight: 600; color: var(--l-fg); }
+.rvLinhaPend b { color: #b45309; }
+.rvSep { width: 100%; height: 1px; margin: 4px 0; border: none; background: var(--l-border); }
+.rvSituacao { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--l-muted-fg); }
+.rvBtnResumo {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--l-r-md); font-family: inherit; font-size: 12.5px; font-weight: 500;
+  color: var(--l-fg); cursor: pointer; transition: background-color .15s;
+}
+.rvBtnResumo { padding: 9px 12px; border: 1px solid var(--l-border); background: var(--l-card); }
+.rvBtnResumo:hover { background: var(--l-accent); }
+
+.rvFoot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px 28px;
+  border-top: 1px solid var(--l-border);
+}
+.rvFoot .rvInfoIcon, .rvHeadInfo .rvInfoIcon { margin-top: 0; }
+.rvFootTxt { font-size: 11.5px; color: var(--l-muted-fg); }
+
+/* Responsivo pela largura real do detalhe (ficha estreita, zoom alto), não da tela */
+.hSlideBox { container: rvBox / inline-size; }
+
+/* Médio: o período desce para baixo do quarto, num quadro com check-in e check-out lado a lado */
+@container rvBox (max-width: 680px) {
+  .rvHead { flex-direction: column; align-items: stretch; gap: 16px; padding: 22px 24px 20px; }
+  .rvHeadQuarto { padding-right: 0; border-right: none; }
+  .rvPeriodo {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    grid-template-areas: "ent seta sai dia";
+    align-items: center; gap: 10px 12px;
+    padding: 14px 16px; border-radius: var(--l-r-lg, 8px);
+    background: var(--l-bg); border: 1px solid var(--l-border);
+  }
+  .rvPerIcone { display: none; }
+  .rvPerEntrada { grid-area: ent; }
+  .rvPerSeta  { grid-area: seta; }
+  .rvPerSaida { grid-area: sai; text-align: right; }
+  .rvPerDia   { font-size: 15px; line-height: 20px; overflow: hidden; text-overflow: ellipsis; }
+  .rvPerDiarias { grid-area: dia; margin-left: 0; padding-left: 12px; text-align: center; }
+}
+
+/* Estreito: resumo financeiro desce para baixo do conteúdo */
+@container rvBox (max-width: 760px) {
+  .rv { grid-template-columns: minmax(0, 1fr); grid-template-areas: "head" "main" "resumo" "foot"; }
+  .rvResumo { margin: 4px 20px 20px; }
+  .rvMain { padding: 0 20px; }
+  .rvFoot { padding: 14px 20px; flex-wrap: wrap; }
+  .rvTitulo { font-size: 20px; line-height: 26px; }
+}
+
+/* Bem estreito (celular, zoom muito alto): datas menores, sem perder a leitura */
+@container rvBox (max-width: 420px) {
+  .rvHead { padding: 18px 16px; }
+  .rvMain { padding: 0 16px; }
+  .rvResumo { margin: 4px 16px 16px; padding-left: 16px; padding-right: 16px; }
+  .rvFoot { padding: 12px 16px; }
+  .rvTitulo { font-size: 18px; line-height: 24px; }
+  .rvPeriodo { padding: 12px; gap: 8px; }
+  .rvPerDia { font-size: 13.5px; line-height: 18px; }
+  .rvPerHora { font-size: 11px; }
+  .rvPeriodo { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "ent seta sai" "dia dia dia"; }
+  .rvPerDiarias { display: flex; align-items: baseline; gap: 6px; padding: 8px 0 0; border-left: none; border-top: 1px solid var(--l-border); justify-content: center; text-align: center; }
+}
+@media print {
+  .rv { box-shadow: none; }
+}
+
+/* Histórico ↔ detalhe da hospedagem: troca com deslize lateral */
+.hSlideBox { overflow-x: clip; }
+.rvInline {
+  border: 1px solid var(--l-border); border-radius: var(--l-r-xl); overflow: hidden;
+  animation: rvEntra .3s cubic-bezier(.2, .8, .2, 1);
+}
+.hVolta > * { animation: hVolta .3s cubic-bezier(.2, .8, .2, 1); }
+@keyframes rvEntra { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes hVolta  { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .rvInline, .hVolta > * { animation: none; }
+}
+.rvLinhaTotal, .rvLinhaTotal b { color: var(--l-fg); font-weight: 700; }
+.rvQuitado { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: #4d7c3c; }
+.rvQuitado img { width: 18px; height: 18px; display: block; }
+.rvTdVazio { text-align: center; font-size: 12.5px; padding: 18px 12px !important; }
