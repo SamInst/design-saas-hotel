@@ -1,3 +1,4 @@
+import { tr, locale } from '../../../i18n';
 const initials = (nome) => {
   const p = (nome || '').trim().split(/\s+/).filter(Boolean);
   if (!p.length) return '?';
@@ -13,7 +14,7 @@ const fmtCpf = (v) => {
 export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false, userName = '' }) => {
   const sv  = servico;
   const brl = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const fn  = (n) => `${n} noite${n !== 1 ? 's' : ''}`;
+  const fn  = (n) => (n !== 1 ? tr('{{n}} noites', { n }) : tr('{{n}} noite', { n }));
 
   const diarias    = sv.diarias || [];
   const consumos   = sv.consumos || [];
@@ -44,7 +45,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
   })();
 
   const titularNome = (sv.titularNome || titular?.nome || '').toUpperCase();
-  const docTitle    = `${nowFmt} VOUCHER DE HOSPEDAGEM${titularNome ? ` | ${titularNome}` : ''}`;
+  const docTitle    = tr('{{nowFmt}} VOUCHER DE HOSPEDAGEM{{v1}}', { nowFmt, v1: titularNome ? ` | ${titularNome}` : '' });
 
   // ── Hóspedes ────────────────────────────────────────────────────────────────
   const hospedesHtml = hospedes.length === 0 ? '' : `
@@ -53,7 +54,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
         <div class="person-row">
           <div class="person-avatar">${initials(titular.nome)}</div>
           <div>
-            <div class="person-name">${titular.nome} <span class="titular-tag">Titular</span></div>
+            <div class="person-name">${titular.nome} <span class="titular-tag">${tr('Titular')}</span></div>
             ${titular.cpf ? `<div class="person-cpf">${fmtCpf(titular.cpf)}</div>` : ''}
           </div>
         </div>` : ''}
@@ -69,7 +70,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
 
   // ── Diárias (price-row pattern) ───────────────────────────────────────────
   const diariasHtml = diarias.map((d, i) => {
-    const label = `Diária ${d.num ?? (i + 1)}${d.dataInicio ? ` &nbsp; ${d.dataInicio} → ${d.dataFim}` : ''}`;
+    const label = tr('Diária {{v0}}{{v1}}', { v0: d.num ?? (i + 1), v1: d.dataInicio ? ` &nbsp; ${d.dataInicio} → ${d.dataFim}` : '' });
     return `
       <div class="price-row">
         <span class="price-desc">${label}</span>
@@ -80,7 +81,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
   // ── Consumo (price-row pattern) ───────────────────────────────────────────
   const consumoBlockHtml = (!incluirConsumo || consumos.length === 0) ? '' : `
     <div class="consumo-sep"></div>
-    <div class="consumo-header">Consumo</div>
+    <div class="consumo-header">${tr('Consumo')}</div>
     ${consumos.map((c) => `
       <div class="price-row">
         <span class="price-desc">${c.item || c.descricao || '—'}${c.quantidade ? ` <span class="price-qty">×${c.quantidade}</span>` : ''}</span>
@@ -99,7 +100,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
       ${diariasHtml}
       ${consumoBlockHtml}
       <div class="total-row">
-        <span class="total-label">Total${incluirConsumo && consumos.length > 0 ? ' (Hospedagem + Consumo)' : ''}</span>
+        <span class="total-label">${tr('Total')}${incluirConsumo && consumos.length > 0 ? ` ${tr('(Hospedagem + Consumo)')}` : ''}</span>
         <span class="total-val">${brl(grandTotal)}</span>
       </div>
     </div>`;
@@ -107,7 +108,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
   // ── Pagamentos ────────────────────────────────────────────────────────────
   const pagsHtml = pagamentos.length === 0 ? '' : `
     <div class="pags-section" style="margin-top:20px">
-      <div class="pags-title">Pagamentos</div>
+      <div class="pags-title">${tr('Pagamentos')}</div>
       ${pagamentos.map((p) => {
         const dtPag = (() => {
           if (!p.data && !p.dataRegistro) return '';
@@ -119,7 +120,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
             ${p.descricao       ? `<span class="pag-forma">${p.descricao}</span>`                                   : ''}
             ${p.nomePagador     ? `<span class="pag-nome">${p.nomePagador}</span>`                                  : ''}
             ${dtPag || p.formaPagamento ? `<span class="pag-data">${[dtPag, p.formaPagamento].filter(Boolean).join(' · ')}</span>` : ''}
-            ${p.funcionario     ? `<span class="pag-func">registrado por ${p.funcionario}</span>`                   : ''}
+            ${p.funcionario     ? `<span class="pag-func">${tr('registrado por {{nome}}', { nome: p.funcionario })}</span>`                   : ''}
           </div>
           <span class="pag-val">${brl(p.valor)}</span>
         </div>`;
@@ -130,11 +131,11 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
   const stripStyle = pagamentos.length === 0 ? 'style="margin-top:20px;border-radius:0 0 8px 8px;border-top:1px solid #e2e8f0"' : '';
   const stripHtml  = `
     <div class="price-strip" ${stripStyle}>
-      <div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(pendente)}</b></div>
+      <div class="price-strip-item">${tr('Pendente')} &nbsp;<b class="pendente-val">${brl(pendente)}</b></div>
       <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
+      <div class="price-strip-item">${tr('Pago')} &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
       <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(grandTotal)}</b></div>
+      <div class="price-strip-item">${tr('Valor Total')} &nbsp;<b>${brl(grandTotal)}</b></div>
     </div>`;
 
   // ── Date band ─────────────────────────────────────────────────────────────
@@ -142,7 +143,7 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
   const checkoutDate = (sv.saidaPrevista    || '').split(' ')[0] || '—';
   const bandHtml = `<div class="periodo-band">${checkinDate} → ${checkoutDate} · ${fn(sv.totalDiarias ?? 0)}</div>`;
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
+  const html = `<!DOCTYPE html><html lang="${locale()}"><head>
   <meta charset="utf-8">
   <title>${docTitle}</title>
   <style>
@@ -200,13 +201,13 @@ export const gerarVoucherHospedagem = ({ quarto, servico, incluirConsumo = false
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">maishospedagem &nbsp;|&nbsp; Voucher de Hospedagem${incluirConsumo ? ' + Consumo' : ''}</div>
-    <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
+    <div class="doc-title">maishospedagem &nbsp;|&nbsp; ${tr('Voucher de Hospedagem')}${incluirConsumo ? ` + ${tr('Consumo')}` : ''}</div>
+    <div class="doc-sub">${tr('Gerado em {{data}}', { data: new Date().toLocaleDateString(locale(), { day: '2-digit', month: 'long', year: 'numeric' }) })}${userName ? ` ${tr('por {{nome}}', { nome: userName })}` : ''}</div>
     <div class="info-grid">
-      <div class="info-item"><label>Apartamento</label><span>${quarto.numero}</span></div>
-      <div class="info-item"><label>Categoria</label><span>${quarto.categoria || '—'}${quarto.tipoOcupacao ? ` · ${quarto.tipoOcupacao}` : ''}</span></div>
-      <div class="info-item"><label>Titular</label><span>${titularNome || '—'}</span></div>
-      <div class="info-item"><label>Total de Noites</label><span>${sv.totalDiarias ?? '—'}</span></div>
+      <div class="info-item"><label>${tr('Apartamento')}</label><span>${quarto.numero}</span></div>
+      <div class="info-item"><label>${tr('Categoria')}</label><span>${quarto.categoria || '—'}${quarto.tipoOcupacao ? ` · ${quarto.tipoOcupacao}` : ''}</span></div>
+      <div class="info-item"><label>${tr('Titular')}</label><span>${titularNome || '—'}</span></div>
+      <div class="info-item"><label>${tr('Total de Noites')}</label><span>${sv.totalDiarias ?? '—'}</span></div>
     </div>
   </div>
   ${bandHtml}

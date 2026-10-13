@@ -17,6 +17,7 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { relatorioDiaPdf, relatorioFiltroPdf } from './financeiroReport';
 
 import styles from './FinancialDashboard.module.css';
+import { tr } from '../../i18n';
 
 // ─── Money helpers ─────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const ACCENT_HEX = {
 };
 const methodColor = (m) => ACCENT_HEX[accentOf(m)] ?? '#7c3aed';
 
-const fmtQuarto = (q) => `Quarto ${q.id} - ${q.descricao}`;
+const fmtQuarto = (q) => tr('Quarto {{id}} - {{descricao}}', { id: q.id, descricao: q.descricao });
 
 // ─────────────────────────────────────────────────────────────
 export default function FinancialDashboard() {
@@ -138,7 +139,7 @@ export default function FinancialDashboard() {
       setGrupos(res?.page?.content ?? []);
       setPagamentos(res?.pagamentos ?? {});
     } catch {
-      showNotif('Erro ao carregar lançamentos.', 'error');
+      showNotif(tr('Erro ao carregar lançamentos.'), 'error');
     } finally {
       setLoadingData(false);
     }
@@ -175,10 +176,10 @@ export default function FinancialDashboard() {
         ...(_quarto ? { quarto: { id: Number(_quarto) } } : {}),
       };
       await relatorioApi.criar(body, _arquivo ?? null);
-      showNotif('Lançamento adicionado!');
+      showNotif(tr('Lançamento adicionado!'));
       fetchData(activeFilters);
     } catch (e) {
-      showNotif(e.message || 'Erro ao adicionar.', 'error');
+      showNotif(e.message || tr('Erro ao adicionar.'), 'error');
     } finally {
       setIsSubmitting(false);
       setShowPaymentAdd(false);
@@ -215,10 +216,10 @@ export default function FinancialDashboard() {
       };
       await relatorioApi.atualizar(body, _arqEdit ?? null);
       setShowEdit(false);
-      showNotif('Lançamento editado!');
+      showNotif(tr('Lançamento editado!'));
       fetchData(activeFilters);
     } catch (e) {
-      showNotif(e.message || 'Erro ao editar.', 'error');
+      showNotif(e.message || tr('Erro ao editar.'), 'error');
     } finally { setIsSubmitting(false); }
   };
 
@@ -279,13 +280,13 @@ export default function FinancialDashboard() {
   };
   const periodoLabel = (() => {
     const totalTx = methodEntries.reduce((acc, [, v]) => acc + (v.amount ?? 0), 0);
-    const totalTxLabel = `Total de transações: ${totalTx}`;
+    const totalTxLabel = tr('Total de transações: {{totalTx}}', { totalTx });
     const ini = activeFilters.data_inicio;
     const fim = activeFilters.data_fim;
     let periodo = '';
     if (ini && fim)   periodo = ini === fim ? brDate(ini) : `${brDate(ini)} – ${brDate(fim)}`;
-    else if (ini)     periodo = `A partir de ${brDate(ini)}`;
-    else if (fim)     periodo = `Até ${brDate(fim)}`;
+    else if (ini)     periodo = tr('A partir de {{data}}', { data: brDate(ini) });
+    else if (fim)     periodo = tr('Até {{data}}', { data: brDate(fim) });
     return periodo ? `${totalTxLabel} · ${periodo}` : totalTxLabel;
   })();
 
@@ -306,22 +307,22 @@ export default function FinancialDashboard() {
   const filtrosResumo = () => {
     const parts = [];
     if (activeFilters.data_inicio || activeFilters.data_fim) {
-      parts.push({ type: 'periodo', label: 'Período', value: `${activeFilters.data_inicio ? brDate(activeFilters.data_inicio) : '…'} a ${activeFilters.data_fim ? brDate(activeFilters.data_fim) : '…'}` });
+      parts.push({ type: 'periodo', label: tr('Período'), value: `${activeFilters.data_inicio ? brDate(activeFilters.data_inicio) : '…'} a ${activeFilters.data_fim ? brDate(activeFilters.data_fim) : '…'}` });
     }
     if (activeFilters.registro) {
-      parts.push({ type: 'registro', label: 'Tipo', value: activeFilters.registro === 'ENTRADA' ? 'Entradas' : 'Saídas' });
+      parts.push({ type: 'registro', label: tr('Tipo'), value: activeFilters.registro === 'ENTRADA' ? tr('Entradas') : tr('Saídas') });
     }
     if (activeFilters.tipo_pagamento_id) {
       const tp = tiposPagamento.find(t => t.id === activeFilters.tipo_pagamento_id);
-      parts.push({ type: 'pagamento', label: 'Pagamento', value: tp?.descricao ?? activeFilters.tipo_pagamento_id });
+      parts.push({ type: 'pagamento', label: tr('Pagamento'), value: tp?.descricao ?? activeFilters.tipo_pagamento_id });
     }
     if (activeFilters.quarto_id) {
       const q = quartos.find(x => x.id === activeFilters.quarto_id);
-      parts.push({ type: 'quarto', label: 'Quarto', value: q ? fmtQuarto(q) : activeFilters.quarto_id });
+      parts.push({ type: 'quarto', label: tr('Quarto'), value: q ? fmtQuarto(q) : activeFilters.quarto_id });
     }
     if (activeFilters.funcionario_id) {
       const f = funcionarios.find(x => x.id === activeFilters.funcionario_id);
-      parts.push({ type: 'funcionario', label: 'Funcionário', value: f?.pessoa?.nome ?? activeFilters.funcionario_id });
+      parts.push({ type: 'funcionario', label: tr('Funcionário'), value: f?.pessoa?.nome ?? activeFilters.funcionario_id });
     }
     return parts;
   };
@@ -386,25 +387,25 @@ export default function FinancialDashboard() {
                   <div className={[styles.kpi, styles.kpiIn].join(' ')} style={{ animationDelay: '0ms' }}>
                     <div className={styles.kpiTop}>
                       <span className={styles.kpiIcon}><ArrowUpRight size={16} /></span>
-                      <span className={styles.kpiLabel}>Receita total</span>
+                      <span className={styles.kpiLabel}>{tr('Receita total')}</span>
                     </div>
                     <div className={styles.kpiValue}>{fmt(total.receitas)}</div>
                   </div>
                   <div className={[styles.kpi, styles.kpiOut].join(' ')} style={{ animationDelay: '60ms' }}>
                     <div className={styles.kpiTop}>
                       <span className={styles.kpiIcon}><ArrowDownRight size={16} /></span>
-                      <span className={styles.kpiLabel}>Despesa total</span>
+                      <span className={styles.kpiLabel}>{tr('Despesa total')}</span>
                     </div>
                     <div className={styles.kpiValue}>{fmt(Math.abs(total.despesas))}</div>
                   </div>
                   <div className={[styles.kpi, styles.kpiNet].join(' ')} style={{ animationDelay: '120ms' }}>
                     <div className={styles.kpiTop}>
                       <span className={styles.kpiIcon}><Wallet size={16} /></span>
-                      <span className={styles.kpiLabel}>Lucro</span>
+                      <span className={styles.kpiLabel}>{tr('Lucro')}</span>
                     </div>
                     <div className={[styles.kpiValue, total.lucro < 0 ? styles.kpiNeg : ''].join(' ')}>{fmt(total.lucro)}</div>
                     {total.receitas > 0 && (
-                      <span className={styles.kpiMargin}>Margem de {Math.round((total.lucro / total.receitas) * 100)}%</span>
+                      <span className={styles.kpiMargin}>{tr('Margem de')} {Math.round((total.lucro / total.receitas) * 100)}%</span>
                     )}
                   </div>
                   {(() => {
@@ -414,10 +415,10 @@ export default function FinancialDashboard() {
                       <div className={[styles.kpi, styles.kpiCash].join(' ')} style={{ animationDelay: '180ms' }}>
                         <div className={styles.kpiTop}>
                           <span className={styles.kpiIcon}><Banknote size={16} /></span>
-                          <span className={styles.kpiLabel}>Saldo do Caixa</span>
+                          <span className={styles.kpiLabel}>{tr('Saldo do Caixa')}</span>
                         </div>
                         <div className={[styles.kpiValue, cv.lucro < 0 ? styles.kpiNeg : ''].join(' ')}>{fmt(cv.lucro)}</div>
-                        <span className={styles.kpiMargin}>Dinheiro em espécie</span>
+                        <span className={styles.kpiMargin}>{tr('Dinheiro em espécie')}</span>
                       </div>
                     );
                   })()}
@@ -426,7 +427,7 @@ export default function FinancialDashboard() {
                 {methodEntries.length > 0 && (
                   <div className={styles.dist} style={{ animationDelay: '180ms' }}>
                     <div className={styles.distHead}>
-                      <span className={styles.distTitle}>Receita por forma de pagamento</span>
+                      <span className={styles.distTitle}>{tr('Receita por forma de pagamento')}</span>
                       <span className={styles.distTxTotal}>{periodoLabel}</span>
                     </div>
                     <div className={styles.distBar}>
@@ -444,7 +445,7 @@ export default function FinancialDashboard() {
                       {methodEntries.map(([m, v]) => (
                         <div key={m} className={styles.distChip}>
                           <span className={styles.distDot} style={{ background: methodColor(m) }} />
-                          <span className={styles.distCount} title={`${v.amount ?? 0} ${(v.amount ?? 0) === 1 ? 'lançamento' : 'lançamentos'}`}>
+                          <span className={styles.distCount} title={`${v.amount ?? 0} ${(v.amount ?? 0) === 1 ? tr('lançamento') : tr('lançamentos')}`}>
                             {v.amount ?? 0}
                           </span>
                           <PayMethodIcon descricao={m} size={12} className={styles.distIcon} />
@@ -464,10 +465,10 @@ export default function FinancialDashboard() {
                   <div className={styles.cashGlow} />
                   <div className={styles.cashIcon}><Banknote size={22} /></div>
                   <div className={styles.cashBody}>
-                    <span className={styles.cashLabel}>Saldo em caixa · Dinheiro</span>
+                    <span className={styles.cashLabel}>{tr('Saldo em caixa · Dinheiro')}</span>
                     <div className={styles.cashSub}>
-                      <span className={styles.cashUp}><ArrowUpRight size={14} /> Entradas {fmt(v.receitas)}</span>
-                      <span className={styles.cashDown}><ArrowDownRight size={14} /> Saídas {fmt(Math.abs(v.despesas))}</span>
+                      <span className={styles.cashUp}><ArrowUpRight size={14} /> {tr('Entradas')} {fmt(v.receitas)}</span>
+                      <span className={styles.cashDown}><ArrowDownRight size={14} /> {tr('Saídas')} {fmt(Math.abs(v.despesas))}</span>
                     </div>
                   </div>
                   <div className={styles.cashValue}>{fmt(v.lucro)}</div>
@@ -484,32 +485,32 @@ export default function FinancialDashboard() {
                 <div className={styles.searchWrap}>
                   <Search size={13} className={styles.searchIcon} />
                   <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                    placeholder="Buscar lançamento..." className={styles.searchInput} />
+                    placeholder={tr('Buscar lançamento...')} className={styles.searchInput} />
                 </div>
                 {canFiltros && (
                   <Button onClick={() => setShowFilter(true)}>
-                    <Filter size={14} /> Filtros
+                    <Filter size={14} /> {tr('Filtros')}
                     {nFilters > 0 && <span className={styles.filterBadge}>{nFilters}</span>}
                   </Button>
                 )}
                 {canFiltros && nFilters > 0 && (
                   <button type="button" className={styles.clearFilterBtn}
-                    onClick={clearFilter} title="Remover filtros" aria-label="Remover filtros">
+                    onClick={clearFilter} title={tr('Remover filtros')} aria-label={tr('Remover filtros')}>
                     <X size={14} />
                   </button>
                 )}
                 {canFiltros && nFilters > 0 && (
-                  <Button onClick={baixarRelatorioFiltro} title="Baixar relatório da busca filtrada">
-                    <Download size={14} /> Relatório PDF
+                  <Button onClick={baixarRelatorioFiltro} title={tr('Baixar relatório da busca filtrada')}>
+                    <Download size={14} /> {tr('Relatório PDF')}
                   </Button>
                 )}
                 {canNovoLancamento && (
                   <>
                     <Button variant="success" onClick={openNovaReceita}>
-                      <Plus size={14} /> Nova Receita
+                      <Plus size={14} /> {tr('Nova Receita')}
                     </Button>
                     <Button variant="danger" onClick={openNovaDespesa}>
-                      <Plus size={14} /> Nova Despesa
+                      <Plus size={14} /> {tr('Nova Despesa')}
                     </Button>
                   </>
                 )}
@@ -518,7 +519,7 @@ export default function FinancialDashboard() {
 
             {canFiltros && nFilters > 0 && (
               <div className={styles.activeFiltersBar}>
-                <span className={styles.activeFiltersTitle}>Filtros aplicados:</span>
+                <span className={styles.activeFiltersTitle}>{tr('Filtros aplicados:')}</span>
                 {filtrosResumo().map(p => (
                   <span key={p.type} className={styles.filterChip}>
                     <span className={styles.filterChipLabel}>{p.label}:</span>
@@ -527,8 +528,8 @@ export default function FinancialDashboard() {
                       type="button"
                       className={styles.filterChipRemove}
                       onClick={() => removeFiltro(p.type)}
-                      title={`Remover filtro: ${p.label}`}
-                      aria-label={`Remover filtro: ${p.label}`}>
+                      title={tr('Remover filtro: {{label}}', { label: p.label })}
+                      aria-label={tr('Remover filtro: {{label}}', { label: p.label })}>
                       <X size={12} />
                     </button>
                   </span>
@@ -538,12 +539,12 @@ export default function FinancialDashboard() {
 
             {loadingData ? (
               <div className={styles.loadingInline}>
-                <Loader2 size={17} className={styles.spinnerInline} /> Carregando...
+                <Loader2 size={17} className={styles.spinnerInline} /> {tr('Carregando...')}
               </div>
             ) : visibleGrupos.length === 0 ? (
               <div className={styles.empty}>
                 <AlertCircle size={26} opacity={0.3} />
-                <span>Nenhum lançamento encontrado.</span>
+                <span>{tr('Nenhum lançamento encontrado.')}</span>
               </div>
             ) : (
               <div className={styles.groupList}>
@@ -560,28 +561,28 @@ export default function FinancialDashboard() {
                           <ChevronDown size={14} className={[styles.chev, isOpen ? '' : styles.chevCollapsed].join(' ')} />
                           <Calendar size={13} className={styles.iconViolet} />
                           <span className={styles.groupDate}>{data}</span>
-                          <span className={styles.badge}>{_items.length} {_items.length === 1 ? 'lançamento' : 'lançamentos'}</span>
+                          <span className={styles.badge}>{_items.length} {_items.length === 1 ? tr('lançamento') : tr('lançamentos')}</span>
                         </div>
                         {canValorTotalDia && (
                           <div className={styles.groupRight}>
                             <span className={styles.groupRightItem}>
-                              <span className={styles.groupRightLabel}>Receita total do dia:</span>
+                              <span className={styles.groupRightLabel}>{tr('Receita total do dia:')}</span>
                               <b className={styles.moneyPlus}>{fmt(total_entrada_dia)}</b>
                             </span>
                             <span className={styles.groupRightItem}>
-                              <span className={styles.groupRightLabel}>Total de despesas:</span>
+                              <span className={styles.groupRightLabel}>{tr('Total de despesas:')}</span>
                               <b className={styles.moneyMinus}>{fmt(total_saida_dia)}</b>
                             </span>
                             <span className={styles.groupRightItem}>
-                              <span className={styles.groupRightLabel}>Lucro do dia:</span>
+                              <span className={styles.groupRightLabel}>{tr('Lucro do dia:')}</span>
                               <b className={dayL >= 0 ? styles.money_emerald : styles.moneyMinus}>{fmt(dayL)}</b>
                             </span>
                             <button
                               type="button"
                               className={styles.dayReportBtn}
-                              title="Baixar relatório do dia"
+                              title={tr('Baixar relatório do dia')}
                               onClick={(e) => { e.stopPropagation(); baixarRelatorioDia(g); }}>
-                              <Download size={12} /> Relatório do dia
+                              <Download size={12} /> {tr('Relatório do dia')}
                             </button>
                           </div>
                         )}
@@ -592,9 +593,9 @@ export default function FinancialDashboard() {
                           <table className={styles.table}>
                             <thead><tr>
                               <th style={{ width: 36 }}></th>
-                              <th>Descrição</th>
-                              <th style={{ width: 140, textAlign: 'right' }}>Valor</th>
-                              {canHistoricoSaldo && <th className={styles.colSaldo} style={{ width: 150, textAlign: 'right' }}>Saldo Dinheiro</th>}
+                              <th>{tr('Descrição')}</th>
+                              <th style={{ width: 140, textAlign: 'right' }}>{tr('Valor')}</th>
+                              {canHistoricoSaldo && <th className={styles.colSaldo} style={{ width: 150, textAlign: 'right' }}>{tr('Saldo Dinheiro')}</th>}
                             </tr></thead>
                             <tbody>
                               {_items.map(t => {
@@ -612,12 +613,12 @@ export default function FinancialDashboard() {
                                     </td>
                                     <td>
                                       <div className={styles.desc}>
-                                        {t.editado && <span className={styles.editadoTag}>(Editado)</span>}
+                                        {t.editado && <span className={styles.editadoTag}>{tr('(Editado)')}</span>}
                                         {t.relatorio ?? '—'}
                                       </div>
                                       <div className={styles.subdesc}>
                                         {t.data_hora_registro} · {metDesc ?? '—'}
-                                        {t.despesa_pessoal && <span className={styles.pessoalTag}>Despesa Interna</span>}
+                                        {t.despesa_pessoal && <span className={styles.pessoalTag}>{tr('Despesa Interna')}</span>}
                                       </div>
                                     </td>
                                     <td className={styles.valorCell}>
@@ -661,13 +662,13 @@ export default function FinancialDashboard() {
       </div>
 
       {/* ══ MODAL: DETALHE ══════════════════════════════════ */}
-      <Modal open={showDetail && !!item} onClose={() => setShowDetail(false)} title="Lançamento"
+      <Modal open={showDetail && !!item} onClose={() => setShowDetail(false)} title={tr('Lançamento')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowDetail(false)} className={styles.full}>Fechar</Button>
+            <Button onClick={() => setShowDetail(false)} className={styles.full}>{tr('Fechar')}</Button>
             {canEditar && (
               <Button variant="primary" onClick={openEdit} className={styles.full}>
-                <Edit2 size={13} /> Editar
+                <Edit2 size={13} /> {tr('Editar')}
               </Button>
             )}
           </div>
@@ -676,12 +677,12 @@ export default function FinancialDashboard() {
           <div className={styles.detailGrid}>
 
             {/* ── Lançamento ── */}
-            <div className={styles.detailSection}>Lançamento</div>
+            <div className={styles.detailSection}>{tr('Lançamento')}</div>
             {[
-              ['Descrição',   item.relatorio ?? '—'],
-              ['Data / Hora', item.data_hora_registro ?? '—'],
-              ['Funcionário', item.funcionario?.nome ?? '—'],
-              ['Quarto',      item.quarto ? fmtQuarto(item.quarto) : '—'],
+              [tr('Descrição'),   item.relatorio ?? '—'],
+              [tr('Data / Hora'), item.data_hora_registro ?? '—'],
+              [tr('Funcionário'), item.funcionario?.nome ?? '—'],
+              [tr('Quarto'),      item.quarto ? fmtQuarto(item.quarto) : '—'],
             ].map(([label, val]) => (
               <div key={label} className={styles.detailRow}>
                 <span className={styles.detailLabel}>{label}</span>
@@ -690,17 +691,17 @@ export default function FinancialDashboard() {
             ))}
             {item.despesa_pessoal && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Tipo</span>
-                <span className={styles.pessoalTag}>Despesa Interna</span>
+                <span className={styles.detailLabel}>{tr('Tipo')}</span>
+                <span className={styles.pessoalTag}>{tr('Despesa Interna')}</span>
               </div>
             )}
 
             {/* ── Pagamento ── */}
-            <div className={styles.detailSection}>Pagamento</div>
+            <div className={styles.detailSection}>{tr('Pagamento')}</div>
             {[
               ['UUID',          item.pagamento?.uuid ?? '—'],
-              ['Pagador',       item.pagamento?.nome_pagador ?? '—'],
-              ['Forma',         item.pagamento?.tipo_pagamento?.descricao ?? '—'],
+              [tr('Pagador'),       item.pagamento?.nome_pagador ?? '—'],
+              [tr('Forma'),         item.pagamento?.tipo_pagamento?.descricao ?? '—'],
             ].map(([label, val]) => (
               <div key={label} className={styles.detailRow}>
                 <span className={styles.detailLabel}>{label}</span>
@@ -709,16 +710,16 @@ export default function FinancialDashboard() {
             ))}
             {item.pagamento?.path_arquivo && (
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Comprovante</span>
+                <span className={styles.detailLabel}>{tr('Comprovante')}</span>
                 <button className={styles.arquivoLink}
                   onClick={() => arquivoApi.abrir(item.pagamento.path_arquivo)}>
-                  <Download size={13} /> Ver comprovante
+                  <Download size={13} /> {tr('Ver comprovante')}
                 </button>
               </div>
             )}
 
             {/* ── Valor ── */}
-            <div className={styles.detailSection}>Valor</div>
+            <div className={styles.detailSection}>{tr('Valor')}</div>
             {item.pagamento?.desconto ? (() => {
               const d     = item.pagamento.desconto;
               const bruto = Math.abs(item.pagamento?.valor ?? item.valor);
@@ -727,64 +728,64 @@ export default function FinancialDashboard() {
               const sign  = item.valor >= 0 ? '+' : '−';
               return (<>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Valor bruto</span>
+                  <span className={styles.detailLabel}>{tr('Valor bruto')}</span>
                   <span className={styles.detailVal}>{sign}{fmt(bruto)}</span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Desconto</span>
+                  <span className={styles.detailLabel}>{tr('Desconto')}</span>
                   <span className={styles.detailMinus} style={{ fontSize: 13 }}>
                     −{fmt(desc)}{d.porcentagem > 0 ? ` (${d.porcentagem}%)` : ''}
                   </span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Valor final</span>
+                  <span className={styles.detailLabel}>{tr('Valor final')}</span>
                   <span className={item.valor >= 0 ? styles.detailPlus : styles.detailMinus}>
                     {sign}{fmt(final)}
                   </span>
                 </div>
                 {canHistoricoSaldo && (
                   <div className={styles.detailRow}>
-                    <span className={styles.detailLabel}>Saldo Dinheiro</span>
+                    <span className={styles.detailLabel}>{tr('Saldo Dinheiro')}</span>
                     <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
                   </div>
                 )}
-                <div className={styles.detailSection}>Desconto</div>
+                <div className={styles.detailSection}>{tr('Desconto')}</div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>UUID</span>
+                  <span className={styles.detailLabel}>{tr('UUID')}</span>
                   <span className={styles.detailVal}>{d.uuid ?? '—'}</span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Autorizado por</span>
+                  <span className={styles.detailLabel}>{tr('Autorizado por')}</span>
                   <span className={styles.detailVal}>{d.funcionario?.nome ?? '—'}</span>
                 </div>
                 <div className={styles.detailRow}>
-                  <span className={styles.detailLabel}>Data / Hora</span>
+                  <span className={styles.detailLabel}>{tr('Data / Hora')}</span>
                   <span className={styles.detailVal}>{d.data_hora_registro ?? '—'}</span>
                 </div>
               </>);
             })() : (<>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Valor</span>
+                <span className={styles.detailLabel}>{tr('Valor')}</span>
                 <span className={item.valor >= 0 ? styles.detailPlus : styles.detailMinus}>
                   {item.valor >= 0 ? '+' : '−'}{fmt(Math.abs(item.valor))}
                 </span>
               </div>
               <div className={styles.detailRow}>
-                <span className={styles.detailLabel}>Saldo Dinheiro</span>
+                <span className={styles.detailLabel}>{tr('Saldo Dinheiro')}</span>
                 <span className={styles.detailVal}>{fmt(item.valor_historico_dinheiro ?? 0)}</span>
               </div>
             </>)}
 
             {/* ── Histórico de alterações ── */}
             <div className={styles.detailSection}>
-              <History size={12} className={styles.detailSectionIcon} /> Histórico de alterações
+              <History size={12} className={styles.detailSectionIcon} /> {tr('Histórico de alterações')}
             </div>
             {loadingHist ? (
               <div className={styles.histLoading}>
-                <Loader2 size={14} className={styles.spinnerInline} /> Carregando histórico...
+                <Loader2 size={14} className={styles.spinnerInline} /> {tr('Carregando histórico...')}
               </div>
             ) : historico.length === 0 ? (
-              <div className={styles.histEmpty}>Nenhuma alteração registrada.</div>
+              <div className={styles.histEmpty}>{tr('Nenhuma alteração registrada.')}</div>
             ) : (
               <div className={styles.histList}>
                 {historico.map(h => (
@@ -813,31 +814,31 @@ export default function FinancialDashboard() {
       </Modal>
 
       {/* ══ MODAL: EDITAR ═══════════════════════════════════ */}
-      <Modal open={showEdit} onClose={() => setShowEdit(false)} title="Editar Lançamento"
+      <Modal open={showEdit} onClose={() => setShowEdit(false)} title={tr('Editar Lançamento')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEdit(false)} className={styles.full}>Cancelar</Button>
+            <Button onClick={() => setShowEdit(false)} className={styles.full}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleEdit} disabled={isSubmitting} className={styles.full}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinnerInline} /> Salvando...</> : 'Salvar'}
+              {isSubmitting ? <><Loader2 size={13} className={styles.spinnerInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }>
-        <FormField label="Tipo">
+        <FormField label={tr('Tipo')}>
           <Select value={editTipoRegistro} onChange={e => setEditTipoRegistro(e.target.value)}>
-            <option value="ENTRADA">Receita (+)</option>
-            <option value="SAIDA">Despesa (−)</option>
+            <option value="ENTRADA">{tr('Receita (+)')}</option>
+            <option value="SAIDA">{tr('Despesa (−)')}</option>
           </Select>
         </FormField>
-        <FormField label="Quarto">
+        <FormField label={tr('Quarto')}>
           <Select value={editQuarto} onChange={e => setEditQuarto(e.target.value)}>
-            <option value="">Nenhum</option>
+            <option value="">{tr('Nenhum')}</option>
             {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
           </Select>
         </FormField>
         <label className={styles.checkRow}>
           <input type="checkbox" checked={editPessoal}
             onChange={e => setEditPessoal(e.target.checked)} />
-          <span>Despesa interna do Hotel</span>
+          <span>{tr('Despesa interna do Hotel')}</span>
         </label>
 
         {editPagamento ? (
@@ -846,53 +847,53 @@ export default function FinancialDashboard() {
             <span>{descPag(editPagamento)}</span>
             {canEditarPagamento && (
               <button className={styles.pagamentoEdit} onClick={() => setShowPaymentEdit(true)}>
-                Alterar
+                {tr('Alterar')}
               </button>
             )}
           </div>
         ) : canEditarPagamento && (
           <button className={styles.definePagamento} onClick={() => setShowPaymentEdit(true)}>
-            <CreditCard size={13} /> Definir Pagamento
+            <CreditCard size={13} /> {tr('Definir Pagamento')}
           </button>
         )}
       </Modal>
 
       {/* ══ MODAL: FILTROS ══════════════════════════════════ */}
-      <Modal open={showFilter} onClose={() => setShowFilter(false)} title="Filtros"
+      <Modal open={showFilter} onClose={() => setShowFilter(false)} title={tr('Filtros')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={clearFilter} className={styles.full}>Limpar</Button>
-            <Button variant="primary" onClick={applyFilter} className={styles.full}>Aplicar</Button>
+            <Button onClick={clearFilter} className={styles.full}>{tr('Limpar')}</Button>
+            <Button variant="primary" onClick={applyFilter} className={styles.full}>{tr('Aplicar')}</Button>
           </div>
         }>
         <DatePicker
-          mode="range" label="Período"
+          mode="range" label={tr('Período')}
           startDate={fStart} endDate={fEnd}
           onRangeChange={({ start, end }) => { setFStart(start); setFEnd(end); }}
-          placeholder="Selecione o período..."
+          placeholder={tr('Selecione o período...')}
         />
-        <FormField label="Tipo de Valor">
+        <FormField label={tr('Tipo de Valor')}>
           <Select value={fValores} onChange={e => setFValores(e.target.value)}>
-            <option value="">Selecione</option>
-            <option value="ENTRADA">Entradas</option>
-            <option value="SAIDA">Saídas</option>
+            <option value="">{tr('Selecione')}</option>
+            <option value="ENTRADA">{tr('Entradas')}</option>
+            <option value="SAIDA">{tr('Saídas')}</option>
           </Select>
         </FormField>
-        <FormField label="Tipo de Pagamento">
+        <FormField label={tr('Tipo de Pagamento')}>
           <Select value={fPagId} onChange={e => setFPagId(e.target.value)}>
-            <option value="">Selecione</option>
+            <option value="">{tr('Selecione')}</option>
             {tiposPagamento.map(tp => <option key={tp.id} value={tp.id}>{tp.descricao}</option>)}
           </Select>
         </FormField>
-        <FormField label="Quarto">
+        <FormField label={tr('Quarto')}>
           <Select value={fQuarto} onChange={e => setFQuarto(e.target.value)}>
-            <option value="">Selecione</option>
+            <option value="">{tr('Selecione')}</option>
             {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
           </Select>
         </FormField>
-        <FormField label="Funcionário">
+        <FormField label={tr('Funcionário')}>
           <Select value={fFuncId} onChange={e => setFFuncId(e.target.value)}>
-            <option value="">Selecione</option>
+            <option value="">{tr('Selecione')}</option>
             {funcionarios.map(f => (
               <option key={f.id} value={f.id}>{f.pessoa?.nome}</option>
             ))}

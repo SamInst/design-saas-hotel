@@ -4,6 +4,7 @@ import { Button } from '../../../../components/ui/Button';
 import { Select, Input } from '../../../../components/ui/Input';
 import { fmtBRL } from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
+import { tr } from '../../../../i18n';
 
 export default function AtribuirLimpezaModal({
   atribuirLimpezaModal, setAtribuirLimpezaModal,
@@ -26,24 +27,23 @@ export default function AtribuirLimpezaModal({
           open
           onClose={() => setCheckoutAntecipado(false)}
           size="sm"
-          title={<><AlertTriangle size={15} /> Finalização Antecipada</>}
+          title={<><AlertTriangle size={15} /> {tr('Finalização Antecipada')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setCheckoutAntecipado(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => setCheckoutAntecipado(false)}>{tr('Cancelar')}</Button>
               <Button variant="danger" onClick={() => { setCheckoutAntecipado(false); _prosseguirFinalizar(); }}>
-                Finalizar mesmo assim
+                {tr('Finalizar mesmo assim')}
               </Button>
             </div>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-              O checkout previsto do <strong>Apt. {selectedRoom.numero}</strong> é{' '}
-              <strong style={{ color: '#d97706' }}>{selectedRoom.servico?.saidaPrevista?.split(' ')[0] || '—'}</strong>,
-              diferente de hoje.
+              {tr('O checkout previsto do')} <strong>{tr('Apt.')} {selectedRoom.numero}</strong> {tr('é')}{' '}
+              <strong style={{ color: '#d97706' }}>{selectedRoom.servico?.saidaPrevista?.split(' ')[0] || '—'}</strong>{tr(', diferente de hoje.')}
             </p>
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-              Deseja finalizar o pernoite antes da data prevista?
+              {tr('Deseja finalizar o pernoite antes da data prevista?')}
             </p>
           </div>
         </Modal>
@@ -55,22 +55,22 @@ export default function AtribuirLimpezaModal({
           open
           onClose={() => setPendingPayWarning(false)}
           size="sm"
-          title={<><AlertTriangle size={15} /> Pagamento Pendente</>}
+          title={<><AlertTriangle size={15} /> {tr('Pagamento Pendente')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setPendingPayWarning(false)} disabled={saving}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => setPendingPayWarning(false)} disabled={saving}>{tr('Cancelar')}</Button>
               <Button variant="danger" onClick={() => { setPendingPayWarning(false); openAtribuirLimpeza('FINALIZADO_PAGAMENTO_PENDENTE'); }} disabled={saving}>
-                Prosseguir mesmo assim
+                {tr('Prosseguir mesmo assim')}
               </Button>
             </div>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-              Ainda há <strong style={{ color: '#d97706' }}>{fmtBRL(selectedRoom.servico?.pagamentoPendente)}</strong> de pagamento pendente no <strong>Apt. {selectedRoom.numero}</strong>.
+              {tr('Ainda há')} <strong style={{ color: '#d97706' }}>{fmtBRL(selectedRoom.servico?.pagamentoPendente)}</strong> {tr('de pagamento pendente no')} <strong>{tr('Apt.')} {selectedRoom.numero}</strong>.
             </p>
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6 }}>
-              Prosseguir com a finalização? O pernoite ficará com o status <strong>Finalizado com Pagamento Pendente</strong>.
+              {tr('Prosseguir com a finalização? O pernoite ficará com o status')} <strong>{tr('Finalizado com Pagamento Pendente')}</strong>.
             </p>
           </div>
         </Modal>
@@ -84,24 +84,24 @@ export default function AtribuirLimpezaModal({
           open
           onClose={() => { setConfirmModal(null); setCancelMotivo?.(''); }}
           size="sm"
-          title={<><XCircle size={15} /> {isPernoite ? 'Cancelar Pernoite' : 'Cancelar Serviço'}</>}
+          title={<><XCircle size={15} /> {isPernoite ? tr('Cancelar Pernoite') : tr('Cancelar Serviço')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => { setConfirmModal(null); setCancelMotivo?.(''); }}>Voltar</Button>
+              <Button variant="secondary" onClick={() => { setConfirmModal(null); setCancelMotivo?.(''); }}>{tr('Voltar')}</Button>
               <Button variant="danger" onClick={handleCancelar} disabled={saving || (isPernoite && !(cancelMotivo || '').trim())}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                {isPernoite ? 'Cancelar Pernoite' : 'Cancelar Serviço'}
+                {isPernoite ? tr('Cancelar Pernoite') : tr('Cancelar Serviço')}
               </Button>
             </div>
           }
         >
           <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, marginBottom: isPernoite ? 14 : 0 }}>
-            Confirma o cancelamento do {isPernoite ? 'pernoite' : 'serviço'} no <strong>Apt. {selectedRoom.numero}</strong>? O quarto ficará disponível.
+            {tr('Confirma o cancelamento do')} {isPernoite ? tr('pernoite') : tr('serviço')} {tr('no')} <strong>{tr('Apt.')} {selectedRoom.numero}</strong>{tr('? O quarto ficará disponível.')}
           </p>
           {isPernoite && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>Motivo do cancelamento *</label>
-              <Input value={cancelMotivo || ''} onChange={(e) => setCancelMotivo?.(e.target.value)} placeholder="Ex.: Desistência do hóspede" autoFocus />
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 6 }}>{tr('Motivo do cancelamento *')}</label>
+              <Input value={cancelMotivo || ''} onChange={(e) => setCancelMotivo?.(e.target.value)} placeholder={tr('Ex.: Desistência do hóspede')} autoFocus />
             </div>
           )}
         </Modal>
@@ -114,35 +114,35 @@ export default function AtribuirLimpezaModal({
           open
           onClose={() => setAtribuirLimpezaModal(null)}
           size="sm"
-          title={<><Sparkles size={15} /> Atribuir Limpeza</>}
+          title={<><Sparkles size={15} /> {tr('Atribuir Limpeza')}</>}
           footer={
             <div className={styles.footerBetween}>
               <Button variant="secondary" onClick={() => handleDoFinalizar(null)} disabled={saving}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                Pular
+                {tr('Pular')}
               </Button>
               <Button variant="primary" onClick={() => handleDoFinalizar(limpezaFuncId || null)} disabled={saving || limpezaFuncsLoading || !limpezaFuncId}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                <CheckCircle size={14} /> Atribuir e Finalizar
+                <CheckCircle size={14} /> {tr('Atribuir e Finalizar')}
               </Button>
             </div>
           }
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <p style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
-              Selecione o funcionário responsável pela limpeza do <strong style={{ color: 'var(--text)' }}>Apt. {selectedRoom.numero}</strong>.
+              {tr('Selecione o funcionário responsável pela limpeza do')} <strong style={{ color: 'var(--text)' }}>{tr('Apt.')} {selectedRoom.numero}</strong>.
             </p>
             {limpezaFuncsLoading ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-2)' }}>
-                <Loader2 size={14} className={styles.spin} /> Carregando funcionários...
+                <Loader2 size={14} className={styles.spin} /> {tr('Carregando funcionários...')}
               </div>
             ) : (
               <Select
-                label="Funcionário"
+                label={tr('Funcionário')}
                 value={limpezaFuncId}
                 onChange={(e) => setLimpezaFuncId(e.target.value)}
               >
-                <option value="">Selecione...</option>
+                <option value="">{tr('Selecione...')}</option>
                 {limpezaFuncs.map((f) => (
                   <option key={f.id} value={f.id}>{f.pessoa?.nome ?? f.nome ?? f.id}</option>
                 ))}

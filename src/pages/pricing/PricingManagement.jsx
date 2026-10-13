@@ -3,7 +3,6 @@ import {
   BedDouble, Calendar, Tag, Users, Clock,
   Plus, Trash2, Loader2, Check,
   Search, X, ChevronLeft, ChevronRight, AlertCircle,
-  Layers,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -13,6 +12,7 @@ import { DatePicker }               from '../../components/ui/DatePicker';
 import { Notification }             from '../../components/ui/Notification';
 import { quartoCategoriApi, quartoApi, sazonalidadeApi } from '../../services/api';
 import styles from './PricingManagement.module.css';
+import { tr } from '../../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtBRL = (v) =>
@@ -206,15 +206,15 @@ function seaFromBackend(s) {
   };
 }
 
-const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const MESES_NOME  = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const DIAS_SEMANA = [tr('Dom'), tr('Seg'), tr('Ter'), tr('Qua'), tr('Qui'), tr('Sex'), tr('Sáb')];
+const MESES_NOME  = [tr('Jan'),tr('Fev'),tr('Mar'),tr('Abr'),tr('Mai'),tr('Jun'),tr('Jul'),tr('Ago'),tr('Set'),tr('Out'),tr('Nov'),tr('Dez')];
 const DIAS_MES    = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const MODO_LABEL = {
-  'data-especifica': 'Data Específica',
-  semanal:           'Semanal',
-  mensal:            'Mensal',
-  anual:             'Anual',
+  'data-especifica': tr('Data Específica'),
+  semanal:           tr('Semanal'),
+  mensal:            tr('Mensal'),
+  anual:             tr('Anual'),
 };
 
 /** "2026-12-01" → "01/12/2026". Deixa passar o que não for ISO. */
@@ -226,15 +226,15 @@ function describeSchedule(s) {
       return `${fmtDataBR(s.dataInicio) || '—'} → ${fmtDataBR(s.dataFim) || '—'}  ${s.horaInicio || ''} / ${s.horaFim || ''}`.trim();
     case 'semanal': {
       const dias = (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ');
-      return `Semanal · ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+      return tr('Semanal · {{v0}} · check-in {{horaCheckin}} / check-out {{horaCheckout}}', { v0: dias || '—', horaCheckin: s.horaCheckin, horaCheckout: s.horaCheckout });
     }
     case 'mensal': {
       const dias = (s.diasMes || []).join(', ');
-      return `Mensal · dias ${dias || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+      return tr('Mensal · dias {{v0}} · check-in {{horaCheckin}} / check-out {{horaCheckout}}', { v0: dias || '—', horaCheckin: s.horaCheckin, horaCheckout: s.horaCheckout });
     }
     case 'anual': {
       const meses = (s.meses || []).map((m) => MESES_NOME[m]).join(', ');
-      return `Anual · ${meses || '—'} · check-in ${s.horaCheckin} / check-out ${s.horaCheckout}`;
+      return tr('Anual · {{v0}} · check-in {{horaCheckin}} / check-out {{horaCheckout}}', { v0: meses || '—', horaCheckin: s.horaCheckin, horaCheckout: s.horaCheckout });
     }
     default: return '';
   }
@@ -242,16 +242,16 @@ function describeSchedule(s) {
 
 // ── Tab constants ─────────────────────────────────────────────────────────────
 const CAT_FORM_TABS   = ['precos', 'dayuse', 'vinculos', 'criancas'];
-const CAT_FORM_LABELS = ['Preços', 'Day Use', 'Quartos & Sazonais', 'Menores de Idade'];
+const CAT_FORM_LABELS = [tr('Preços'), tr('Day Use'), tr('Quartos & Sazonais'), tr('Menores de Idade')];
 const SEA_FORM_TABS   = ['agenda', 'categorias', 'precos', 'dayuse', 'criancas'];
-const SEA_FORM_LABELS = ['Agendamento', 'Categorias', 'Preços', 'Day Use', 'Menores de Idade'];
+const SEA_FORM_LABELS = [tr('Agendamento'), tr('Categorias'), tr('Preços'), tr('Day Use'), tr('Menores de Idade')];
 
 
 const CRIANCAS_MODO_LABEL = {
-  'taxa-fixa':             'Taxa adicional fixa',
-  'taxa-quantidade':       'Taxa por quantidade',
-  'taxa-faixa':            'Taxa por faixa etária',
-  'porcentagem-quantidade':'Porcentagem por quantidade',
+  'taxa-fixa':             tr('Taxa adicional fixa'),
+  'taxa-quantidade':       tr('Taxa por quantidade'),
+  'taxa-faixa':            tr('Taxa por faixa etária'),
+  'porcentagem-quantidade':tr('Porcentagem por quantidade'),
 };
 
 // ── Blank form factories ──────────────────────────────────────────────────────
@@ -339,7 +339,7 @@ function resumoSchedule(s) {
   switch (s.modoOperacao) {
     case 'data-especifica': return `${fmtDataBR(s.dataInicio) || '—'} → ${fmtDataBR(s.dataFim) || '—'}`;
     case 'semanal': return (s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ') || '—';
-    case 'mensal':  return `Dias ${(s.diasMes || []).join(', ') || '—'}`;
+    case 'mensal':  return tr('Dias {{v0}}', { v0: (s.diasMes || []).join(', ') || '—' });
     case 'anual':   return (s.meses || []).map((m) => MESES_NOME[m]).join(', ') || '—';
     default: return '';
   }
@@ -366,7 +366,7 @@ const sk = (...extra) => [styles.sk, ...extra].join(' ');
 
 function SkeletonLista({ linhas = 7 }) {
   return (
-    <div role="status" aria-label="Carregando">
+    <div role="status" aria-label={tr('Carregando')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.listItem} aria-hidden="true">
           <span className={styles.listItemBody}>
@@ -379,29 +379,17 @@ function SkeletonLista({ linhas = 7 }) {
   );
 }
 
-function SkeletonPainel() {
-  return (
-    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
-      {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className={styles.statCard} aria-hidden="true">
-          <span className={sk(styles.skLabel)} />
-          <span className={sk(styles.skNumero)} />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function OccTable({ label, occ, maxPessoas }) {
   return (
     <table className={styles.miniTable}>
-      <thead><tr><th>Pax</th><th>{label}</th></tr></thead>
+      <thead><tr><th>{tr('Capacidade')}</th><th>{label}</th></tr></thead>
       <tbody>
         {Array.from({ length: maxPessoas }, (_, i) => i + 1).map((q) => (
           <tr key={q}>
-            <td>{q} {q === 1 ? 'pessoa' : 'pessoas'}</td>
+            <td>{q} {q === 1 ? tr('pessoa') : tr('pessoas')}</td>
             <td className={styles.miniPrice}>{fmtBRL(occ?.[q])}</td>
           </tr>
         ))}
@@ -415,8 +403,8 @@ function OccInputs({ occ, maxPessoas, onChange }) {
     <div className={styles.inputGrid}>
       {Array.from({ length: maxPessoas }, (_, i) => i + 1).map((q) => (
         <div key={q} className={styles.fieldCard}>
-          <span className={styles.fieldCardLabel}>{q} {q === 1 ? 'pessoa' : 'pessoas'}</span>
-          <Input placeholder="R$ 0,00" value={occ?.[q] ?? ''} onChange={(e) => onChange(q, maskBRL(e.target.value))} />
+          <span className={styles.fieldCardLabel}>{q} {q === 1 ? tr('pessoa') : tr('pessoas')}</span>
+          <Input placeholder={tr('R$ 0,00')} value={occ?.[q] ?? ''} onChange={(e) => onChange(q, maskBRL(e.target.value))} />
         </div>
       ))}
     </div>
@@ -437,14 +425,14 @@ function ScheduleFields({ form, onChange }) {
   if (mode === 'data-especifica') return (
     <>
       <div className={styles.formGrid4}>
-        <FormField label="Data início *">
+        <FormField label={tr('Data início *')}>
           <DatePicker value={strToDate(form.dataInicio)} onChange={(d) => onChange('dataInicio', dateToStr(d))} placeholder="DD/MM/AAAA" />
         </FormField>
-        <FormField label="Data fim *">
+        <FormField label={tr('Data fim *')}>
           <DatePicker value={strToDate(form.dataFim)} onChange={(d) => onChange('dataFim', dateToStr(d))} placeholder="DD/MM/AAAA" />
         </FormField>
-        <FormField label="Check-in *"><TimePicker value={form.horaInicio} onChange={(v) => onChange('horaInicio', v)} /></FormField>
-        <FormField label="Check-out *"><TimePicker value={form.horaFim} onChange={(v) => onChange('horaFim', v)} /></FormField>
+        <FormField label={tr('Check-in *')}><TimePicker value={form.horaInicio} onChange={(v) => onChange('horaInicio', v)} /></FormField>
+        <FormField label={tr('Check-out *')}><TimePicker value={form.horaFim} onChange={(v) => onChange('horaFim', v)} /></FormField>
       </div>
     </>
   );
@@ -452,7 +440,7 @@ function ScheduleFields({ form, onChange }) {
 
   if (mode === 'semanal') return (
     <>
-      <FormField label="Dias da semana *">
+      <FormField label={tr('Dias da semana *')}>
         <div className={styles.chipGroup}>
           {DIAS_SEMANA.map((d, i) => (
             <button key={i} type="button" className={[styles.chip, form.diasSemana.includes(i) ? styles.chipActive : ''].join(' ')} onClick={() => toggleDia(i)}>{d}</button>
@@ -460,15 +448,15 @@ function ScheduleFields({ form, onChange }) {
         </div>
       </FormField>
       <div className={styles.formRow}>
-        <FormField label="Check-in *"><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
-        <FormField label="Check-out *"><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
+        <FormField label={tr('Check-in *')}><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
+        <FormField label={tr('Check-out *')}><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
       </div>
     </>
   );
 
   if (mode === 'mensal') return (
     <>
-      <FormField label="Dias do mês *">
+      <FormField label={tr('Dias do mês *')}>
         <div className={styles.dayGrid}>
           {DIAS_MES.map((d) => (
             <button key={d} type="button" className={[styles.chip, form.diasMes.includes(d) ? styles.chipActive : ''].join(' ')} onClick={() => toggleMesDia(d)}>{d}</button>
@@ -476,15 +464,15 @@ function ScheduleFields({ form, onChange }) {
         </div>
       </FormField>
       <div className={styles.formRow}>
-        <FormField label="Check-in *"><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
-        <FormField label="Check-out *"><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
+        <FormField label={tr('Check-in *')}><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
+        <FormField label={tr('Check-out *')}><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
       </div>
     </>
   );
 
   if (mode === 'anual') return (
     <>
-      <FormField label="Meses *">
+      <FormField label={tr('Meses *')}>
         <div className={styles.chipGroup}>
           {MESES_NOME.map((m, i) => (
             <button key={i} type="button" className={[styles.chip, form.meses.includes(i) ? styles.chipActive : ''].join(' ')} onClick={() => toggleMes(i)}>{m}</button>
@@ -492,8 +480,8 @@ function ScheduleFields({ form, onChange }) {
         </div>
       </FormField>
       <div className={styles.formRow}>
-        <FormField label="Check-in *"><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
-        <FormField label="Check-out *"><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
+        <FormField label={tr('Check-in *')}><TimePicker value={form.horaCheckin} onChange={(v) => onChange('horaCheckin', v)} /></FormField>
+        <FormField label={tr('Check-out *')}><TimePicker value={form.horaCheckout} onChange={(v) => onChange('horaCheckout', v)} /></FormField>
       </div>
     </>
   );
@@ -522,29 +510,29 @@ function PricingFields({ form, setField, setOcc }) {
 
   return (
     <>
-      <div className={styles.sectionTitle}>Hospedagem</div>
+      <div className={styles.sectionTitle}>{tr('Hospedagem')}</div>
       <div className={styles.formGrid4}>
         <div className={styles.span2}>
-          <FormField label="Modelo de cobrança">
+          <FormField label={tr('Modelo de cobrança')}>
             <Select value={modelo} onChange={(e) => handleModeloChange(e.target.value)}>
-              <option value="Por ocupação">Por ocupação</option>
-              <option value="Por quarto (tarifa fixa)">Por quarto (tarifa fixa)</option>
+              <option value="Por ocupação">{tr('Por ocupação')}</option>
+              <option value="Por quarto (tarifa fixa)">{tr('Por quarto (tarifa fixa)')}</option>
             </Select>
           </FormField>
         </div>
         {modelo === 'Por quarto (tarifa fixa)' ? (
-          <FormField label="Tarifa fixa (R$) *">
-            <Input placeholder="R$ 0,00" value={form.precoFixo} onChange={(e) => setField('precoFixo', maskBRL(e.target.value))} />
+          <FormField label={tr('Tarifa fixa (R$) *')}>
+            <Input placeholder={tr('R$ 0,00')} value={form.precoFixo} onChange={(e) => setField('precoFixo', maskBRL(e.target.value))} />
           </FormField>
         ) : (
-          <FormField label="Máximo de pessoas">
+          <FormField label={tr('Máximo de pessoas')}>
             <Input type="number" min="1" max="10" value={maxPessoas} onChange={(e) => handleMaxChange(e.target.value)} />
           </FormField>
         )}
       </div>
       {modelo !== 'Por quarto (tarifa fixa)' && (
         <>
-          <div className={styles.sectionTitle}>Preço por número de hóspedes *</div>
+          <div className={styles.sectionTitle}>{tr('Preço por número de hóspedes *')}</div>
           <OccInputs occ={occ} maxPessoas={maxPessoas} onChange={(q, v) => setOcc(q, v)} />
         </>
       )}
@@ -564,32 +552,32 @@ function DayUseFields({ du, maxPessoas, onChange }) {
       <label className={styles.checkboxRow}>
         <input type="checkbox" className={styles.checkbox} checked={du.ativo} onChange={(e) => setDu('ativo', e.target.checked)} />
         <div>
-          <span className={styles.checkboxLabel}>Habilitar Day Use</span>
-          <span className={styles.checkboxSub}>Permite uso do quarto por quantidade de horas</span>
+          <span className={styles.checkboxLabel}>{tr('Habilitar Day Use')}</span>
+          <span className={styles.checkboxSub}>{tr('Permite uso do quarto por quantidade de horas')}</span>
         </div>
       </label>
       {du.ativo && (
         <>
-          <FormField label="Modo Day Use">
+          <FormField label={tr('Modo Day Use')}>
             <Select value={du.modo} onChange={(e) => handleModoChange(e.target.value)}>
-              <option value="padrao">Padrão (preço base + hora adicional)</option>
-              <option value="ocupacao">Por ocupação (preço varia por hóspedes)</option>
+              <option value="padrao">{tr('Padrão (preço base + hora adicional)')}</option>
+              <option value="ocupacao">{tr('Por ocupação (preço varia por hóspedes)')}</option>
             </Select>
           </FormField>
           {du.modo === 'padrao' ? (
             <>
               <div className={styles.formRow}>
-                <FormField label="Preço base"><Input placeholder="R$ 0,00" value={du.precoFixo} onChange={(e) => setDu('precoFixo', maskBRL(e.target.value))} /></FormField>
-                <FormField label="Horas (Preço Base)"><Input type="number" min="1" placeholder="Ex: 4" value={du.horasBase} onChange={(e) => setDu('horasBase', e.target.value)} /></FormField>
-                <FormField label="Valor da Hora adicional"><Input placeholder="R$ 0,00" value={du.precoAdicional} onChange={(e) => setDu('precoAdicional', maskBRL(e.target.value))} /></FormField>
+                <FormField label={tr('Preço base')}><Input placeholder={tr('R$ 0,00')} value={du.precoFixo} onChange={(e) => setDu('precoFixo', maskBRL(e.target.value))} /></FormField>
+                <FormField label={tr('Horas (Preço Base)')}><Input type="number" min="1" placeholder={tr('Ex: 4')} value={du.horasBase} onChange={(e) => setDu('horasBase', e.target.value)} /></FormField>
+                <FormField label={tr('Valor da Hora adicional')}><Input placeholder={tr('R$ 0,00')} value={du.precoAdicional} onChange={(e) => setDu('precoAdicional', maskBRL(e.target.value))} /></FormField>
               </div>
             </>
           ) : (
             <>
-              <FormField label="Hora adicional por pessoa">
-                <Input placeholder="R$ 0,00" value={du.horaAdicionalPorPessoa} onChange={(e) => setDu('horaAdicionalPorPessoa', maskBRL(e.target.value))} />
+              <FormField label={tr('Hora adicional por pessoa')}>
+                <Input placeholder={tr('R$ 0,00')} value={du.horaAdicionalPorPessoa} onChange={(e) => setDu('horaAdicionalPorPessoa', maskBRL(e.target.value))} />
               </FormField>
-              <div className={styles.sectionTitle}>Preços por hóspedes</div>
+              <div className={styles.sectionTitle}>{tr('Preços por hóspedes')}</div>
               <OccInputs occ={du.precosOcupacao} maxPessoas={maxPessoas}
                 onChange={(q, v) => onChange({ ...du, precosOcupacao: { ...du.precosOcupacao, [q]: v } })} />
             </>
@@ -625,8 +613,8 @@ function ChildPricingFields({ criancas, onChange }) {
       <label className={styles.checkboxRow}>
         <input type="checkbox" className={styles.checkbox} checked={criancas.ativo} onChange={(e) => set('ativo', e.target.checked)} />
         <div>
-          <span className={styles.checkboxLabel}>Habilitar cobrança de menores de idade</span>
-          <span className={styles.checkboxSub}>Define tarifas específicas para crianças</span>
+          <span className={styles.checkboxLabel}>{tr('Habilitar cobrança de menores de idade')}</span>
+          <span className={styles.checkboxSub}>{tr('Define tarifas específicas para crianças')}</span>
         </div>
       </label>
 
@@ -638,14 +626,14 @@ function ChildPricingFields({ criancas, onChange }) {
                 checked={criancas.gratuidadeAtiva}
                 onChange={(e) => set('gratuidadeAtiva', e.target.checked)} />
               <div>
-                <span className={styles.checkboxLabel}>Faixa de gratuidade</span>
-                <span className={styles.checkboxSub}>Crianças nessa faixa etária não pagam, independente do modelo de cobrança</span>
+                <span className={styles.checkboxLabel}>{tr('Faixa de gratuidade')}</span>
+                <span className={styles.checkboxSub}>{tr('Crianças nessa faixa etária não pagam, independente do modelo de cobrança')}</span>
               </div>
             </label>
             {criancas.gratuidadeAtiva && (
               <div style={{ marginTop: 12 }}>
-                <FormField label="Gratuito até (anos)">
-                  <Input type="number" min="0" max="17" placeholder="Ex: 5"
+                <FormField label={tr('Gratuito até (anos)')}>
+                  <Input type="number" min="0" max="17" placeholder={tr('Ex: 5')}
                     value={criancas.gratuidadeMax}
                     onChange={(e) => set('gratuidadeMax', e.target.value)} />
                 </FormField>
@@ -653,7 +641,7 @@ function ChildPricingFields({ criancas, onChange }) {
             )}
           </div>
 
-          <FormField label="Modelo de cobrança">
+          <FormField label={tr('Modelo de cobrança')}>
             <Select value={criancas.modo} onChange={(e) => handleModoChange(e.target.value)}>
               {Object.entries(CRIANCAS_MODO_LABEL).map(([v, l]) => (
                 <option key={v} value={v}>{l}</option>
@@ -664,13 +652,13 @@ function ChildPricingFields({ criancas, onChange }) {
           {/* ── Taxa adicional fixa ── */}
           {criancas.modo === 'taxa-fixa' && (
             <div className={styles.formRow}>
-              <FormField label="Idade máxima (anos)">
-                <Input type="number" min="0" max="17" placeholder="Ex: 12"
+              <FormField label={tr('Idade máxima (anos)')}>
+                <Input type="number" min="0" max="17" placeholder={tr('Ex: 12')}
                   value={criancas.idadeMaxima}
                   onChange={(e) => set('idadeMaxima', e.target.value)} />
               </FormField>
-              <FormField label="Valor fixo por criança">
-                <Input placeholder="R$ 0,00"
+              <FormField label={tr('Valor fixo por criança')}>
+                <Input placeholder={tr('R$ 0,00')}
                   value={criancas.valorFixo}
                   onChange={(e) => set('valorFixo', maskBRL(e.target.value))} />
               </FormField>
@@ -680,13 +668,13 @@ function ChildPricingFields({ criancas, onChange }) {
           {/* ── Taxa por quantidade ── */}
           {criancas.modo === 'taxa-quantidade' && (
             <>
-              <div className={styles.sectionTitle}>Valores por quantidade de crianças</div>
+              <div className={styles.sectionTitle}>{tr('Valores por quantidade de crianças')}</div>
               <div className={styles.inputGrid}>
                 {criancas.entradas.map((e, i) => (
                   <div key={i} className={styles.fieldCard}>
-                    <span className={styles.fieldCardLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
+                    <span className={styles.fieldCardLabel}>{e.quantidade} {tr('criança')}{e.quantidade > 1 ? 's' : ''}</span>
                     <div className={styles.fieldCardRow}>
-                      <Input placeholder="R$ 0,00" value={e.valor}
+                      <Input placeholder={tr('R$ 0,00')} value={e.valor}
                         onChange={(ev) => setEntrada(i, 'valor', maskBRL(ev.target.value))} />
                       <button type="button" className={styles.childRemoveBtn} onClick={() => removeEntrada(i)}>
                         <Trash2 size={13} />
@@ -696,7 +684,7 @@ function ChildPricingFields({ criancas, onChange }) {
                 ))}
               </div>
               <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addEntrada}>
-                <Plus size={13} /> Adicionar linha
+                <Plus size={13} /> {tr('Adicionar linha')}
               </Button>
             </>
           )}
@@ -704,23 +692,23 @@ function ChildPricingFields({ criancas, onChange }) {
           {/* ── Taxa por faixa etária ── */}
           {criancas.modo === 'taxa-faixa' && (
             <>
-              <div className={styles.sectionTitle}>Faixas etárias</div>
+              <div className={styles.sectionTitle}>{tr('Faixas etárias')}</div>
               <div className={styles.inputGrid}>
                 {criancas.faixas.map((f, i) => (
                   <div key={i} className={styles.fieldCard}>
-                    <span className={styles.fieldCardLabel}>Faixa {i + 1}</span>
+                    <span className={styles.fieldCardLabel}>{tr('Faixa')} {i + 1}</span>
                     <div className={styles.fieldCardRow}>
-                      <Input type="number" min="0" max="17" placeholder="De"
+                      <Input type="number" min="0" max="17" placeholder={tr('De')}
                         className={styles.childInputAge} value={f.idadeMin}
                         onChange={(ev) => setFaixa(i, 'idadeMin', ev.target.value)} />
                       <span className={styles.childSep}>–</span>
-                      <Input type="number" min="0" max="17" placeholder="Até"
+                      <Input type="number" min="0" max="17" placeholder={tr('Até')}
                         className={styles.childInputAge} value={f.idadeMax}
                         onChange={(ev) => setFaixa(i, 'idadeMax', ev.target.value)} />
-                      <span className={styles.childSep}>anos</span>
+                      <span className={styles.childSep}>{tr('anos')}</span>
                     </div>
                     <div className={styles.fieldCardRow}>
-                      <Input placeholder="R$ 0,00" className={styles.childInputVal} value={f.valor}
+                      <Input placeholder={tr('R$ 0,00')} className={styles.childInputVal} value={f.valor}
                         onChange={(ev) => setFaixa(i, 'valor', maskBRL(ev.target.value))} />
                       <button type="button" className={styles.childRemoveBtn} onClick={() => removeFaixa(i)}>
                         <Trash2 size={13} />
@@ -730,7 +718,7 @@ function ChildPricingFields({ criancas, onChange }) {
                 ))}
               </div>
               <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addFaixa}>
-                <Plus size={13} /> Adicionar faixa
+                <Plus size={13} /> {tr('Adicionar faixa')}
               </Button>
             </>
           )}
@@ -738,11 +726,11 @@ function ChildPricingFields({ criancas, onChange }) {
           {/* ── Porcentagem por quantidade ── */}
           {criancas.modo === 'porcentagem-quantidade' && (
             <>
-              <div className={styles.sectionTitle}>Porcentagem por quantidade de crianças</div>
+              <div className={styles.sectionTitle}>{tr('Porcentagem por quantidade de crianças')}</div>
               <div className={styles.inputGrid}>
                 {criancas.entradas.map((e, i) => (
                   <div key={i} className={styles.fieldCard}>
-                    <span className={styles.fieldCardLabel}>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</span>
+                    <span className={styles.fieldCardLabel}>{e.quantidade} {tr('criança')}{e.quantidade > 1 ? 's' : ''}</span>
                     <div className={styles.fieldCardRow}>
                       <Input type="number" min="0" max="100" placeholder="%" value={e.valor}
                         onChange={(ev) => setEntrada(i, 'valor', ev.target.value)} />
@@ -754,7 +742,7 @@ function ChildPricingFields({ criancas, onChange }) {
                 ))}
               </div>
               <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addEntrada}>
-                <Plus size={13} /> Adicionar linha
+                <Plus size={13} /> {tr('Adicionar linha')}
               </Button>
             </>
           )}
@@ -771,33 +759,33 @@ function ChildPricingDisplay({ criancas }) {
     <div className={styles.rowsBlock}>
       {criancas?.gratuidadeAtiva && (
         <div className={styles.gratuidadeDisplay}>
-          <span className={styles.gratuidadeDisplayLabel}>Gratuidade</span>
+          <span className={styles.gratuidadeDisplayLabel}>{tr('Gratuidade')}</span>
           <span className={styles.gratuidadeDisplayVal}>
-            0–{criancas.gratuidadeMax} anos (isento de cobrança)
+            0–{criancas.gratuidadeMax} {tr('anos (isento de cobrança)')}
           </span>
         </div>
       )}
       {!criancas?.ativo ? (
-        <div className={styles.duInactive}>Cobrança de menores não configurada.</div>
+        <div className={styles.duInactive}>{tr('Cobrança de menores não configurada.')}</div>
       ) : (
       <>
       <div className={styles.duRow}>
-        <span className={styles.duLabel}>Modelo</span>
+        <span className={styles.duLabel}>{tr('Modelo')}</span>
         <span className={styles.duVal}>{CRIANCAS_MODO_LABEL[modo] ?? modo}</span>
       </div>
       {modo === 'taxa-fixa' && (
         <>
-          <div className={styles.duRow}><span className={styles.duLabel}>Idade máxima</span><span className={styles.duVal}>{criancas.idadeMaxima} anos</span></div>
-          <div className={styles.duRow}><span className={styles.duLabel}>Valor por criança</span><span className={styles.duVal}>{fmtBRL(parseBRL(criancas.valorFixo))}</span></div>
+          <div className={styles.duRow}><span className={styles.duLabel}>{tr('Idade máxima')}</span><span className={styles.duVal}>{criancas.idadeMaxima} {tr('anos')}</span></div>
+          <div className={styles.duRow}><span className={styles.duLabel}>{tr('Valor por criança')}</span><span className={styles.duVal}>{fmtBRL(parseBRL(criancas.valorFixo))}</span></div>
         </>
       )}
       {(modo === 'taxa-quantidade' || modo === 'porcentagem-quantidade') && (
         <table className={styles.miniTable}>
-          <thead><tr><th>Qtd</th><th>{modo === 'taxa-quantidade' ? 'Valor' : '%'}</th></tr></thead>
+          <thead><tr><th>{tr('Qtd')}</th><th>{modo === 'taxa-quantidade' ? tr('Valor') : '%'}</th></tr></thead>
           <tbody>
             {(criancas.entradas ?? []).map((e, i) => (
               <tr key={i}>
-                <td>{e.quantidade} criança{e.quantidade > 1 ? 's' : ''}</td>
+                <td>{e.quantidade} {tr('criança')}{e.quantidade > 1 ? 's' : ''}</td>
                 <td className={styles.miniPrice}>
                   {modo === 'taxa-quantidade' ? fmtBRL(parseBRL(e.valor)) : `${e.valor}%`}
                 </td>
@@ -808,11 +796,11 @@ function ChildPricingDisplay({ criancas }) {
       )}
       {modo === 'taxa-faixa' && (
         <table className={styles.miniTable}>
-          <thead><tr><th>Faixa</th><th>Valor</th></tr></thead>
+          <thead><tr><th>{tr('Faixa')}</th><th>{tr('Valor')}</th></tr></thead>
           <tbody>
             {(criancas.faixas ?? []).map((f, i) => (
               <tr key={i}>
-                <td>{f.idadeMin}–{f.idadeMax} anos</td>
+                <td>{f.idadeMin}–{f.idadeMax} {tr('anos')}</td>
                 <td className={styles.miniPrice}>{fmtBRL(parseBRL(f.valor))}</td>
               </tr>
             ))}
@@ -890,7 +878,7 @@ export default function PricingManagement() {
       });
       setQuartos(Array.isArray(quartoPage) ? quartoPage : (quartoPage.content ?? []));
     } catch (e) {
-      notify('Erro ao carregar dados: ' + e.message, 'error');
+      notify(tr('Erro ao carregar dados: ') + e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -919,8 +907,8 @@ export default function PricingManagement() {
   /** Fecha o formulário aberto; com algo digitado, pergunta antes. */
   const descartarForm = () => {
     if (formSujo() && !window.confirm(formModo === 'edit'
-      ? 'Deseja descartar as alterações em andamento?'
-      : 'Deseja descartar o cadastro em andamento?')) return false;
+      ? tr('Deseja descartar as alterações em andamento?')
+      : tr('Deseja descartar o cadastro em andamento?'))) return false;
     setCatModal(null); setSeaModal(null);
     setEditingCat(null); setEditingSea(null);
     setCatForm(blankCat()); setSeaForm(blankSea());
@@ -1096,16 +1084,16 @@ export default function PricingManagement() {
 
       if (catModal !== 'edit') {
         await quartoCategoriApi.criar(payload);
-        notify('Categoria criada com sucesso!');
+        notify(tr('Categoria criada com sucesso!'));
       } else {
         await quartoCategoriApi.atualizar({ id: editingCat.id, ...payload });
-        notify('Categoria atualizada com sucesso!');
+        notify(tr('Categoria atualizada com sucesso!'));
       }
       setCatModal(null); setEditingCat(null);
       setCatForm(blankCat()); setCatTab('precos');
       load();
     } catch (e) {
-      notify('Erro: ' + e.message, 'error');
+      notify(tr('Erro: ') + e.message, 'error');
     } finally {
       setCatSaving(false);
     }
@@ -1298,16 +1286,16 @@ export default function PricingManagement() {
 
       if (seaModal !== 'edit') {
         await sazonalidadeApi.criar(payload);
-        notify('Sazonalidade criada com sucesso!');
+        notify(tr('Sazonalidade criada com sucesso!'));
       } else {
         await sazonalidadeApi.atualizar({ id: editingSea.id, ...payload });
-        notify('Sazonalidade atualizada com sucesso!');
+        notify(tr('Sazonalidade atualizada com sucesso!'));
       }
       setSeaModal(null); setEditingSea(null);
       setSeaForm(blankSea()); setSeaTab('agenda');
       load();
     } catch (e) {
-      notify('Erro: ' + e.message, 'error');
+      notify(tr('Erro: ') + e.message, 'error');
     } finally {
       setSeaSaving(false);
     }
@@ -1320,16 +1308,16 @@ export default function PricingManagement() {
     try {
       if (deleteTarget.type === 'cat') {
         await quartoCategoriApi.excluir(deleteTarget.id);
-        notify('Categoria excluída.');
+        notify(tr('Categoria excluída.'));
       } else {
         await sazonalidadeApi.excluir(deleteTarget.id);
-        notify('Sazonalidade excluída.');
+        notify(tr('Sazonalidade excluída.'));
       }
       setDeleteTarget(null);
       closeDetail();
       load();
     } catch (e) {
-      notify('Erro: ' + e.message, 'error');
+      notify(tr('Erro: ') + e.message, 'error');
     } finally {
       setDeleting(false);
     }
@@ -1347,14 +1335,11 @@ export default function PricingManagement() {
     return (
       <>
         <div className={styles.panelFields}>
-          <Field label="Modelo de cobrança" value={item.modeloCobranca} />
-          {!fixo && (
-            <Field label="Capacidade" value={`${item.maxPessoas} pessoa${item.maxPessoas !== 1 ? 's' : ''}`} />
-          )}
+          <Field label={tr('Modelo de cobrança')} value={tr(item.modeloCobranca)} />
         </div>
         {fixo
-          ? <Field label="Tarifa fixa" value={fmtBRL(item.precoFixo)} lg />
-          : <OccTable label="Preço/noite" occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />}
+          ? <Field label={tr('Tarifa fixa')} value={fmtBRL(item.precoFixo)} lg />
+          : <OccTable label={tr('Preço/noite')} occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />}
       </>
     );
   };
@@ -1362,22 +1347,22 @@ export default function PricingManagement() {
   /** Day Use de um item. */
   const DayUseBloco = ({ item }) => {
     const d = item.dayUse ?? {};
-    if (!d.ativo) return <p className={styles.duInactive}>Day Use não está ativo.</p>;
+    if (!d.ativo) return <p className={styles.duInactive}>{tr('Day Use não está ativo.')}</p>;
     return (
       <>
         <div className={styles.panelFields}>
-          <Field label="Modo" value={d.modo === 'padrao' ? 'Padrão' : 'Por ocupação'} />
+          <Field label={tr('Modo')} value={d.modo === 'padrao' ? tr('Padrão') : tr('Por ocupação')} />
           {d.modo === 'padrao'
-            ? <Field label="Horas incluídas" value={d.horasBase ? `${d.horasBase}h` : ''} />
-            : <Field label="Hora adicional/pessoa" value={fmtBRL(d.horaAdicionalPorPessoa)} />}
+            ? <Field label={tr('Horas incluídas')} value={d.horasBase ? `${d.horasBase}h` : ''} />
+            : <Field label={tr('Hora adicional/pessoa')} value={fmtBRL(d.horaAdicionalPorPessoa)} />}
         </div>
         {d.modo === 'padrao' ? (
           <div className={styles.panelFields}>
-            <Field label="Preço base" value={fmtBRL(d.precoFixo)} lg />
-            <Field label="Hora adicional" value={fmtBRL(d.precoAdicional)} />
+            <Field label={tr('Preço base')} value={fmtBRL(d.precoFixo)} lg />
+            <Field label={tr('Hora adicional')} value={fmtBRL(d.precoAdicional)} />
           </div>
         ) : (
-          <OccTable label="Preço" occ={d.precosOcupacao} maxPessoas={item.maxPessoas} />
+          <OccTable label={tr('Preço')} occ={d.precosOcupacao} maxPessoas={item.maxPessoas} />
         )}
       </>
     );
@@ -1393,7 +1378,7 @@ export default function PricingManagement() {
     return (
       <div className={styles.compareGrid}>
         <div className={styles.comparePanel}>
-          <span className={styles.comparePanelTitle}>Base</span>
+          <span className={styles.comparePanelTitle}>{tr('Base')}</span>
           {render(base)}
         </div>
         {seas.map((s) => (
@@ -1419,20 +1404,20 @@ export default function PricingManagement() {
   /** Barra de ações da ficha — editar, excluir, fechar. */
   const FichaActions = ({ onEdit }) => (
     <div className={styles.dCardActions}>
-      <Button className={styles.btnSolid} onClick={onEdit}>Editar</Button>
+      <Button className={styles.btnSolid} onClick={onEdit}>{tr('Editar')}</Button>
       <Button variant="danger" className={[styles.btnSolid, styles.btnDanger].join(' ')}
         onClick={() => setDeleteTarget({ type: detailType, id: detailItem.id, nome: detailItem.nome })}>
-        Excluir
+        {tr('Excluir')}
       </Button>
       <button type="button" className={styles.idClose} onClick={closeDetail}
-        title="Fechar ficha" aria-label="Fechar ficha">
+        title={tr('Fechar ficha')} aria-label={tr('Fechar ficha')}>
         <X size={16} />
       </button>
     </div>
   );
 
   // só aparece quando a ficha/formulário ocupa a tela e a lista está fora
-  const BackBtn = ({ onClick = closeDetail, title = 'Voltar para a lista' }) => (
+  const BackBtn = ({ onClick = closeDetail, title = tr('Voltar para a lista') }) => (
     <button type="button" className={styles.backBtn} onClick={onClick}
       title={title} aria-label={title}>
       <ChevronLeft size={17} />
@@ -1458,11 +1443,11 @@ export default function PricingManagement() {
     const fixo   = cat.modeloCobranca === 'Por quarto (tarifa fixa)';
     const nQuart = (cat.quartos ?? []).length;
     const abas = [
-      ['dados', 'Dados da categoria'],
-      ['precos', 'Tarifas'],
-      ['dayuse', 'Day Use'],
-      ['menores', 'Menores de idade'],
-      ['vinculos', 'Quartos e sazonalidades'],
+      ['dados', tr('Dados da categoria')],
+      ['precos', tr('Tarifas')],
+      ['dayuse', tr('Day Use')],
+      ['menores', tr('Menores de idade')],
+      ['vinculos', tr('Quartos e sazonalidades')],
     ];
 
     return (
@@ -1471,7 +1456,7 @@ export default function PricingManagement() {
           <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
             <BackBtn />
             <Tag size={16} />
-            <span className={styles.dCardTitle}>Ficha da categoria</span>
+            <span className={styles.dCardTitle}>{tr('Ficha da categoria')}</span>
             <FichaActions onEdit={() => openEditCat(cat)} />
           </h3>
 
@@ -1483,10 +1468,10 @@ export default function PricingManagement() {
                   <h2 className={styles.fichaNome}>{cat.nome}</h2>
                   {cat.descricao && <p className={styles.fichaSub}>{cat.descricao}</p>}
                   <div className={styles.idTags}>
-                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
-                    {cat.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
-                    {cat.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
-                    <Pill>{nQuart} quarto{nQuart !== 1 ? 's' : ''}</Pill>
+                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? tr('Tarifa fixa') : tr('Por ocupação')}</Pill>
+                    {cat.dayUse?.ativo && <Pill tom="tagAmber">{tr('Day Use')}</Pill>}
+                    {cat.criancas?.ativo && <Pill tom="tagPrimary">{tr('Menores')}</Pill>}
+                    <Pill>{nQuart} {tr('quarto')}{nQuart !== 1 ? 's' : ''}</Pill>
                   </div>
                 </div>
               </div>
@@ -1495,12 +1480,12 @@ export default function PricingManagement() {
 
             {abaFicha === 'dados' && (<>
               <div className={styles.fieldGrid}>
-                <Field label="Modelo de cobrança" value={cat.modeloCobranca} />
-                {!fixo && <Field label="Capacidade" value={`${cat.maxPessoas} pessoa${cat.maxPessoas !== 1 ? 's' : ''}`} />}
-                <Field label="Check-in"  value={cat.hora_checkin} />
-                <Field label="Check-out" value={cat.hora_checkout} />
-                <Field label="Quartos vinculados" value={String(nQuart)} />
-                <Field label="Sazonalidades" value={String(seas.length)} />
+                <Field label={tr('Modelo de cobrança')} value={tr(cat.modeloCobranca)} />
+                {!fixo && <Field label={tr('Capacidade')} value={`${cat.maxPessoas} pessoa${cat.maxPessoas !== 1 ? 's' : ''}`} />}
+                <Field label={tr('Check-in')}  value={cat.hora_checkin} />
+                <Field label={tr('Check-out')} value={cat.hora_checkout} />
+                <Field label={tr('Quartos vinculados')} value={String(nQuart)} />
+                <Field label={tr('Sazonalidades')} value={String(seas.length)} />
               </div>
               <AuditFooter item={cat} />
             </>)}
@@ -1519,9 +1504,9 @@ export default function PricingManagement() {
 
             {/* mesmo desenho da aba "Quartos & Sazonais" do formulário, só leitura */}
             {abaFicha === 'vinculos' && (<div className={styles.formBody}>
-              <div className={styles.sectionTitle}>Quartos vinculados</div>
+              <div className={styles.sectionTitle}>{tr('Quartos vinculados')}</div>
               {(cat.quartosObj ?? []).length === 0 ? (
-                <p className={styles.blockEmpty}>Nenhum quarto vinculado.</p>
+                <p className={styles.blockEmpty}>{tr('Nenhum quarto vinculado.')}</p>
               ) : (
                 <div className={styles.checkList}>
                   {(cat.quartosObj ?? []).map((q) => {
@@ -1531,7 +1516,7 @@ export default function PricingManagement() {
                       <div key={q.id} className={[styles.checkItem, styles.checkItemView].join(' ')}>
                         <Check size={14} className={styles.checkItemIco} />
                         <span className={styles.checkItemLabel}>
-                          Quarto {full?.numero ?? q.id}{desc ? ` - ${desc.toUpperCase()}` : ''}
+                          {tr('Quarto')} {full?.numero ?? q.id}{desc ? ` - ${desc.toUpperCase()}` : ''}
                         </span>
                       </div>
                     );
@@ -1539,9 +1524,9 @@ export default function PricingManagement() {
                 </div>
               )}
 
-              <div className={styles.sectionTitle}>Sazonalidades ativas</div>
+              <div className={styles.sectionTitle}>{tr('Sazonalidades ativas')}</div>
               {seas.length === 0 ? (
-                <p className={styles.blockEmpty}>Nenhuma sazonalidade ativa nesta categoria.</p>
+                <p className={styles.blockEmpty}>{tr('Nenhuma sazonalidade ativa nesta categoria.')}</p>
               ) : (
                 <div className={styles.checkList}>
                   {seas.map((s) => (
@@ -1567,11 +1552,11 @@ export default function PricingManagement() {
       (c.sazonaisAtivas ?? []).includes(s.id) || (s.categoriasIds ?? []).includes(c.id)
     );
     const abas = [
-      ['dados', 'Agendamento'],
-      ['precos', 'Tarifas'],
-      ['dayuse', 'Day Use'],
-      ['menores', 'Menores de idade'],
-      ['categorias', 'Categorias vinculadas'],
+      ['dados', tr('Agendamento')],
+      ['precos', tr('Tarifas')],
+      ['dayuse', tr('Day Use')],
+      ['menores', tr('Menores de idade')],
+      ['categorias', tr('Categorias vinculadas')],
     ];
 
     return (
@@ -1580,7 +1565,7 @@ export default function PricingManagement() {
           <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
             <BackBtn />
             <Calendar size={16} />
-            <span className={styles.dCardTitle}>Ficha da sazonalidade</span>
+            <span className={styles.dCardTitle}>{tr('Ficha da sazonalidade')}</span>
             <FichaActions onEdit={() => openEditSea(s)} />
           </h3>
 
@@ -1592,11 +1577,11 @@ export default function PricingManagement() {
                   <h2 className={styles.fichaNome}>{s.nome}</h2>
                   <p className={styles.fichaSub}>{describeSchedule(s)}</p>
                   <div className={styles.idTags}>
-                    {expirada(s) && <Pill tom="tagRed">Expirado</Pill>}
+                    {expirada(s) && <Pill tom="tagRed">{tr('Expirado')}</Pill>}
                     <Pill tom="tagAmber">{MODO_LABEL[s.modoOperacao]}</Pill>
-                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
-                    {s.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
-                    {s.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
+                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? tr('Tarifa fixa') : tr('Por ocupação')}</Pill>
+                    {s.dayUse?.ativo && <Pill tom="tagAmber">{tr('Day Use')}</Pill>}
+                    {s.criancas?.ativo && <Pill tom="tagPrimary">{tr('Menores')}</Pill>}
                   </div>
                 </div>
               </div>
@@ -1605,22 +1590,22 @@ export default function PricingManagement() {
 
             {abaFicha === 'dados' && (<>
               <div className={styles.fieldGrid}>
-                <Field label="Modo de operação" value={MODO_LABEL[s.modoOperacao]} />
+                <Field label={tr('Modo de operação')} value={MODO_LABEL[s.modoOperacao]} />
                 {s.modoOperacao === 'data-especifica' && <>
-                  <Field label="Início" value={[fmtDataBR(s.dataInicio), s.horaInicio].filter(Boolean).join(' · ')} />
-                  <Field label="Fim"    value={[fmtDataBR(s.dataFim), s.horaFim].filter(Boolean).join(' · ')} />
+                  <Field label={tr('Início')} value={[fmtDataBR(s.dataInicio), s.horaInicio].filter(Boolean).join(' · ')} />
+                  <Field label={tr('Fim')}    value={[fmtDataBR(s.dataFim), s.horaFim].filter(Boolean).join(' · ')} />
                 </>}
                 {s.modoOperacao === 'semanal' && (
-                  <Field label="Dias da semana" value={(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ')} />
+                  <Field label={tr('Dias da semana')} value={(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ')} />
                 )}
                 {s.modoOperacao === 'mensal' && (
-                  <Field label="Dias do mês" value={(s.diasMes || []).join(', ')} />
+                  <Field label={tr('Dias do mês')} value={(s.diasMes || []).join(', ')} />
                 )}
                 {s.modoOperacao === 'anual' && (
-                  <Field label="Meses" value={(s.meses || []).map((m) => MESES_NOME[m]).join(', ')} />
+                  <Field label={tr('Meses')} value={(s.meses || []).map((m) => MESES_NOME[m]).join(', ')} />
                 )}
-                <Field label="Check-in"  value={s.horaCheckin} />
-                <Field label="Check-out" value={s.horaCheckout} />
+                <Field label={tr('Check-in')}  value={s.horaCheckin} />
+                <Field label={tr('Check-out')} value={s.horaCheckout} />
               </div>
               <AuditFooter item={s} />
             </>)}
@@ -1631,15 +1616,15 @@ export default function PricingManagement() {
 
             {abaFicha === 'categorias' && (
               vinculadas.length === 0 ? (
-                <p className={styles.blockEmpty}>Esta sazonalidade não está vinculada a nenhuma categoria.</p>
+                <p className={styles.blockEmpty}>{tr('Esta sazonalidade não está vinculada a nenhuma categoria.')}</p>
               ) : (
                 <div className={styles.rowsBlock}>
                   {vinculadas.map((c) => (
                     <div key={c.id} className={styles.duRow}>
                       <span className={styles.duLabel}>{c.nome}</span>
                       <span className={styles.duVal}>
-                        {c.modeloCobranca === 'Por quarto (tarifa fixa)' ? 'Tarifa fixa' : 'Por ocupação'}
-                        {c.dayUse?.ativo ? ' · Day Use' : ''}
+                        {c.modeloCobranca === 'Por quarto (tarifa fixa)' ? tr('Tarifa fixa') : tr('Por ocupação')}
+                        {c.dayUse?.ativo ? tr(' · Day Use') : ''}
                       </span>
                     </div>
                   ))}
@@ -1657,19 +1642,19 @@ export default function PricingManagement() {
     {catTab === 'precos' && (<>
       <div className={styles.formGrid4}>
         <div className={styles.span2}>
-          <FormField label="Nome da Categoria *">
-            <Input value={catForm.nome} onChange={(e) => setCatField('nome', e.target.value.toUpperCase())} placeholder="EX: STANDARD ATÉ 5 PESSOAS" />
+          <FormField label={tr('Nome da Categoria *')}>
+            <Input value={catForm.nome} onChange={(e) => setCatField('nome', e.target.value.toUpperCase())} placeholder={tr('EX: STANDARD ATÉ 5 PESSOAS')} />
           </FormField>
         </div>
         <div className={styles.span2}>
-          <FormField label="Descrição">
-            <Input value={catForm.descricao} onChange={(e) => setCatField('descricao', e.target.value.toUpperCase())} placeholder="DESCRIÇÃO DA CATEGORIA" />
+          <FormField label={tr('Descrição')}>
+            <Input value={catForm.descricao} onChange={(e) => setCatField('descricao', e.target.value.toUpperCase())} placeholder={tr('DESCRIÇÃO DA CATEGORIA')} />
           </FormField>
         </div>
-        <FormField label="Check-in">
+        <FormField label={tr('Check-in')}>
           <TimePicker value={catForm.hora_checkin} onChange={(v) => setCatField('hora_checkin', v)} />
         </FormField>
-        <FormField label="Check-out">
+        <FormField label={tr('Check-out')}>
           <TimePicker value={catForm.hora_checkout} onChange={(v) => setCatField('hora_checkout', v)} />
         </FormField>
       </div>
@@ -1682,7 +1667,7 @@ export default function PricingManagement() {
       <ChildPricingFields criancas={catForm.criancas} onChange={(c) => setCatField('criancas', c)} />
     )}
     {catTab === 'vinculos' && (<>
-      <div className={styles.sectionTitle}>Quartos vinculados</div>
+      <div className={styles.sectionTitle}>{tr('Quartos vinculados')}</div>
       <div className={styles.checkList}>
         {quartos.map((q) => {
           const active = catForm.quartos.includes(q.id);
@@ -1698,16 +1683,16 @@ export default function PricingManagement() {
             ].join(' ')}>
               <input type="checkbox" className={styles.checkItemCb} checked={active} disabled={unavailable} onChange={() => !unavailable && toggleCatQuarto(q.id)} />
               <span className={styles.checkItemLabel}>
-                Quarto {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}
+                {tr('Quarto')} {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}
                 {unavailable && <span className={styles.checkItemTag}>{outraCat.nome}</span>}
               </span>
             </label>
           );
         })}
       </div>
-      <div className={styles.sectionTitle}>Sazonalidades ativas</div>
+      <div className={styles.sectionTitle}>{tr('Sazonalidades ativas')}</div>
       {sazonalidades.length === 0
-        ? <div className={styles.detailEmpty}>Nenhuma sazonalidade cadastrada.</div>
+        ? <div className={styles.detailEmpty}>{tr('Nenhuma sazonalidade cadastrada.')}</div>
         : (
           <div className={styles.checkList}>
             {sazonalidades.map((s) => {
@@ -1727,17 +1712,17 @@ export default function PricingManagement() {
 
   const seaFormContent = () => (<>
     {seaTab === 'agenda' && (<>
-      <FormField label="Nome da Sazonalidade *">
-        <Input value={seaForm.nome} onChange={(e) => setSeaField('nome', e.target.value.toUpperCase())} placeholder="EX: ALTA TEMPORADA VERÃO" />
+      <FormField label={tr('Nome da Sazonalidade *')}>
+        <Input value={seaForm.nome} onChange={(e) => setSeaField('nome', e.target.value.toUpperCase())} placeholder={tr('EX: ALTA TEMPORADA VERÃO')} />
       </FormField>
 
-      <div className={styles.sectionTitle}>Modo de Operação *</div>
+      <div className={styles.sectionTitle}>{tr('Modo de Operação *')}</div>
       <div className={styles.modeCards}>
         {[
-          { value: 'data-especifica', label: 'Data Específica', desc: 'Período fixo' },
-          { value: 'semanal',         label: 'Semanal',         desc: 'Dias da semana' },
-          { value: 'mensal',          label: 'Mensal',          desc: 'Dias do mês' },
-          { value: 'anual',           label: 'Anual',           desc: 'Meses do ano' },
+          { value: 'data-especifica', label: tr('Data Específica'), desc: tr('Período fixo') },
+          { value: 'semanal',         label: tr('Semanal'),         desc: tr('Dias da semana') },
+          { value: 'mensal',          label: tr('Mensal'),          desc: tr('Dias do mês') },
+          { value: 'anual',           label: tr('Anual'),           desc: tr('Meses do ano') },
         ].map((m) => (
           <button key={m.value} type="button"
             className={[styles.modeCard, seaForm.modoOperacao === m.value ? styles.modeCardActive : ''].join(' ')}
@@ -1760,35 +1745,35 @@ export default function PricingManagement() {
       <ChildPricingFields criancas={seaForm.criancas} onChange={(c) => setSeaField('criancas', c)} />
     )}
     {seaTab === 'categorias' && (<>
-      <div className={styles.sectionTitle}>Vincular categorias</div>
+      <div className={styles.sectionTitle}>{tr('Vincular categorias')}</div>
       <div className={styles.checkList}>
         {categorias.map((cat) => {
           const active = seaForm.categoriasIds.includes(cat.id);
           const duLabel = cat.dayUse?.ativo
-            ? (cat.dayUse.modo === 'ocupacao' ? 'Day Use · por ocupação' : 'Day Use · preço fixo')
-            : 'Sem Day Use';
+            ? (cat.dayUse.modo === 'ocupacao' ? tr('Day Use · por ocupação') : tr('Day Use · preço fixo'))
+            : tr('Sem Day Use');
           const criLabel = cat.criancas?.ativo
-            ? `Menores · ${CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo}`
-            : 'Sem cobrança de menores';
+            ? tr('Menores · {{v0}}', { v0: CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo })
+            : tr('Sem cobrança de menores');
           return (
             <label key={cat.id} className={[styles.checkboxRow, active ? styles.checkboxRowActive : ''].join(' ')}>
               <input type="checkbox" className={styles.checkbox} checked={active}
                 onChange={() => toggleSeaCat(cat.id)} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span className={styles.checkboxLabel}>{cat.nome}</span>
-                <span className={styles.checkboxSub}>{cat.modeloCobranca} · {duLabel} · {criLabel}</span>
+                <span className={styles.checkboxSub}>{tr(cat.modeloCobranca)} · {duLabel} · {criLabel}</span>
               </div>
               {active && (
                 <button type="button" className={styles.seaRefBtn}
                   onClick={(e) => { e.preventDefault(); preencherDeCat(cat); }}>
-                  Usar como referência
+                  {tr('Usar como referência')}
                 </button>
               )}
             </label>
           );
         })}
         {categorias.length === 0 && (
-          <span className={styles.detailEmpty}>Nenhuma categoria cadastrada</span>
+          <span className={styles.detailEmpty}>{tr('Nenhuma categoria cadastrada')}</span>
         )}
       </div>
     </>)}
@@ -1803,20 +1788,20 @@ export default function PricingManagement() {
     const valido  = (isCat ? isCatValid(catForm) : isSeaValid(seaForm)) && (editar || ultima);
     const salvando = isCat ? catSaving : seaSaving;
     const titulo  = isCat
-      ? (editar ? 'Editar categoria' : 'Nova categoria')
-      : (editar ? 'Editar sazonalidade' : 'Nova sazonalidade');
+      ? (editar ? tr('Editar categoria') : tr('Nova categoria'))
+      : (editar ? tr('Editar sazonalidade') : tr('Nova sazonalidade'));
 
     return (
       <div className={styles.detailPanel}>
         <section className={[styles.dCard, styles.fichaCard].join(' ')}>
           <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
-            {formExplicito && <BackBtn onClick={cancelarForm} title={editar ? 'Voltar para a ficha' : 'Voltar para a lista'} />}
+            {formExplicito && <BackBtn onClick={cancelarForm} title={editar ? tr('Voltar para a ficha') : tr('Voltar para a lista')} />}
             {isCat ? <Tag size={16} /> : <Calendar size={16} />}
             <span className={styles.dCardTitle}>{titulo}</span>
             {formExplicito && (
               <div className={styles.dCardActions}>
                 <button type="button" className={styles.idClose} onClick={cancelarForm}
-                  title="Cancelar" aria-label="Cancelar">
+                  title={tr('Cancelar')} aria-label={tr('Cancelar')}>
                   <X size={16} />
                 </button>
               </div>
@@ -1834,18 +1819,18 @@ export default function PricingManagement() {
 
             <div className={styles.formFoot}>
               <Button className={styles.btnSolid} onClick={cancelarForm}>
-                {formExplicito ? 'Cancelar' : 'Limpar'}
+                {formExplicito ? tr('Cancelar') : tr('Limpar')}
               </Button>
               {valido ? (
                 <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                   onClick={isCat ? handleSaveCat : handleSaveSea} disabled={salvando}>
                   {salvando && <Loader2 size={14} className={styles.spinInline} />}
-                  {editar ? 'Salvar alterações' : isCat ? 'Criar categoria' : 'Criar sazonalidade'}
+                  {editar ? tr('Salvar alterações') : isCat ? tr('Criar categoria') : tr('Criar sazonalidade')}
                 </Button>
               ) : (
                 <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                   onClick={isCat ? advanceCatTab : advanceSeaTab}>
-                  Avançar
+                  {tr('Avançar')}
                 </Button>
               )}
             </div>
@@ -1871,8 +1856,6 @@ export default function PricingManagement() {
   const nSaz = (c) => (c.sazonaisAtivas ?? []).length;
 
   // Totais do painel geral (celular, sem nada aberto).
-  const quartosVinculados = new Set(categorias.flatMap((c) => c.quartos ?? [])).size;
-  const comDayUse = categorias.filter((c) => c.dayUse?.ativo).length;
 
   return (
     <div className={styles.page}>
@@ -1889,18 +1872,18 @@ export default function PricingManagement() {
                 <button type="button"
                   className={[styles.segmentedBtn, !isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
                   onClick={() => changeAba('cat')}>
-                  Categorias
+                  {tr('Categorias')}
                 </button>
                 <button type="button"
                   className={[styles.segmentedBtn, isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
                   onClick={() => changeAba('sea')}>
-                  Sazonalidades
+                  {tr('Sazonalidades')}
                 </button>
               </div>
               {!formAtivo && (
                 <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                   onClick={isSeaTab ? openCreateSea : openCreateCat}>
-                  Cadastrar
+                  {tr('Cadastrar')}
                 </Button>
               )}
             </div>
@@ -1910,12 +1893,12 @@ export default function PricingManagement() {
               <Input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder={isSeaTab ? 'Buscar sazonalidade...' : 'Buscar categoria...'}
+                placeholder={isSeaTab ? tr('Buscar sazonalidade...') : tr('Buscar categoria...')}
                 className={styles.searchInput}
-                aria-label="Buscar"
+                aria-label={tr('Buscar')}
               />
               {searchTerm.length > 0 && (
-                <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label={tr('Limpar busca')}>
                   <X size={14} />
                 </button>
               )}
@@ -1924,7 +1907,7 @@ export default function PricingManagement() {
             <div className={styles.listMeta}>
               <span>
                 {loading
-                  ? 'Carregando...'
+                  ? tr('Carregando...')
                   : isSeaTab
                     ? `${items.length} sazonalidade${items.length !== 1 ? 's' : ''}`
                     : `${items.length} categoria${items.length !== 1 ? 's' : ''}`}
@@ -1937,7 +1920,7 @@ export default function PricingManagement() {
               ) : items.length === 0 ? (
                 <div className={styles.empty}>
                   <AlertCircle size={24} opacity={0.3} />
-                  <span>{searchTerm ? 'Nenhum resultado encontrado.' : isSeaTab ? 'Nenhuma sazonalidade cadastrada.' : 'Nenhuma categoria cadastrada.'}</span>
+                  <span>{searchTerm ? tr('Nenhum resultado encontrado.') : isSeaTab ? tr('Nenhuma sazonalidade cadastrada.') : tr('Nenhuma categoria cadastrada.')}</span>
                 </div>
               ) : items.map((item) => {
                 const ativo = detailItem?.id === item.id && detailType === (isSeaTab ? 'sea' : 'cat');
@@ -1949,15 +1932,15 @@ export default function PricingManagement() {
                     <span className={styles.listItemBody}>
                       <span className={styles.listItemName}>
                         <span className={styles.nome}>{item.nome}</span>
-                        {isSeaTab && expirada(item) && <Pill tom="tagRed">Expirado</Pill>}
+                        {isSeaTab && expirada(item) && <Pill tom="tagRed">{tr('Expirado')}</Pill>}
                       </span>
                       <span className={styles.listItemSub}>
                         {(isSeaTab
                           ? [MODO_LABEL[item.modoOperacao], resumoSchedule(item)]
                           : [
-                              fixo ? 'Tarifa fixa' : 'Por ocupação',
-                              item.dayUse?.ativo && 'Day Use',
-                              nSaz(item) > 0 && `${nSaz(item)} sazonalidade${nSaz(item) !== 1 ? 's' : ''}`,
+                              fixo ? tr('Tarifa fixa') : tr('Por ocupação'),
+                              item.dayUse?.ativo && tr('Day Use'),
+                              nSaz(item) > 0 && (nSaz(item) !== 1 ? tr('{{n}} sazonalidades', { n: nSaz(item) }) : tr('{{n}} sazonalidade', { n: nSaz(item) })),
                             ]
                         ).filter(Boolean).join(' · ')}
                       </span>
@@ -1969,43 +1952,10 @@ export default function PricingManagement() {
             </div>
           </aside>
 
-          {/* ══ DIREITA: formulário, ficha ou painel geral ══════ */}
+          {/* ══ DIREITA: formulário ou ficha ══════ */}
           {formAtivo ? renderForm()
             : detailItem ? (detailType === 'cat' ? renderCatPanel(detailItem) : renderSeaPanel(detailItem))
-            : (
-            /* ── Painel geral (celular, nada aberto) ── */
-            <div className={styles.detailPanel}>
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <Layers size={16} />
-                  <span className={styles.dCardTitle}>Visão geral de preços</span>
-                </h3>
-
-                <div className={styles.dCardBody}>
-                  {loading ? <SkeletonPainel /> : (
-                    <div className={styles.statGrid}>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Categorias</p>
-                        <p className={styles.statVal}>{categorias.length}</p>
-                      </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Sazonalidades</p>
-                        <p className={[styles.statVal, styles.statValAmber].join(' ')}>{sazonalidades.length}</p>
-                      </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Quartos vinculados</p>
-                        <p className={styles.statVal}>{quartosVinculados}</p>
-                      </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Com Day Use</p>
-                        <p className={[styles.statVal, styles.statValGreen].join(' ')}>{comDayUse}</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </section>
-            </div>
-          )}
+            : null}
         </main>
       </div>
 
@@ -2016,19 +1966,19 @@ export default function PricingManagement() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         size="sm"
-        title={<><Trash2 size={15} /> Confirmar exclusão</>}
+        title={<><Trash2 size={15} /> {tr('Confirmar exclusão')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)}>{tr('Cancelar')}</Button>
             <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
               {deleting && <Loader2 size={14} className={styles.spinInline} />}
-              Excluir
+              {tr('Excluir')}
             </Button>
           </div>
         }
       >
         <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
-          Tem certeza que deseja excluir <strong>{deleteTarget?.nome}</strong>?
+          {tr('Tem certeza que deseja excluir')} <strong>{deleteTarget?.nome}</strong>?
           {deleteTarget?.type === 'cat' && (() => {
             const cat = categorias.find((c) => c.id === deleteTarget.id);
             const qs = (cat?.quartosObj ?? []).map((q) => quartos.find((x) => x.id === q.id)?.numero ?? q.id);
@@ -2036,9 +1986,9 @@ export default function PricingManagement() {
             if (!qs.length && !ss.length) return null;
             return (
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)' }}>
-                Esta categoria possui vínculos que também serão removidos:
-                {qs.length > 0 && <div style={{ marginTop: 6 }}><strong>Quartos:</strong> {qs.join(', ')}</div>}
-                {ss.length > 0 && <div style={{ marginTop: 4 }}><strong>Sazonalidades:</strong> {ss.join(', ')}</div>}
+                {tr('Esta categoria possui vínculos que também serão removidos:')}
+                {qs.length > 0 && <div style={{ marginTop: 6 }}><strong>{tr('Quartos:')}</strong> {qs.join(', ')}</div>}
+                {ss.length > 0 && <div style={{ marginTop: 4 }}><strong>{tr('Sazonalidades:')}</strong> {ss.join(', ')}</div>}
               </div>
             );
           })()}
@@ -2047,8 +1997,8 @@ export default function PricingManagement() {
             if (!cs.length) return null;
             return (
               <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)' }}>
-                Esta sazonalidade possui vínculos que também serão removidos:
-                <div style={{ marginTop: 6 }}><strong>Categorias:</strong> {cs.join(', ')}</div>
+                {tr('Esta sazonalidade possui vínculos que também serão removidos:')}
+                <div style={{ marginTop: 6 }}><strong>{tr('Categorias:')}</strong> {cs.join(', ')}</div>
               </div>
             );
           })()}

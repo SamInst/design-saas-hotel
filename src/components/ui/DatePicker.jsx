@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import styles from './DatePicker.module.css';
+import { tr } from '../../i18n';
 
-const MONTHS       = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const MONTHS_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-const DAYS         = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MONTHS       = [tr('Janeiro'),tr('Fevereiro'),tr('Março'),tr('Abril'),tr('Maio'),tr('Junho'),tr('Julho'),tr('Agosto'),tr('Setembro'),tr('Outubro'),tr('Novembro'),tr('Dezembro')];
+const MONTHS_SHORT = [tr('Jan'),tr('Fev'),tr('Mar'),tr('Abr'),tr('Mai'),tr('Jun'),tr('Jul'),tr('Ago'),tr('Set'),tr('Out'),tr('Nov'),tr('Dez')];
+const DAYS         = [tr('Dom'),tr('Seg'),tr('Ter'),tr('Qua'),tr('Qui'),tr('Sex'),tr('Sáb')];
 
 const sod     = (d) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const sameDay = (a,b) => a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
@@ -57,7 +58,7 @@ export function DatePicker({
   readOnly = false,       // somente visualização: dias não selecionáveis (mantém navegação de mês)
   disabled = false,       // campo inativo: não abre, não aceita digitação, não limpa
   lockMonth = false,      // trava o mês exibido: esconde as setas e desativa o seletor de mês/ano
-  placeholder = 'Selecione a data',
+  placeholder = tr('Selecione a data'),
   label,
   error = false,
   className = '',
@@ -408,7 +409,7 @@ export function DatePicker({
               );
             })}
           </div>
-          {mode==='range' && startDate && !endDate && <p className={styles.hint}>Selecione a data final</p>}
+          {mode==='range' && startDate && !endDate && <p className={styles.hint}>{tr('Selecione a data final')}</p>}
         </>
       )}
 

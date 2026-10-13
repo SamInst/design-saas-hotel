@@ -1,8 +1,9 @@
 import { ROOM_STATUS } from './overviewApi';
+import { tr } from '../../../i18n';
 
 // ── Currency helpers ──────────────────────────────────────────────────────────
 export const fmtBRL = (v) =>
-  v == null ? 'R$ 0,00' :
+  v == null ? tr('R$ 0,00') :
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 export const maskBRL = (v) => {
@@ -59,7 +60,7 @@ export function calcValorDayUse(precoBase, precoAdicional, horasBase, elapsedMin
 export function fmtElapsed(min) {
   if (min <= 0) return '0min';
   const h = Math.floor(min / 60), m = min % 60;
-  return h === 0 ? `${m}min` : `${h}h ${String(m).padStart(2, '0')}min`;
+  return h === 0 ? `${m}min` : tr('{{h}}h {{v1}}min', { h, v1: String(m).padStart(2, '0') });
 }
 
 export function fmtClock(sec) {
@@ -85,12 +86,12 @@ export function roomStatusKey(status) {
 
 // ── Filter options ────────────────────────────────────────────────────────────
 export const FILTER_OPTIONS = [
-  { id: 'todos',     label: 'Todos'           },
-  { id: 'disponivel',label: 'Disponível'      },
-  { id: 'ocupado',   label: 'Ocupado'         },
-  { id: 'reservado', label: 'Reservado'       },
-  { id: 'limpeza',   label: 'Limpeza'         },
-  { id: 'servico',   label: 'Manutenção/Fora' },
+  { id: 'todos',     label: tr('Todos')           },
+  { id: 'disponivel',label: tr('Disponível')      },
+  { id: 'ocupado',   label: tr('Ocupado')         },
+  { id: 'reservado', label: tr('Reservado')       },
+  { id: 'limpeza',   label: tr('Limpeza')         },
+  { id: 'servico',   label: tr('Manutenção/Fora') },
 ];
 
 // ── Mock itens do quarto ──────────────────────────────────────────────────────

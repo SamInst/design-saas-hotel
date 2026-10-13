@@ -9,6 +9,7 @@ import { computeAdjustedTotal, novoPrecoToState, describeAdjustment } from '../.
 import { reservaApi, hospedagemApi } from '../../../../services/api';
 import { fmtBRL } from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
+import { tr } from '../../../../i18n';
 
 // ── Date helpers (backend: "dd/MM/yyyy HH:mm") ─────────────────────────────────
 const parseBr = (s) => {
@@ -114,7 +115,7 @@ export default function GerenciarDiariasModal({
           ?? diarias[diarias.length - 1] ?? null;
         setSelRowKey(cur?.key ?? null);
       })
-      .catch((e) => { if (!cancelled) notify?.('Erro ao carregar diárias: ' + (e.message || ''), 'error'); })
+      .catch((e) => { if (!cancelled) notify?.(tr('Erro ao carregar diárias: ') + (e.message || ''), 'error'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [open, hospedagemId]); // eslint-disable-line
@@ -309,16 +310,16 @@ export default function GerenciarDiariasModal({
   };
 
   const handleSave = async () => {
-    if (rows.length === 0) { notify?.('Adicione ao menos uma diária.', 'error'); return; }
+    if (rows.length === 0) { notify?.(tr('Adicione ao menos uma diária.'), 'error'); return; }
     const invalid = rows.find((r) =>
       !r.quartoId || !r.checkin || (!r.meiaDiaria && (!r.checkout || r.checkin >= r.checkout)),
     );
-    if (invalid) { notify?.('Verifique o quarto e o período de cada diária.', 'error'); return; }
+    if (invalid) { notify?.(tr('Verifique o quarto e o período de cada diária.'), 'error'); return; }
     const meiaInvalida = rows.find((r) => r.meiaDiaria && !/^\d{2}:\d{2}$/.test(r.horaSaida || ''));
-    if (meiaInvalida) { notify?.('Informe a hora de saída da meia diária.', 'error'); return; }
+    if (meiaInvalida) { notify?.(tr('Informe a hora de saída da meia diária.'), 'error'); return; }
     // A meia diária começa no checkout da categoria (fim da diária anterior); a saída precisa ser depois.
     const meiaHora = rows.find((r) => r.meiaDiaria && (r.horaSaida || '') <= roomTimes(r.quartoId).checkout);
-    if (meiaHora) { notify?.(`A hora de saída da meia diária deve ser após o checkout da categoria.`, 'error'); return; }
+    if (meiaHora) { notify?.(tr('A hora de saída da meia diária deve ser após o checkout da categoria.'), 'error'); return; }
     setSaving(true);
     try {
       const pessoas = hospedes.map((h) => h.id).filter(Boolean);
@@ -346,10 +347,10 @@ export default function GerenciarDiariasModal({
         };
       });
       await hospedagemApi.atualizarDiarias(hospedagemId, body);
-      notify?.(`${rows.length} diária(s) salva(s).`);
+      notify?.(tr('{{length}} diária(s) salva(s).', { length: rows.length }));
       onSaved?.();
       onClose();
-    } catch (e) { notify?.('Erro: ' + (e.message || ''), 'error'); }
+    } catch (e) { notify?.(tr('Erro: ') + (e.message || ''), 'error'); }
     finally { setSaving(false); }
   };
 
@@ -362,19 +363,19 @@ export default function GerenciarDiariasModal({
       onClose={onClose}
       size="lg"
       containerStyle={{ maxWidth: 'min(820px, 96vw)' }}
-      title={<><RefreshCw size={15} /> Gerenciar Diárias — Apt. {roomLabel}</>}
+      title={<><RefreshCw size={15} /> {tr('Gerenciar Diárias — Apt.')} {roomLabel}</>}
       footer={
         <div className={styles.footerRight}>
           <Button variant="primary" onClick={handleSave} disabled={saving || loading || rows.length === 0}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            Salvar Diárias
+            {tr('Salvar Diárias')}
           </Button>
         </div>
       }
     >
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '24px 0', color: 'var(--text-2)', fontSize: 13 }}>
-          <Loader2 size={15} className={styles.spin} /> Carregando diárias...
+          <Loader2 size={15} className={styles.spin} /> {tr('Carregando diárias...')}
         </div>
       ) : (
         <div className={styles.formStack}>
@@ -382,22 +383,22 @@ export default function GerenciarDiariasModal({
           <div className={styles.gdFinCard}>
             <div className={styles.gdFinHeader}>
               <DollarSign size={13} className={styles.gdFinIcon} />
-              <span className={styles.gdFinTitle}>Resumo Financeiro</span>
-              <span className={styles.gdFinDiarias}>{rows.length} diária(s)</span>
+              <span className={styles.gdFinTitle}>{tr('Resumo Financeiro')}</span>
+              <span className={styles.gdFinDiarias}>{rows.length} {tr('diária(s)')}</span>
             </div>
             <div className={styles.gdFinRow}>
               <div className={styles.gdFinItem}>
-                <span className={styles.gdFinLabel}>Valor Total</span>
+                <span className={styles.gdFinLabel}>{tr('Valor Total')}</span>
                 <span className={styles.gdFinValue}>
                   {calcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(total)}
                 </span>
               </div>
               <div className={styles.gdFinItem}>
-                <span className={styles.gdFinLabel}>Total Pago</span>
+                <span className={styles.gdFinLabel}>{tr('Total Pago')}</span>
                 <span className={[styles.gdFinValue, styles.gdFinPaid].join(' ')}>{fmtBRL(totalPago || 0)}</span>
               </div>
               <div className={styles.gdFinItem}>
-                <span className={styles.gdFinLabel}>Pendente</span>
+                <span className={styles.gdFinLabel}>{tr('Pendente')}</span>
                 <span className={[styles.gdFinValue, pendente > 0 ? styles.gdFinPending : styles.gdFinPaid].join(' ')}>
                   {fmtBRL(pendente)}
                 </span>
@@ -406,7 +407,7 @@ export default function GerenciarDiariasModal({
             {total > 0 && (
               <div className={styles.gdFinProgress}>
                 <div className={styles.gdFinProgressMeta}>
-                  <span>Progresso de pagamento</span>
+                  <span>{tr('Progresso de pagamento')}</span>
                   <span>{pagPct}%</span>
                 </div>
                 <div className={styles.gdFinBar}>
@@ -415,14 +416,14 @@ export default function GerenciarDiariasModal({
               </div>
             )}
             {adjDesc && (
-              <div className={styles.gdFinAdj}>Subtotal {fmtBRL(baseTotal)} · {adjDesc}</div>
+              <div className={styles.gdFinAdj}>{tr('Subtotal')} {fmtBRL(baseTotal)} · {adjDesc}</div>
             )}
           </div>
 
           {/* Hóspedes do pernoite (usados no cálculo de todas as diárias) */}
           {hospedes.length > 0 && (
             <div className={styles.gdHospedesInfo}>
-              <span className={styles.gdFieldLabel}>Hóspedes do pernoite</span>
+              <span className={styles.gdFieldLabel}>{tr('Hóspedes do pernoite')}</span>
               <div className={styles.gdHospedesChips}>
                 {hospedes.map((h) => (
                   <span key={h.id} className={styles.gdHospedeChip}>{h.nome}</span>
@@ -435,7 +436,7 @@ export default function GerenciarDiariasModal({
           <div className={styles.gdSplit}>
             <div className={styles.gdSplitLeft}>
           {rows.length === 0 ? (
-            <div className={styles.emptyList}><CalendarDays size={20} color="var(--text-2)" /><span>Nenhuma diária</span></div>
+            <div className={styles.emptyList}><CalendarDays size={20} color="var(--text-2)" /><span>{tr('Nenhuma diária')}</span></div>
           ) : (
             <div className={styles.gdDiariaList} ref={listRef} style={{ gap: 12, paddingRight: 4, paddingBottom: 4 }}>
               {rows.map((r, idx) => {
@@ -455,11 +456,11 @@ export default function GerenciarDiariasModal({
                   <div key={r.key}
                     className={[styles.gdCard, r.key === selRowKey ? styles.gdCardSel : ''].join(' ')}
                     onClick={() => setSelRowKey(r.key)}
-                    title="Ver disponibilidade desta diária no calendário">
+                    title={tr('Ver disponibilidade desta diária no calendário')}>
                     <div className={styles.gdCardHeader}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                          <span className={styles.gdCardNum}>Diária {idx + 1}</span>
+                          <span className={styles.gdCardNum}>{tr('Diária')} {idx + 1}</span>
                           {canMeia && (
                             <label className={styles.gdMeiaCheck}>
                               <input
@@ -467,14 +468,14 @@ export default function GerenciarDiariasModal({
                                 checked={!!r.meiaDiaria}
                                 onChange={(e) => toggleMeia(r.key, e.target.checked)}
                               />
-                              Definir como meia diária
+                              {tr('Definir como meia diária')}
                             </label>
                           )}
                         </div>
                         {showBelow && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                            {past && <span className={styles.gdPastTag}>Encerrada</span>}
-                            {r.meiaDiaria && !canMeia && <span className={styles.gdMeiaTag}>Meia diária</span>}
+                            {past && <span className={styles.gdPastTag}>{tr('Encerrada')}</span>}
+                            {r.meiaDiaria && !canMeia && <span className={styles.gdMeiaTag}>{tr('Meia diária')}</span>}
                             {sazNomes.map((n) => (
                               <span key={n} className={styles.nhSazChip}>{n}</span>
                             ))}
@@ -483,13 +484,13 @@ export default function GerenciarDiariasModal({
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                         <span className={styles.gdCardPeople}>
-                          {adultos} adulto(s){criancas > 0 && ` + ${criancas} criança(s)`}
+                          {adultos} {tr('adulto(s)')}{criancas > 0 && tr(' + {{criancas}} criança(s)', { criancas })}
                         </span>
                         <span className={styles.gdCardVal}>
                           {calcLoading ? <Loader2 size={12} className={styles.spin} /> : fmtBRL(r.valor)}
                         </span>
                         {!past && (
-                          <button className={styles.removeBtn} onClick={() => setConfirmRemove({ key: r.key, num: idx + 1 })} disabled={saving} title="Remover diária">
+                          <button className={styles.removeBtn} onClick={() => setConfirmRemove({ key: r.key, num: idx + 1 })} disabled={saving} title={tr('Remover diária')}>
                             <Trash2 size={13} />
                           </button>
                         )}
@@ -499,12 +500,12 @@ export default function GerenciarDiariasModal({
                     <div className={styles.gdCardBody}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                         <div className={styles.formStack} style={{ gap: 5 }}>
-                          <label className={styles.gdFieldLabel}>{r.meiaDiaria ? 'Data · Hora de saída' : 'Período'}</label>
+                          <label className={styles.gdFieldLabel}>{r.meiaDiaria ? tr('Data · Hora de saída') : tr('Período')}</label>
                           {r.meiaDiaria ? (
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 96px', gap: 8 }}>
                               {(idx > 0 || past) ? (
                                 // Data fixa = checkout da diária anterior; só a hora é editável.
-                                <div className={styles.gdReadonlyDate} title="Data definida pela diária anterior">
+                                <div className={styles.gdReadonlyDate} title={tr('Data definida pela diária anterior')}>
                                   {brDateOnly(r.checkin)}
                                 </div>
                               ) : (
@@ -518,7 +519,7 @@ export default function GerenciarDiariasModal({
                               <TimeInput value={r.horaSaida} onChange={(v) => patchRow(r.key, { horaSaida: v })} />
                             </div>
                           ) : past ? (
-                            <div className={styles.gdReadonlyDate} title="Diária encerrada">
+                            <div className={styles.gdReadonlyDate} title={tr('Diária encerrada')}>
                               {brDateOnly(r.checkin)} → {brDateOnly(r.checkout)}
                             </div>
                           ) : (
@@ -532,15 +533,15 @@ export default function GerenciarDiariasModal({
                           )}
                         </div>
                         <div className={styles.formStack} style={{ gap: 5 }}>
-                          <label className={styles.gdFieldLabel}>Quarto</label>
+                          <label className={styles.gdFieldLabel}>{tr('Quarto')}</label>
                           {past ? (
-                            <div className={styles.gdReadonlyDate} title="Diária encerrada">
-                              Apt. {quartos.find((q) => q.id === r.quartoId)?.numero ?? r.quartoId}
+                            <div className={styles.gdReadonlyDate} title={tr('Diária encerrada')}>
+                              {tr('Apt.')} {quartos.find((q) => q.id === r.quartoId)?.numero ?? r.quartoId}
                             </div>
                           ) : (
                             <Select value={r.quartoId ?? ''} onChange={(e) => patchRow(r.key, { quartoId: Number(e.target.value) })}>
                               {quartos.map((q) => (
-                                <option key={q.id} value={q.id}>Apt. {q.numero} · {q.tipoOcupacao || q.categoria}</option>
+                                <option key={q.id} value={q.id}>{tr('Apt.')} {q.numero} · {q.tipoOcupacao || q.categoria}</option>
                               ))}
                             </Select>
                           )}
@@ -558,32 +559,32 @@ export default function GerenciarDiariasModal({
             className={styles.gdAddBtn}
             onClick={addRow}
             disabled={saving || availLoading || nextDateBusy}
-            title={nextDateBusy ? 'A próxima data está ocupada no calendário.' : undefined}
+            title={nextDateBusy ? tr('A próxima data está ocupada no calendário.') : undefined}
           >
             {availLoading ? <Loader2 size={14} className={styles.spin} /> : <Plus size={14} />}
             {availLoading
-              ? 'Carregando disponibilidade…'
+              ? tr('Carregando disponibilidade…')
               : nextDateBusy
-                ? 'Próxima data indisponível'
-                : 'Adicionar Diária'}
+                ? tr('Próxima data indisponível')
+                : tr('Adicionar Diária')}
           </button>
             </div>
 
             <div className={styles.gdSplitRight}>
               <span className={styles.gdFieldLabel}>
-                Disponibilidade · Apt. {selRoomLabel}{selRow ? ` · Diária ${rows.indexOf(selRow) + 1}` : ''}
+                {tr('Disponibilidade · Apt.')} {selRoomLabel}{selRow ? tr(' · Diária {{v0}}', { v0: rows.indexOf(selRow) + 1 }) : ''}
               </span>
               {/* Resumo do período da diária selecionada (datas editadas nos campos à esquerda). */}
               <div className={styles.gdEditCalSummary}>
                 <div className={styles.gdEditCalLeg}>
-                  <span className={styles.gdEditCalLegKey} style={{ color: 'var(--emerald)' }}>Check-in</span>
+                  <span className={styles.gdEditCalLegKey} style={{ color: 'var(--emerald)' }}>{tr('Check-in')}</span>
                   <b>{selRow ? brDateOnly(selRow.checkin) : '—'}</b>
                 </div>
                 <div className={styles.gdEditCalArrow}>
                   <svg viewBox="0 0 24 8" width="34" height="8" fill="none"><path d="M0 4h22m0 0l-4-3.5M22 4l-4 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
                 <div className={[styles.gdEditCalLeg, styles.gdEditCalLegRight].join(' ')}>
-                  <span className={styles.gdEditCalLegKey} style={{ color: '#f97316' }}>Check-out</span>
+                  <span className={styles.gdEditCalLegKey} style={{ color: '#f97316' }}>{tr('Check-out')}</span>
                   <b>{selRow ? brDateOnly(selRow.checkout) : '—'}</b>
                 </div>
               </div>
@@ -599,10 +600,10 @@ export default function GerenciarDiariasModal({
                 onRangeChange={() => {}}
               />
               <div className={styles.gdCalLegend}>
-                <span className={styles.gdCalLegendItem}><i className={styles.gdLgSel} /> Diária</span>
-                <span className={styles.gdCalLegendItem}><i className={styles.gdLgBlk} /> Ocupado</span>
-                <span className={styles.gdCalLegendItem}><i className={styles.gdLgHalf} /> Entrada/saída (meio-dia)</span>
-                <span className={styles.gdCalLegendItem}><i className={styles.gdLgFree} /> Disponível</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgSel} /> {tr('Diária')}</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgBlk} /> {tr('Ocupado')}</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgHalf} /> {tr('Entrada/saída (meio-dia)')}</span>
+                <span className={styles.gdCalLegendItem}><i className={styles.gdLgFree} /> {tr('Disponível')}</span>
               </div>
             </div>
           </div>
@@ -615,18 +616,18 @@ export default function GerenciarDiariasModal({
         open
         onClose={() => setConfirmRemove(null)}
         size="sm"
-        title={<><AlertTriangle size={15} /> Remover Diária</>}
+        title={<><AlertTriangle size={15} /> {tr('Remover Diária')}</>}
         footer={
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => setConfirmRemove(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setConfirmRemove(null)}>{tr('Cancelar')}</Button>
             <Button variant="danger" onClick={() => { removeRow(confirmRemove.key); setConfirmRemove(null); }}>
-              <Trash2 size={14} /> Remover
+              <Trash2 size={14} /> {tr('Remover')}
             </Button>
           </div>
         }
       >
         <p style={{ margin: 0, color: 'var(--text)', fontSize: 14, lineHeight: 1.6 }}>
-          Confirma a remoção da <strong>Diária {confirmRemove.num}</strong>? A alteração só é aplicada ao salvar.
+          {tr('Confirma a remoção da')} <strong>{tr('Diária')} {confirmRemove.num}</strong>{tr('? A alteração só é aplicada ao salvar.')}
         </p>
       </Modal>
     )}

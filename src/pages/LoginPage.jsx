@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { authApi } from '../services/api';
 import styles from './LoginPage.module.css';
 
@@ -39,6 +40,7 @@ function PlusMark({ className }) {
 }
 
 export default function LoginPage({ onLogin }) {
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -63,7 +65,7 @@ export default function LoginPage({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!username.trim() || !password.trim()) {
-      setError('Preencha usuário e senha.');
+      setError(t('login.errors.required'));
       return;
     }
 
@@ -79,18 +81,18 @@ export default function LoginPage({ onLogin }) {
         name:         user.pessoa?.nome,
         username:     user.usuario?.username,
         email:        user.pessoa?.email,
-        role:         user.cargo?.descricao ?? 'Funcionário',
+        role:         user.cargo?.descricao ?? t('login.defaultRole'),
         cargo:        user.cargo,
         dataAdmissao: user.data_admissao,
         avatar:       null,
       });
     } catch (err) {
       if (err.status === 401 || err.status === 403) {
-        setError('Usuário ou senha incorretos.');
+        setError(t('login.errors.invalid'));
       } else if (err.status === 0 || !err.status) {
-        setError('Não foi possível conectar ao servidor. Tente novamente.');
+        setError(t('login.errors.network'));
       } else {
-        setError(err.message || 'Erro ao fazer login. Tente novamente.');
+        setError(err.message || t('login.errors.generic'));
       }
     } finally {
       setLoading(false);
@@ -116,16 +118,11 @@ export default function LoginPage({ onLogin }) {
       {/* ── IMMERSIVE STAGE ─────────────────────────────────────────── */}
       <aside className={styles.stage} aria-hidden="true">
         <div className={styles.stageBody}>
-          <span className={styles.kicker}>Sistema de Gestão Hoteleira</span>
+          <span className={styles.kicker}>{t('login.kicker')}</span>
           <h2 className={styles.wordmark}>
             <PlusMark className={styles.plus} /><em>hospedagem</em>
           </h2>
-          <p className={styles.features}>
-            Reservas, pernoites e meias-diárias num só calendário. Recepção com
-            check-in e check-out em tempo real, cadastro de hóspedes e empresas,
-            tarifas por temporada, controle financeiro com vouchers e orçamentos,
-            equipe e permissões por cargo, tudo integrado num único painel.
-          </p>
+          <p className={styles.features}>{t('login.features')}</p>
           <div className={styles.dots}>
             {SLIDES.map((src, i) => (
               <span
@@ -149,7 +146,7 @@ export default function LoginPage({ onLogin }) {
           <div className={styles.panelInner}>
 
           <div className={styles.intro}>
-            <h1 className={styles.title}>Bem-vindo de volta</h1>
+            <h1 className={styles.title}>{t('login.welcome')}</h1>
             {/*<p className={styles.sub}>Entre para gerenciar a operação da hospedagem.</p>*/}
           </div>
 
@@ -174,7 +171,7 @@ export default function LoginPage({ onLogin }) {
                 disabled={loading}
                 required
               />
-              <label className={styles.label} htmlFor="username">Usuário</label>
+              <label className={styles.label} htmlFor="username">{t('login.username')}</label>
               <span className={styles.underline} />
             </div>
 
@@ -190,13 +187,13 @@ export default function LoginPage({ onLogin }) {
                 disabled={loading}
                 required
               />
-              <label className={styles.label} htmlFor="password">Senha</label>
+              <label className={styles.label} htmlFor="password">{t('login.password')}</label>
               <span className={styles.underline} />
               <button
                 type="button"
                 className={styles.eye}
                 onClick={() => setShowPass(v => !v)}
-                aria-label={showPass ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-label={showPass ? t('login.hidePassword') : t('login.showPassword')}
                 tabIndex={-1}
               >
                 {showPass ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -204,12 +201,12 @@ export default function LoginPage({ onLogin }) {
             </div>
 
             <div className={styles.forgotRow}>
-              <button type="button" className={styles.forgot}>Esqueceu a senha?</button>
+              <button type="button" className={styles.forgot}>{t('login.forgot')}</button>
             </div>
 
             <button className={styles.submit} disabled={loading} type="submit">
               <span className={styles.submitLabel}>
-                {loading ? 'Entrando' : 'Entrar'}
+                {loading ? t('login.submitting') : t('login.submit')}
               </span>
               {loading
                 ? <Loader2 size={17} className={styles.spinner} />
@@ -218,7 +215,7 @@ export default function LoginPage({ onLogin }) {
           </form>
 
           <footer className={styles.legal}>
-            +hospedagem © {new Date().getFullYear()} · Painel interno
+            +hospedagem © {new Date().getFullYear()} · {t('login.footer')}
           </footer>
           </div>
         </div>

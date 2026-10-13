@@ -35,6 +35,7 @@ import {
 } from './registersMocks';
 
 import styles from './RegistersPage.module.css';
+import { tr } from '../../i18n';
 
 // Teste: painel "Visão geral dos cadastros" desligado; os totais foram para a lista.
 const MOSTRAR_VISAO_GERAL = false;
@@ -205,7 +206,7 @@ const fmtBRL = (v) =>
 /** 7 → "07"; de 10 para cima fica como está. */
 const pad2 = (n) => String(n ?? 0).padStart(2, '0');
 
-const MESES_CURTOS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_CURTOS = [tr('Jan'),tr('Fev'),tr('Mar'),tr('Abr'),tr('Mai'),tr('Jun'),tr('Jul'),tr('Ago'),tr('Set'),tr('Out'),tr('Nov'),tr('Dez')];
 
 /** Normaliza a data de registro (ISO ou dd/MM/yyyy, com ou sem hora) para yyyy-MM-dd. */
 const toISODate = (reg) => {
@@ -241,12 +242,12 @@ const isNovo = (item) => {
 const nacionalidade = (pais) => {
   const p = (pais ?? '').trim();
   if (!p) return '';
-  if (/^brasil$/i.test(p)) return 'Brasileira';
+  if (/^brasil$/i.test(p)) return tr('Brasileira');
   return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
 };
 
 const sexoLabel = (sexo) =>
-  Number(sexo) === 1 ? 'Masculino' : Number(sexo) === 2 ? 'Feminino' : sexo ? 'Outro' : '';
+  Number(sexo) === 1 ? tr('Masculino') : Number(sexo) === 2 ? tr('Feminino') : sexo ? tr('Outro') : '';
 
 const catTomClass = (tom) => ({
   ouro:   styles.catOuro,
@@ -362,10 +363,10 @@ const validarCPF = cpf => {
 };
 
 const SEXO_OPTS = [
-  { value: '',  label: 'Selecione' },
-  { value: '1', label: 'Masculino' },
-  { value: '2', label: 'Feminino'  },
-  { value: '3', label: 'Outro'     },
+  { value: '',  label: tr('Selecione') },
+  { value: '1', label: tr('Masculino') },
+  { value: '2', label: tr('Feminino')  },
+  { value: '3', label: tr('Outro')     },
 ];
 
 /**
@@ -374,26 +375,26 @@ const SEXO_OPTS = [
  * manda esse valor (ver o TODO lá).
  */
 const PARENTESCO_OPTS = [
-  { value: '',          label: 'Selecione'              },
-  { value: 'CONJUGE',   label: 'Cônjuge / Companheiro'  },
-  { value: 'FILHO',     label: 'Filho(a)'               },
-  { value: 'ENTEADO',   label: 'Enteado(a)'             },
-  { value: 'PAI_MAE',   label: 'Pai / Mãe'              },
-  { value: 'IRMAO',     label: 'Irmão / Irmã'           },
-  { value: 'AVO',       label: 'Avô / Avó'              },
-  { value: 'NETO',      label: 'Neto(a)'                },
-  { value: 'TIO',       label: 'Tio(a)'                 },
-  { value: 'SOBRINHO',  label: 'Sobrinho(a)'            },
-  { value: 'PRIMO',     label: 'Primo(a)'               },
-  { value: 'AMIGO',     label: 'Amigo(a)'               },
-  { value: 'OUTRO',     label: 'Outro'                  },
+  { value: '',          label: tr('Selecione')              },
+  { value: 'CONJUGE',   label: tr('Cônjuge / Companheiro')  },
+  { value: 'FILHO',     label: tr('Filho(a)')               },
+  { value: 'ENTEADO',   label: tr('Enteado(a)')             },
+  { value: 'PAI_MAE',   label: tr('Pai / Mãe')              },
+  { value: 'IRMAO',     label: tr('Irmão / Irmã')           },
+  { value: 'AVO',       label: tr('Avô / Avó')              },
+  { value: 'NETO',      label: tr('Neto(a)')                },
+  { value: 'TIO',       label: tr('Tio(a)')                 },
+  { value: 'SOBRINHO',  label: tr('Sobrinho(a)')            },
+  { value: 'PRIMO',     label: tr('Primo(a)')               },
+  { value: 'AMIGO',     label: tr('Amigo(a)')               },
+  { value: 'OUTRO',     label: tr('Outro')                  },
 ];
 const parentescoLabel = (v) => PARENTESCO_OPTS.find(o => o.value === v && o.value)?.label ?? '—';
 
 const blankVeiculo = () => ({ tipo:'', modelo:'', marca:'', ano:'', placa:'', cor:'' });
 
 /** "Honda Civic" / "Civic" — o que aparece na linha da lista de veículos. */
-const veiculoLabel = (v) => [v.marca, v.modelo].filter(Boolean).join(' ') || 'Veículo';
+const veiculoLabel = (v) => [v.marca, v.modelo].filter(Boolean).join(' ') || tr('Veículo');
 /** "2024 · Preto" — os dados secundários da mesma linha. */
 const veiculoSub = (v) => [v.ano, v.cor].filter(Boolean).join(' · ');
 
@@ -446,7 +447,7 @@ function ConfirmRow({ label, value }) {
 function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome }) {
   const idade = idadeDe(pessoa.dataNascimento);
   const nasc  = pessoa.dataNascimento
-    ? `${nascLabel(pessoa.dataNascimento)}${idade != null ? ` (${idade} anos)` : ''}`
+    ? `${nascLabel(pessoa.dataNascimento)}${idade != null ? ` ${tr('({{idade}} anos)', { idade })}` : ''}`
     : '';
   const local = [pessoa.municipio, pessoa.estado].filter(Boolean).join(', ');
   const veiculos = pessoa.veiculos ?? [];
@@ -459,17 +460,17 @@ function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome })
           <div className={styles.cfNameRow}>
             <span className={styles.cfName}>{pessoa.nome || '—'}</span>
             <span className={dependente ? styles.confirmBadgeDep : styles.confirmBadgeTitular}>
-              {dependente ? 'Dependente' : 'Titular'}
+              {dependente ? tr('Dependente') : tr('Titular')}
             </span>
           </div>
           <div className={styles.cfGrid}>
             <ConfirmRow label="CPF"         value={maskCPF(pessoa.cpf ?? '')} />
-            <ConfirmRow label="Nascimento"  value={nasc} />
+            <ConfirmRow label={tr('Nascimento')}  value={nasc} />
             <ConfirmRow label="RG"          value={pessoa.rg} />
-            <ConfirmRow label="Gênero"      value={sexoLabel(pessoa.sexo)} />
-            {dependente && <ConfirmRow label="Parentesco" value={pessoa.parentesco ? parentescoLabel(pessoa.parentesco) : ''} />}
-            {!usaTitular && <ConfirmRow label="Telefone" value={pessoa.telefone} />}
-            {!usaTitular && <ConfirmRow label="Email"    value={pessoa.email} />}
+            <ConfirmRow label={tr('Gênero')}      value={sexoLabel(pessoa.sexo)} />
+            {dependente && <ConfirmRow label={tr('Parentesco')} value={pessoa.parentesco ? parentescoLabel(pessoa.parentesco) : ''} />}
+            {!usaTitular && <ConfirmRow label={tr('Telefone')} value={pessoa.telefone} />}
+            {!usaTitular && <ConfirmRow label={tr('Email')}    value={pessoa.email} />}
           </div>
         </div>
       </div>
@@ -478,32 +479,32 @@ function ConfirmPessoa({ pessoa, dependente, usaTitular, empresa, empresaNome })
         <div className={styles.cfBottom}>
           {!usaTitular && (
             <div className={styles.cfCol}>
-              <span className={styles.cfSecTitle}>Endereço</span>
-              <ConfirmRow label="Logradouro"  value={pessoa.endereco} />
-              <ConfirmRow label="Número"      value={pessoa.numero} />
+              <span className={styles.cfSecTitle}>{tr('Endereço')}</span>
+              <ConfirmRow label={tr('Logradouro')}  value={pessoa.endereco} />
+              <ConfirmRow label={tr('Número')}      value={pessoa.numero} />
               <ConfirmRow label="CEP"         value={pessoa.cep} />
-              <ConfirmRow label="Complemento" value={pessoa.complemento} />
-              <ConfirmRow label="Bairro"      value={pessoa.bairro} />
-              <ConfirmRow label="Município"   value={local} />
-              <ConfirmRow label="País"        value={pessoa.pais} />
+              <ConfirmRow label={tr('Complemento')} value={pessoa.complemento} />
+              <ConfirmRow label={tr('Bairro')}      value={pessoa.bairro} />
+              <ConfirmRow label={tr('Município')}   value={local} />
+              <ConfirmRow label={tr('País')}        value={pessoa.pais} />
             </div>
           )}
           {(empresa || veiculos.length > 0) && (
             <div className={styles.cfCol}>
               {empresa && (
                 <div className={styles.cfSec}>
-                  <span className={styles.cfSecTitle}>Empresa</span>
-                  <ConfirmRow label="Nome/Razão" value={empresaNome} />
+                  <span className={styles.cfSecTitle}>{tr('Empresa')}</span>
+                  <ConfirmRow label={tr('Nome/Razão')} value={empresaNome} />
                   <ConfirmRow label="CNPJ"       value={maskCNPJ(empresa.cnpj ?? '')} />
-                  <ConfirmRow label="Telefone"   value={empresa.telefone} />
-                  <ConfirmRow label="Email"      value={empresa.email} />
+                  <ConfirmRow label={tr('Telefone')}   value={empresa.telefone} />
+                  <ConfirmRow label={tr('Email')}      value={empresa.email} />
                 </div>
               )}
               {veiculos.length > 0 && (
                 <div className={styles.cfSec}>
-                  <span className={styles.cfSecTitle}>{veiculos.length > 1 ? 'Veículos' : 'Veículo'}</span>
+                  <span className={styles.cfSecTitle}>{veiculos.length > 1 ? tr('Veículos') : tr('Veículo')}</span>
                   {veiculos.map((v, k) => (
-                    <ConfirmRow key={k} label={v.placa || 'Sem placa'}
+                    <ConfirmRow key={k} label={v.placa || tr('Sem placa')}
                       value={[v.tipo, veiculoLabel(v), v.ano, v.cor].filter(Boolean).join(' · ')} />
                   ))}
                 </div>
@@ -550,7 +551,7 @@ const sk = (...extra) => [styles.sk, ...extra].join(' ');
 
 function SkeletonLista({ linhas = 7 }) {
   return (
-    <div role="status" aria-label="Carregando cadastros">
+    <div role="status" aria-label={tr('Carregando cadastros')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.listItem} aria-hidden="true">
           <span className={sk(styles.skAvatar)} />
@@ -566,7 +567,7 @@ function SkeletonLista({ linhas = 7 }) {
 
 function SkeletonPainel() {
   return (
-    <div role="status" aria-label="Carregando totais">
+    <div role="status" aria-label={tr('Carregando totais')}>
       <span className={sk(styles.skBarra)} style={{ marginBottom: 16 }} aria-hidden="true" />
       <div className={styles.statLine} aria-hidden="true">
         {Array.from({ length: 4 }, (_, i) => (
@@ -582,11 +583,11 @@ function SkeletonPainel() {
 
 function SkeletonHistorico({ linhas = 4 }) {
   return (
-    <div className={styles.hScroll} role="status" aria-label="Carregando hospedagens">
+    <div className={styles.hScroll} role="status" aria-label={tr('Carregando hospedagens')}>
       <table className={styles.hTable} aria-hidden="true">
         <thead><tr>
-          <th>Quarto</th><th>Período</th><th>Pessoas</th>
-          <th>Diárias</th><th>Total</th><th>Status</th>
+          <th>{tr('Quarto')}</th><th>{tr('Período')}</th><th>{tr('Pessoas')}</th>
+          <th>{tr('Diárias')}</th><th>{tr('Total')}</th><th>{tr('Status')}</th>
         </tr></thead>
         <tbody>
           {Array.from({ length: linhas }, (_, i) => (
@@ -607,7 +608,7 @@ function SkeletonHistorico({ linhas = 4 }) {
 
 function SkeletonVinculo({ linhas = 3 }) {
   return (
-    <div role="status" aria-label="Buscando">
+    <div role="status" aria-label={tr('Buscando')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.linkDropdownItem} aria-hidden="true">
           <span className={sk(styles.skAvatarXs)} />
@@ -637,10 +638,10 @@ function PlacaMercosul({ placa }) {
   const txt = fmtPlaca(placa);
   if (!txt) return <span className={styles.vMeta}>—</span>;
   return (
-    <span className={styles.placa} aria-label={`Placa ${txt}`}>
+    <span className={styles.placa} aria-label={tr('Placa {{txt}}', { txt })}>
       <span className={styles.placaBand}>
         <span className={styles.placaMerco} aria-hidden="true" />
-        <span className={styles.placaPais}>BRASIL</span>
+        <span className={styles.placaPais}>{tr('BRASIL')}</span>
         <svg className={styles.placaFlag} viewBox="0 0 20 14" aria-hidden="true">
           <rect width="20" height="14" fill="#009b3a" />
           <path d="M10 1.6 18.2 7 10 12.4 1.8 7z" fill="#fedf00" />
@@ -667,20 +668,20 @@ function Field({ label, value, mono = false }) {
 // ── Histórico de hospedagem ───────────────────────────────────
 // Status do back-end → rótulo e tom do selo na tabela.
 const STATUS_HOSPEDAGEM = {
-  RESERVA_SOLICITADA:                     { label: 'Reserva solicitada', tom: 'hStatusReserva' },
-  RESERVA_ATIVA:                          { label: 'Reservada',          tom: 'hStatusReserva' },
-  RESERVA_CANCELADA:                      { label: 'Cancelada',          tom: 'hStatusCancelada' },
-  RESERVA_AUSENTE:                        { label: 'Não compareceu',     tom: 'hStatusCancelada' },
-  PERNOITE_ATIVO:                         { label: 'Em andamento',       tom: 'hStatusAtiva' },
-  PERNOITE_CANCELADO:                     { label: 'Cancelada',          tom: 'hStatusCancelada' },
-  PERNOITE_FINALIZADO:                    { label: 'Finalizada',         tom: 'hStatusFinalizada' },
-  PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE: { label: 'Pagamento pendente', tom: 'hStatusPendente' },
-  DAY_USE_SOLICITADO:                     { label: 'Day use solicitado', tom: 'hStatusReserva' },
-  DAY_USE_ATIVO:                          { label: 'Day use ativo',      tom: 'hStatusAtiva' },
-  DAY_USE_CANCELADO:                      { label: 'Cancelada',          tom: 'hStatusCancelada' },
-  DAY_USE_FINALIZADO:                     { label: 'Finalizada',         tom: 'hStatusFinalizada' },
-  DAY_USE_FINALIZADO_PAGAMENTO_PENDENTE:  { label: 'Pagamento pendente', tom: 'hStatusPendente' },
-  DAY_USE_AUSENTE:                        { label: 'Não compareceu',     tom: 'hStatusCancelada' },
+  RESERVA_SOLICITADA:                     { label: tr('Reserva solicitada'), tom: 'hStatusReserva' },
+  RESERVA_ATIVA:                          { label: tr('Reservada'),          tom: 'hStatusReserva' },
+  RESERVA_CANCELADA:                      { label: tr('Cancelada'),          tom: 'hStatusCancelada' },
+  RESERVA_AUSENTE:                        { label: tr('Não compareceu'),     tom: 'hStatusCancelada' },
+  PERNOITE_ATIVO:                         { label: tr('Em andamento'),       tom: 'hStatusAtiva' },
+  PERNOITE_CANCELADO:                     { label: tr('Cancelada'),          tom: 'hStatusCancelada' },
+  PERNOITE_FINALIZADO:                    { label: tr('Finalizada'),         tom: 'hStatusFinalizada' },
+  PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE: { label: tr('Pagamento pendente'), tom: 'hStatusPendente' },
+  DAY_USE_SOLICITADO:                     { label: tr('Day use solicitado'), tom: 'hStatusReserva' },
+  DAY_USE_ATIVO:                          { label: tr('Day use ativo'),      tom: 'hStatusAtiva' },
+  DAY_USE_CANCELADO:                      { label: tr('Cancelada'),          tom: 'hStatusCancelada' },
+  DAY_USE_FINALIZADO:                     { label: tr('Finalizada'),         tom: 'hStatusFinalizada' },
+  DAY_USE_FINALIZADO_PAGAMENTO_PENDENTE:  { label: tr('Pagamento pendente'), tom: 'hStatusPendente' },
+  DAY_USE_AUSENTE:                        { label: tr('Não compareceu'),     tom: 'hStatusCancelada' },
 };
 const statusHosp = (s) => STATUS_HOSPEDAGEM[s] ?? { label: s ?? '—', tom: 'hStatusFinalizada' };
 
@@ -711,7 +712,7 @@ const exportarHistoricoCSV = (lista, nomeArquivo) => {
   const cel = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const num = (v) => (Number(v) || 0).toFixed(2).replace('.', ',');
   const linhas = [
-    ['Quarto', 'Check-in', 'Check-out', 'Pessoas', 'Diárias', 'Consumo', 'Total', 'Pago', 'Pendente', 'Status'],
+    [tr('Quarto'), tr('Check-in'), tr('Check-out'), tr('Pessoas'), tr('Diárias'), tr('Consumo'), tr('Total'), tr('Pago'), tr('Pendente'), tr('Status')],
     ...lista.map(h => {
       const c = contasHosp(h);
       return [
@@ -808,12 +809,12 @@ function HistoricoCard({ tipo, id, embutido = false }) {
               <Input
                 value={busca}
                 onChange={e => setBusca(e.target.value)}
-                placeholder="Buscar por quarto, data ou status..."
+                placeholder={tr('Buscar por quarto, data ou status...')}
                 className={styles.searchInput}
-                aria-label="Buscar no histórico"
+                aria-label={tr('Buscar no histórico')}
               />
               {busca && (
-                <button type="button" className={styles.searchClear} onClick={() => setBusca('')} aria-label="Limpar busca">
+                <button type="button" className={styles.searchClear} onClick={() => setBusca('')} aria-label={tr('Limpar busca')}>
                   <X size={14} />
                 </button>
               )}
@@ -824,15 +825,15 @@ function HistoricoCard({ tipo, id, embutido = false }) {
                 className={[styles.filterBtn, statusFiltro ? styles.filterBtnOn : ''].join(' ')}
                 onClick={() => setMenuStatus(v => !v)}
                 aria-haspopup="menu" aria-expanded={menuStatus}
-                title={`Filtrar por status — ${statusFiltro || 'Todos'}`}>
+                title={tr('Filtrar por status — {{v0}}', { v0: statusFiltro || 'Todos' })}>
                 <FilterIcon size={18} />
                 {statusFiltro && <span className={styles.filterDot} />}
               </button>
 
               {menuStatus && (
                 <div className={styles.filterMenu} role="menu">
-                  <span className={styles.filterMenuLabel}>Status</span>
-                  {[['', 'Todos', registros.length], ...Object.entries(qtdStatus).map(([l, q]) => [l, l, q])].map(([val, label, qtd]) => (
+                  <span className={styles.filterMenuLabel}>{tr('Status')}</span>
+                  {[['', tr('Todos'), registros.length], ...Object.entries(qtdStatus).map(([l, q]) => [l, l, q])].map(([val, label, qtd]) => (
                     <button key={label} type="button" role="menuitem"
                       className={[styles.filterMenuItem, statusFiltro === val ? styles.filterMenuItemOn : ''].join(' ')}
                       onClick={() => { setStatusFiltro(val); setMenuStatus(false); }}>
@@ -847,8 +848,8 @@ function HistoricoCard({ tipo, id, embutido = false }) {
             <Button className={styles.btnSolid}
               onClick={() => exportarHistoricoCSV(filtrados, `historico-hospedagens-${tipo}-${id}.csv`)}
               disabled={filtrados.length === 0}
-              title="Exportar relatório das hospedagens listadas">
-              <Download size={14} /> Exportar
+              title={tr('Exportar relatório das hospedagens listadas')}>
+              <Download size={14} /> {tr('Exportar')}
             </Button>
           </div>
         )}
@@ -857,22 +858,22 @@ function HistoricoCard({ tipo, id, embutido = false }) {
           <SkeletonHistorico />
         ) : erro ? (
           <div className={styles.empty}>
-            <AlertCircle size={24} opacity={0.3} /><span>Não foi possível carregar o histórico.</span>
+            <AlertCircle size={24} opacity={0.3} /><span>{tr('Não foi possível carregar o histórico.')}</span>
           </div>
         ) : registros.length === 0 ? (
           <div className={styles.empty}>
-            <CalendarDays size={26} opacity={0.2} /><span>Nenhuma hospedagem registrada.</span>
+            <CalendarDays size={26} opacity={0.2} /><span>{tr('Nenhuma hospedagem registrada.')}</span>
           </div>
         ) : filtrados.length === 0 ? (
           <div className={styles.empty}>
-            <AlertCircle size={24} opacity={0.3} /><span>Nenhuma hospedagem encontrada.</span>
+            <AlertCircle size={24} opacity={0.3} /><span>{tr('Nenhuma hospedagem encontrada.')}</span>
           </div>
         ) : (
           <div className={styles.hScroll}>
             <table className={styles.hTable}>
               <thead><tr>
-                <th>Quarto</th><th>Período</th><th>Pessoas</th>
-                <th>Diárias</th><th>Total</th><th>Status</th><th aria-label="Abrir" />
+                <th>{tr('Quarto')}</th><th>{tr('Período')}</th><th>{tr('Pessoas')}</th>
+                <th>{tr('Diárias')}</th><th>{tr('Total')}</th><th>{tr('Status')}</th><th aria-label={tr('Abrir')} />
               </tr></thead>
               <tbody>
                 {filtrados.map(h => {
@@ -880,7 +881,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
                   const qs = quartosObjHosp(h);
                   return (
                     <tr key={h.id} className={styles.hRow} tabIndex={0} role="button"
-                      title="Ver detalhes da hospedagem"
+                      title={tr('Ver detalhes da hospedagem')}
                       onClick={() => setAberta(h)}
                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAberta(h); } }}>
                       <td>
@@ -888,7 +889,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
                           <span className={styles.hQuartoNum}><BedDouble size={14} /></span>
                           <span className={styles.hQuartoTxt}>
                             <span className={styles.hQuartoDesc}>
-                              {qs.length > 1 ? `Quartos ${qs.map(q => q.id).join(', ')}` : qs[0] ? `Quarto ${qs[0].id}` : '—'}
+                              {qs.length > 1 ? tr('Quartos {{v0}}', { v0: qs.map(q => q.id).join(', ') }) : qs[0] ? tr('Quarto {{id}}', { id: qs[0].id }) : '—'}
                             </span>
                             {qs[0]?.descricao && <span className={styles.hQuartoSub}>{qs[0].descricao}</span>}
                           </span>
@@ -917,7 +918,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
     <section className={styles.dCard}>
       <h3 className={styles.dCardHead}>
         <CalendarDays size={16} />
-        <span className={styles.dCardTitle}>Histórico de hospedagem</span>
+        <span className={styles.dCardTitle}>{tr('Histórico de hospedagem')}</span>
       </h3>
       <div className={styles.dCardBody}>{conteudo}</div>
     </section>
@@ -926,7 +927,7 @@ function HistoricoCard({ tipo, id, embutido = false }) {
 
 // ── Detalhe de uma hospedagem do histórico ────────────────────
 /** "Reserva" / "Pernoite" / "Day use", pelo prefixo do status. */
-const tipoHosp = (s) => (/^RESERVA/.test(s ?? '') ? 'Reserva' : /^DAY_USE/.test(s ?? '') ? 'Day use' : 'Pernoite');
+const tipoHosp = (s) => (/^RESERVA/.test(s ?? '') ? tr('Reserva') : /^DAY_USE/.test(s ?? '') ? tr('Day use') : tr('Pernoite'));
 
 /** "27/08/2026 12:00" → "27/08" */
 const diaMes = (dh) => (dh ?? '').slice(0, 5);
@@ -944,8 +945,8 @@ const dataBR = (dh) => {
   const m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(dh ?? '');
   return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
 };
-const DIAS_SEM = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
-const MESES_AB = ['jan.', 'fev.', 'mar.', 'abr.', 'mai.', 'jun.', 'jul.', 'ago.', 'set.', 'out.', 'nov.', 'dez.'];
+const DIAS_SEM = [tr('dom'), tr('seg'), tr('ter'), tr('qua'), tr('qui'), tr('sex'), tr('sáb')];
+const MESES_AB = [tr('jan.'), tr('fev.'), tr('mar.'), tr('abr.'), tr('mai.'), tr('jun.'), tr('jul.'), tr('ago.'), tr('set.'), tr('out.'), tr('nov.'), tr('dez.')];
 /** "sáb 27/06/2026" */
 const diaSemanaData = (dh) => { const d = dataBR(dh); return d ? `${DIAS_SEM[d.getDay()]} ${soData(dh)}` : '—'; };
 /** "27 jun. 2026" */
@@ -981,25 +982,25 @@ function RvSecao({ icon: Icon, titulo, extra, children }) {
 /** Resumo em texto, para o "Baixar resumo". */
 const resumoTexto = (h, contas) => {
   const linhas = [
-    `${tipoHosp(h.status).toUpperCase()} DE HOSPEDAGEM — ${statusHosp(h.status).label}`,
-    `Quarto(s): ${quartosHosp(h)}`,
-    `Check-in: ${h.data_hora_checkin ?? '—'}   Check-out: ${h.data_hora_checkout ?? '—'}   Diárias: ${h.quantidade_diarias ?? 0}`,
+    tr('{{tipo}} DE HOSPEDAGEM — {{status}}', { tipo: tipoHosp(h.status).toUpperCase(), status: statusHosp(h.status).label }),
+    tr('Quarto(s): {{quartos}}', { quartos: quartosHosp(h) }),
+    tr('Check-in: {{ci}}   Check-out: {{co}}   Diárias: {{n}}', { ci: h.data_hora_checkin ?? '—', co: h.data_hora_checkout ?? '—', n: h.quantidade_diarias ?? 0 }),
     '',
-    'Hóspedes:',
-    ...(h.pessoas ?? []).map(p => `  - ${p.nome}${p.titular ? ' (titular)' : ''}  CPF ${maskCPF(p.cpf ?? '')}`),
+    tr('Hóspedes:'),
+    ...(h.pessoas ?? []).map(p => tr('  - {{nome}}{{v1}}  CPF {{v2}}', { nome: p.nome, v1: p.titular ? ` (${tr('titular')})` : '', v2: maskCPF(p.cpf ?? '') })),
     '',
-    'Diárias:',
+    tr('Diárias:'),
     ...(h.diarias ?? []).map(d => `  ${pad2(d.numero)}  ${nomeQuarto(d.quarto)}  ${diaMes(d.checkin)} → ${diaMes(d.checkout)}  ${fmtBRL(d.valor)}`),
-    ...((h.consumos ?? []).length ? ['', 'Consumo:', ...h.consumos.map(c => `  ${c.item?.descricao ?? '—'} x${c.quantidade}  ${fmtBRL(totalConsumo(c))}${c.cancelado ? ' (cancelado)' : ''}`)] : []),
+    ...((h.consumos ?? []).length ? ['', tr('Consumo:'), ...h.consumos.map(c => `  ${c.item?.descricao ?? '—'} x${c.quantidade}  ${fmtBRL(totalConsumo(c))}${c.cancelado ? ` (${tr('cancelado')})` : ''}`)] : []),
     '',
-    'Pagamentos:',
-    ...(h.pagamentos ?? []).map(p => `  ${p.tipo_pagamento?.descricao ?? '—'}  ${p.data_hora_registro ?? ''}  ${p.nome_pagador ?? ''}  ${fmtBRL(p.valor)}${p.cancelado ? ' (cancelado)' : ''}`),
+    tr('Pagamentos:'),
+    ...(h.pagamentos ?? []).map(p => `  ${p.tipo_pagamento?.descricao ?? '—'}  ${p.data_hora_registro ?? ''}  ${p.nome_pagador ?? ''}  ${fmtBRL(p.valor)}${p.cancelado ? ` (${tr('cancelado')})` : ''}`),
     '',
-    `Hospedagem: ${fmtBRL(h.valor_total)}`,
-    `Consumo:    ${fmtBRL(contas.consumo)}`,
-    `Total:      ${fmtBRL(contas.total)}`,
-    `Pago:       ${fmtBRL(contas.pago)}`,
-    `Pendente:   ${fmtBRL(contas.pendente)}`,
+    `${tr('Hospedagem:')} ${fmtBRL(h.valor_total)}`,
+    `${tr('Consumo:')}    ${fmtBRL(contas.consumo)}`,
+    `${tr('Total:')}      ${fmtBRL(contas.total)}`,
+    `${tr('Pago:')}       ${fmtBRL(contas.pago)}`,
+    `${tr('Pendente:')}   ${fmtBRL(contas.pendente)}`,
   ];
   return linhas.join('\r\n');
 };
@@ -1046,11 +1047,11 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
         <div className={styles.rvHeadQuarto}>
           <div className={styles.rvTituloLinha}>
             <button type="button" className={styles.rvVoltar} onClick={onClose}
-              aria-label="Voltar ao histórico" title="Voltar ao histórico" data-noprint>
+              aria-label={tr('Voltar ao histórico')} title={tr('Voltar ao histórico')} data-noprint>
               <ChevronLeft size={20} />
             </button>
             <h3 className={styles.rvTitulo}>
-              {qs.length > 1 ? `Quartos ${qs.map(q => pad2(q.id)).join(', ')}` : `Quarto ${qs[0] ? pad2(qs[0].id) : '—'}`}
+              {qs.length > 1 ? tr('Quartos {{v0}}', { v0: qs.map(q => pad2(q.id)).join(', ') }) : tr('Quarto {{v0}}', { v0: qs[0] ? pad2(qs[0].id) : '—' })}
             </h3>
             <span className={[styles.hStatus, styles.hStatusDot, styles.rvStatus, styles[st.tom]].join(' ')}>{st.label}</span>
           </div>
@@ -1062,17 +1063,17 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
             <CalendarDays size={20} className={styles.rvPerIcone} />
             <div className={styles.rvPerData}>
               <p className={styles.rvPerDia}>{diaSemanaData(h.data_hora_checkin)}</p>
-              <p className={styles.rvPerHora}>Check-in <b>{soHora(h.data_hora_checkin) || '—'}</b></p>
+              <p className={styles.rvPerHora}>{tr('Check-in')} <b>{soHora(h.data_hora_checkin) || '—'}</b></p>
             </div>
           </div>
           <ArrowRight size={18} className={styles.rvPerSeta} />
           <div className={[styles.rvPerData, styles.rvPerSaida].join(' ')}>
             <p className={styles.rvPerDia}>{diaSemanaData(h.data_hora_checkout)}</p>
-            <p className={styles.rvPerHora}>Check-out <b>{soHora(h.data_hora_checkout) || '—'}</b></p>
+            <p className={styles.rvPerHora}>{tr('Check-out')} <b>{soHora(h.data_hora_checkout) || '—'}</b></p>
           </div>
           <div className={[styles.rvPerData, styles.rvPerDiarias].join(' ')}>
             <p className={styles.rvPerDia}>{pad2(nDiarias)}</p>
-            <p className={styles.rvPerHora}>Diária{nDiarias !== 1 ? 's' : ''}</p>
+            <p className={styles.rvPerHora}>{tr('Diária')}{nDiarias !== 1 ? 's' : ''}</p>
           </div>
         </div>
       </header>
@@ -1080,7 +1081,7 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
         <div className={styles.rvMain}>
 
           <RvSecao icon={Users}>
-            {pessoas.length === 0 ? <p className={styles.rvVazio}>Nenhum hóspede informado.</p> : (
+            {pessoas.length === 0 ? <p className={styles.rvVazio}>{tr('Nenhum hóspede informado.')}</p> : (
               <ul className={styles.rvPessoas}>
                 {pessoas.map(p => (
                   <li key={p.id}>
@@ -1088,9 +1089,9 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
                     <div className={styles.rvPessoaTxt}>
                       <p className={styles.rvPessoaNome}>
                         {p.nome}
-                        {p.titular && <span className={styles.rvTag}>Titular</span>}
+                        {p.titular && <span className={styles.rvTag}>{tr('Titular')}</span>}
                       </p>
-                      <p className={styles.rvPessoaSub}>CPF {maskCPF(p.cpf ?? '') || '—'}</p>
+                      <p className={styles.rvPessoaSub}>{tr('CPF')} {maskCPF(p.cpf ?? '') || '—'}</p>
                     </div>
                   </li>
                 ))}
@@ -1102,7 +1103,7 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
             <RvSecao icon={Moon}>
               <div className={styles.hScroll}>
                 <table className={styles.rvTable}>
-                  <thead><tr><th>Nº / Quarto</th><th>Período</th><th>Ocupação</th><th className={styles.rvDir}>Valor</th></tr></thead>
+                  <thead><tr><th>{tr('Nº / Quarto')}</th><th>{tr('Período')}</th><th>{tr('Ocupação')}</th><th className={styles.rvDir}>{tr('Valor')}</th></tr></thead>
                   <tbody>
                     {diarias.map(d => (
                       <tr key={d.id}>
@@ -1110,15 +1111,15 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
                           <span className={styles.rvQuartoCel}>
                             <span className={styles.rvNumBox}>{d.quarto?.id ? pad2(d.quarto.id) : '—'}</span>
                             <span>
-                              <span className={styles.rvCelTit}>{d.quarto?.descricao || `Quarto ${d.quarto?.id ?? '—'}`}</span>
-                              <span className={styles.rvCelSub}>Diária {pad2(d.numero)}</span>
+                              <span className={styles.rvCelTit}>{d.quarto?.descricao || tr('Quarto {{v0}}', { v0: d.quarto?.id ?? '—' })}</span>
+                              <span className={styles.rvCelSub}>{tr('Diária')} {pad2(d.numero)}</span>
                             </span>
                           </span>
                         </td>
                         <td>{diaMes(d.checkin)} → {diaMes(d.checkout)}</td>
                         <td>
                           {ocupacaoLabel(d)}
-                          {d.meia_diaria && <span className={styles.rvTag}>Meia diária</span>}
+                          {d.meia_diaria && <span className={styles.rvTag}>{tr('Meia diária')}</span>}
                           {d.sazonalidade?.descricao && <span className={styles.rvTag}>{d.sazonalidade.descricao}</span>}
                         </td>
                         <td className={[styles.rvDir, styles.rvForte].join(' ')}>{fmtBRL(d.valor)}</td>
@@ -1134,16 +1135,16 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
           <RvSecao icon={Package}>
             <div className={styles.hScroll}>
               <table className={styles.rvTable}>
-                <thead><tr><th>Consumo</th><th>Qtd.</th><th>Data</th><th className={styles.rvDir}>Total</th></tr></thead>
+                <thead><tr><th>{tr('Consumo')}</th><th>{tr('Qtd.')}</th><th>{tr('Data')}</th><th className={styles.rvDir}>{tr('Total')}</th></tr></thead>
                 <tbody>
                   {consumos.length === 0 && (
-                    <tr><td colSpan={4} className={styles.rvTdVazio}>Nenhum consumo registrado.</td></tr>
+                    <tr><td colSpan={4} className={styles.rvTdVazio}>{tr('Nenhum consumo registrado.')}</td></tr>
                   )}
                   {consumos.map(c => (
                     <tr key={c.id} className={c.cancelado ? styles.rvCancelado : ''}>
                       <td>
                         <span className={styles.rvCelTit}>{c.item?.descricao ?? '—'}</span>
-                        <span className={styles.rvCelSub}>{fmtBRL(c.valor)} cada{c.cancelado ? ' · cancelado' : ''}</span>
+                        <span className={styles.rvCelSub}>{fmtBRL(c.valor)} {tr('cada')}{c.cancelado ? tr(' · cancelado') : ''}</span>
                       </td>
                       <td>{pad2(c.quantidade)}</td>
                       <td>{(c.data_hora_registro ?? '').slice(0, 16)}</td>
@@ -1156,13 +1157,13 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
           </RvSecao>
 
           {h.observacao && (
-            <RvSecao icon={FileText} titulo="Observação">
+            <RvSecao icon={FileText} titulo={tr('Observação')}>
               <p className={styles.rvTexto}>{h.observacao}</p>
             </RvSecao>
           )}
 
           {h.motivo_cancelamento?.motivo_cancelamento && (
-            <RvSecao icon={XCircle} titulo="Motivo do cancelamento">
+            <RvSecao icon={XCircle} titulo={tr('Motivo do cancelamento')}>
               <p className={styles.rvTexto}>
                 {h.motivo_cancelamento.motivo_cancelamento}
                 {h.motivo_cancelamento.funcionario?.nome && ` — ${h.motivo_cancelamento.funcionario.nome}`}
@@ -1174,25 +1175,25 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
 
         {/* Resumo financeiro */}
         <aside className={styles.rvResumo}>
-          <h4 className={styles.rvResumoTit}>Resumo financeiro</h4>
-          <div className={styles.rvLinha}><span>Hospedagem</span><b>{fmtBRL(h.valor_total)}</b></div>
-          <div className={styles.rvLinha}><span>Consumo</span><b>{fmtBRL(contas.consumo)}</b></div>
+          <h4 className={styles.rvResumoTit}>{tr('Resumo financeiro')}</h4>
+          <div className={styles.rvLinha}><span>{tr('Hospedagem')}</span><b>{fmtBRL(h.valor_total)}</b></div>
+          <div className={styles.rvLinha}><span>{tr('Consumo')}</span><b>{fmtBRL(contas.consumo)}</b></div>
           <hr className={styles.rvSep} />
-          <div className={[styles.rvLinha, styles.rvLinhaTotal].join(' ')}><span>Total da {tipoHosp(h.status).toLowerCase()}</span><b>{fmtBRL(contas.total)}</b></div>
+          <div className={[styles.rvLinha, styles.rvLinhaTotal].join(' ')}><span>{tr('Total da')} {tipoHosp(h.status).toLowerCase()}</span><b>{fmtBRL(contas.total)}</b></div>
           {quitado ? (
-            <p className={styles.rvQuitado}><img src={icoOk} alt="" /> Pago integralmente</p>
+            <p className={styles.rvQuitado}><img src={icoOk} alt="" /> {tr('Pago integralmente')}</p>
           ) : (<>
             <div className={[styles.rvLinha, styles.rvLinhaPend].join(' ')}>
-              <span>Saldo pendente</span><b>{fmtBRL(contas.pendente)}</b>
+              <span>{tr('Saldo pendente')}</span><b>{fmtBRL(contas.pendente)}</b>
             </div>
-            <p className={styles.rvSituacao}><Clock size={14} /> {contas.pago > 0 ? 'Pagamento parcial' : 'Aguardando pagamento'}</p>
+            <p className={styles.rvSituacao}><Clock size={14} /> {contas.pago > 0 ? tr('Pagamento parcial') : tr('Aguardando pagamento')}</p>
           </>)}
           <div className={styles.rvPgBloco}>
             <div className={styles.rvPgHead}>
-              <h5>Pagamentos</h5>
-              {recebidos > 0 && <span className={styles.rvRecebidos}><Check size={13} /> {recebidos} recebido{recebidos !== 1 ? 's' : ''}</span>}
+              <h5>{tr('Pagamentos')}</h5>
+              {recebidos > 0 && <span className={styles.rvRecebidos}><Check size={13} /> {recebidos} {tr('recebido')}{recebidos !== 1 ? 's' : ''}</span>}
             </div>
-            {pagamentos.length === 0 ? <p className={styles.rvVazio}>Nenhum pagamento registrado.</p> : (
+            {pagamentos.length === 0 ? <p className={styles.rvVazio}>{tr('Nenhum pagamento registrado.')}</p> : (
               <ul className={styles.rvPagamentos}>
                 {pagamentos.map(p => {
                   const valido = pagamentoValido(p);
@@ -1210,7 +1211,7 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
                       </div>
                       <div className={styles.rvPgValor}>
                         <p className={styles.rvForte}>{fmtBRL(p.valor)}</p>
-                        {!valido && <p className={styles.rvPgSub}>{p.cancelado ? 'Cancelado' : 'Pendente'}</p>}
+                        {!valido && <p className={styles.rvPgSub}>{p.cancelado ? tr('Cancelado') : tr('Pendente')}</p>}
                       </div>
                     </li>
                   );
@@ -1224,16 +1225,16 @@ function HospedagemDetalhe({ hospedagem: h, onClose }) {
         <ShieldCheck size={16} className={styles.rvInfoIcon} />
         <div>
           <p className={styles.rvFootTxt}>
-            Registrada em {dataExtenso(h.data_hora_registro) || '—'}{soHora(h.data_hora_registro) && `, às ${soHora(h.data_hora_registro)}`}
+            {tr('Registrada em')} {dataExtenso(h.data_hora_registro) || '—'}{soHora(h.data_hora_registro) && tr(', às {{v0}}', { v0: soHora(h.data_hora_registro) })}
           </p>
-          {h.funcionario?.nome && <p className={styles.rvPgSub}>por {h.funcionario.nome}</p>}
+          {h.funcionario?.nome && <p className={styles.rvPgSub}>{tr('por')} {h.funcionario.nome}</p>}
         </div>
         <div className={styles.rvAcoes} data-noprint>
           <button type="button" className={styles.rvBtnResumo} onClick={baixarResumo}>
-            <Download size={15} /> Baixar resumo
+            <Download size={15} /> {tr('Baixar resumo')}
           </button>
           <button type="button" className={styles.rvBtnResumo} onClick={imprimir}>
-            <Printer size={15} /> Imprimir
+            <Printer size={15} /> {tr('Imprimir')}
           </button>
         </div>
       </footer>
@@ -1264,12 +1265,12 @@ function DateMaskInput({ value, onChange, className = '' }) {
       <Input
         value={text}
         onChange={handle}
-        placeholder="dd/mm/aaaa"
+        placeholder={tr('dd/mm/aaaa')}
         inputMode="numeric"
         maxLength={10}
         className={className}
       />
-      {invalida && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>Data inválida</span>}
+      {invalida && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>{tr('Data inválida')}</span>}
     </>
   );
 }
@@ -1368,7 +1369,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
   };
   const removeVeiculo = (i) => {
     const placa = data.veiculos?.[i]?.placa;
-    if (!window.confirm(`Tem certeza que deseja remover ${placa ? `o veículo ${placa}` : 'este veículo'}?`)) return;
+    if (!window.confirm(tr('Tem certeza que deseja remover {{v0}}?', { v0: placa ? tr('o veículo {{placa}}', { placa }) : tr('este veículo') }))) return;
     onChange(p => ({
       ...p,
       veiculos: (p.veiculos ?? []).filter((_, k) => k !== i),
@@ -1421,19 +1422,19 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
               </svg>
             </div>
           </div>
-          <span className={styles.photoBadgeTop}>Em breve</span>
+          <span className={styles.photoBadgeTop}>{tr('Em breve')}</span>
         </div>
 
         <div className={styles.photoRightCol}>
           <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-            <FormField label="Nome completo *">
-              <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
+            <FormField label={tr('Nome completo *')}>
+              <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder={tr('Nome completo')} />
             </FormField>
           </div>
 
           <div className={styles.gridFix}>
             <div className={[styles.cpfBlock, hasErr('cpf') && !cpfStatus ? styles.reqFieldErr : ''].join(' ')}>
-              <FormField label="CPF *">
+              <FormField label={tr('CPF *')}>
                 <div className={styles.cpfWrap}>
                   <Input
                     value={data.cpf}
@@ -1444,32 +1445,32 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                   {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
                 </div>
               </FormField>
-              {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>CPF inválido</span>}
-              {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>CPF já cadastrado</span>}
-              {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>CPF disponível</span>}
+              {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>{tr('CPF inválido')}</span>}
+              {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>{tr('CPF já cadastrado')}</span>}
+              {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>{tr('CPF disponível')}</span>}
             </div>
 
             <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
-              <FormField label="Data de Nascimento *">
+              <FormField label={tr('Data de Nascimento *')}>
                 <DateMaskInput
                   value={data.dataNascimento}
                   onChange={d => set('dataNascimento', d)}
                 />
               </FormField>
             </div>
-            <FormField label="Sexo">
+            <FormField label={tr('Sexo')}>
               <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
                 {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </Select>
             </FormField>
             <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
-              <FormField label="Telefone *">
+              <FormField label={tr('Telefone *')}>
                 <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" disabled={useTitularTel} />
               </FormField>
               {titular && (
                 <label className={styles.useTitularRow}>
                   <input type="checkbox" checked={useTitularTel} onChange={e => toggleTitularTel(e.target.checked)} />
-                  <span>Usar do titular</span>
+                  <span>{tr('Usar do titular')}</span>
                 </label>
               )}
             </div>
@@ -1483,13 +1484,13 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
           <Input value={data.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
         </FormField>
         <div>
-          <FormField label="Email">
-            <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" disabled={useTitularEmail} />
+          <FormField label={tr('Email')}>
+            <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder={tr('email@exemplo.com')} disabled={useTitularEmail} />
           </FormField>
           {titular && (
             <label className={styles.useTitularRow}>
               <input type="checkbox" checked={useTitularEmail} onChange={e => toggleTitularEmail(e.target.checked)} />
-              <span>Usar do titular</span>
+              <span>{tr('Usar do titular')}</span>
             </label>
           )}
         </div>
@@ -1497,18 +1498,18 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
 
       {/* ── Endereço ── */}
       <div className={styles.sectionDividerRow} style={{ marginTop: 10 }}>
-        <div className={styles.sectionDivider}><MapPin size={12} /> Endereço</div>
+        <div className={styles.sectionDivider}><MapPin size={12} /> {tr('Endereço')}</div>
         {titular && (
           <label className={styles.useTitularRow} style={{ marginBottom: 0 }}>
             <input type="checkbox" checked={useTitularEnd} onChange={e => toggleTitularEnd(e.target.checked)} />
-            <span>Usar endereço do titular</span>
+            <span>{tr('Usar endereço do titular')}</span>
           </label>
         )}
       </div>
 
       <div className={styles.addrRow1}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="CEP *">
+          <FormField label={tr('CEP *')}>
             <div className={styles.inputWithSpinner}>
               <Input value={data.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
                 className={hasErr('cep') ? styles.inputErr : ''} disabled={useTitularEnd} />
@@ -1516,30 +1517,30 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
             </div>
           </FormField>
         </div>
-        <FormField label="Endereço">
-          <Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
+        <FormField label={tr('Endereço')}>
+          <Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder={tr('Rua / Av.')} />
         </FormField>
-        <FormField label="Número">
+        <FormField label={tr('Número')}>
           <Input value={data.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
         </FormField>
       </div>
       <div className={styles.addrRow2}>
-        <FormField label="Bairro">
+        <FormField label={tr('Bairro')}>
           <Input value={data.bairro} onChange={e => set('bairro', e.target.value)} />
         </FormField>
-        <FormField label="Município">
+        <FormField label={tr('Município')}>
           <Input value={data.municipio} onChange={e => set('municipio', e.target.value)} />
         </FormField>
-        <FormField label="Estado">
+        <FormField label={tr('Estado')}>
           <Input value={data.estado} onChange={e => set('estado', e.target.value)} placeholder="UF" />
         </FormField>
       </div>
       <div className={styles.addrRow3}>
-        <FormField label="País">
-          <Input value={data.pais} onChange={e => set('pais', e.target.value)} placeholder="Brasil" />
+        <FormField label={tr('País')}>
+          <Input value={data.pais} onChange={e => set('pais', e.target.value)} placeholder={tr('Brasil')} />
         </FormField>
-        <FormField label="Complemento">
-          <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
+        <FormField label={tr('Complemento')}>
+          <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder={tr('Apto, Bloco...')} />
         </FormField>
       </div>
 
@@ -1557,7 +1558,7 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
         <div className={styles.hScroll} style={{ marginTop: 16 }}>
           <table className={[styles.hTable, styles.optTable].join(' ')}>
             <thead><tr>
-              <th>Veículo</th><th>Tipo</th><th>Cor</th><th>Placa</th><th aria-label="Ações" />
+              <th>{tr('Veículo')}</th><th>{tr('Tipo')}</th><th>{tr('Cor')}</th><th>{tr('Placa')}</th><th aria-label={tr('Ações')} />
             </tr></thead>
             <tbody>
               {data.veiculos.map((v, i) => (
@@ -1569,9 +1570,9 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                   <td>
                     <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
                       <button type="button" className={styles.btnEdit} onClick={() => abrirVeiculo(i)}
-                        title="Editar veículo"><Pencil size={12} /></button>
+                        title={tr('Editar veículo')}><Pencil size={12} /></button>
                       <button type="button" className={styles.btnRemove} onClick={() => removeVeiculo(i)}
-                        title="Remover veículo"><X size={12} /></button>
+                        title={tr('Remover veículo')}><X size={12} /></button>
                     </span>
                   </td>
                 </tr>
@@ -1588,33 +1589,33 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
             {/*<span>{vEdit.index == null ? 'Novo veículo' : `Editando ${veiculoLabel(vEdit.value)}`}</span>*/}
           </div>
           <div className={styles.grid3}>
-            <FormField label="Tipo">
+            <FormField label={tr('Tipo')}>
               <Select value={tipoCanon(vEdit.value.tipo)}
                 onChange={e => onChange(p => ({ ...p, veiculoEdit: { ...p.veiculoEdit, value: { ...p.veiculoEdit.value, tipo: e.target.value, marca: '' } } }))}>
-                <option value="">Selecione</option>
-                {TIPOS_VEICULO.map(t => <option key={t} value={t}>{t}</option>)}
+                <option value="">{tr('Selecione')}</option>
+                {TIPOS_VEICULO.map(t => <option key={t} value={t}>{tr(t)}</option>)}
               </Select>
             </FormField>
-            <FormField label="Marca *">
+            <FormField label={tr('Marca *')}>
               <SearchableCombobox
                 value={vEdit.value.marca}
                 onChange={val => setVeiculo('marca', val)}
                 options={MARCAS_POR_TIPO[tipoCanon(vEdit.value.tipo)] ?? []}
-                placeholder={tipoCanon(vEdit.value.tipo) ? 'Selecione a marca' : 'Selecione o tipo antes'}
+                placeholder={tipoCanon(vEdit.value.tipo) ? tr('Selecione a marca') : tr('Selecione o tipo antes')}
                 hasError={vErr && !vEdit.value.marca}
               />
             </FormField>
-            <FormField label="Modelo *">
+            <FormField label={tr('Modelo *')}>
               <Input
                 value={vEdit.value.modelo}
                 onChange={e => setVeiculo('modelo', e.target.value)}
-                placeholder="Ex: Civic"
+                placeholder={tr('Ex: Civic')}
                 className={vErr && !vEdit.value.modelo ? styles.inputErr : ''}
               />
             </FormField>
           </div>
           <div className={styles.grid2}>
-            <FormField label="Placa *">
+            <FormField label={tr('Placa *')}>
               <Input
                 value={vEdit.value.placa}
                 onChange={e => setVeiculo('placa', maskPlaca(e.target.value))}
@@ -1622,22 +1623,22 @@ function PessoaForm({ data, onChange, onFetchCEP, onCheckCPF, showErrors = false
                 className={vErr && !cleanPlaca(vEdit.value.placa) ? styles.inputErr : ''}
               />
             </FormField>
-            <FormField label="Cor">
-              <SearchableCombobox value={vEdit.value.cor} onChange={val => setVeiculo('cor', val)} options={CORES_VEICULO} placeholder="Ex: Preto" />
+            <FormField label={tr('Cor')}>
+              <SearchableCombobox value={vEdit.value.cor} onChange={val => setVeiculo('cor', val)} options={CORES_VEICULO} placeholder={tr('Ex: Preto')} />
             </FormField>
           </div>
           <div className={styles.editorFoot}>
             <button type="button" className={styles.optAdd} onClick={confirmarVeiculo}>
-              <Check size={13} /> Confirmar veículo
+              <Check size={13} /> {tr('Confirmar veículo')}
             </button>
-            <button type="button" className={styles.btnGhost} onClick={cancelarVeiculo}>Cancelar</button>
+            <button type="button" className={styles.btnGhost} onClick={cancelarVeiculo}>{tr('Cancelar')}</button>
           </div>
         </div>
       )}
 
       {!vEdit && (
         <button type="button" className={styles.optAdd} onClick={() => abrirVeiculo()}>
-          <Plus size={13} /> Veículo
+          <Plus size={13} /> {tr('Veículo')}
         </button>
       )}
       <div ref={veiculosEndRef} />
@@ -1661,26 +1662,26 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
   return (
     <div className={[styles.optItem, styles.formBody].join(' ')}>
       <div className={styles.optItemHead} style={{ marginBottom: 6 }}>
-        {index != null && <span>{`Editando dependente ${index + 1}`}</span>}
+        {index != null && <span>{tr('Editando dependente {{v0}}', { v0: index + 1 })}</span>}
         <label className={styles.useTitularRow} style={{ marginBottom: 0, marginLeft: index == null ? 0 : 'auto' }}>
           <input
             type="checkbox"
             checked={usarTitular}
             onChange={e => set('usarDadosTitular', e.target.checked)}
           />
-          <span>Usar os dados do titular</span>
+          <span>{tr('Usar os dados do titular')}</span>
         </label>
       </div>
 
       {usarTitular ? (<>
         <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Nome completo *">
-            <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder="Nome completo" />
+          <FormField label={tr('Nome completo *')}>
+            <Input value={data.nome} onChange={e => set('nome', maskNome(e.target.value))} placeholder={tr('Nome completo')} />
           </FormField>
         </div>
         <div className={styles.gridFix}>
           <div className={[styles.reqField, hasErr('cpf') ? styles.reqFieldErr : ''].join(' ')}>
-            <FormField label="CPF *">
+            <FormField label={tr('CPF *')}>
               <Input
                 value={data.cpf}
                 onChange={e => set('cpf', maskCPF(e.target.value))}
@@ -1688,19 +1689,19 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
                 className={cpfRuim ? styles.inputErr : ''}
               />
             </FormField>
-            {cpfRuim && <span className={styles.cpfMsg} style={{ color: '#ef4444' }}>CPF inválido</span>}
+            {cpfRuim && <span className={styles.cpfMsg} style={{ color: '#ef4444' }}>{tr('CPF inválido')}</span>}
           </div>
           <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
-            <FormField label="Data de Nascimento *">
+            <FormField label={tr('Data de Nascimento *')}>
               <DateMaskInput value={data.dataNascimento} onChange={d => set('dataNascimento', d)} />
             </FormField>
           </div>
-          <FormField label="Sexo">
+          <FormField label={tr('Sexo')}>
             <Select value={data.sexo} onChange={e => set('sexo', e.target.value)}>
               {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
           </FormField>
-          <FormField label="Parentesco">
+          <FormField label={tr('Parentesco')}>
             <Select value={data.parentesco ?? ''} onChange={e => set('parentesco', e.target.value)}>
               {PARENTESCO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </Select>
@@ -1710,7 +1711,7 @@ function DependenteForm({ data, onChange, titular, index, onFetchCEP, onCheckCPF
         <>
           {/* o PessoaForm já traz o Sexo; o parentesco é só do dependente */}
           <div className={styles.grid3}>
-            <FormField label="Parentesco">
+            <FormField label={tr('Parentesco')}>
               <Select value={data.parentesco ?? ''} onChange={e => set('parentesco', e.target.value)}>
                 {PARENTESCO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </Select>
@@ -1769,10 +1770,10 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
 
   return (
     <div className={styles.formBody}>
-      <div className={styles.sectionDivider}><Building2 size={12} /> Dados Empresariais</div>
+      <div className={styles.sectionDivider}><Building2 size={12} /> {tr('Dados Empresariais')}</div>
       <div className={styles.grid2}>
         <div>
-          <label className={styles.fieldLabel}>CNPJ *</label>
+          <label className={styles.fieldLabel}>{tr('CNPJ *')}</label>
           <div className={styles.inputWithSpinner}>
             <Input value={data.cnpj} onChange={e => handleCNPJ(e.target.value)} placeholder="00.000.000/0000-00"
               className={cnpjExists ? styles.inputErr : ''} />
@@ -1780,51 +1781,51 @@ function EmpresaForm({ data, onChange, onFetchCNPJ, onFetchCEP, editMode = false
           </div>
           {cnpjExists && (
             <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>
-              CNPJ já cadastrado no sistema!
+              {tr('CNPJ já cadastrado no sistema!')}
             </span>
           )}
         </div>
-        <FormField label="Razão Social *">
+        <FormField label={tr('Razão Social *')}>
           <Input value={data.razaoSocial} onChange={e => set('razaoSocial', e.target.value)} />
         </FormField>
       </div>
       <div className={styles.grid2}>
-        <FormField label="Nome Fantasia">
+        <FormField label={tr('Nome Fantasia')}>
           <Input value={data.nomeFantasia} onChange={e => set('nomeFantasia', e.target.value)} />
         </FormField>
-        <FormField label="Telefone">
+        <FormField label={tr('Telefone')}>
           <Input value={data.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
         </FormField>
       </div>
-      <FormField label="Email">
-        <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder="contato@empresa.com" />
+      <FormField label={tr('Email')}>
+        <Input type="email" value={data.email} onChange={e => set('email', e.target.value)} placeholder={tr('contato@empresa.com')} />
       </FormField>
 
-      <div className={styles.sectionDivider}><Calendar size={12} /> Endereço</div>
+      <div className={styles.sectionDivider}><Calendar size={12} /> {tr('Endereço')}</div>
 
       <div className={styles.grid3}>
         <div>
-          <label className={styles.fieldLabel}>CEP</label>
+          <label className={styles.fieldLabel}>{tr('CEP')}</label>
           <div className={styles.inputWithSpinner}>
             <Input value={data.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000" />
             {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
           </div>
         </div>
-        <FormField label="País"><Input value={data.pais} onChange={e => set('pais', e.target.value)} /></FormField>
-        <FormField label="Estado"><Input value={data.estado} onChange={e => set('estado', e.target.value)} /></FormField>
+        <FormField label={tr('País')}><Input value={data.pais} onChange={e => set('pais', e.target.value)} /></FormField>
+        <FormField label={tr('Estado')}><Input value={data.estado} onChange={e => set('estado', e.target.value)} /></FormField>
       </div>
       <div className={styles.grid2}>
-        <FormField label="Município"><Input value={data.municipio} onChange={e => set('municipio', e.target.value)} /></FormField>
-        <FormField label="Bairro"><Input value={data.bairro} onChange={e => set('bairro', e.target.value)} /></FormField>
+        <FormField label={tr('Município')}><Input value={data.municipio} onChange={e => set('municipio', e.target.value)} /></FormField>
+        <FormField label={tr('Bairro')}><Input value={data.bairro} onChange={e => set('bairro', e.target.value)} /></FormField>
       </div>
       <div className={styles.grid3}>
         <div className={styles.spanTwo}>
-          <FormField label="Endereço"><Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." /></FormField>
+          <FormField label={tr('Endereço')}><Input value={data.endereco} onChange={e => set('endereco', e.target.value)} placeholder={tr('Rua / Av.')} /></FormField>
         </div>
-        <FormField label="Número"><Input value={data.numero} onChange={e => set('numero', e.target.value)} placeholder="0" /></FormField>
+        <FormField label={tr('Número')}><Input value={data.numero} onChange={e => set('numero', e.target.value)} placeholder="0" /></FormField>
       </div>
-      <FormField label="Complemento">
-        <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Sala, Bloco..." />
+      <FormField label={tr('Complemento')}>
+        <Input value={data.complemento} onChange={e => set('complemento', e.target.value)} placeholder={tr('Sala, Bloco...')} />
       </FormField>
     </div>
   );
@@ -1951,8 +1952,8 @@ export default function RegistersPage() {
     if (raw.length !== 8) return;
     let d;
     try { d = await cadastroApi.buscarCEP(raw); }
-    catch { showNotif('CEP não encontrado.', 'error'); return; }
-    if (!d) { showNotif('CEP não encontrado.', 'error'); return; }
+    catch { showNotif(tr('CEP não encontrado.'), 'error'); return; }
+    if (!d) { showNotif(tr('CEP não encontrado.'), 'error'); return; }
     // O back-end pode devolver estado/municipio/pais como string ("MARANHÃO")
     // ou como objeto ({ descricao: "MARANHÃO" }). Normaliza os dois formatos.
     const desc = v => (v && typeof v === 'object' ? v.descricao : v) || '';
@@ -1965,8 +1966,8 @@ export default function RegistersPage() {
       estado:      desc(d.estado)    || prev.estado,
       municipio:   desc(d.municipio) || prev.municipio,
     }));
-    if (d.endereco || desc(d.municipio)) showNotif('CEP encontrado!');
-    else showNotif('CEP não encontrado.', 'error');
+    if (d.endereco || desc(d.municipio)) showNotif(tr('CEP encontrado!'));
+    else showNotif(tr('CEP não encontrado.'), 'error');
   };
 
   const fetchCNPJ = async (cnpj) => {
@@ -2021,7 +2022,7 @@ export default function RegistersPage() {
       setTotalPages(res?.totalPages ?? 0);
       setTotalElements(res?.totalElements ?? 0);
     } catch {
-      showNotif('Erro ao carregar cadastros.', 'error');
+      showNotif(tr('Erro ao carregar cadastros.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -2090,7 +2091,7 @@ export default function RegistersPage() {
           setLinkResults(res?.content ?? []);
         } catch (e) {
           setLinkResults([]);
-          showNotif(e.message || 'Erro ao buscar empresa.', 'error');
+          showNotif(e.message || tr('Erro ao buscar empresa.'), 'error');
         } finally { setLinkLoading(false); }
       }, 400);
     } else { setLinkResults([]); }
@@ -2151,7 +2152,7 @@ export default function RegistersPage() {
 
   const handleSaveNewDep = async () => {
     if (!newDepData.nome || !newDepData.cpf) {
-      showNotif('Preencha ao menos nome e CPF do dependente.', 'error'); return;
+      showNotif(tr('Preencha ao menos nome e CPF do dependente.'), 'error'); return;
     }
     setSavingNewDep(true);
     try {
@@ -2163,50 +2164,50 @@ export default function RegistersPage() {
       if (novaId) {
         await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: novaId }, vinculo: true });
       }
-      showNotif('Dependente cadastrado e vinculado!');
+      showNotif(tr('Dependente cadastrado e vinculado!'));
       setShowNewDep(false);
       setNewDepData(blankPessoa());
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao cadastrar dependente.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao cadastrar dependente.'), 'error'); }
     finally { setSavingNewDep(false); }
   };
 
   const handleVincularDependente = async (pessoaId, nome) => {
-    if (!window.confirm(`Vincular ${nome || 'esta pessoa'} como dependente de ${detailItem.nome || 'este hóspede'}?`)) return;
+    if (!window.confirm(tr('Vincular {{v0}} como dependente de {{v1}}?', { v0: nome || tr('esta pessoa'), v1: detailItem.nome || tr('este hóspede') }))) return;
     try {
       await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: pessoaId }, vinculo: true });
-      showNotif('Dependente vinculado!');
+      showNotif(tr('Dependente vinculado!'));
       setDepSearch(''); setDepSearchResults([]);
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao vincular.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao vincular.'), 'error'); }
   };
 
   const handleDesvincularDependente = async pessoaId => {
-    if (!window.confirm('Tem certeza que deseja desvincular este dependente?')) return;
+    if (!window.confirm(tr('Tem certeza que deseja desvincular este dependente?'))) return;
     try {
       await cadastroApi.vincularTitular({ titular: { id: detailItem.id }, acompanhante: { id: pessoaId }, vinculo: false });
-      showNotif('Dependente desvinculado!');
+      showNotif(tr('Dependente desvinculado!'));
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao desvincular.'), 'error'); }
   };
 
   const handleVincularEmpresa = async (empresaId, nome) => {
-    if (!window.confirm(`Vincular ${detailItem.nome || 'este hóspede'} à empresa ${nome || 'selecionada'}?`)) return;
+    if (!window.confirm(tr('Vincular {{v0}} à empresa {{v1}}?', { v0: detailItem.nome || tr('este hóspede'), v1: nome || tr('selecionada') }))) return;
     try {
       await cadastroApi.vincularPessoa({ empresa: { id: empresaId }, pessoa: { id: detailItem.id }, ativo: true });
-      showNotif('Empresa vinculada!');
+      showNotif(tr('Empresa vinculada!'));
       setEmpSearch(''); setEmpSearchResults([]);
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao vincular empresa.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao vincular empresa.'), 'error'); }
   };
 
   const handleDesvincularEmpresa = async empresaId => {
-    if (!window.confirm('Tem certeza que deseja desvincular esta empresa?')) return;
+    if (!window.confirm(tr('Tem certeza que deseja desvincular esta empresa?'))) return;
     try {
       await cadastroApi.vincularPessoa({ empresa: { id: empresaId }, pessoa: { id: detailItem.id }, ativo: false });
-      showNotif('Empresa desvinculada!');
+      showNotif(tr('Empresa desvinculada!'));
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao desvincular empresa.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao desvincular empresa.'), 'error'); }
   };
 
   const changeFilter = mode => {
@@ -2238,18 +2239,18 @@ export default function RegistersPage() {
     const cpfRaw = unmask(d.cpf ?? '');
     if (!d.nome || !d.dataNascimento || !cpfRaw) {
       setDepErr(true);
-      showNotif('Preencha CPF, nome e data de nascimento do dependente.', 'error');
+      showNotif(tr('Preencha CPF, nome e data de nascimento do dependente.'), 'error');
       return;
     }
     if (cpfRaw.length !== 11 || !validarCPF(cpfRaw)) {
       setDepErr(true);
-      showNotif('CPF do dependente inválido.', 'error');
+      showNotif(tr('CPF do dependente inválido.'), 'error');
       return;
     }
     // quem não herda do titular precisa dos próprios contato e endereço
     if (d.usarDadosTitular === false && (!d.telefone || !d.cep)) {
       setDepErr(true);
-      showNotif('Preencha telefone e CEP do dependente.', 'error');
+      showNotif(tr('Preencha telefone e CEP do dependente.'), 'error');
       return;
     }
     // o mesmo CPF não pode aparecer duas vezes no cadastro
@@ -2258,7 +2259,7 @@ export default function RegistersPage() {
       ...dependentes.filter((_, j) => j !== depEdit.index).map(x => unmask(x.cpf ?? '')),
     ].filter(Boolean);
     if (jaUsados.includes(cpfRaw)) {
-      showNotif('Esse CPF já está neste cadastro.', 'error');
+      showNotif(tr('Esse CPF já está neste cadastro.'), 'error');
       return;
     }
     setDependentes(prev => depEdit.index == null
@@ -2269,7 +2270,7 @@ export default function RegistersPage() {
 
   const handleRemoveDependente = i => {
     const nome = dependentes[i]?.nome;
-    if (!window.confirm(`Tem certeza que deseja remover ${nome ? `o dependente ${nome}` : 'este dependente'}?`)) return;
+    if (!window.confirm(tr('Tem certeza que deseja remover {{v0}}?', { v0: nome ? tr('o dependente {{nome}}', { nome }) : tr('este dependente') }))) return;
     setDependentes(prev => prev.filter((_, j) => j !== i));
     // editando justamente esse: o editor fecha junto
     setDepEdit(prev => (prev && prev.index === i ? null : prev));
@@ -2279,40 +2280,40 @@ export default function RegistersPage() {
     // Um editor aberto guarda dados que ainda não entraram na lista; avançar
     // agora perderia o que foi digitado.
     if (titular.veiculoEdit) {
-      showNotif('Confirme ou cancele o veículo em edição.', 'error');
+      showNotif(tr('Confirme ou cancele o veículo em edição.'), 'error');
       return;
     }
     if (depEdit) {
-      showNotif('Confirme ou cancele o dependente em edição.', 'error');
+      showNotif(tr('Confirme ou cancele o dependente em edição.'), 'error');
       return;
     }
     if (!titular.nome || !titular.cpf || !titular.dataNascimento || !titular.telefone || !titular.cep) {
      
       setShowErrors(true);
-      showNotif('Preencha os campos obrigatórios do titular (*).', 'error');
+      showNotif(tr('Preencha os campos obrigatórios do titular (*).'), 'error');
       return;
     }
     if ((titular.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
      
-      showNotif('Preencha a placa de todos os veículos do titular.', 'error');
+      showNotif(tr('Preencha a placa de todos os veículos do titular.'), 'error');
       return;
     }
     for (let i = 0; i < dependentes.length; i++) {
       const dep = dependentes[i];
       if (!dep.nome || !dep.cpf || !dep.dataNascimento) {
         setShowErrors(true);
-        showNotif(`Preencha os campos obrigatórios do dependente ${i + 1} (*).`, 'error');
+        showNotif(tr('Preencha os campos obrigatórios do dependente {{v0}} (*).', { v0: i + 1 }), 'error');
         return;
       }
       // quem não herda do titular precisa dos próprios contato e endereço
       if (dep.usarDadosTitular === false && (!dep.telefone || !dep.cep)) {
         setShowErrors(true);
-        showNotif(`Preencha telefone e CEP do dependente ${i + 1} (*).`, 'error');
+        showNotif(tr('Preencha telefone e CEP do dependente {{v0}} (*).', { v0: i + 1 }), 'error');
         return;
       }
       if ((dep.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
 
-        showNotif(`Preencha a placa dos veículos do dependente ${i + 1}.`, 'error');
+        showNotif(tr('Preencha a placa dos veículos do dependente {{v0}}.', { v0: i + 1 }), 'error');
         return;
       }
     }
@@ -2322,8 +2323,8 @@ export default function RegistersPage() {
     const duplicado = cpfs.find((c, idx) => cpfs.indexOf(c) !== idx);
     if (duplicado) {
       const idxs = todos.reduce((acc, p, i) => (unmask(p.cpf) === duplicado ? [...acc, i] : acc), []);
-      const nomes = idxs.map(i => i === 0 ? 'Titular' : `Dependente ${i}`).join(' e ');
-      showNotif(`CPF duplicado entre ${nomes}.`, 'error');
+      const nomes = idxs.map(i => i === 0 ? tr('Titular') : tr('Dependente {{i}}', { i })).join(' e ');
+      showNotif(tr('CPF duplicado entre {{nomes}}.', { nomes }), 'error');
 
       return;
     }
@@ -2343,20 +2344,20 @@ export default function RegistersPage() {
         ],
         empresas: linkEmpresa ? [{ id: linkEmpresa.id }] : [],
       });
-      showNotif('Hóspede(s) cadastrado(s) com sucesso!');
+      showNotif(tr('Hóspede(s) cadastrado(s) com sucesso!'));
       setShowAddPessoa(false);
       setConfirmStep(false); setShowErrors(false);
       setTitular(blankPessoa()); setDependentes([]);
       setLinkEmpresa(null); setLinkSearch(''); setLinkResults([]);
       destacarNovos(cpfsCriados);
       fetchData(searchTerm, filterMode, page);
-    } catch (e) { showNotif(e.message || 'Erro ao cadastrar.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao cadastrar.'), 'error'); }
     finally { setIsSubmitting(false); }
   };
 
   const handleSaveEmpresa = async () => {
     if (!empresa.razaoSocial || !empresa.cnpj) {
-      showNotif('Preencha CNPJ e Razão Social.', 'error'); return;
+      showNotif(tr('Preencha CNPJ e Razão Social.'), 'error'); return;
     }
     setIsSubmitting(true);
     try {
@@ -2379,21 +2380,21 @@ export default function RegistersPage() {
       };
       if (editMode && detailItem?.id) {
         await cadastroApi.atualizarEmpresa({ id: detailItem.id, ...body });
-        showNotif('Empresa atualizada!');
+        showNotif(tr('Empresa atualizada!'));
       } else {
         // Use termo= endpoint for checking duplicates
         const check = await cadastroApi.listarEmpresas({ termo: cnpjRaw, size: 1 });
         if ((check?.content ?? []).length > 0) {
-          showNotif('CNPJ já cadastrado!', 'error');
+          showNotif(tr('CNPJ já cadastrado!'), 'error');
           setIsSubmitting(false); return;
         }
         await cadastroApi.criarEmpresa(body);
-        showNotif('Empresa cadastrada com sucesso!');
+        showNotif(tr('Empresa cadastrada com sucesso!'));
         destacarNovos([cnpjRaw]);
       }
       setShowAddEmpresa(false); setEmpresa(blankEmpresa()); setEditMode(false);
       fetchData(searchTerm, filterMode, page);
-    } catch (e) { showNotif(e.message || 'Erro ao salvar empresa.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao salvar empresa.'), 'error'); }
     finally { setIsSubmitting(false); }
   };
 
@@ -2442,34 +2443,34 @@ export default function RegistersPage() {
 
   const handleSaveEditPessoa = async () => {
     if (editPessoa.veiculoEdit) {
-      showNotif('Confirme ou cancele o veículo em edição.', 'error');
+      showNotif(tr('Confirme ou cancele o veículo em edição.'), 'error');
       return;
     }
     if ((editPessoa.veiculos ?? []).some(v => !cleanPlaca(v.placa))) {
-      showNotif('Preencha a placa de todos os veículos.', 'error');
+      showNotif(tr('Preencha a placa de todos os veículos.'), 'error');
       return;
     }
     setIsSubmitting(true);
     try {
       await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(editPessoa) });
-      showNotif('Pessoa atualizada!');
+      showNotif(tr('Pessoa atualizada!'));
       setShowEdit(false);
       await refreshDetailPessoa();
-    } catch (e) { showNotif(e.message || 'Erro ao editar.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao editar.'), 'error'); }
     finally { setIsSubmitting(false); }
   };
 
   const handleToggleStatus = async () => {
     const novoStatus = detailItem.status === 'BLOQUEADO' ? 'ATIVO' : 'BLOQUEADO';
     if (novoStatus === 'BLOQUEADO'
-      && !window.confirm(`Tem certeza que deseja bloquear o cadastro de ${detailItem.nome || 'este hóspede'}?`)) return;
+      && !window.confirm(tr('Tem certeza que deseja bloquear o cadastro de {{v0}}?', { v0: detailItem.nome || 'este hóspede' }))) return;
     setIsSubmitting(true);
     try {
       await cadastroApi.atualizarPessoa({ id: detailItem.id, ...buildPessoaBody(detailItem, { status: novoStatus }) });
-      showNotif(`Status alterado para ${novoStatus}!`);
+      showNotif(tr('Status alterado para {{novoStatus}}!', { novoStatus }));
       setDetailItem(prev => ({ ...prev, status: novoStatus }));
       fetchData(searchTerm, filterMode, page);
-    } catch (e) { showNotif(e.message || 'Erro ao alterar status.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao alterar status.'), 'error'); }
     finally { setIsSubmitting(false); }
   };
 
@@ -2484,8 +2485,8 @@ export default function RegistersPage() {
         : formAtivo === 'empresa' ? empresaDigitada
         : true;
       const msg = formAtivo === 'pessoa-edit' || (formAtivo === 'empresa' && editMode)
-        ? 'Deseja descartar as alterações em andamento?'
-        : 'Deseja descartar o cadastro em andamento?';
+        ? tr('Deseja descartar as alterações em andamento?')
+        : tr('Deseja descartar o cadastro em andamento?');
       if (sujo && !window.confirm(msg)) return;
       setShowAddPessoa(false); setShowErrors(false); setConfirmStep(false);
       setTitular(blankPessoa()); setDependentes([]);
@@ -2510,28 +2511,28 @@ export default function RegistersPage() {
     try {
       const vinculadoIds = (detailItem?.pessoas_vinculadas ?? detailItem?.pessoasVinculadas ?? []).map(p => p.id);
       if (vinculadoIds.includes(pessoaId)) {
-        showNotif('Esta pessoa já está vinculada!', 'error');
+        showNotif(tr('Esta pessoa já está vinculada!'), 'error');
         return;
       }
       await cadastroApi.vincularPessoa({ empresa: { id: detailItem.id }, pessoa: { id: pessoaId }, ativo: true });
-      showNotif('Pessoa vinculada!');
+      showNotif(tr('Pessoa vinculada!'));
       const res = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       const updated = res?.content?.[0] ?? res;
       setDetailItem({ ...updated, _type: 'empresa' });
       setVinculSearch('');
       setVinculResults([]);
-    } catch (e) { showNotif(e.message || 'Erro ao vincular.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao vincular.'), 'error'); }
   };
 
   const handleDesvincular = async pessoaId => {
-    if (!window.confirm('Tem certeza que deseja desvincular esta pessoa?')) return;
+    if (!window.confirm(tr('Tem certeza que deseja desvincular esta pessoa?'))) return;
     try {
       await cadastroApi.vincularPessoa({ empresa: { id: detailItem.id }, pessoa: { id: pessoaId }, ativo: false });
-      showNotif('Pessoa desvinculada!');
+      showNotif(tr('Pessoa desvinculada!'));
       const res = await cadastroApi.buscarEmpresaPorId(detailItem.id);
       const updated = res?.content?.[0] ?? res;
       setDetailItem({ ...updated, _type: 'empresa' });
-    } catch (e) { showNotif(e.message || 'Erro ao desvincular.', 'error'); }
+    } catch (e) { showNotif(e.message || tr('Erro ao desvincular.'), 'error'); }
   };
 
   const openEditEmpresa = () => {
@@ -2555,9 +2556,9 @@ export default function RegistersPage() {
   // Status da lista, no botão de filtro ao lado da busca.
   // "Empresas" não entra aqui: virou o alternador do topo.
   const statusFilters = [
-    { id: 'todos',      label: 'Todos'      },
-    { id: 'hospedados', label: 'Hospedados' },
-    { id: 'bloqueados', label: 'Bloqueados' },
+    { id: 'todos',      label: tr('Todos')      },
+    { id: 'hospedados', label: tr('Hospedados') },
+    { id: 'bloqueados', label: tr('Bloqueados') },
   ];
   const isEmpresasTab = filterMode === 'empresas';
   const filtroAtual = statusFilters.find(f => f.id === filterMode) ?? statusFilters[0];
@@ -2625,7 +2626,7 @@ export default function RegistersPage() {
 
   const cancelAddPessoa = () => {
     const temDados = titular.nome || titular.cpf || dependentes.length > 0;
-    if (temDados && !window.confirm('Deseja descartar o cadastro em andamento?')) return;
+    if (temDados && !window.confirm(tr('Deseja descartar o cadastro em andamento?'))) return;
     setShowAddPessoa(false); setShowErrors(false);
     setConfirmStep(false);
     setTitular(blankPessoa()); setDependentes([]);
@@ -2647,10 +2648,10 @@ export default function RegistersPage() {
               ))}
             </div>
             <div className={styles.formFoot}>
-              <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>Voltar</Button>
+              <Button className={styles.btnSolid} onClick={() => setConfirmStep(false)}>{tr('Voltar')}</Button>
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                 onClick={doSavePessoa} disabled={isSubmitting}>
-                {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Confirmar e salvar'}
+                {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Confirmar e salvar')}
               </Button>
             </div>
           </div>
@@ -2668,15 +2669,15 @@ export default function RegistersPage() {
                 <div className={styles.opcoesBlock}>
                   <label className={styles.opcaoRow}>
                     <input type="checkbox" checked={temVeiculo} onChange={e => toggleTemVeiculo(e.target.checked)} />
-                    <Car size={13} /> <span>Possui veículo</span>
+                    <Car size={13} /> <span>{tr('Possui veículo')}</span>
                   </label>
                   <label className={styles.opcaoRow}>
                     <input type="checkbox" checked={temDependentes} onChange={e => toggleTemDependentes(e.target.checked)} />
-                    <Users size={13} /> <span>Possui dependentes</span>
+                    <Users size={13} /> <span>{tr('Possui dependentes')}</span>
                   </label>
                   <label className={styles.opcaoRow}>
                     <input type="checkbox" checked={temEmpresa} onChange={e => toggleTemEmpresa(e.target.checked)} />
-                    <Building2 size={13} /> <span>Vínculo com empresa registrada</span>
+                    <Building2 size={13} /> <span>{tr('Vínculo com empresa registrada')}</span>
                   </label>
                 </div>
               }
@@ -2692,10 +2693,10 @@ export default function RegistersPage() {
                   <div className={styles.hScroll}>
                     <table className={[styles.hTable, styles.optTable].join(' ')}>
                       <thead><tr>
-                        <th>Dependente</th><th>CPF</th><th>Nascimento</th><th>Parentesco</th>
+                        <th>{tr('Dependente')}</th><th>{tr('CPF')}</th><th>{tr('Nascimento')}</th><th>{tr('Parentesco')}</th>
                         {/* só aparece se algum dependente tem contato e endereço próprios */}
-                        {dependentes.some(d => d.usarDadosTitular === false) && <th>Contato e endereço</th>}
-                        <th aria-label="Ações" />
+                        {dependentes.some(d => d.usarDadosTitular === false) && <th>{tr('Contato e endereço')}</th>}
+                        <th aria-label={tr('Ações')} />
                       </tr></thead>
                       <tbody>
                         {dependentes.map((dep, i) => (
@@ -2703,7 +2704,7 @@ export default function RegistersPage() {
                             <td>
                               <span className={styles.hQuarto}>
                                 <AvatarCircle sexo={dep.sexo} size={24} />
-                                {dep.nome || `Dependente ${i + 1}`}
+                                {dep.nome || tr('Dependente {{v0}}', { v0: i + 1 })}
                               </span>
                             </td>
                             <td>{maskCPF(dep.cpf) || '—'}</td>
@@ -2711,15 +2712,15 @@ export default function RegistersPage() {
                             <td>{parentescoLabel(dep.parentesco)}</td>
                             {dependentes.some(d => d.usarDadosTitular === false) && (
                               <td>
-                                {dep.usarDadosTitular === false && <span className={styles.optTag}>Próprios</span>}
+                                {dep.usarDadosTitular === false && <span className={styles.optTag}>{tr('Próprios')}</span>}
                               </td>
                             )}
                             <td>
                               <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
                                 <button type="button" className={styles.btnEdit} onClick={() => abrirDependente(i)}
-                                  title="Editar dependente"><Pencil size={12} /></button>
+                                  title={tr('Editar dependente')}><Pencil size={12} /></button>
                                 <button type="button" className={styles.btnRemove} onClick={() => handleRemoveDependente(i)}
-                                  title="Remover dependente"><X size={12} /></button>
+                                  title={tr('Remover dependente')}><X size={12} /></button>
                               </span>
                             </td>
                           </tr>
@@ -2744,16 +2745,16 @@ export default function RegistersPage() {
                     />
                     <div className={styles.editorFoot}>
                       <button type="button" className={styles.optAdd} onClick={confirmarDependente}>
-                        <Check size={13} /> Confirmar dependente
+                        <Check size={13} /> {tr('Confirmar dependente')}
                       </button>
-                      <button type="button" className={styles.btnGhost} onClick={cancelarDependente}>Cancelar</button>
+                      <button type="button" className={styles.btnGhost} onClick={cancelarDependente}>{tr('Cancelar')}</button>
                     </div>
                   </>
                 )}
 
                 {!depEdit && (
                   <button type="button" className={styles.optAdd} style={{ marginTop: 12 }} onClick={() => abrirDependente()}>
-                    <Plus size={13} /> Dependente
+                    <Plus size={13} /> {tr('Dependente')}
                   </button>
                 )}
               </>
@@ -2768,8 +2769,8 @@ export default function RegistersPage() {
                   <div className={[styles.hScroll, styles.empresaBloco].join(' ')}>
                     <table className={[styles.hTable, styles.optTable].join(' ')}>
                       <thead><tr>
-                        <th>Empresa</th><th>CNPJ</th>
-                        <th aria-label="Ações" />
+                        <th>{tr('Empresa')}</th><th>{tr('CNPJ')}</th>
+                        <th aria-label={tr('Ações')} />
                       </tr></thead>
                       <tbody>
                         <tr>
@@ -2783,7 +2784,7 @@ export default function RegistersPage() {
                           <td>
                             <span className={[styles.tdAcoes, styles.acoesSemBorda].join(' ')}>
                               <button type="button" className={styles.btnRemove}
-                                onClick={() => setLinkEmpresa(null)} title="Desvincular empresa"><X size={12} /></button>
+                                onClick={() => setLinkEmpresa(null)} title={tr('Desvincular empresa')}><X size={12} /></button>
                             </span>
                           </td>
                         </tr>
@@ -2797,7 +2798,7 @@ export default function RegistersPage() {
                       <Input
                         value={linkSearch}
                         onChange={e => setLinkSearch(e.target.value)}
-                        placeholder="Buscar por nome ou CNPJ (mín. 3 caracteres)..."
+                        placeholder={tr('Buscar por nome ou CNPJ (mín. 3 caracteres)...')}
                         className={styles.searchInput}
                       />
                       {linkLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
@@ -2822,9 +2823,9 @@ export default function RegistersPage() {
             {/* ── Fim do cadastro ── */}
             <div className={styles.formFoot}>
               <Button className={styles.btnSolid}
-                onClick={() => setTitular(blankPessoa())}>Limpar</Button>
+                onClick={() => setTitular(blankPessoa())}>{tr('Limpar')}</Button>
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                onClick={handlePreviewPessoa}>Próximo</Button>
+                onClick={handlePreviewPessoa}>{tr('Próximo')}</Button>
             </div>
           </div>
         </div>
@@ -2848,7 +2849,7 @@ export default function RegistersPage() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <LayoutDashboard size={16} />
-                  <span className={styles.dCardTitle}>Visão geral dos cadastros</span>
+                  <span className={styles.dCardTitle}>{tr('Visão geral dos cadastros')}</span>
                   {/* cada aba mostra o seu cadastro; some quando o formulário já está aberto */}
                   {canCadastrar && !formAtivo && (
                     <div className={styles.dCardActions}>
@@ -2856,7 +2857,7 @@ export default function RegistersPage() {
                         <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                           disabled={!!formMode}
                           onClick={() => { setEmpresa(blankEmpresa()); setEditMode(false); setShowAddEmpresa(true); }}>
-                          Cadastrar empresa
+                          {tr('Cadastrar empresa')}
                         </Button>
                       ) : (
                         <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} disabled={!!formMode} onClick={() => {
@@ -2866,7 +2867,7 @@ export default function RegistersPage() {
                           setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
                           setShowAddPessoa(true);
                         }}>
-                          Cadastrar hóspede
+                          {tr('Cadastrar hóspede')}
                         </Button>
                       )}
                     </div>
@@ -2879,7 +2880,7 @@ export default function RegistersPage() {
                   ) : !stats ? (
                     <div className={styles.empty}>
                       <AlertCircle size={24} opacity={0.3} />
-                      <span>Não foi possível carregar os totais.</span>
+                      <span>{tr('Não foi possível carregar os totais.')}</span>
                     </div>
                   ) : (
                     <>
@@ -2901,17 +2902,17 @@ export default function RegistersPage() {
                     <div className={styles.statLine}>
                       <span className={styles.statItem}>
                         {/* <i className={[styles.statDot, styles.dotTotal].join(' ')} /> */}
-                        <span className={styles.statItemLabel}>Cadastrados</span>
+                        <span className={styles.statItemLabel}>{tr('Cadastrados')}</span>
                         <span className={styles.statItemVal}>{stats.pessoas}</span>
                       </span>
                       <span className={styles.statItem}>
                         {/* <i className={[styles.statDot, styles.distHosp].join(' ')} /> */}
-                        <span className={styles.statItemLabel}>Hospedados</span>
+                        <span className={styles.statItemLabel}>{tr('Hospedados')}</span>
                         <span className={[styles.statItemVal, styles.statValGreen].join(' ')}>{stats.hospedados}</span>
                       </span>
                       <span className={styles.statItem}>
                         {/* <i className={[styles.statDot, styles.distBloq].join(' ')} /> */}
-                        <span className={styles.statItemLabel}>Bloqueados</span>
+                        <span className={styles.statItemLabel}>{tr('Bloqueados')}</span>
                         <span className={[styles.statItemVal, styles.statValRed].join(' ')}>{stats.bloqueados}</span>
                       </span>
                       {/* <span className={styles.statItem}>
@@ -2935,12 +2936,12 @@ export default function RegistersPage() {
               <button type="button"
                 className={[styles.segmentedBtn, !isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
                 onClick={() => changeFilter('todos')}>
-                Hóspedes
+                {tr('Hóspedes')}
               </button>
               <button type="button"
                 className={[styles.segmentedBtn, isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
                 onClick={() => changeFilter('empresas')}>
-                Empresas
+                {tr('Empresas')}
               </button>
             </div>
             {canCadastrar && !formAtivo && (
@@ -2953,7 +2954,7 @@ export default function RegistersPage() {
                   setTemVeiculo(false); setTemDependentes(false); setTemEmpresa(false);
                   setShowAddPessoa(true);
                 }}>
-                Cadastrar
+                {tr('Cadastrar')}
               </Button>
             )}
             </div>
@@ -2965,14 +2966,14 @@ export default function RegistersPage() {
                 <Input
                   value={searchTerm}
                   onChange={e => setSearchTerm(limparBusca(e.target.value, !isEmpresasTab))}
-                  placeholder={isEmpresasTab ? 'Buscar razão social ou CNPJ...' : 'Buscar por nome, CPF ou placa...'}
+                  placeholder={isEmpresasTab ? tr('Buscar razão social ou CNPJ...') : tr('Buscar por nome, CPF ou placa...')}
                   className={styles.searchInput}
-                  aria-label="Buscar"
+                  aria-label={tr('Buscar')}
                 />
                 {loading && searchTerm.length >= 3
                   ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
                   : searchTerm.length > 0 &&
-                    <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                    <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label={tr('Limpar busca')}>
                       <X size={14} />
                     </button>
                 }
@@ -2984,14 +2985,14 @@ export default function RegistersPage() {
                     className={[styles.filterBtn, filterMode !== 'todos' ? styles.filterBtnOn : ''].join(' ')}
                     onClick={() => setStatusMenu(v => !v)}
                     aria-haspopup="menu" aria-expanded={statusMenu}
-                    title={`Filtrar por status — ${filtroAtual.label}`}>
+                    title={tr('Filtrar por status — {{label}}', { label: filtroAtual.label })}>
                     <FilterIcon size={18} />
                     {filterMode !== 'todos' && <span className={styles.filterDot} />}
                   </button>
 
                   {statusMenu && (
                     <div className={styles.filterMenu} role="menu">
-                      <span className={styles.filterMenuLabel}>Status</span>
+                      <span className={styles.filterMenuLabel}>{tr('Status')}</span>
                       {statusFilters.map(({ id, label }) => (
                         <button key={id} type="button" role="menuitem"
                           className={[styles.filterMenuItem, filterMode === id ? styles.filterMenuItemOn : ''].join(' ')}
@@ -3010,10 +3011,10 @@ export default function RegistersPage() {
             {!isEmpresasTab && filterMode !== 'todos' && (
               <div className={styles.filtroChips}>
                 <span className={styles.filtroChip}>
-                  <span className={styles.filtroChipRot}>Status:</span> {filtroAtual.label}
+                  <span className={styles.filtroChipRot}>{tr('Status:')}</span> {filtroAtual.label}
                   <button type="button" className={styles.filtroChipX}
                     onClick={() => changeFilter('todos')}
-                    title="Remover filtro" aria-label={`Remover filtro ${filtroAtual.label}`}>
+                    title={tr('Remover filtro')} aria-label={tr('Remover filtro {{label}}', { label: filtroAtual.label })}>
                     <X size={12} />
                   </button>
                 </span>
@@ -3023,23 +3024,23 @@ export default function RegistersPage() {
             <div className={styles.listMeta}>
               <span>
                 {loading
-                  ? 'Carregando...'
+                  ? tr('Carregando...')
                   : `${totalElements} ${isEmpresasTab
-                      ? `empresa${totalElements !== 1 ? 's' : ''}`
-                      : `hóspede${totalElements !== 1 ? 's' : ''}`}`}
-                {!loading && !isEmpresasTab && stats && ` · ${stats.hospedados} hospedado${stats.hospedados !== 1 ? 's' : ''}`}
+                      ? (totalElements !== 1 ? tr('empresas') : tr('empresa'))
+                      : (totalElements !== 1 ? tr('hóspedes') : tr('hóspede'))}`}
+                {!loading && !isEmpresasTab && stats && tr(' · {{hospedados}} hospedado{{v1}}', { hospedados: stats.hospedados, v1: stats.hospedados !== 1 ? 's' : '' })}
               </span>
               {!isEmpresasTab && (
                 <select
                   className={styles.sortSelect}
                   value={`${ordenacao}|${direcao}`}
                   onChange={e => { const [ord, dir] = e.target.value.split('|'); changeSort(ord, dir); }}
-                  aria-label="Ordenação"
+                  aria-label={tr('Ordenação')}
                 >
-                  <option value="DATA_CADASTRO|DESC">Mais recentes</option>
-                  <option value="DATA_CADASTRO|ASC">Mais antigos</option>
-                  <option value="NOME|ASC">Nome A→Z</option>
-                  <option value="NOME|DESC">Nome Z→A</option>
+                  <option value="DATA_CADASTRO|DESC">{tr('Mais recentes')}</option>
+                  <option value="DATA_CADASTRO|ASC">{tr('Mais antigos')}</option>
+                  <option value="NOME|ASC">{tr('Nome A→Z')}</option>
+                  <option value="NOME|DESC">{tr('Nome Z→A')}</option>
                 </select>
               )}
             </div>
@@ -3050,7 +3051,7 @@ export default function RegistersPage() {
               ) : items.length === 0 ? (
                 <div className={styles.empty}>
                   <AlertCircle size={24} opacity={0.3} />
-                  <span>Nenhum resultado encontrado.</span>
+                  <span>{tr('Nenhum resultado encontrado.')}</span>
                 </div>
               ) : items.map((item, i) => {
                 const name  = nomeListing(item);
@@ -3071,9 +3072,9 @@ export default function RegistersPage() {
                     <span className={styles.listItemBody}>
                       <span className={styles.listItemName}>
                         <span className={styles.nome}>{name}</span>
-                        {item.status === 'BLOQUEADO' && <span className={styles.badgeBloqueado}>Bloqueado</span>}
-                        {item.status === 'HOSPEDADO' && <span className={styles.badgeHospedado}>Hospedado</span>}
-                        {isNovo(item) && <span className={styles.badgeNovo}>Novo</span>}
+                        {item.status === 'BLOQUEADO' && <span className={styles.badgeBloqueado}>{tr('Bloqueado')}</span>}
+                        {item.status === 'HOSPEDADO' && <span className={styles.badgeHospedado}>{tr('Hospedado')}</span>}
+                        {isNovo(item) && <span className={styles.badgeNovo}>{tr('Novo')}</span>}
                       </span>
                       {local && (
                         <span className={styles.listItemLoc}>
@@ -3090,12 +3091,12 @@ export default function RegistersPage() {
             {totalPages > 1 && (
               <div className={styles.pagination}>
                 <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}
-                  aria-label="Página anterior">
+                  aria-label={tr('Página anterior')}>
                   <ChevronLeft size={16} />
                 </button>
-                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <span className={styles.pageCurrent}>{page + 1} {tr('de')} {totalPages}</span>
                 <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}
-                  aria-label="Próxima página">
+                  aria-label={tr('Próxima página')}>
                   <ChevRight size={16} />
                 </button>
               </div>
@@ -3116,12 +3117,12 @@ export default function RegistersPage() {
               <section className={styles.dCard}>
                 <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn} onClick={cancelAddPessoa}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <UserPlus size={16} />
                   <span className={styles.dCardTitle}>
-                    {confirmStep ? 'Revisar Dados' : 'Novo hóspede'}
+                    {confirmStep ? tr('Revisar Dados') : tr('Novo hóspede')}
                   </span>
                 </h3>
                 <div className={styles.dCardBody}>{addPessoaBody}</div>
@@ -3133,14 +3134,14 @@ export default function RegistersPage() {
               <section className={styles.dCard}>
                 <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
-                    title="Voltar" aria-label="Voltar">
+                    title={tr('Voltar')} aria-label={tr('Voltar')}>
                     <ChevronLeft size={17} />
                   </button>
                   <Contact size={16} />
-                  <span className={styles.dCardTitle}>Editar hóspede</span>
+                  <span className={styles.dCardTitle}>{tr('Editar hóspede')}</span>
                   <div className={styles.dCardActions}>
                     <button type="button" className={styles.idClose} onClick={() => setShowEdit(false)}
-                      title="Cancelar" aria-label="Cancelar">
+                      title={tr('Cancelar')} aria-label={tr('Cancelar')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -3148,10 +3149,10 @@ export default function RegistersPage() {
                 <div className={styles.dCardBody}>
                   <PessoaForm data={editPessoa} onChange={setEditPessoa} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
                   <div className={styles.formFoot}>
-                    <Button className={styles.btnSolid} onClick={() => setEditPessoa(blankPessoa())}>Limpar</Button>
+                    <Button className={styles.btnSolid} onClick={() => setEditPessoa(blankPessoa())}>{tr('Limpar')}</Button>
                     <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                       onClick={handleSaveEditPessoa} disabled={isSubmitting}>
-                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
                     </Button>
                   </div>
                 </div>
@@ -3164,15 +3165,15 @@ export default function RegistersPage() {
                 <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
                   <button type="button" className={styles.backBtn}
                     onClick={() => { setShowAddEmpresa(false); setEditMode(false); setEmpresa(blankEmpresa()); }}
-                    title="Voltar" aria-label="Voltar">
+                    title={tr('Voltar')} aria-label={tr('Voltar')}>
                     <ChevronLeft size={17} />
                   </button>
                   <Building2 size={16} />
-                  <span className={styles.dCardTitle}>{editMode ? 'Editar empresa' : 'Nova empresa'}</span>
+                  <span className={styles.dCardTitle}>{editMode ? tr('Editar empresa') : tr('Nova empresa')}</span>
                   <div className={styles.dCardActions}>
                     <button type="button" className={styles.idClose}
                       onClick={() => { setShowAddEmpresa(false); setEditMode(false); setEmpresa(blankEmpresa()); }}
-                      title="Cancelar" aria-label="Cancelar">
+                      title={tr('Cancelar')} aria-label={tr('Cancelar')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -3180,10 +3181,10 @@ export default function RegistersPage() {
                 <div className={styles.dCardBody}>
                   <EmpresaForm data={empresa} onChange={setEmpresa} onFetchCNPJ={fetchCNPJ} onFetchCEP={fetchCEP} editMode={editMode} />
                   <div className={styles.formFoot}>
-                    <Button className={styles.btnSolid} onClick={() => setEmpresa(blankEmpresa())}>Limpar</Button>
+                    <Button className={styles.btnSolid} onClick={() => setEmpresa(blankEmpresa())}>{tr('Limpar')}</Button>
                     <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                       onClick={handleSaveEmpresa} disabled={isSubmitting}>
-                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
                     </Button>
                   </div>
                 </div>
@@ -3199,29 +3200,29 @@ export default function RegistersPage() {
                 <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
                   {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <Contact size={16} />
-                  <span className={styles.dCardTitle}>Ficha do hóspede</span>
+                  <span className={styles.dCardTitle}>{tr('Ficha do hóspede')}</span>
                   <div className={styles.dCardActions}>
                     <span className={[styles.fichaStatus, isBloqueado ? styles.fichaStatusBloq : ''].join(' ')}>
-                      {isBloqueado ? 'Cadastro bloqueado' : 'Cadastro ativo'}
+                      {isBloqueado ? tr('Cadastro bloqueado') : tr('Cadastro ativo')}
                     </span>
                     {canAtualizar && (
                       <Button className={styles.btnSolid} onClick={() => openEditPessoa(detailItem)} disabled={isBloqueado}>
-                        Editar
+                        {tr('Editar')}
                       </Button>
                     )}
                     {canBloquear && (
                       <Button variant={isBloqueado ? 'primary' : 'danger'}
                         className={[styles.btnSolid, isBloqueado ? styles.btnPrimary : styles.btnDanger].join(' ')}
                         onClick={handleToggleStatus} disabled={isSubmitting}>
-                        {isBloqueado ? 'Desbloquear' : 'Bloquear'}
+                        {isBloqueado ? tr('Desbloquear') : tr('Bloquear')}
                       </Button>
                     )}
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar cadastro" aria-label="Fechar cadastro">
+                      title={tr('Fechar cadastro')} aria-label={tr('Fechar cadastro')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -3234,8 +3235,8 @@ export default function RegistersPage() {
                     <div className={styles.idHeadMain}>
                       <h2 className={styles.fichaNome}>{detailItem.nome ?? '—'}</h2>
                       <p className={styles.fichaSub}>
-                        <span>Cliente desde {cadastradoEm}</span>
-                        {detailItem.titularNome && <><span aria-hidden="true">·</span><span>Dep. de {detailItem.titularNome}</span></>}
+                        <span>{tr('Cliente desde')} {cadastradoEm}</span>
+                        {detailItem.titularNome && <><span aria-hidden="true">·</span><span>{tr('Dep. de')} {detailItem.titularNome}</span></>}
                         <span aria-hidden="true">·</span>
                         {/* MOCK — categoria de fidelidade */}
                         <span className={[styles.fichaCat, catTomClass(categoria.tom)].join(' ')}>
@@ -3245,20 +3246,20 @@ export default function RegistersPage() {
                       <p className={styles.fichaSub}>
                         {/* sem funcionário = veio do site de autocadastro */}
                         {detailItem.funcionario?.nome
-                          ? `Registrado por ${detailItem.funcionario.nome}`
-                          : 'Autocadastro feito'}
-                        {horaRegistro && ` às ${horaRegistro}`}
+                          ? tr('Registrado por {{nome}}', { nome: detailItem.funcionario.nome })
+                          : tr('Autocadastro feito')}
+                        {horaRegistro && tr(' às {{horaRegistro}}', { horaRegistro })}
                       </p>
                     </div>
                   </div>
 
                   <div className={styles.fichaTabs} role="tablist">
                     {[
-                      ['dados', 'Dados cadastrais'],
-                      ...(detailItem.titularId == null ? [['dependentes', 'Dependentes']] : []),
-                      ['empresa', 'Empresa'],
-                      ['veiculos', 'Veículos'],
-                      ...(canHistorico ? [['historico', 'Histórico de Hospedagem']] : []),
+                      ['dados', tr('Dados cadastrais')],
+                      ...(detailItem.titularId == null ? [['dependentes', tr('Dependentes')]] : []),
+                      ['empresa', tr('Empresa')],
+                      ['veiculos', tr('Veículos')],
+                      ...(canHistorico ? [['historico', tr('Histórico de Hospedagem')]] : []),
                     ].map(([k, label]) => (
                       <button key={k} type="button" role="tab" aria-selected={abaFicha === k}
                         className={[styles.fichaTab, abaFicha === k ? styles.fichaTabAtiva : ''].join(' ')}
@@ -3275,7 +3276,7 @@ export default function RegistersPage() {
                       <div className={styles.searchWrap}>
                         <Search size={13} className={styles.searchIcon} />
                         <Input value={depSearch} onChange={e => setDepSearch(e.target.value)}
-                          placeholder="Buscar pessoa para vincular como dependente..." className={styles.searchInput} />
+                          placeholder={tr('Buscar pessoa para vincular como dependente...')} className={styles.searchInput} />
                         {depSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                       </div>
                       {(depSearchLoading || depSearchResults.length > 0) && (
@@ -3291,8 +3292,8 @@ export default function RegistersPage() {
                                 <span className={styles.nome}>{p.nome}</span>
                                 <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
                                 {jaVinculado
-                                  ? <span className={styles.jaVinculadoBadge}>Já vinculado</span>
-                                  : <span className={styles.vincularHint}>Vincular</span>}
+                                  ? <span className={styles.jaVinculadoBadge}>{tr('Já vinculado')}</span>
+                                  : <span className={styles.vincularHint}>{tr('Vincular')}</span>}
                               </button>
                             );
                           })}
@@ -3302,13 +3303,13 @@ export default function RegistersPage() {
                   </div>
 
                   {dependentesList.length === 0 ? (
-                    <p className={styles.blockEmpty}>Sem dependentes vinculados.</p>
+                    <p className={styles.blockEmpty}>{tr('Sem dependentes vinculados.')}</p>
                   ) : (
                     <ul className={styles.dList}>
                       {dependentesList.map(dep => (
                         <li key={dep.id} className={styles.depCard}>
                           <button className={[styles.btnRemove, styles.btnRemoveSolto].join(' ')}
-                            onClick={() => handleDesvincularDependente(dep.id)} title="Desvincular" aria-label="Desvincular dependente">
+                            onClick={() => handleDesvincularDependente(dep.id)} title={tr('Desvincular')} aria-label={tr('Desvincular dependente')}>
                             <Trash2 size={15} />
                           </button>
                           <AvatarCircle sexo={dep.sexo} size={36} />
@@ -3328,7 +3329,7 @@ export default function RegistersPage() {
                       <div className={styles.searchWrap}>
                         <Search size={13} className={styles.searchIcon} />
                         <Input value={empSearch} onChange={e => setEmpSearch(e.target.value)}
-                          placeholder="Buscar empresa para vincular..." className={styles.searchInput} />
+                          placeholder={tr('Buscar empresa para vincular...')} className={styles.searchInput} />
                         {empSearchLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                       </div>
                       {(empSearchLoading || empSearchResults.length > 0) && (
@@ -3344,8 +3345,8 @@ export default function RegistersPage() {
                                 <span className={styles.nome}>{empresaLabel(emp)}</span>
                                 <span className={styles.mono}>{maskCNPJ(emp.cnpj ?? '')}</span>
                                 {jaVinculado
-                                  ? <span className={styles.jaVinculadoBadge}>Já vinculada</span>
-                                  : <span className={styles.vincularHint}>Vincular</span>}
+                                  ? <span className={styles.jaVinculadoBadge}>{tr('Já vinculada')}</span>
+                                  : <span className={styles.vincularHint}>{tr('Vincular')}</span>}
                               </button>
                             );
                           })}
@@ -3355,13 +3356,13 @@ export default function RegistersPage() {
                   </div>
 
                   {empresasList.length === 0 ? (
-                    <p className={styles.blockEmpty}>Sem empresas vinculadas.</p>
+                    <p className={styles.blockEmpty}>{tr('Sem empresas vinculadas.')}</p>
                   ) : (
                     <div className={styles.hScroll}>
                       <table className={styles.hTable}>
                         <thead><tr>
-                          <th aria-label="Desvincular" />
-                          <th>Razão social</th><th>CNPJ</th><th>Contato financeiro</th>
+                          <th aria-label={tr('Desvincular')} />
+                          <th>{tr('Razão social')}</th><th>{tr('CNPJ')}</th><th>{tr('Contato financeiro')}</th>
                         </tr></thead>
                         <tbody>
                           {empresasList.map(e => {
@@ -3371,7 +3372,7 @@ export default function RegistersPage() {
                               <tr key={e.id}>
                                 <td className={styles.tdAcao}>
                                   <button className={[styles.btnRemove, styles.btnRemoveSolto].join(' ')}
-                                    onClick={() => handleDesvincularEmpresa(e.id)} title="Desvincular" aria-label="Desvincular empresa">
+                                    onClick={() => handleDesvincularEmpresa(e.id)} title={tr('Desvincular')} aria-label={tr('Desvincular empresa')}>
                                     <Trash2 size={15} />
                                   </button>
                                 </td>
@@ -3387,21 +3388,21 @@ export default function RegistersPage() {
                   )}
                   </>) : abaFicha === 'veiculos' ? (<>
                   {veiculosList.length === 0 ? (
-                    <p className={styles.blockEmpty}>Sem veículos cadastrados.</p>
+                    <p className={styles.blockEmpty}>{tr('Sem veículos cadastrados.')}</p>
                   ) : (
                     <ul className={styles.vList}>
                       {veiculosList.map((v, i) => (
                         <li key={v.id ?? i} className={styles.vRow}>
-                          <img className={styles.vTipoImg} src={imgTipo(v.tipo, v.codigo_cor ?? codigoCor(v.cor))} alt={tipoCanon(v.tipo) || 'Veículo'} />
+                          <img className={styles.vTipoImg} src={imgTipo(v.tipo, v.codigo_cor ?? codigoCor(v.cor))} alt={tipoCanon(v.tipo) || tr('Veículo')} />
                           <div className={styles.vInfo}>
                             <p className={styles.vModelo}>
                               {[v.marca, v.modelo].filter(Boolean).join(' ') || '—'}
                             </p>
                             <p className={styles.vMeta}>
                               {[
-                                tipoCanon(v.tipo) || null,
+                                tr(tipoCanon(v.tipo)) || null,
                                 v.cor || null,
-                                Number(v.ano) ? `Ano ${v.ano}` : null,
+                                Number(v.ano) ? tr('Ano {{ano}}', { ano: v.ano }) : null,
                               ].filter(Boolean).join(' · ') || '—'}
                             </p>
                           </div>
@@ -3414,22 +3415,22 @@ export default function RegistersPage() {
                   <div className={styles.fieldGrid}>
                     <Field label="CPF" value={maskCPF(detailItem.cpf ?? '')} mono />
                     <Field label="RG" value={detailItem.rg} mono />
-                    <Field label="Data de nascimento" value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
-                    <Field label="Sexo" value={sexoLabel(detailItem.sexo)} />
-                    <Field label="Nacionalidade" value={nacionalidade(detailItem.pais)} />
-                    <Field label="Profissão" value={detailItem.profissao} />
+                    <Field label={tr('Data de nascimento')} value={detailItem.data_nascimento ?? dateFromApi(detailItem.dataNascimento)} />
+                    <Field label={tr('Sexo')} value={sexoLabel(detailItem.sexo)} />
+                    <Field label={tr('Nacionalidade')} value={nacionalidade(detailItem.pais)} />
+                    <Field label={tr('Profissão')} value={detailItem.profissao} />
                   </div>
 
                   <div className={styles.dadosGrupoSep}>
-                    <div className={styles.dadosHead}><Mail size={16} /><span>Contato</span></div>
+                    <div className={styles.dadosHead}><Mail size={16} /><span>{tr('Contato')}</span></div>
                     <div className={styles.fieldGrid}>
-                      <Field label="E-mail" value={detailItem.email ? (
-                        <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title="Enviar e-mail">
+                      <Field label={tr('E-mail')} value={detailItem.email ? (
+                        <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title={tr('Enviar e-mail')}>
                           {detailItem.email}
                         </ContatoBotao>
                       ) : ''} />
-                      <Field label="Telefone" value={detailItem.telefone ? (
-                        <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title="WhatsApp">
+                      <Field label={tr('Telefone')} value={detailItem.telefone ? (
+                        <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title={tr('WhatsApp')}>
                           {maskPhone(detailItem.telefone)}
                         </ContatoBotao>
                       ) : ''} />
@@ -3437,13 +3438,13 @@ export default function RegistersPage() {
                   </div>
 
                   <div className={styles.dadosGrupoSep}>
-                    <div className={styles.dadosHead}><MapPin size={16} /><span>Endereço</span></div>
+                    <div className={styles.dadosHead}><MapPin size={16} /><span>{tr('Endereço')}</span></div>
                     <div className={styles.fieldGrid}>
-                      <Field label="Endereço" value={[
+                      <Field label={tr('Endereço')} value={[
                         [detailItem.endereco, detailItem.numero].filter(Boolean).join(', '),
                         detailItem.bairro,
                       ].filter(Boolean).join(' — ')} />
-                      <Field label="Cidade / UF" value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
+                      <Field label={tr('Cidade / UF')} value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
                       <Field label="CEP" value={maskCEP(detailItem.cep ?? '')} mono />
                     </div>
                   </div>
@@ -3460,20 +3461,20 @@ export default function RegistersPage() {
                 <h3 className={styles.dCardHead}>
                   {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <Contact size={16} />
-                  <span className={styles.dCardTitle}>Dados da empresa</span>
+                  <span className={styles.dCardTitle}>{tr('Dados da empresa')}</span>
                   <div className={styles.dCardActions}>
-                    {isBloqueado && <span className={styles.blockedNotice}>Bloqueada</span>}
+                    {isBloqueado && <span className={styles.blockedNotice}>{tr('Bloqueada')}</span>}
                     {canAtualizar && (
                       <Button className={styles.btnSolid} onClick={openEditEmpresa} disabled={isBloqueado}>
-                        Editar
+                        {tr('Editar')}
                       </Button>
                     )}
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar cadastro" aria-label="Fechar cadastro">
+                      title={tr('Fechar cadastro')} aria-label={tr('Fechar cadastro')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -3490,37 +3491,37 @@ export default function RegistersPage() {
                         <span className={styles.detailId}>{detailItem.tipoEmpresa ?? detailItem.tipo_empresa ?? 'CLIENTE'}</span>
                       </div>
                       <p className={styles.idSub}>
-                        Cadastrada em {cadastradoEm}
+                        {tr('Cadastrada em')} {cadastradoEm}
                         {(detailItem.nomeFantasia ?? detailItem.nome_fantasia) &&
                           ` · ${detailItem.nomeFantasia ?? detailItem.nome_fantasia}`}
-                        {` · ${vinculadosList.length} vinculado${vinculadosList.length !== 1 ? 's' : ''}`}
+                        {tr(' · {{length}} vinculado{{v1}}', { length: vinculadosList.length, v1: vinculadosList.length !== 1 ? 's' : '' })}
                       </p>
                       <p className={styles.idSub}>
-                        Registrado por: {detailItem.funcionario?.nome || '—'}
+                        {tr('Registrado por:')} {detailItem.funcionario?.nome || '—'}
                       </p>
                     </div>
                   </div>
 
                   <div className={styles.fieldGrid}>
                     <Field label="CNPJ" value={maskCNPJ(detailItem.cnpj ?? '')} mono />
-                    <Field label="Nome fantasia" value={detailItem.nomeFantasia ?? detailItem.nome_fantasia} />
-                    <Field label="E-mail" value={detailItem.email ? (
-                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title="Enviar e-mail">
+                    <Field label={tr('Nome fantasia')} value={detailItem.nomeFantasia ?? detailItem.nome_fantasia} />
+                    <Field label={tr('E-mail')} value={detailItem.email ? (
+                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.email}`} title={tr('Enviar e-mail')}>
                         {detailItem.email}
                       </ContatoBotao>
                     ) : ''} />
-                    <Field label="Telefone" value={detailItem.telefone ? (
-                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title="WhatsApp">
+                    <Field label={tr('Telefone')} value={detailItem.telefone ? (
+                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.telefone)}`} title={tr('WhatsApp')}>
                         {maskPhone(detailItem.telefone)}
                       </ContatoBotao>
                     ) : ''} />
-                    <Field label="Endereço" value={[
+                    <Field label={tr('Endereço')} value={[
                       [detailItem.endereco, detailItem.numero].filter(Boolean).join(', '),
                       detailItem.bairro,
                     ].filter(Boolean).join(' — ')} />
-                    <Field label="Cidade / UF" value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
+                    <Field label={tr('Cidade / UF')} value={[detailItem.municipio, detailItem.estado].filter(Boolean).join(' — ')} />
                     <Field label="CEP" value={maskCEP(detailItem.cep ?? '')} mono />
-                    <Field label="Status" value={detailItem.status} />
+                    <Field label={tr('Status')} value={detailItem.status} />
                   </div>
                 </div>
               </section>
@@ -3529,7 +3530,7 @@ export default function RegistersPage() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Users size={16} />
-                  <span className={styles.dCardTitle}>Pessoas vinculadas</span>
+                  <span className={styles.dCardTitle}>{tr('Pessoas vinculadas')}</span>
                 </h3>
 
                 <div className={styles.dCardBody}>
@@ -3537,7 +3538,7 @@ export default function RegistersPage() {
                     <div className={styles.searchWrap}>
                       <Search size={13} className={styles.searchIcon} />
                       <Input value={vinculSearch} onChange={e => setVinculSearch(e.target.value)}
-                        placeholder="Buscar pessoa por nome ou CPF..." className={styles.searchInput} />
+                        placeholder={tr('Buscar pessoa por nome ou CPF...')} className={styles.searchInput} />
                       {vinculLoading && <Loader2 size={13} className={[styles.spinInline, styles.searchSpinner].join(' ')} />}
                     </div>
                     {(vinculLoading || vinculResults.length > 0) && (
@@ -3553,8 +3554,8 @@ export default function RegistersPage() {
                               <span className={styles.nome}>{p.nome}</span>
                               <span className={styles.mono}>{maskCPF(p.cpf ?? '')}</span>
                               {jaVinculado
-                                ? <span className={styles.jaVinculadoBadge}>Já vinculado</span>
-                                : <span className={styles.vincularHint}>Vincular</span>}
+                                ? <span className={styles.jaVinculadoBadge}>{tr('Já vinculado')}</span>
+                                : <span className={styles.vincularHint}>{tr('Vincular')}</span>}
                             </button>
                           );
                         })}
@@ -3563,7 +3564,7 @@ export default function RegistersPage() {
                   </div>
 
                   {vinculadosList.length === 0 ? (
-                    <p className={styles.blockEmpty}>Nenhum vinculado.</p>
+                    <p className={styles.blockEmpty}>{tr('Nenhum vinculado.')}</p>
                   ) : (
                     <ul className={styles.dList}>
                       {vinculadosList.map(p => (
@@ -3573,7 +3574,7 @@ export default function RegistersPage() {
                             <p className={styles.nome}>{p.nome}</p>
                             <p className={styles.sub}>{maskCPF(p.cpf ?? '')}</p>
                           </div>
-                          <button className={styles.btnRemove} onClick={() => handleDesvincular(p.id)} title="Desvincular">
+                          <button className={styles.btnRemove} onClick={() => handleDesvincular(p.id)} title={tr('Desvincular')}>
                             <Trash2 size={13} />
                           </button>
                         </li>
@@ -3596,12 +3597,12 @@ export default function RegistersPage() {
         open={showNewDep}
         onClose={() => setShowNewDep(false)}
         size="xl"
-        title="Novo Dependente"
+        title={tr('Novo Dependente')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setNewDepData(blankPessoa())}>Limpar</Button>
+            <Button onClick={() => setNewDepData(blankPessoa())}>{tr('Limpar')}</Button>
             <Button variant="primary" onClick={handleSaveNewDep} disabled={savingNewDep}>
-              {savingNewDep ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Cadastrar e Vincular'}
+              {savingNewDep ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Cadastrar e Vincular')}
             </Button>
           </div>
         }

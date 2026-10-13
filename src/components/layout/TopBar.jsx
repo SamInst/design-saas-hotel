@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   CalendarDays, Wallet, Package, Tag, LogOut, Sun, Moon, ChevronDown,
-  UserCog, Users, ShieldCheck, Building2,
+  UserCog, Users, ShieldCheck, Building2, Settings,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import styles from './TopBar.module.css';
 import img3dRecepcao     from '../../assets/menu/recepcao.png';
 import img3dReservas     from '../../assets/menu/reservas.png';
@@ -17,15 +18,17 @@ import { usePermissions } from '../../hooks/usePermissions';
 // tela: nome exato da tela no backend (cargo.telas[].nome)
 // tela: 'ADMIN' = tela de administrador total (vê tudo)
 const NAV_ITEMS = [
-  { id: 'reception',   label: 'Recepção',            icon: Building2,  tela: 'DASHBOARD', img: img3dRecepcao, tone: '#f28b6d' },
-  { id: 'bookings',    label: 'Reservas',             icon: CalendarDays,tela: 'RESERVAS', img: img3dReservas, tone: '#6fa8f5' },
-  { id: 'financial',   label: 'Financeiro',           icon: Wallet,     tela: 'FINANCEIRO', img: img3dFinanceiro, tone: '#5fc79a' },
-  { id: 'inventory',   label: 'Itens',                icon: Package,    tela: 'ITENS', img: img3dItens, tone: '#f5b75a' },
-  { id: 'registers',   label: 'Cadastros',            icon: Users,      tela: 'CADASTRO', img: img3dCadastros, tone: '#9b8cf0' },
-  { id: 'pricing',     label: 'Preços',               icon: Tag,        tela: 'PRECOS', img: img3dPrecos, tone: '#f07fa6' },
-  { id: 'employees',   label: 'Funcionários',         icon: UserCog,    tela: 'FUNCIONARIOS', img: img3dFuncionarios, tone: '#4fc2c9' },
-  { id: 'permissions', label: 'Cargos e Permissões',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES', img: img3dPermissoes, tone: '#8a9bb5' },
+  { id: 'reception',   label: 'nav.reception', icon: Building2,  tela: 'DASHBOARD', img: img3dRecepcao, tone: '#f28b6d' },
+  { id: 'bookings',    label: 'nav.bookings',  icon: CalendarDays,tela: 'RESERVAS', img: img3dReservas, tone: '#6fa8f5' },
+  { id: 'financial',   label: 'nav.financial',  icon: Wallet,     tela: 'FINANCEIRO', img: img3dFinanceiro, tone: '#5fc79a' },
+  { id: 'inventory',   label: 'nav.inventory',  icon: Package,    tela: 'ITENS', img: img3dItens, tone: '#f5b75a' },
+  { id: 'registers',   label: 'nav.registers',  icon: Users,      tela: 'CADASTRO', img: img3dCadastros, tone: '#9b8cf0' },
+  { id: 'pricing',     label: 'nav.pricing',  icon: Tag,        tela: 'PRECOS', img: img3dPrecos, tone: '#f07fa6' },
+  { id: 'employees',   label: 'nav.employees',  icon: UserCog,    tela: 'FUNCIONARIOS', img: img3dFuncionarios, tone: '#4fc2c9' },
+  { id: 'permissions', label: 'nav.permissions',  icon: ShieldCheck,tela: 'CARGOS E PERMISSOES', img: img3dPermissoes, tone: '#8a9bb5' },
 ];
+
+const SETTINGS_ITEM = { id: 'settings', label: 'nav.settings', icon: Settings, tone: '#8a9bb5' };
 
 /** Ícone do menu de telas — SVG próprio, herda a cor do botão. */
 function MenuIcon({ size = 19 }) {
@@ -63,6 +66,7 @@ export default function TopBar({
   onToggleTheme,
   onLogout,
 }) {
+  const { t } = useTranslation();
   const { hasTela, loggedUser } = usePermissions();
   const isAdmin = hasTela('ADMIN');
 
@@ -75,8 +79,8 @@ export default function TopBar({
 
   const rawNome = loggedUser?.pessoa?.nome ?? user?.name ?? '';
   const parts   = rawNome.trim().split(/\s+/).filter(Boolean);
-  const displayName = parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0] || 'Usuário';
-  const displayRole = loggedUser?.cargo?.descricao ?? user?.role ?? 'Perfil';
+  const displayName = parts.length >= 2 ? `${parts[0]} ${parts[parts.length - 1]}` : parts[0] || t('profile.defaultName');
+  const displayRole = loggedUser?.cargo?.descricao ?? user?.role ?? t('profile.defaultRole');
   const initials = parts.length >= 2
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : (displayName.charAt(0) || 'U').toUpperCase();
@@ -85,12 +89,12 @@ export default function TopBar({
 
   // Se a página atual não está acessível, redireciona para a primeira disponível
   const firstAvailable = visibleItems[0]?.id;
-  if (firstAvailable && !visibleItems.some((i) => i.id === currentPage)) {
+  if (firstAvailable && currentPage !== SETTINGS_ITEM.id && !visibleItems.some((i) => i.id === currentPage)) {
     onNavigate(firstAvailable);
   }
 
-  const pageItem  = NAV_ITEMS.find((i) => i.id === currentPage);
-  const pageLabel = pageItem?.label ?? '';
+  const pageItem  = [...NAV_ITEMS, SETTINGS_ITEM].find((i) => i.id === currentPage);
+  const pageLabel = pageItem ? t(pageItem.label) : '';
 
   const go = (id) => { setMenuOpen(false); onNavigate(id); };
 
@@ -98,7 +102,9 @@ export default function TopBar({
     <header className={styles.topbar}>
       {/* ── Logo + nome da tela ── */}
       <div className={styles.brand}>
-        {pageItem?.img && <img className={styles.pageIcon} src={pageItem.img} alt="" />}
+        {pageItem?.img
+          ? <img className={styles.pageIcon} src={pageItem.img} alt="" />
+          : pageItem?.icon && <pageItem.icon size={26} className={styles.pageIcon} />}
         <h1 className={styles.pageName}>{pageLabel}</h1>
       </div>
 
@@ -109,17 +115,17 @@ export default function TopBar({
             type="button"
             className={[styles.iconBtn, menuOpen ? styles.iconBtnActive : ''].join(' ')}
             onClick={() => { setMenuOpen((v) => !v); setProfileOpen(false); }}
-            aria-label="Menu"
+            aria-label={t('nav.menu')}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            title="Menu"
+            title={t('nav.menu')}
           >
             <MenuIcon size={19} />
           </button>
 
           {menuOpen && (
             <div className={styles.dropdown} role="menu">
-              <span className={styles.dropdownLabel}>Menu</span>
+              <span className={styles.dropdownLabel}>{t('nav.menu')}</span>
               {visibleItems.map(({ id, label, icon: Icon, img, tone }, i) => {
                 const active = currentPage === id;
                 return (
@@ -138,7 +144,7 @@ export default function TopBar({
                         <Icon size={16} strokeWidth={2.2} />
                       </span>
                     )}
-                    <span className={styles.menuLabel}>{label}</span>
+                    <span className={styles.menuLabel}>{t(label)}</span>
                   </button>
                 );
               })}
@@ -182,7 +188,17 @@ export default function TopBar({
                 onClick={() => { setProfileOpen(false); onToggleTheme(); }}
               >
                 <span className={styles.menuIcon}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</span>
-                <span className={styles.menuLabel}>{isDark ? 'Modo Claro' : 'Modo Escuro'}</span>
+                <span className={styles.menuLabel}>{isDark ? t('profile.lightMode') : t('profile.darkMode')}</span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                className={[styles.menuItem, currentPage === SETTINGS_ITEM.id ? styles.menuItemActive : ''].join(' ')}
+                onClick={() => { setProfileOpen(false); onNavigate(SETTINGS_ITEM.id); }}
+              >
+                <span className={styles.menuIcon}><Settings size={17} /></span>
+                <span className={styles.menuLabel}>{t('profile.settings')}</span>
               </button>
 
               <button
@@ -192,7 +208,7 @@ export default function TopBar({
                 onClick={() => { setProfileOpen(false); onLogout(); }}
               >
                 <span className={styles.menuIcon}><LogOut size={17} /></span>
-                <span className={styles.menuLabel}>Sair</span>
+                <span className={styles.menuLabel}>{t('profile.logout')}</span>
               </button>
             </div>
           )}

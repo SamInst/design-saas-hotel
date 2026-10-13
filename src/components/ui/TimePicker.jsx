@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './TimePicker.module.css';
+import { tr } from '../../i18n';
 
 const HOURS   = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
@@ -131,7 +132,7 @@ export function TimePicker({ value, onChange }) {
             <span className={styles.timeSep}>:</span>
             <Roda itens={MINUTES} valor={m} onPick={(mm) => emit(parse(atual.current).h, mm)} />
           </div>
-          <button type="button" className={styles.timeOk} onClick={() => setOpen(false)}>OK</button>
+          <button type="button" className={styles.timeOk} onClick={() => setOpen(false)}>{tr('OK')}</button>
         </div>,
         document.body,
       )}

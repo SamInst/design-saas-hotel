@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import TopBar from './TopBar';
 import styles from './AppLayout.module.css';
 
@@ -7,6 +8,7 @@ export default function AppLayout({ children, currentPage, onNavigate, ...topBar
   // Troca de tela: as páginas montam e só então buscam os próprios dados, então
   // fica um intervalo de tela vazia. O overlay cobre esse intervalo — entra na
   // hora da troca e sai no quadro seguinte à montagem da nova tela.
+  const { t } = useTranslation();
   const [navigating, setNavigating] = useState(false);
   const first = useRef(true);
 
@@ -31,7 +33,7 @@ export default function AppLayout({ children, currentPage, onNavigate, ...topBar
         {navigating && (
           <div className={styles.navLoading} role="status" aria-live="polite">
             <Loader2 size={26} className={styles.navSpinner} />
-            <span>Carregando...</span>
+            <span>{t('common.loading')}</span>
           </div>
         )}
       </main>

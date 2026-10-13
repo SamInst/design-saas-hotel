@@ -5,6 +5,7 @@ import { Select, FormField } from '../../../../components/ui/Input';
 import { PaymentModal }  from '../../../../components/ui/PaymentModal';
 import { fmtBRL }        from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
+import { tr } from '../../../../i18n';
 
 export default function ConsumoModal({
   showAddConsumoModal, setShowAddConsumoModal,
@@ -33,17 +34,17 @@ export default function ConsumoModal({
           open
           onClose={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}
           size="md"
-          title={<><ShoppingCart size={15} /> Adicionar Consumo</>}
+          title={<><ShoppingCart size={15} /> {tr('Adicionar Consumo')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}>Fechar</Button>
+              <Button variant="secondary" onClick={() => { setShowAddConsumoModal(false); setConsumoCart([]); setConsumoCartPag(null); }}>{tr('Fechar')}</Button>
               <Button
                 variant="primary"
                 disabled={consumoSaving || consumoCart.length === 0}
                 onClick={() => handleConfirmConsumoAll(consumoCartPag)}
               >
                 {consumoSaving && <Loader2 size={13} className={styles.spin} />}
-                <Plus size={13} /> Adicionar Consumo{cartTotal > 0 ? ` · ${fmtBRL(cartTotal)}` : ''}
+                <Plus size={13} /> {tr('Adicionar Consumo')}{cartTotal > 0 ? ` · ${fmtBRL(cartTotal)}` : ''}
               </Button>
             </div>
           }
@@ -54,15 +55,15 @@ export default function ConsumoModal({
               const _d  = (_sv.diarias || [])[(_sv.diariaAtual || 1) - 1];
               return _d ? (
                 <div className={styles.diariaInfoStrip}>
-                  <span className={styles.diariaInfoLabel}>Diária {_sv.diariaAtual}</span>
+                  <span className={styles.diariaInfoLabel}>{tr('Diária')} {_sv.diariaAtual}</span>
                   {_d.dataInicio && <span className={styles.diariaInfoDates}>{_d.dataInicio} → {_d.dataFim}</span>}
-                  <span className={styles.diariaAtualChip}>Atual</span>
+                  <span className={styles.diariaAtualChip}>{tr('Atual')}</span>
                 </div>
               ) : null;
             })()}
 
             <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
+              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> {tr('Itens do quarto')}</div>
               <div className={styles.consumoItemList}>
                 {(selectedRoom.minibar ?? []).map((m) => {
                   const item     = { id: m.produtoId, quartoItemId: m.quartoItemId, nome: m.nome, categoria: m.categoria || 'Minibar', preco: m.preco ?? 0, qtdAtual: m.qtdAtual ?? 0, qtdBase: m.qtdBase ?? 0 };
@@ -76,7 +77,7 @@ export default function ConsumoModal({
                       <div className={styles.consumoItemInfo}>
                         <span className={styles.consumoItemNome}>{item.nome}</span>
                         <span className={styles.consumoItemMeta}>
-                          {item.categoria}{item.preco > 0 ? ` · ${fmtBRL(item.preco)}/un.` : ''}
+                          {item.categoria}{item.preco > 0 ? tr(' · {{v0}}/un.', { v0: fmtBRL(item.preco) }) : ''}
                         </span>
                       </div>
                       <div className={[styles.cartQtdStepper, esgotado ? styles.cartQtdStepperDisabled : ''].join(' ')}>
@@ -98,9 +99,9 @@ export default function ConsumoModal({
             <div className={styles.consumoModalDivider} />
 
             <div className={styles.consumoModalSection}>
-              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Consumo externo (dispensa)</div>
+              <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> {tr('Consumo externo (dispensa)')}</div>
               <button className={styles.consumoExtOpenBtn} onClick={() => setShowConsumoExternoModal(true)}>
-                <Plus size={13} /> Selecionar itens da dispensa
+                <Plus size={13} /> {tr('Selecionar itens da dispensa')}
               </button>
             </div>
 
@@ -108,7 +109,7 @@ export default function ConsumoModal({
               <>
                 <div className={styles.consumoModalDivider} />
                 <div className={styles.consumoModalSection}>
-                  <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens selecionados</div>
+                  <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> {tr('Itens selecionados')}</div>
                   <div className={styles.cartTable}>
                     {consumoCart.map((item) => (
                       <div key={item.key} className={styles.cartRow}>
@@ -121,7 +122,7 @@ export default function ConsumoModal({
                       </div>
                     ))}
                     <div className={styles.cartTotalRow}>
-                      <span>Total</span>
+                      <span>{tr('Total')}</span>
                       <span>{fmtBRL(cartTotal)}</span>
                     </div>
                   </div>
@@ -130,11 +131,11 @@ export default function ConsumoModal({
                     <div className={styles.pagamentoChipOv}>
                       <CreditCard size={13} />
                       <span>{tiposPagamentoOv.find((t) => t.id === Number(consumoCartPag.tipo_pagamento?.id))?.descricao ?? '—'} · {consumoCartPag.nome_pagador ?? '—'} · {fmtBRL(consumoCartPag.valor)}</span>
-                      <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoPag(true)}>Alterar</button>
+                      <button className={styles.pagamentoEditOv} onClick={() => setShowConsumoPag(true)}>{tr('Alterar')}</button>
                     </div>
                   ) : (
                     <button className={styles.definePagamentoOv} onClick={() => setShowConsumoPag(true)}>
-                      <CreditCard size={13} /> Adicionar Pagamento (opcional)
+                      <CreditCard size={13} /> {tr('Adicionar Pagamento (opcional)')}
                     </button>
                   )}
                 </div>
@@ -150,22 +151,22 @@ export default function ConsumoModal({
           open
           onClose={() => { setShowConsumoExternoModal(false); setExternoCart([]); setDetailConsumoCat(''); }}
           size="md"
-          title={<><ShoppingCart size={15} /> Consumo Externo (Dispensa)</>}
+          title={<><ShoppingCart size={15} /> {tr('Consumo Externo (Dispensa)')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => { setShowConsumoExternoModal(false); setExternoCart([]); setDetailConsumoCat(''); }}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => { setShowConsumoExternoModal(false); setExternoCart([]); setDetailConsumoCat(''); }}>{tr('Cancelar')}</Button>
               <Button variant="primary" disabled={externoCart.length === 0} onClick={handleConfirmExterno}>
-                <Plus size={13} /> Adicionar ao consumo
+                <Plus size={13} /> {tr('Adicionar ao consumo')}
               </Button>
             </div>
           }
         >
           <div className={styles.formStack}>
-            <FormField label="Categoria">
+            <FormField label={tr('Categoria')}>
               <Select value={detailConsumoCat} onChange={(e) => setDetailConsumoCat(e.target.value)}>
-                <option value="">Selecione uma categoria...</option>
+                <option value="">{tr('Selecione uma categoria...')}</option>
                 {consumoCatsLoading
-                  ? <option disabled>Carregando...</option>
+                  ? <option disabled>{tr('Carregando...')}</option>
                   : consumoCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
               </Select>
             </FormField>
@@ -200,7 +201,7 @@ export default function ConsumoModal({
             <>
               <div className={styles.consumoModalDivider} />
               <div className={styles.consumoModalSection}>
-                <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Selecionados</div>
+                <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> {tr('Selecionados')}</div>
                 <div className={styles.cartTable}>
                   {externoCart.map((item) => (
                     <div key={item.key} className={styles.cartRow}>
@@ -213,7 +214,7 @@ export default function ConsumoModal({
                     </div>
                   ))}
                   <div className={styles.cartTotalRow}>
-                    <span>Total</span>
+                    <span>{tr('Total')}</span>
                     <span>{fmtBRL(externoCart.reduce((s, c) => s + c.preco * c.qtd, 0))}</span>
                   </div>
                 </div>

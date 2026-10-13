@@ -9,6 +9,7 @@ import HospedeResults               from '../../shared/HospedeResults';
 import { DAY_USE_PRICING }          from '../../shared/overviewApi';
 import { fmtBRL, maskBRL, parseBRL, todayDisplay } from '../../shared/helpers';
 import styles from '../../recepcao.module.css';
+import { tr } from '../../../../i18n';
 
 export default function NovoServicoModal({
   novoModal, setNovoModal, novoRoom,
@@ -42,13 +43,13 @@ export default function NovoServicoModal({
           open
           onClose={() => setNovoModal(null)}
           size="lg"
-          title={<><BedDouble size={15} /> Nova Hospedagem — Apt. {novoRoom.numero} <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{novoRoom.categoria} · {novoRoom.tipoOcupacao}</span></>}
+          title={<><BedDouble size={15} /> {tr('Nova Hospedagem — Apt.')} {novoRoom.numero} <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--text-2)', marginLeft: 6 }}>{novoRoom.categoria} · {novoRoom.tipoOcupacao}</span></>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setNovoModal(null)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => setNovoModal(null)}>{tr('Cancelar')}</Button>
               <Button variant="primary" onClick={handleCriarPernoite} disabled={savingNh || !nhCheckinDate || !nhCheckoutDate}>
                 {savingNh && <Loader2 size={14} className={styles.spin} />}
-                Criar Hospedagem
+                {tr('Criar Hospedagem')}
               </Button>
             </div>
           }
@@ -56,14 +57,14 @@ export default function NovoServicoModal({
           <div className={styles.formStack}>
 
             <div className={styles.formStack} style={{ gap: 8 }}>
-              <div className={styles.nhDividerBlue}>Hóspedes</div>
+              <div className={styles.nhDividerBlue}>{tr('Hóspedes')}</div>
               <NhHospedesPicker value={nhHospedes} onChange={setNhHospedes} />
             </div>
 
             <div className={styles.formStack} style={{ gap: 8 }}>
-              <div className={styles.nhDividerBlue}>Período</div>
+              <div className={styles.nhDividerBlue}>{tr('Período')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <FormField label="Check-in">
+                <FormField label={tr('Check-in')}>
                   <DatePicker
                     mode="single"
                     value={nhCheckinDate}
@@ -73,16 +74,16 @@ export default function NovoServicoModal({
                       // Se o check-out passou a ser anterior/igual ao novo check-in, limpa.
                       if (nhCheckoutDate && d && nhCheckoutDate <= d) setNhCheckoutDate(null);
                     }}
-                    placeholder="Check-in"
+                    placeholder={tr('Check-in')}
                   />
                 </FormField>
-                <FormField label="Check-out">
+                <FormField label={tr('Check-out')}>
                   <DatePicker
                     mode="single"
                     value={nhCheckoutDate}
                     minDate={nhCheckinDate || new Date()}
                     onChange={(d) => setNhCheckoutDate(d)}
-                    placeholder="Check-out"
+                    placeholder={tr('Check-out')}
                   />
                 </FormField>
               </div>
@@ -96,7 +97,7 @@ export default function NovoServicoModal({
                   >
                     <span className={styles.nhFinStrip}>
                       <span className={styles.nhFinStripItem}>
-                        Valor Total{' '}
+                        {tr('Valor Total')}{' '}
                         {nhCalcLoading
                           ? <b><Loader2 size={11} className={styles.spin} /></b>
                           : <b>{fmtBRL(nhTotalHosp)}</b>
@@ -104,11 +105,11 @@ export default function NovoServicoModal({
                       </span>
                       <span className={styles.nhFinStripDivider} />
                       <span className={styles.nhFinStripItem}>
-                        Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(nhTotalPago)}</b>
+                        {tr('Pago')} <b style={{ color: 'var(--emerald)' }}>{fmtBRL(nhTotalPago)}</b>
                       </span>
                       <span className={styles.nhFinStripDivider} />
                       <span className={styles.nhFinStripItem}>
-                        Pendente <b style={{ color: nhPendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(nhPendente)}</b>
+                        {tr('Pendente')} <b style={{ color: nhPendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(nhPendente)}</b>
                       </span>
                     </span>
                     {!nhCalcLoading && nhCalc?.detalhes?.length > 0 && (
@@ -118,7 +119,7 @@ export default function NovoServicoModal({
                   {onGerenciarPreco && !nhCalcLoading && (
                     <button
                       type="button"
-                      title={priceAdjDesc ? `Preço ajustado · ${priceAdjDesc}` : 'Gerenciar Preços'}
+                      title={priceAdjDesc ? tr('Preço ajustado · {{priceAdjDesc}}', { priceAdjDesc }) : tr('Gerenciar Preços')}
                       onClick={onGerenciarPreco}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 12px',
@@ -145,13 +146,13 @@ export default function NovoServicoModal({
                               <div className={styles.nhPriceDetailSub}>
                                 <span>{fmtBRL((d.valor_base ?? 0) + (d.acrescimo_sazonalidade ?? 0))}</span>
                                 {d.sazonalidade?.descricao && <span className={styles.nhSazChip}>{d.sazonalidade.descricao}</span>}
-                                {d.valor_criancas > 0 && <span>+ Crianças {fmtBRL(d.valor_criancas)}</span>}
+                                {d.valor_criancas > 0 && <span>{tr('+ Crianças')} {fmtBRL(d.valor_criancas)}</span>}
                               </div>
                             )}
                           </div>
                         ))}
                         <div className={styles.nhPriceTotalRow}>
-                          <span>Total</span>
+                          <span>{tr('Total')}</span>
                           <span>{fmtBRL(nhCalc.valor_total)}</span>
                         </div>
                       </div>
@@ -163,7 +164,7 @@ export default function NovoServicoModal({
             </div>
 
             <div className={styles.formStack} style={{ gap: 8 }}>
-              <div className={styles.nhDividerOrange}>Pagamentos</div>
+              <div className={styles.nhDividerOrange}>{tr('Pagamentos')}</div>
 
               {nhPagamentos.map((p, i) => (
                 <div key={i} className={styles.nhPagItem}>
@@ -184,31 +185,31 @@ export default function NovoServicoModal({
 
               {nhShowPagForm ? (
                 <div className={styles.nhPagForm}>
-                  <FormField label="Tipo de Pagamento">
+                  <FormField label={tr('Tipo de Pagamento')}>
                     <Select value={nhPagTipoId} onChange={(e) => setNhPagTipoId(e.target.value)}>
-                      <option value="">Selecione...</option>
+                      <option value="">{tr('Selecione...')}</option>
                       {tiposPagamentoOv.map((t) => <option key={t.id} value={t.id}>{t.descricao}</option>)}
                     </Select>
                   </FormField>
-                  <FormField label="Nome do Pagador">
-                    <Input placeholder="Nome completo"
+                  <FormField label={tr('Nome do Pagador')}>
+                    <Input placeholder={tr('Nome completo')}
                       value={nhPagNomePagador} onChange={(e) => setNhPagNomePagador(e.target.value.toUpperCase())} />
                     {nhHospedes[0]?.nome && (
                       <label className={styles.checkRow}>
                         <input type="checkbox"
                           checked={nhPagNomePagador === nhHospedes[0].nome.toUpperCase()}
                           onChange={(e) => setNhPagNomePagador(e.target.checked ? nhHospedes[0].nome.toUpperCase() : '')} />
-                        <span>Nome do titular</span>
+                        <span>{tr('Nome do titular')}</span>
                       </label>
                     )}
                   </FormField>
-                  <FormField label="Descrição">
-                    <Input placeholder="Descrição do pagamento"
+                  <FormField label={tr('Descrição')}>
+                    <Input placeholder={tr('Descrição do pagamento')}
                       value={nhPagDescricao} onChange={(e) => setNhPagDescricao(e.target.value.toUpperCase())} />
                   </FormField>
                   <div className={styles.nhPagValorRow}>
-                    <FormField label="Valor" style={{ flex: 1 }}>
-                      <Input value={nhPagValor} onChange={(e) => setNhPagValor(maskBRL(e.target.value))} placeholder="R$ 0,00" />
+                    <FormField label={tr('Valor')} style={{ flex: 1 }}>
+                      <Input value={nhPagValor} onChange={(e) => setNhPagValor(maskBRL(e.target.value))} placeholder={tr('R$ 0,00')} />
                     </FormField>
                     <div className={styles.nhPagAddWrap}>
                       <Button variant="secondary" onClick={() => {
@@ -222,17 +223,17 @@ export default function NovoServicoModal({
                         }]);
                         setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor('');
                         setNhShowPagForm(false);
-                      }}>Adicionar</Button>
+                      }}>{tr('Adicionar')}</Button>
                     </div>
                   </div>
                   <button className={styles.nhAddPagBtn} style={{ alignSelf: 'flex-start', borderColor: 'var(--border)', background: 'none', color: 'var(--text-2)' }}
                     onClick={() => { setNhShowPagForm(false); setNhPagTipoId(''); setNhPagNomePagador(''); setNhPagDescricao(''); setNhPagValor(''); }}>
-                    Cancelar
+                    {tr('Cancelar')}
                   </button>
                 </div>
               ) : (
                 <button className={styles.nhAddPagBtn} onClick={() => setNhShowPagForm(true)}>
-                  <Plus size={11} /> Adicionar pagamento
+                  <Plus size={11} /> {tr('Adicionar pagamento')}
                 </button>
               )}
             </div>
@@ -247,13 +248,13 @@ export default function NovoServicoModal({
           open
           onClose={() => setNovoModal(null)}
           size="sm"
-          title={<><Clock size={15} /> Novo Day Use — Apt. {novoRoom.numero}</>}
+          title={<><Clock size={15} /> {tr('Novo Day Use — Apt.')} {novoRoom.numero}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setNovoModal(null)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => setNovoModal(null)}>{tr('Cancelar')}</Button>
               <Button variant="primary" onClick={handleCriarDayUse} disabled={saving || !nduForm.horaEntrada}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                Iniciar Day Use
+                {tr('Iniciar Day Use')}
               </Button>
             </div>
           }
@@ -262,20 +263,20 @@ export default function NovoServicoModal({
             {(() => { const p = DAY_USE_PRICING[novoRoom.categoria]; return (
               <div className={styles.pricingHint}>
                 <span className={styles.pricingHintLabel}>{novoRoom.categoria}</span>
-                <span><strong>{fmtBRL(p?.precoBase)}</strong> base ({p?.horasBase}h)</span>
-                <span>+ {fmtBRL(p?.precoAdicional)}/h adicional</span>
+                <span><strong>{fmtBRL(p?.precoBase)}</strong> {tr('base (')}{p?.horasBase}{tr('h)')}</span>
+                <span>+ {fmtBRL(p?.precoAdicional)}{tr('/h adicional')}</span>
               </div>
             ); })()}
 
-            <FormField label="Data de uso">
+            <FormField label={tr('Data de uso')}>
               <Input value={todayDisplay()} disabled />
             </FormField>
-            <FormField label="Hora de entrada *">
+            <FormField label={tr('Hora de entrada *')}>
               <TimeInput value={nduForm.horaEntrada} onChange={(v) => setNduForm((f) => ({ ...f, horaEntrada: v }))} />
             </FormField>
 
-            <FormField label="Hóspede (opcional)">
-              <Input value={nduForm.hospedeSearch} onChange={(e) => setNduForm((f) => ({ ...f, hospedeSearch: e.target.value }))} placeholder="Buscar hóspede cadastrado..." />
+            <FormField label={tr('Hóspede (opcional)')}>
+              <Input value={nduForm.hospedeSearch} onChange={(e) => setNduForm((f) => ({ ...f, hospedeSearch: e.target.value }))} placeholder={tr('Buscar hóspede cadastrado...')} />
               <HospedeResults results={nduHosp} onAdd={addNduHospede} />
               {nduForm.hospedes.length > 0 && (
                 <div className={styles.hospedeChips}>

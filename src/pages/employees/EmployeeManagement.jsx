@@ -16,6 +16,7 @@ import iconWhatsapp from '../../assets/whatsapp.png';
 import iconGmail    from '../../assets/gmail.png';
 
 import styles from './EmployeeManagement.module.css';
+import { tr } from '../../i18n';
 
 // ── Máscaras ──────────────────────────────────────────────────
 const maskCPF = v =>
@@ -166,7 +167,7 @@ const sk = (...extra) => [styles.sk, ...extra].join(' ');
 
 function SkeletonLista({ linhas = 7 }) {
   return (
-    <div role="status" aria-label="Carregando funcionários">
+    <div role="status" aria-label={tr('Carregando funcionários')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.listItem} aria-hidden="true">
           <span className={sk(styles.skAvatar)} />
@@ -182,7 +183,7 @@ function SkeletonLista({ linhas = 7 }) {
 
 function SkeletonPainel() {
   return (
-    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+    <div className={styles.statGrid} role="status" aria-label={tr('Carregando totais')}>
       {Array.from({ length: 4 }, (_, i) => (
         <div key={i} className={styles.statCard} aria-hidden="true">
           <span className={sk(styles.skLabel)} />
@@ -238,12 +239,12 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
 
   return (
     <div className={styles.formBody}>
-      <div className={styles.sectionLabel}>Dados Pessoais</div>
+      <div className={styles.sectionLabel}>{tr('Dados Pessoais')}</div>
       {/* CPF | Nome | Data Nascimento */}
       <div className={styles.cpfRow}>
         <div className={styles.cpfBlock}>
           <label className={[styles.cpfLabel, hasErr('cpf') && !cpfStatus ? styles.labelErr : ''].join(' ')}>
-            CPF *
+            {tr('CPF *')}
           </label>
           <div className={styles.cpfWrap}>
             <Input
@@ -254,25 +255,25 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
             />
             {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
           </div>
-          {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>CPF inválido</span>}
-          {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>CPF já cadastrado</span>}
-          {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>CPF disponível</span>}
+          {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>{tr('CPF inválido')}</span>}
+          {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>{tr('CPF já cadastrado')}</span>}
+          {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>{tr('CPF disponível')}</span>}
         </div>
 
         <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Nome completo *">
-            <Input value={p.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome completo" />
+          <FormField label={tr('Nome completo *')}>
+            <Input value={p.nome} onChange={e => set('nome', e.target.value)} placeholder={tr('Nome completo')} />
           </FormField>
         </div>
 
         <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Data de Nascimento *">
+          <FormField label={tr('Data de Nascimento *')}>
             <DatePicker
               mode="single"
               value={p.dataNascimento}
               onChange={d => set('dataNascimento', d ?? null)}
               maxDate={new Date()}
-              placeholder="dd/mm/aaaa"
+              placeholder={tr('dd/mm/aaaa')}
               error={hasErr('dataNascimento')}
             />
           </FormField>
@@ -283,65 +284,65 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
         <FormField label="RG">
           <Input value={p.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
         </FormField>
-        <FormField label="Sexo">
+        <FormField label={tr('Sexo')}>
           <Select value={p.sexo} onChange={e => set('sexo', e.target.value)}>
-            <option value="">Selecione</option>
-            <option value="1">Masculino</option>
-            <option value="2">Feminino</option>
-            <option value="3">Outro</option>
+            <option value="">{tr('Selecione')}</option>
+            <option value="1">{tr('Masculino')}</option>
+            <option value="2">{tr('Feminino')}</option>
+            <option value="3">{tr('Outro')}</option>
           </Select>
         </FormField>
         <div className={[styles.reqField, hasErr('telefone') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label="Telefone *">
+          <FormField label={tr('Telefone *')}>
             <Input value={p.telefone} onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
           </FormField>
         </div>
       </div>
 
       <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
-        <FormField label="Email *">
-          <Input type="email" value={p.email} onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+        <FormField label={tr('Email *')}>
+          <Input type="email" value={p.email} onChange={e => set('email', e.target.value)} placeholder={tr('email@exemplo.com')} />
         </FormField>
       </div>
 
-      <div className={styles.sectionLabel}>Endereço</div>
+      <div className={styles.sectionLabel}>{tr('Endereço')}</div>
 
       <div className={styles.grid3}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
-          <label className={[styles.fieldLabel, hasErr('cep') ? styles.labelErr : ''].join(' ')}>CEP *</label>
+          <label className={[styles.fieldLabel, hasErr('cep') ? styles.labelErr : ''].join(' ')}>{tr('CEP *')}</label>
           <div className={styles.inputWithSpinner}>
             <Input value={p.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
               className={hasErr('cep') ? styles.inputErr : ''} />
             {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
           </div>
         </div>
-        <FormField label="País">
-          <Input value={p.pais} onChange={e => set('pais', e.target.value)} placeholder="Brasil" />
+        <FormField label={tr('País')}>
+          <Input value={p.pais} onChange={e => set('pais', e.target.value)} placeholder={tr('Brasil')} />
         </FormField>
-        <FormField label="Estado">
+        <FormField label={tr('Estado')}>
           <Input value={p.estado} onChange={e => set('estado', e.target.value)} placeholder="UF" />
         </FormField>
       </div>
       <div className={styles.grid2}>
-        <FormField label="Município">
+        <FormField label={tr('Município')}>
           <Input value={p.municipio} onChange={e => set('municipio', e.target.value)} />
         </FormField>
-        <FormField label="Bairro">
+        <FormField label={tr('Bairro')}>
           <Input value={p.bairro} onChange={e => set('bairro', e.target.value)} />
         </FormField>
       </div>
       <div className={styles.grid3}>
         <div className={styles.spanTwo}>
-          <FormField label="Endereço">
-            <Input value={p.endereco} onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
+          <FormField label={tr('Endereço')}>
+            <Input value={p.endereco} onChange={e => set('endereco', e.target.value)} placeholder={tr('Rua / Av.')} />
           </FormField>
         </div>
-        <FormField label="Número">
+        <FormField label={tr('Número')}>
           <Input value={p.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
         </FormField>
       </div>
-      <FormField label="Complemento">
-        <Input value={p.complemento} onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
+      <FormField label={tr('Complemento')}>
+        <Input value={p.complemento} onChange={e => set('complemento', e.target.value)} placeholder={tr('Apto, Bloco...')} />
       </FormField>
     </div>
   );
@@ -536,7 +537,7 @@ export default function EmployeeManagement() {
       setTotalPages(res?.totalPages ?? 0);
       setTotalElements(res?.totalElements ?? 0);
     } catch (e) {
-      showNotif('Erro ao carregar funcionários.', 'error');
+      showNotif(tr('Erro ao carregar funcionários.'), 'error');
     } finally {
       setLoading(false);
     }
@@ -561,19 +562,19 @@ export default function EmployeeManagement() {
     const p = newFunc.pessoa;
     if (!p.nome || !p.cpf || !p.dataNascimento || !p.telefone || !p.email || !p.cep) {
       setShowErrors(true);
-      showNotif('Preencha todos os campos obrigatórios (*).', 'error');
+      showNotif(tr('Preencha todos os campos obrigatórios (*).'), 'error');
       return;
     }
     if (!newFunc.cargoId) {
-      showNotif('Selecione um cargo.', 'error');
+      showNotif(tr('Selecione um cargo.'), 'error');
       return;
     }
     if (!newFunc.dataAdmissao) {
-      showNotif('Defina a data de admissão.', 'error');
+      showNotif(tr('Defina a data de admissão.'), 'error');
       return;
     }
     if (newFunc.usuario.username && newFunc.usuario.senha !== newFunc.senhaConfirma) {
-      showNotif('As senhas não conferem.', 'error');
+      showNotif(tr('As senhas não conferem.'), 'error');
       return;
     }
     doSaveEmployee();
@@ -588,7 +589,7 @@ export default function EmployeeManagement() {
       const pessoaId = pessoaRes?.pessoaId ?? pessoaRes?.[0]?.id ?? pessoaRes?.id;
 
       if (!pessoaId) {
-        showNotif('Erro ao criar pessoa: ID não retornado', 'error');
+        showNotif(tr('Erro ao criar pessoa: ID não retornado'), 'error');
         return;
       }
 
@@ -607,7 +608,7 @@ export default function EmployeeManagement() {
       };
 
       await funcionarioApi.criar(funBody);
-      showNotif('Funcionário cadastrado com sucesso!');
+      showNotif(tr('Funcionário cadastrado com sucesso!'));
       setShowAddModal(false);
       setNewFunc(blankFuncionario());
       setShowErrors(false);
@@ -616,7 +617,7 @@ export default function EmployeeManagement() {
       fetchData(searchTerm, page);
       fetchStats();
     } catch (e) {
-      showNotif(e.message || 'Erro ao cadastrar funcionário.', 'error');
+      showNotif(e.message || tr('Erro ao cadastrar funcionário.'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -714,13 +715,13 @@ export default function EmployeeManagement() {
         salario:       parseBRL(editFunc.salario),
       };
       await funcionarioApi.atualizar(funBody);
-      showNotif('Funcionário atualizado!');
+      showNotif(tr('Funcionário atualizado!'));
       setShowEdit(false);
       fetchData(searchTerm, page);
       fetchStats();
       refreshDetail();
     } catch (e) {
-      showNotif(e.message || 'Erro ao atualizar.', 'error');
+      showNotif(e.message || tr('Erro ao atualizar.'), 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -728,19 +729,19 @@ export default function EmployeeManagement() {
 
   const handleFireEmployee = async () => {
     if (!detailItem || !detailItem.usuario?.id) return;
-    if (!window.confirm('Tem certeza que deseja desligar este funcionário?')) return;
+    if (!window.confirm(tr('Tem certeza que deseja desligar este funcionário?'))) return;
 
     setFireLoading(true);
     try {
       await usuarioApi.bloquear(detailItem.usuario.id, true);
       const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'DEMITIDO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
-      showNotif('Funcionário demitido e usuário bloqueado!');
+      showNotif(tr('Funcionário demitido e usuário bloqueado!'));
       setDetailItem(null);
       fetchData(searchTerm, page);
       fetchStats();
     } catch (e) {
-      showNotif(e.message || 'Erro ao desligar funcionário.', 'error');
+      showNotif(e.message || tr('Erro ao desligar funcionário.'), 'error');
     } finally {
       setFireLoading(false);
     }
@@ -748,19 +749,19 @@ export default function EmployeeManagement() {
 
   const handleReativarEmployee = async () => {
     if (!detailItem || !detailItem.usuario?.id) return;
-    if (!window.confirm('Tem certeza que deseja reativar este funcionário?')) return;
+    if (!window.confirm(tr('Tem certeza que deseja reativar este funcionário?'))) return;
 
     setFireLoading(true);
     try {
       await usuarioApi.bloquear(detailItem.usuario.id, false);
       const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'CONTRATADO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
-      showNotif('Funcionário reativado com sucesso!');
+      showNotif(tr('Funcionário reativado com sucesso!'));
       setDetailItem(null);
       fetchData(searchTerm, page);
       fetchStats();
     } catch (e) {
-      showNotif(e.message || 'Erro ao reativar funcionário.', 'error');
+      showNotif(e.message || tr('Erro ao reativar funcionário.'), 'error');
     } finally {
       setFireLoading(false);
     }
@@ -769,7 +770,7 @@ export default function EmployeeManagement() {
   const handleEditCredentials = async () => {
     if (!detailItem?.usuario?.id) return;
     if (!credentialsForm.username.trim() || !credentialsForm.senha.trim()) {
-      showNotif('Preencha username e senha.', 'error');
+      showNotif(tr('Preencha username e senha.'), 'error');
       return;
     }
 
@@ -779,12 +780,12 @@ export default function EmployeeManagement() {
         username: credentialsForm.username.trim(),
         senha: credentialsForm.senha,
       });
-      showNotif('Credenciais atualizadas!');
+      showNotif(tr('Credenciais atualizadas!'));
       setShowEditCredentials(false);
       setCredentialsForm({ username: '', senha: '' });
       refreshDetail();
     } catch (e) {
-      showNotif(e.message || 'Erro ao atualizar credenciais.', 'error');
+      showNotif(e.message || tr('Erro ao atualizar credenciais.'), 'error');
     } finally {
       setCredLoading(false);
     }
@@ -793,7 +794,7 @@ export default function EmployeeManagement() {
   const handleEditHistory = async () => {
     if (!editHistoryItem) return;
     if (!historyForm.cargoId || !historyForm.salario) {
-      showNotif('Preencha cargo e salário.', 'error');
+      showNotif(tr('Preencha cargo e salário.'), 'error');
       return;
     }
 
@@ -804,14 +805,14 @@ export default function EmployeeManagement() {
         funcionarioId: detailItem.id,
         salario: parseBRL(historyForm.salario),
       });
-      showNotif('Histórico atualizado!');
+      showNotif(tr('Histórico atualizado!'));
       setShowEditHistory(false);
       setEditHistoryItem(null);
       // Reload history
       const res = await funcionarioApi.listarHistorico(detailItem.id);
       setHistorico(res?.content ?? res ?? []);
     } catch (e) {
-      showNotif(e.message || 'Erro ao atualizar histórico.', 'error');
+      showNotif(e.message || tr('Erro ao atualizar histórico.'), 'error');
     } finally {
       setHistoryLoading(false);
     }
@@ -833,7 +834,7 @@ export default function EmployeeManagement() {
   const handleAddRecebido = async () => {
     if (!editHistoryItem) return;
     if (!addRecebidoForm.valorRecebido || !addRecebidoForm.dataHoraInicio || !addRecebidoForm.dataHoraPagamento) {
-      showNotif('Preencha valor, data de início e pagamento.', 'error');
+      showNotif(tr('Preencha valor, data de início e pagamento.'), 'error');
       return;
     }
 
@@ -856,7 +857,7 @@ export default function EmployeeManagement() {
       };
 
       await funcionarioApi.criarRecebido(recebidoData, recebidoFile);
-      showNotif('Recebido adicionado!');
+      showNotif(tr('Recebido adicionado!'));
       setShowAddRecebido(false);
       setAddRecebidoForm({
         historicoFuncionarioId: '',
@@ -870,7 +871,7 @@ export default function EmployeeManagement() {
       setRecebidoFile(null);
       await loadRecebidos(editHistoryItem.id);
     } catch (e) {
-      showNotif(e.message || 'Erro ao adicionar recebido.', 'error');
+      showNotif(e.message || tr('Erro ao adicionar recebido.'), 'error');
     } finally {
       setAddRecebidoLoading(false);
     }
@@ -879,7 +880,7 @@ export default function EmployeeManagement() {
   const handleEditRecebido = async () => {
     if (!editRecebidoItem) return;
     if (!editRecebidoForm.valorRecebido || !editRecebidoForm.dataHoraInicio || !editRecebidoForm.dataHoraPagamento) {
-      showNotif('Preencha valor, data de início e pagamento.', 'error');
+      showNotif(tr('Preencha valor, data de início e pagamento.'), 'error');
       return;
     }
 
@@ -902,7 +903,7 @@ export default function EmployeeManagement() {
       };
 
       await funcionarioApi.atualizarRecebido(editRecebidoItem.id, recebidoData, editRecebidoFile);
-      showNotif('Recebido atualizado!');
+      showNotif(tr('Recebido atualizado!'));
       setShowEditRecebido(false);
       setEditRecebidoItem(null);
       setEditRecebidoForm({
@@ -917,7 +918,7 @@ export default function EmployeeManagement() {
       setEditRecebidoFile(null);
       await loadRecebidos(editHistoryItem.id);
     } catch (e) {
-      showNotif(e.message || 'Erro ao editar recebido.', 'error');
+      showNotif(e.message || tr('Erro ao editar recebido.'), 'error');
     } finally {
       setEditRecebidoLoading(false);
     }
@@ -925,13 +926,13 @@ export default function EmployeeManagement() {
 
   const handleDownloadArquivo = (filePath) => {
     if (!filePath) {
-      showNotif('Arquivo não disponível.', 'error');
+      showNotif(tr('Arquivo não disponível.'), 'error');
       return;
     }
     try {
       funcionarioApi.downloadArquivo(filePath);
     } catch (e) {
-      showNotif(e.message || 'Erro ao baixar arquivo.', 'error');
+      showNotif(e.message || tr('Erro ao baixar arquivo.'), 'error');
     }
   };
 
@@ -949,14 +950,14 @@ export default function EmployeeManagement() {
               <Input
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Buscar por nome, CPF, e-mail ou cargo..."
+                placeholder={tr('Buscar por nome, CPF, e-mail ou cargo...')}
                 className={styles.searchInput}
-                aria-label="Buscar"
+                aria-label={tr('Buscar')}
               />
               {loading && searchTerm.length >= 3
                 ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
                 : searchTerm.length > 0 &&
-                  <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label="Limpar busca">
+                  <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label={tr('Limpar busca')}>
                     <X size={14} />
                   </button>
               }
@@ -965,8 +966,8 @@ export default function EmployeeManagement() {
             <div className={styles.listMeta}>
               <span>
                 {loading
-                  ? 'Carregando...'
-                  : `${totalElements} funcionário${totalElements !== 1 ? 's' : ''}`}
+                  ? tr('Carregando...')
+                  : tr('{{totalElements}} funcionário{{v1}}', { totalElements, v1: totalElements !== 1 ? 's' : '' })}
               </span>
             </div>
 
@@ -976,7 +977,7 @@ export default function EmployeeManagement() {
               ) : items.length === 0 ? (
                 <div className={styles.empty}>
                   <AlertCircle size={24} opacity={0.3} />
-                  <span>Nenhum resultado encontrado.</span>
+                  <span>{tr('Nenhum resultado encontrado.')}</span>
                 </div>
               ) : items.map((item, i) => {
                 const nome  = item.pessoa?.nome || '—';
@@ -989,10 +990,10 @@ export default function EmployeeManagement() {
                     <span className={styles.listItemBody}>
                       <span className={styles.listItemName}>
                         <span className={styles.nome}>{nome}</span>
-                        {item.pessoa?.status === 'DEMITIDO' && <span className={styles.badgeDemitido}>Demitido</span>}
+                        {item.pessoa?.status === 'DEMITIDO' && <span className={styles.badgeDemitido}>{tr('Demitido')}</span>}
                       </span>
                       <span className={styles.listItemLoc}>
-                        <Building size={12} /> {item.cargo?.descricao || 'Sem cargo'}
+                        <Building size={12} /> {item.cargo?.descricao || tr('Sem cargo')}
                       </span>
                     </span>
                     <ChevRight size={16} className={styles.listChevron} />
@@ -1004,12 +1005,12 @@ export default function EmployeeManagement() {
             {totalPages > 1 && (
               <div className={styles.pagination}>
                 <button className={styles.pageBtn} disabled={page === 0} onClick={() => goToPage(page - 1)}
-                  aria-label="Página anterior">
+                  aria-label={tr('Página anterior')}>
                   <ChevronLeft size={16} />
                 </button>
-                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <span className={styles.pageCurrent}>{page + 1} {tr('de')} {totalPages}</span>
                 <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => goToPage(page + 1)}
-                  aria-label="Próxima página">
+                  aria-label={tr('Próxima página')}>
                   <ChevRight size={16} />
                 </button>
               </div>
@@ -1023,7 +1024,7 @@ export default function EmployeeManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Users size={16} />
-                  <span className={styles.dCardTitle}>Visão geral da equipe</span>
+                  <span className={styles.dCardTitle}>{tr('Visão geral da equipe')}</span>
                   <div className={styles.dCardActions}>
                     <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                       onClick={() => {
@@ -1033,7 +1034,7 @@ export default function EmployeeManagement() {
                         setShowConfirmPassword(false);
                         setShowAddModal(true);
                       }}>
-                      Adicionar funcionário
+                      {tr('Adicionar funcionário')}
                     </Button>
                   </div>
                 </h3>
@@ -1044,28 +1045,28 @@ export default function EmployeeManagement() {
                   ) : !stats ? (
                     <div className={styles.empty}>
                       <AlertCircle size={24} opacity={0.3} />
-                      <span>Não foi possível carregar os totais.</span>
+                      <span>{tr('Não foi possível carregar os totais.')}</span>
                     </div>
                   ) : (
                     <div className={styles.statGrid}>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Funcionários</p>
+                        <p className={styles.statLabel}>{tr('Funcionários')}</p>
                         <p className={styles.statVal}>{stats.total}</p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Ativos</p>
+                        <p className={styles.statLabel}>{tr('Ativos')}</p>
                         <p className={[styles.statVal, styles.statValGreen].join(' ')}>
                           {stats.completo ? stats.ativos : '—'}
                         </p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Demitidos</p>
+                        <p className={styles.statLabel}>{tr('Demitidos')}</p>
                         <p className={[styles.statVal, styles.statValRed].join(' ')}>
                           {stats.completo ? stats.demitidos : '—'}
                         </p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Cargos</p>
+                        <p className={styles.statLabel}>{tr('Cargos')}</p>
                         <p className={styles.statVal}>{cargos.length}</p>
                       </div>
                     </div>
@@ -1074,7 +1075,7 @@ export default function EmployeeManagement() {
               </section>
 
               <div className={styles.detailHint}>
-                Escolha um funcionário na lista ao lado para ver a ficha completa.
+                {tr('Escolha um funcionário na lista ao lado para ver a ficha completa.')}
               </div>
             </div>
           ) : (
@@ -1086,28 +1087,28 @@ export default function EmployeeManagement() {
                 <h3 className={styles.dCardHead}>
                   {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <CreditCard size={16} />
-                  <span className={styles.dCardTitle}>Dados do funcionário</span>
+                  <span className={styles.dCardTitle}>{tr('Dados do funcionário')}</span>
                   <div className={styles.dCardActions}>
                     <Button className={styles.btnSolid} onClick={openEditEmployee}>
-                      Editar
+                      {tr('Editar')}
                     </Button>
                     {detailItem.pessoa?.status === 'DEMITIDO' ? (
                       <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                         onClick={handleReativarEmployee} disabled={fireLoading}>
-                        Reativar
+                        {tr('Reativar')}
                       </Button>
                     ) : (
                       <Button variant="danger" className={[styles.btnSolid, styles.btnDanger].join(' ')}
                         onClick={handleFireEmployee} disabled={fireLoading}>
-                        Desligar
+                        {tr('Desligar')}
                       </Button>
                     )}
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar ficha" aria-label="Fechar ficha">
+                      title={tr('Fechar ficha')} aria-label={tr('Fechar ficha')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -1122,57 +1123,57 @@ export default function EmployeeManagement() {
                         <StatusBadge status={detailItem.pessoa?.status} />
                       </div>
                       <p className={styles.idSub}>
-                        {detailItem.cargo?.descricao || 'Sem cargo'}
-                        {detailItem.data_admissao && ` · admitido em ${dateFromApi(detailItem.data_admissao)}`}
+                        {detailItem.cargo?.descricao || tr('Sem cargo')}
+                        {detailItem.data_admissao && tr(' · admitido em {{v0}}', { v0: dateFromApi(detailItem.data_admissao) })}
                       </p>
-                      <p className={styles.idSub}>Salário atual: {fmtBRL(detailItem.salario)}</p>
+                      <p className={styles.idSub}>{tr('Salário atual:')} {fmtBRL(detailItem.salario)}</p>
                     </div>
                   </div>
 
                   <div className={styles.fieldGrid}>
                     <Field label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} mono />
-                    <Field label="Data de nascimento" value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
-                    <Field label="E-mail" value={detailItem.pessoa?.email ? (
-                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.pessoa.email}`} title="Enviar e-mail">
+                    <Field label={tr('Data de nascimento')} value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
+                    <Field label={tr('E-mail')} value={detailItem.pessoa?.email ? (
+                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.pessoa.email}`} title={tr('Enviar e-mail')}>
                         {detailItem.pessoa.email}
                       </ContatoBotao>
                     ) : ''} />
-                    <Field label="Telefone" value={detailItem.pessoa?.telefone ? (
-                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} title="WhatsApp">
+                    <Field label={tr('Telefone')} value={detailItem.pessoa?.telefone ? (
+                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} title={tr('WhatsApp')}>
                         {maskPhone(detailItem.pessoa.telefone)}
                       </ContatoBotao>
                     ) : ''} />
-                    <Field label="Endereço" value={[
+                    <Field label={tr('Endereço')} value={[
                       [detailItem.pessoa?.endereco, detailItem.pessoa?.numero].filter(Boolean).join(', '),
                       detailItem.pessoa?.bairro,
                     ].filter(Boolean).join(' — ')} />
-                    <Field label="Cidade / UF" value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' — ')} />
+                    <Field label={tr('Cidade / UF')} value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' — ')} />
                     <Field label="RG" value={detailItem.pessoa?.rg} mono />
-                    <Field label="Sexo" value={
-                      detailItem.pessoa?.sexo === 1 ? 'Masculino'
-                      : detailItem.pessoa?.sexo === 2 ? 'Feminino'
-                      : detailItem.pessoa?.sexo ? 'Outro' : ''
+                    <Field label={tr('Sexo')} value={
+                      detailItem.pessoa?.sexo === 1 ? tr('Masculino')
+                      : detailItem.pessoa?.sexo === 2 ? tr('Feminino')
+                      : detailItem.pessoa?.sexo ? tr('Outro') : ''
                     } />
                     <Field label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} mono />
-                    <Field label="País" value={detailItem.pessoa?.pais} />
+                    <Field label={tr('País')} value={detailItem.pessoa?.pais} />
                   </div>
 
                   {/* ── Acesso ao sistema ── */}
                   <div className={styles.subBlock}>
                     <div className={styles.blockHead}>
                       <Lock size={15} />
-                      <span>Acesso ao sistema</span>
+                      <span>{tr('Acesso ao sistema')}</span>
                       <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
                         onClick={() => {
                           setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
                           setShowEditCredentials(true);
                         }}>
-                        Atualizar credenciais
+                        {tr('Atualizar credenciais')}
                       </Button>
                     </div>
                     <div className={styles.fieldGrid}>
-                      <Field label="Usuário" value={detailItem.usuario?.username} />
-                      <Field label="Situação do acesso" value={detailItem.usuario?.bloqueado ? 'Bloqueado' : 'Liberado'} />
+                      <Field label={tr('Usuário')} value={detailItem.usuario?.username} />
+                      <Field label={tr('Situação do acesso')} value={detailItem.usuario?.bloqueado ? tr('Bloqueado') : tr('Liberado')} />
                     </div>
                   </div>
                 </div>
@@ -1182,16 +1183,16 @@ export default function EmployeeManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Calendar size={16} />
-                  <span className={styles.dCardTitle}>Histórico do funcionário</span>
+                  <span className={styles.dCardTitle}>{tr('Histórico do funcionário')}</span>
                 </h3>
 
                 <div className={styles.dCardBody}>
                   {historicoLoading ? (
                     <div className={styles.empty}>
-                      <Loader2 size={18} className={styles.spinInline} /> Carregando histórico...
+                      <Loader2 size={18} className={styles.spinInline} /> {tr('Carregando histórico...')}
                     </div>
                   ) : historico.length === 0 ? (
-                    <p className={styles.blockEmpty}>Sem histórico de cargo e salário.</p>
+                    <p className={styles.blockEmpty}>{tr('Sem histórico de cargo e salário.')}</p>
                   ) : (
                     <div className={styles.histList}>
                       {historico.map((h) => {
@@ -1220,7 +1221,7 @@ export default function EmployeeManagement() {
                             {aberto && (
                               <div className={styles.histPanel}>
                                 <div className={styles.histPanelHead}>
-                                  <span>Recebimentos</span>
+                                  <span>{tr('Recebimentos')}</span>
                                   <div className={styles.histPanelActions}>
                                     <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
                                       onClick={() => {
@@ -1236,7 +1237,7 @@ export default function EmployeeManagement() {
                                         setRecebidoFile(null);
                                         setShowAddRecebido(true);
                                       }}>
-                                      Novo
+                                      {tr('Novo')}
                                     </Button>
                                     <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
                                       onClick={() => {
@@ -1246,18 +1247,18 @@ export default function EmployeeManagement() {
                                         });
                                         setShowEditHistory(true);
                                       }}>
-                                      Editar
+                                      {tr('Editar')}
                                     </Button>
                                   </div>
                                 </div>
 
                                 {recebidosLoading ? (
                                   <div className={styles.empty} style={{ padding: '16px 10px' }}>
-                                    <Loader2 size={16} className={styles.spinInline} /> Carregando...
+                                    <Loader2 size={16} className={styles.spinInline} /> {tr('Carregando...')}
                                   </div>
                                 ) : recebidos.length === 0 ? (
                                   <p className={styles.blockEmpty} style={{ paddingLeft: 8 }}>
-                                    Sem registros de recebimento.
+                                    {tr('Sem registros de recebimento.')}
                                   </p>
                                 ) : (
                                   <div className={styles.recebList}>
@@ -1274,7 +1275,7 @@ export default function EmployeeManagement() {
                                           {r.pathArquivoComprovante && (
                                             <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
                                               onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}>
-                                              Comprovante
+                                              {tr('Comprovante')}
                                             </Button>
                                           )}
                                           <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
@@ -1292,7 +1293,7 @@ export default function EmployeeManagement() {
                                               setEditRecebidoFile(null);
                                               setShowEditRecebido(true);
                                             }}>
-                                            Editar
+                                            {tr('Editar')}
                                           </Button>
                                         </div>
                                       </div>
@@ -1319,48 +1320,48 @@ export default function EmployeeManagement() {
         open={showEdit}
         onClose={() => setShowEdit(false)}
         size="lg"
-        title="Editar Funcionário"
+        title={tr('Editar Funcionário')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEdit(false)} className={styles.full}>Cancelar</Button>
+            <Button onClick={() => setShowEdit(false)} className={styles.full}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleSaveEditEmployee} disabled={isSubmitting} className={styles.full}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }>
         <div className={styles.formBody}>
           <PessoaFormEmployee data={editFunc} onChange={setEditFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
 
-          <div className={styles.sectionLabel}>Dados Profissionais</div>
+          <div className={styles.sectionLabel}>{tr('Dados Profissionais')}</div>
 
           <div className={styles.grid2}>
-            <FormField label="Data de Admissão *">
+            <FormField label={tr('Data de Admissão *')}>
               <DatePicker
                 mode="single"
                 value={editFunc.dataAdmissao}
                 onChange={d => setEditFunc(prev => ({ ...prev, dataAdmissao: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
-            <FormField label="Cargo *">
+            <FormField label={tr('Cargo *')}>
               <Select value={editFunc.cargoId} onChange={e => setEditFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
-                <option value="">Selecione um cargo</option>
+                <option value="">{tr('Selecione um cargo')}</option>
                 {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
               </Select>
             </FormField>
           </div>
 
-          <FormField label="Salário">
+          <FormField label={tr('Salário')}>
             <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>R$</span>
+              <span className={styles.currencyPrefix}>{tr('R$')}</span>
               <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
-          <div className={styles.sectionLabel}>Acesso ao Sistema</div>
+          <div className={styles.sectionLabel}>{tr('Acesso ao Sistema')}</div>
 
           <div className={styles.grid2}>
-            <FormField label="Usuário para Acesso">
+            <FormField label={tr('Usuário para Acesso')}>
               <Input value={editFunc.usuario.username} onChange={e => setEditFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" readOnly />
             </FormField>
           </div>
@@ -1372,59 +1373,59 @@ export default function EmployeeManagement() {
         open={showAddModal}
         onClose={() => { setShowAddModal(false); setShowErrors(false); }}
         size="lg"
-        title="Novo Funcionário"
+        title={tr('Novo Funcionário')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => { setShowAddModal(false); setShowErrors(false); }}>Cancelar</Button>
+            <Button onClick={() => { setShowAddModal(false); setShowErrors(false); }}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleAddEmployee} disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Cadastrar'}
+              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Cadastrar')}
             </Button>
           </div>
         }>
         <div className={styles.formBody}>
           <PessoaFormEmployee data={newFunc} onChange={setNewFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} showErrors={showErrors} />
 
-          <div className={styles.sectionLabel}>Dados Profissionais</div>
+          <div className={styles.sectionLabel}>{tr('Dados Profissionais')}</div>
 
           <div className={styles.grid2}>
-            <FormField label="Data de Admissão *">
+            <FormField label={tr('Data de Admissão *')}>
               <DatePicker
                 mode="single"
                 value={newFunc.dataAdmissao}
                 onChange={d => setNewFunc(prev => ({ ...prev, dataAdmissao: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
-            <FormField label="Cargo *">
+            <FormField label={tr('Cargo *')}>
               <Select value={newFunc.cargoId} onChange={e => setNewFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
-                <option value="">Selecione um cargo</option>
+                <option value="">{tr('Selecione um cargo')}</option>
                 {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
               </Select>
             </FormField>
           </div>
 
-          <FormField label="Salário">
+          <FormField label={tr('Salário')}>
             <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>R$</span>
+              <span className={styles.currencyPrefix}>{tr('R$')}</span>
               <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
             </div>
           </FormField>
 
-          <div className={styles.sectionLabel}>Acesso ao Sistema</div>
+          <div className={styles.sectionLabel}>{tr('Acesso ao Sistema')}</div>
 
-          <FormField label="Usuário para Acesso">
+          <FormField label={tr('Usuário para Acesso')}>
             <Input value={newFunc.usuario.username} onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" />
           </FormField>
 
           <div className={styles.grid2}>
             <div>
-              <label className={styles.fieldLabel}>Senha *</label>
+              <label className={styles.fieldLabel}>{tr('Senha *')}</label>
               <div className={styles.inputWithSpinner}>
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={newFunc.usuario.senha}
                   onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, senha: e.target.value } }))}
-                  placeholder="Digite a senha"
+                  placeholder={tr('Digite a senha')}
                 />
                 <button
                   type="button"
@@ -1436,13 +1437,13 @@ export default function EmployeeManagement() {
               </div>
             </div>
             <div>
-              <label className={styles.fieldLabel}>Confirmar Senha *</label>
+              <label className={styles.fieldLabel}>{tr('Confirmar Senha *')}</label>
               <div className={styles.inputWithSpinner}>
                 <Input
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={newFunc.senhaConfirma}
                   onChange={e => setNewFunc(prev => ({ ...prev, senhaConfirma: e.target.value }))}
-                  placeholder="Confirme a senha"
+                  placeholder={tr('Confirme a senha')}
                 />
                 <button
                   type="button"
@@ -1462,25 +1463,25 @@ export default function EmployeeManagement() {
         open={showEditCredentials}
         onClose={() => setShowEditCredentials(false)}
         size="sm"
-        title="Alterar Credenciais"
+        title={tr('Alterar Credenciais')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEditCredentials(false)}>Cancelar</Button>
+            <Button onClick={() => setShowEditCredentials(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleEditCredentials} disabled={credLoading}>
-              {credLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+              {credLoading ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Username *">
+          <FormField label={tr('Username *')}>
             <Input
               value={credentialsForm.username}
               onChange={e => setCredentialsForm(prev => ({ ...prev, username: e.target.value }))}
               placeholder="novo.username"
             />
           </FormField>
-          <FormField label="Senha *">
+          <FormField label={tr('Senha *')}>
             <Input
               type="password"
               value={credentialsForm.senha}
@@ -1496,26 +1497,26 @@ export default function EmployeeManagement() {
         open={showEditHistory}
         onClose={() => setShowEditHistory(false)}
         size="sm"
-        title="Editar Histórico de Salário"
+        title={tr('Editar Histórico de Salário')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEditHistory(false)}>Cancelar</Button>
+            <Button onClick={() => setShowEditHistory(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleEditHistory} disabled={historyLoading}>
-              {historyLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+              {historyLoading ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Cargo *">
+          <FormField label={tr('Cargo *')}>
             <Select value={historyForm.cargoId} onChange={e => setHistoryForm(prev => ({ ...prev, cargoId: e.target.value }))}>
-              <option value="">Selecione um cargo</option>
+              <option value="">{tr('Selecione um cargo')}</option>
               {cargos.map(c => <option key={c.id} value={String(c.id)}>{c.descricao}</option>)}
             </Select>
           </FormField>
-          <FormField label="Salário *">
+          <FormField label={tr('Salário *')}>
             <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>R$</span>
+              <span className={styles.currencyPrefix}>{tr('R$')}</span>
               <Input
                 value={historyForm.salario}
                 onChange={e => setHistoryForm(prev => ({ ...prev, salario: maskBRL(e.target.value) }))}
@@ -1531,20 +1532,20 @@ export default function EmployeeManagement() {
         open={showAddRecebido}
         onClose={() => setShowAddRecebido(false)}
         size="md"
-        title="Novo Recebimento"
+        title={tr('Novo Recebimento')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowAddRecebido(false)}>Cancelar</Button>
+            <Button onClick={() => setShowAddRecebido(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleAddRecebido} disabled={addRecebidoLoading}>
-              {addRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+              {addRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Valor Recebido *">
+          <FormField label={tr('Valor Recebido *')}>
             <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>R$</span>
+              <span className={styles.currencyPrefix}>{tr('R$')}</span>
               <Input
                 value={addRecebidoForm.valorRecebido}
                 onChange={e => setAddRecebidoForm(prev => ({ ...prev, valorRecebido: maskBRL(e.target.value) }))}
@@ -1554,49 +1555,49 @@ export default function EmployeeManagement() {
           </FormField>
 
           <div className={styles.grid2}>
-            <FormField label="Data/Hora Início *">
+            <FormField label={tr('Data/Hora Início *')}>
               <DatePicker
                 mode="single"
                 value={addRecebidoForm.dataHoraInicio}
                 onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraInicio: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
-            <FormField label="Data/Hora Fim">
+            <FormField label={tr('Data/Hora Fim')}>
               <DatePicker
                 mode="single"
                 value={addRecebidoForm.dataHoraFim}
                 onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraFim: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
           </div>
 
-          <FormField label="Data/Hora Pagamento *">
+          <FormField label={tr('Data/Hora Pagamento *')}>
             <DatePicker
               mode="single"
               value={addRecebidoForm.dataHoraPagamento}
               onChange={d => setAddRecebidoForm(prev => ({ ...prev, dataHoraPagamento: d ?? null }))}
-              placeholder="dd/mm/aaaa"
+              placeholder={tr('dd/mm/aaaa')}
             />
           </FormField>
 
-          <FormField label="Tipo de Pagamento *">
+          <FormField label={tr('Tipo de Pagamento *')}>
             <Select value={addRecebidoForm.tipoPagamentoId} onChange={e => setAddRecebidoForm(prev => ({ ...prev, tipoPagamentoId: e.target.value }))}>
-              <option value="">Selecione um tipo</option>
+              <option value="">{tr('Selecione um tipo')}</option>
               {tipoPagamentos.map(t => <option key={t.id} value={String(t.id)}>{t.descricao}</option>)}
             </Select>
           </FormField>
 
-          <FormField label="Descrição">
+          <FormField label={tr('Descrição')}>
             <Input
               value={addRecebidoForm.descricao}
               onChange={e => setAddRecebidoForm(prev => ({ ...prev, descricao: e.target.value?.toUpperCase() }))}
-              placeholder="ex: ADIANTAMENTO, BONUS..."
+              placeholder={tr('ex: ADIANTAMENTO, BONUS...')}
             />
           </FormField>
 
-          <FormField label="Comprovante de pagamento">
+          <FormField label={tr('Comprovante de pagamento')}>
             <input
               ref={fileInputRef}
               type="file"
@@ -1610,7 +1611,7 @@ export default function EmployeeManagement() {
               {recebidoFile ? (
                 <><CheckCircle2 size={14} /> {recebidoFile.name}</>
               ) : (
-                <><Upload size={14} /> Selecionar Arquivo</>
+                <><Upload size={14} /> {tr('Selecionar Arquivo')}</>
               )}
             </Button>
           </FormField>
@@ -1622,20 +1623,20 @@ export default function EmployeeManagement() {
         open={showEditRecebido}
         onClose={() => setShowEditRecebido(false)}
         size="md"
-        title="Editar Recebimento"
+        title={tr('Editar Recebimento')}
         footer={
           <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEditRecebido(false)}>Cancelar</Button>
+            <Button onClick={() => setShowEditRecebido(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleEditRecebido} disabled={editRecebidoLoading}>
-              {editRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> Salvando...</> : 'Salvar'}
+              {editRecebidoLoading ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Valor Recebido *">
+          <FormField label={tr('Valor Recebido *')}>
             <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>R$</span>
+              <span className={styles.currencyPrefix}>{tr('R$')}</span>
               <Input
                 value={editRecebidoForm.valorRecebido}
                 onChange={e => setEditRecebidoForm(prev => ({ ...prev, valorRecebido: maskBRL(e.target.value) }))}
@@ -1645,49 +1646,49 @@ export default function EmployeeManagement() {
           </FormField>
 
           <div className={styles.grid2}>
-            <FormField label="Data/Hora Início *">
+            <FormField label={tr('Data/Hora Início *')}>
               <DatePicker
                 mode="single"
                 value={editRecebidoForm.dataHoraInicio}
                 onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraInicio: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
-            <FormField label="Data/Hora Fim">
+            <FormField label={tr('Data/Hora Fim')}>
               <DatePicker
                 mode="single"
                 value={editRecebidoForm.dataHoraFim}
                 onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraFim: d ?? null }))}
-                placeholder="dd/mm/aaaa"
+                placeholder={tr('dd/mm/aaaa')}
               />
             </FormField>
           </div>
 
-          <FormField label="Data/Hora Pagamento *">
+          <FormField label={tr('Data/Hora Pagamento *')}>
             <DatePicker
               mode="single"
               value={editRecebidoForm.dataHoraPagamento}
               onChange={d => setEditRecebidoForm(prev => ({ ...prev, dataHoraPagamento: d ?? null }))}
-              placeholder="dd/mm/aaaa"
+              placeholder={tr('dd/mm/aaaa')}
             />
           </FormField>
 
-          <FormField label="Tipo de Pagamento *">
+          <FormField label={tr('Tipo de Pagamento *')}>
             <Select value={editRecebidoForm.tipoPagamentoId} onChange={e => setEditRecebidoForm(prev => ({ ...prev, tipoPagamentoId: e.target.value }))}>
-              <option value="">Selecione um tipo</option>
+              <option value="">{tr('Selecione um tipo')}</option>
               {tipoPagamentos.map(t => <option key={t.id} value={String(t.id)}>{t.descricao}</option>)}
             </Select>
           </FormField>
 
-          <FormField label="Descrição">
+          <FormField label={tr('Descrição')}>
             <Input
               value={editRecebidoForm.descricao}
               onChange={e => setEditRecebidoForm(prev => ({ ...prev, descricao: e.target.value?.toUpperCase() }))}
-              placeholder="ex: ADIANTAMENTO, BONUS..."
+              placeholder={tr('ex: ADIANTAMENTO, BONUS...')}
             />
           </FormField>
 
-          <FormField label="Arquivo de Comprovante">
+          <FormField label={tr('Arquivo de Comprovante')}>
             <input
               ref={editFileInputRef}
               type="file"
@@ -1701,7 +1702,7 @@ export default function EmployeeManagement() {
               {editRecebidoFile ? (
                 <><CheckCircle2 size={14} /> {editRecebidoFile.name}</>
               ) : (
-                <><Upload size={14} /> Selecionar Arquivo</>
+                <><Upload size={14} /> {tr('Selecionar Arquivo')}</>
               )}
             </Button>
           </FormField>

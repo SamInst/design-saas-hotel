@@ -224,8 +224,6 @@
 @media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
 .skName   { width: 70%; height: 13px; }
 .skSub    { width: 45%; height: 10px; margin-top: 6px; }
-.skLabel  { width: 58%; height: 10px; }
-.skNumero { width: 46%; height: 22px; margin-top: 8px; }
 
 /* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
 .detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -351,6 +349,7 @@
 .idName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
 .idSub  { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
 .idTags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.idTags .tag { border-radius: 2px; background: transparent; }
 
 /* Campos rótulo/valor */
 .fieldGrid { display: grid; gap: 16px 24px; }
@@ -383,25 +382,11 @@
 .page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
 .page .btnDanger { background: var(--l-destructive); color: var(--l-primary-fg); }
 .page .btnDanger:hover { background: color-mix(in oklch, var(--l-destructive) 88%, black); color: var(--l-primary-fg); }
-
-/* ── Painel geral (nada selecionado) ── */
-.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 780px) { .statGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.statCard {
-  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
-  background: var(--l-bg); padding: 14px 16px;
-}
-.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
-.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
-.statValAmber { color: var(--l-amber-fg); }
-.statValGreen { color: var(--l-emerald-fg); }
 .detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
 
 /* ── Tabela de preço por ocupação ── */
 .miniTable {
   width: 100%; border-collapse: collapse;
-  border-radius: var(--l-r-md); overflow: hidden;
-  border: 1px solid var(--l-border);
   /* sem comparação a tabela fica sozinha no cartão largo: o teto evita que
      o preço fuja para a outra ponta da tela */
   max-width: 560px;
@@ -410,10 +395,11 @@
 .miniTable th {
   font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: .03em;
   text-transform: uppercase; color: var(--l-muted-fg);
-  background: var(--l-bg); padding: 6px 10px; text-align: left;
+  padding: 6px 10px; text-align: left;
+  border-bottom: 1px solid var(--l-border);
 }
 .miniTable th:last-child { text-align: right; }
-.miniTable td { font-size: 13px; line-height: 18px; padding: 7px 10px; border-top: 1px solid var(--l-border); color: var(--l-fg); }
+.miniTable td { font-size: 13px; line-height: 18px; padding: 7px 10px; color: var(--l-fg); }
 .miniPrice { font-weight: 700; color: var(--l-primary); text-align: right; white-space: nowrap; }
 
 /* ── Linha rótulo/valor compacta ──
@@ -455,10 +441,10 @@
 .compareGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .comparePanel {
   border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
-  background: var(--l-bg); padding: 14px 16px;
+  background: transparent; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 12px; min-width: 0;
 }
-.comparePanelSea { border-color: var(--l-amber-border); background: var(--l-amber-bg); }
+.comparePanelSea { border-color: var(--l-amber-border); }
 .comparePanelTitle {
   font-size: 11px; line-height: 16px; font-weight: 700;
   letter-spacing: .04em; text-transform: uppercase; color: var(--l-muted-fg);
@@ -471,9 +457,8 @@
 .comparePanelSea .duLabel   { color: var(--l-amber-fg); opacity: .8; }
 .comparePanelSea .duVal     { color: var(--l-amber-fg); }
 .comparePanelSea .miniPrice { color: var(--l-amber-fg); }
-.comparePanelSea .miniTable    { border-color: var(--l-amber-border); }
-.comparePanelSea .miniTable th { background: transparent; color: var(--l-amber-fg); }
-.comparePanelSea .miniTable td { border-top-color: var(--l-amber-border); color: var(--l-amber-fg); }
+.comparePanelSea .miniTable th { border-bottom-color: var(--l-amber-border); color: var(--l-amber-fg); }
+.comparePanelSea .miniTable td { color: var(--l-amber-fg); }
 .comparePanelSea .duInactive,
 .comparePanelSea .detailEmpty  { color: var(--l-amber-fg); opacity: .85; }
 
@@ -497,6 +482,8 @@
   .listPanel   { order: 2; }
   .listScroll { flex: none; max-height: 55vh; }
   .backBtn { display: inline-flex; }
+  .idClose { display: none; }
+  .dCardActions:has(> .idClose:only-child) { display: none; }
 }
 
 @media (max-width: 640px) {
@@ -513,15 +500,12 @@
   .dCardHead { flex-wrap: wrap; }
   .dCardActions { margin-left: 0; flex: 1 1 100%; }
   .dCardActions > * { flex: 1; }
-  .dCardActions > .idClose { flex: 0 0 auto; }
   .fichaCard .dCardActions { margin-left: auto; flex: 0 1 auto; }
   .blockHead { flex-wrap: wrap; }
-  .statVal { font-size: 20px; line-height: 26px; }
   .subBlock { margin-top: 18px; padding-top: 16px; }
 }
 
 @media (max-width: 420px) {
-  .statGrid { grid-template-columns: minmax(0, 1fr); }
   .listItem { padding: 10px; gap: 10px; }
   .listItem .nome {
     white-space: normal; overflow: visible; text-overflow: clip;

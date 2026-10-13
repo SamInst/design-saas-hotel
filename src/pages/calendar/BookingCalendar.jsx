@@ -20,6 +20,7 @@ import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import whatsappIcon from '../../assets/whatsapp.png';
 import emailIcon    from '../../assets/gmail.png';
 import styles from './BookingCalendar.module.css';
+import { tr, locale } from '../../i18n';
 
 // ─── Date helpers (backend uses "dd/MM/yyyy HH:mm", frontend uses "yyyy-MM-dd") ─
 const parseBrDate = (s) => {
@@ -105,7 +106,7 @@ export const normalizeReserva = (r) => {
     quarto:                  quartoId,
     quartoId:                quartoId, // cópia explícita para uso em display
     categoria:               r.categoria?.nome ?? '',
-    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.nome_solicitante ?? r.titular_nome ?? 'Hóspede',
+    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.nome_solicitante ?? r.titular_nome ?? tr('Hóspede'),
     empresaNome:             r.empresa?.razao_social ?? r.empresa_nome ?? null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
@@ -177,7 +178,7 @@ export const normalizeReserva = (r) => {
       .filter((c) => c && !c.cancelado)
       .map((c) => ({
         id:             c.id,
-        descricao:      c.item?.descricao ?? 'Item',
+        descricao:      c.item?.descricao ?? tr('Item'),
         quantidade:     c.quantidade ?? 1,
         valorUnitario:  c.valor ?? 0,
         valorTotal:     (c.valor ?? 0) * (c.quantidade ?? 1),
@@ -231,7 +232,7 @@ const calcAge = (dob) => {
   if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age--;
   return age;
 };
-const diariasTxt = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
+const diariasTxt = (n) => tr('{{n}} diária{{v1}}', { n, v1: n !== 1 ? 's' : '' });
 
 /** Idade em uma data de referência (não hoje). Aceita yyyy-MM-dd ou dd/MM/yyyy. */
 const idadeEm = (dob, ref) => {
@@ -261,9 +262,9 @@ const ocupacaoTexto = (hospedes, dataInicioIso) => {
   if (adultos === 0 && criancas.length === 0) return '';
   const sufixo =
     criancas.length === 0 ? ''
-    : criancas.length === 1 ? ` + Criança de ${criancas[0]} anos`
-    : ` + Crianças de ${criancas.join(', ')} anos`;
-  return `${adultos} Adulto(s)${sufixo}`;
+    : criancas.length === 1 ? tr(' + Criança de {{idade}} anos', { idade: criancas[0] })
+    : tr(' + Crianças de {{idades}} anos', { idades: criancas.join(', ') });
+  return tr('{{adultos}} Adulto(s){{sufixo}}', { adultos, sufixo });
 };
 
 /** Monta os `detalhes` do card a partir das diárias gravadas, no mesmo formato que o
@@ -330,7 +331,7 @@ const groupDiarias = (detalhes, valorDe) => {
 
 /** "2 Adulto(s)" → "2 Adultos"; "1 Adulto(s)" → "1 Adulto". */
 const normalizaAdultos = (txt) =>
-  txt.replace(/adulto\(s\)/gi, parseInt(txt, 10) === 1 ? 'Adulto' : 'Adultos');
+  txt.replace(/adulto\(s\)|adult\(s\)/gi, parseInt(txt, 10) === 1 ? tr('Adulto') : tr('Adultos'));
 
 /** Sublinha da diária:
  *    "PREÇO ALTO NO DOMINGO - 2 Adultos (R$ 190,00) + Criança de 10 anos (R$ 50,00)"
@@ -376,9 +377,9 @@ const initials = (nome) => {
 };
 
 const STATUS_LABEL = {
-  hospedado: 'Hospedado', confirmada: 'Confirmada',
-  solicitada: 'Solicitada', finalizado: 'Finalizado', cancelado: 'Cancelado',
-  orcamento: 'Orçamento',
+  hospedado: tr('Hospedado'), confirmada: tr('Confirmada'),
+  solicitada: tr('Solicitada'), finalizado: tr('Finalizado'), cancelado: tr('Cancelado'),
+  orcamento: tr('Orçamento'),
 };
 
 const GRUPO_PALETTE = [
@@ -394,8 +395,8 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
     <Modal open onClose={onCancel} size="sm" title={title}
       footer={
         <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={onCancel}>Cancelar</Button>
-          <Button variant="primary"   onClick={onConfirm}>Confirmar</Button>
+          <Button variant="secondary" onClick={onCancel}>{tr('Cancelar')}</Button>
+          <Button variant="primary"   onClick={onConfirm}>{tr('Confirmar')}</Button>
         </div>
       }
     >
@@ -527,8 +528,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           const meia = !!d.meia_diaria;
           return {
             descricao: meia
-              ? `Diária ${d.numero ?? i + 1} (meia diária) · ${ci}`
-              : `Diária ${d.numero ?? i + 1} · ${ci} → ${co}`,
+              ? tr('Diária {{n}} (meia diária) · {{ci}}', { n: d.numero ?? i + 1, ci })
+              : tr('Diária {{n}} · {{ci}} → {{co}}', { n: d.numero ?? i + 1, ci, co }),
             valor_final: d.valor ?? 0,
           };
         });
@@ -553,7 +554,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       userName: _u?.pessoa?.nome ?? _u?.nome ?? '',
       solicitante: solicitanteData,
       pagamentos: pagsAtivos,
-      titulo: reserva.status === 'hospedado' ? 'Voucher de Hospedagem' : 'Voucher de Reserva',
+      titulo: reserva.status === 'hospedado' ? tr('Voucher de Hospedagem') : tr('Voucher de Reserva'),
       consumos: incluirConsumos ? (reserva.consumos ?? []) : [],
     });
   };
@@ -586,7 +587,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       }]);
       setAdjCalc(Array.isArray(res) ? res[0] : res);
     } catch (e) {
-      onNotify?.(e?.message ?? 'Erro ao calcular preço.', 'error');
+      onNotify?.(e?.message ?? tr('Erro ao calcular preço.'), 'error');
       setShowAdjPreco(false);
     }
   };
@@ -856,9 +857,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           onSync?.({ ...reserva, pagamentos });
         }
       }
-      onNotify?.('Alterações salvas!');
+      onNotify?.(tr('Alterações salvas!'));
     } catch (e) {
-      onNotify?.(e?.message ?? 'Erro ao salvar alterações.', 'error');
+      onNotify?.(e?.message ?? tr('Erro ao salvar alterações.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -1137,23 +1138,23 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       return (
         <>
           {editCalcLoading && valGrupos.length === 0 && (
-            <div className={styles.rcSectionLabel}>Calculando…</div>
+            <div className={styles.rcSectionLabel}>{tr('Calculando…')}</div>
           )}
           {valGrupos.map((g, gi) => (
             <div key={g.key} className={[styles.rcDiariaRow, valQuitado ? styles.rcDiariaPago : ''].join(' ')}>
               <span>
-                {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
+                {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
                 {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
               </span>
               <span className={styles.rcDiariaVal}>
                 {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
                 {valQuitado && gi === valGrupos.length - 1 && (
-                  <span className={styles.rcDiariaTag}>(pago 100%)</span>
+                  <span className={styles.rcDiariaTag}>{tr('(pago 100%)')}</span>
                 )}
                 {valIsDiariaAdj
                   ? <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>
                   : g.anterior !== null && <span className={styles.rcDiariaOld}>{fmtBRL(g.anterior)}</span>}
-                {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
+                {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}{tr('x')} </span>}
                 {fmtBRL(g.valor)}
               </span>
             </div>
@@ -1174,17 +1175,17 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcResumoList}>
               {showQuitado && (
                 <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                  <span>Total pago</span><span>{fmtBRL(totalPago)}</span>
+                  <span>{tr('Total pago')}</span><span>{fmtBRL(totalPago)}</span>
                 </div>
               )}
               {showTotal && (
                 <div className={styles.rcResumoRow}>
-                  <span>Total</span><span>{fmtBRL(valTotal)}</span>
+                  <span>{tr('Total')}</span><span>{fmtBRL(valTotal)}</span>
                 </div>
               )}
               {showPend && (
                 <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                  <span>Pendente</span><span>{fmtBRL(valPendente)}</span>
+                  <span>{tr('Pendente')}</span><span>{fmtBRL(valPendente)}</span>
                 </div>
               )}
             </div>
@@ -1201,16 +1202,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         bodyStyle={{ padding: 0, gap: 0 }}
         footer={
           <div className={styles.footerSpread}>
-            <Button variant="secondary" onClick={goBackFromEdit}>← Voltar</Button>
+            <Button variant="secondary" onClick={goBackFromEdit}>{tr('← Voltar')}</Button>
             <div style={{ display: 'flex', gap: 8 }}>
               {hasChanges && (
                 <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
-                  {saving && <Loader2 size={13} className={styles.spin} />} Salvar
+                  {saving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar')}
                 </Button>
               )}
               {hasChangedData && (
                 <Button variant="primary" disabled={!canSave || editSaving} onClick={handleSaveEdit}>
-                  {editSaving && <Loader2 size={13} className={styles.spin} />} Salvar Dados
+                  {editSaving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar Dados')}
                 </Button>
               )}
             </div>
@@ -1225,8 +1226,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcCard}>
               <div className={styles.rcSection}>
                 <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>Valores</span>
-                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label="Fechar">
+                  <span className={styles.rcSectionLabel}>{tr('Valores')}</span>
+                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
                     <X size={17} />
                   </button>
                 </div>
@@ -1248,7 +1249,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 {/* As datas mudam por estes campos; o calendário ao lado só mostra
                     o período escolhido e a ocupação do quarto. */}
                 <div className={styles.editDatesGrid}>
-                  <FormField label="Check-in">
+                  <FormField label={tr('Check-in')}>
                     <div className={styles.dateCompact}>
                       {/* Abre para cima: o calendário fica ao lado (telas largas)
                           ou logo abaixo (estreitas) e não deve ser coberto. */}
@@ -1263,10 +1264,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         minDate={new Date()}
                         disabledDates={checkinBloqueados}
                         placement="top"
-                        placeholder="Data de check-in" />
+                        placeholder={tr('Data de check-in')} />
                     </div>
                   </FormField>
-                  <FormField label="Check-out">
+                  <FormField label={tr('Check-out')}>
                     <div className={styles.dateCompact}>
                       {/* align="end" + placement="top": abre para cima e para a
                           esquerda, sem avançar sobre o calendário. */}
@@ -1275,16 +1276,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         minDate={editCheckin ?? undefined}
                         maxDate={maxCheckout ?? undefined}
                         align="end" placement="top"
-                        placeholder="Data de check-out" />
+                        placeholder={tr('Data de check-out')} />
                     </div>
                   </FormField>
                 </div>
 
                 <div className={[styles.editFieldCap, styles.editObsGrow].join(' ')}>
-                  <FormField label="Observação">
+                  <FormField label={tr('Observação')}>
                     <textarea
                       className={styles.motivoTextarea}
-                      placeholder="Observação sobre a reserva..."
+                      placeholder={tr('Observação sobre a reserva...')}
                       rows={2}
                       value={editObs}
                       onChange={(e) => setEditObs(e.target.value)}
@@ -1304,11 +1305,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               </div>
 
               <div className={styles.editCalLegend}>
-                <span className={styles.editCalLegendItem}><i className={styles.lgTod} /> Hoje</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> Selecionado</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgHalf} /> Entrada/saída (meio-dia)</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> Ocupado</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> Disponível</span>
+                <span className={styles.editCalLegendItem}><i className={styles.lgTod} /> {tr('Hoje')}</span>
+                <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> {tr('Selecionado')}</span>
+                <span className={styles.editCalLegendItem}><i className={styles.lgHalf} /> {tr('Entrada/saída (meio-dia)')}</span>
+                <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> {tr('Ocupado')}</span>
+                <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> {tr('Disponível')}</span>
               </div>
             </div>
           </div>
@@ -1327,7 +1328,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               {pendingPessoa ? (
                 <>
                   <div className={styles.companionHeader}>
-                    <button className={styles.companionBack} onClick={() => setPendingPessoa(null)}><ChevronLeft size={12} /> Voltar</button>
+                    <button className={styles.companionBack} onClick={() => setPendingPessoa(null)}><ChevronLeft size={12} /> {tr('Voltar')}</button>
                   </div>
                   <div style={{ overflowY: 'auto', flex: 1 }}>
                     <div className={styles.companionRow}>
@@ -1336,7 +1337,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         <span className={styles.companionName}>{pendingPessoa.titular.nome}</span>
                         {pendingPessoa.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pendingPessoa.titular.cpf)}</span>}
                       </div>
-                      <span className={styles.titularChip}>Titular</span>
+                      <span className={styles.titularChip}>{tr('Titular')}</span>
                     </div>
                     {pendingPessoa.titular.acompanhantes.map((a) => (
                       <div key={a.id}
@@ -1347,15 +1348,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         </div>
                         <div className={styles.companionInfo}>
                           <span className={styles.companionName}>{a.nome}</span>
-                          {a.cpf && <span className={styles.companionMeta}>{fmtCpf(a.cpf)}{a.idade ? ` · ${a.idade} anos` : ''}</span>}
+                          {a.cpf && <span className={styles.companionMeta}>{fmtCpf(a.cpf)}{a.idade ? tr(' · {{idade}} anos', { idade: a.idade }) : ''}</span>}
                         </div>
-                        {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                        {a.bloqueado && <span className={styles.blockedChip}>{tr('Bloqueado')}</span>}
                       </div>
                     ))}
                   </div>
                   <div className={styles.companionActions}>
-                    <button className={styles.companionBtnSecondary} onClick={() => confirmAddPessoas(false)}>Só o titular</button>
-                    <button className={styles.companionBtnPrimary} onClick={() => confirmAddPessoas(true)}>Adicionar →</button>
+                    <button className={styles.companionBtnSecondary} onClick={() => confirmAddPessoas(false)}>{tr('Só o titular')}</button>
+                    <button className={styles.companionBtnPrimary} onClick={() => confirmAddPessoas(true)}>{tr('Adicionar →')}</button>
                   </div>
                 </>
               ) : (
@@ -1367,8 +1368,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                       <div className={styles.searchResultName}>{p.nome}</div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {p.cpf && <div className={styles.hospedeCpf}>{fmtCpf(p.cpf)}</div>}
-                        {p.acompanhantes?.length > 0 && !p.bloqueado && <span className={styles.companionCountChip}>{p.acompanhantes.length} acomp.</span>}
-                        {p.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                        {p.acompanhantes?.length > 0 && !p.bloqueado && <span className={styles.companionCountChip}>{p.acompanhantes.length} {tr('acomp.')}</span>}
+                        {p.bloqueado && <span className={styles.blockedChip}>{tr('Bloqueado')}</span>}
                       </div>
                       <ChevronRight size={13} className={styles.addIcon} />
                     </div>
@@ -1385,8 +1386,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcCard}>
               <div className={styles.rcSection}>
                 <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>Valores</span>
-                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label="Fechar">
+                  <span className={styles.rcSectionLabel}>{tr('Valores')}</span>
+                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
                     <X size={17} />
                   </button>
                 </div>
@@ -1402,7 +1403,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
                     : <Search size={13} className={styles.hospSearchIcon} />}
                   <div className={styles.hospInputInner}>
-                    <input className={styles.hospInlineInput} placeholder="Buscar hóspede..."
+                    <input className={styles.hospInlineInput} placeholder={tr('Buscar hóspede...')}
                       value={pessoaQuery} onChange={(e) => handlePessoaQuery(e.target.value)} />
                   </div>
                   {pessoaQuery && (
@@ -1419,10 +1420,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcCard}>
               <div className={styles.rcSection}>
                 <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>Hóspedes</span>
+                  <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
                 </div>
                 {lista.length === 0 ? (
-                  <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                  <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
                 ) : (
                   <div className={styles.hospedeList}>
                     {lista.map((h, i) => (
@@ -1431,15 +1432,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div className={styles.hospedeName}>
                             {h.nome}
-                            {i === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>Titular</span>}
+                            {i === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>{tr('Titular')}</span>}
                           </div>
                           {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
                         </div>
                         {i > 0 && editavel && orcPessoas.length === 0 && (
                           <div className={styles.rvGuestContacts}>
-                            <button className={styles.makeTitularBtn} title="Tornar titular"
+                            <button className={styles.makeTitularBtn} title={tr('Tornar titular')}
                               onClick={() => handleSetTitular(h.id)}><Crown size={12} /></button>
-                            <button className={styles.removeIconBtn} title="Remover"
+                            <button className={styles.removeIconBtn} title={tr('Remover')}
                               onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}><X size={12} /></button>
                           </div>
                         )}
@@ -1462,22 +1463,22 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcCard}>
               <div className={[styles.rcSection, styles.rcSectionNoLine].join(' ')}>
                 <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>Pagamentos</span>
-                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label="Fechar">
+                  <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
+                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
                     <X size={17} />
                   </button>
                 </div>
-                {pagamentos.length === 0 && <div className={styles.pagEmpty}>Nenhum pagamento registrado.</div>}
+                {pagamentos.length === 0 && <div className={styles.pagEmpty}>{tr('Nenhum pagamento registrado.')}</div>}
                 {pagamentos.map((p) => (
                   <div key={p.id}
                     className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
                     onClick={() => setViewPagamento(p)}>
                     <div className={styles.step3PagRowTop}>
-                      <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                      <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || tr('Pagamento')}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexShrink: 0 }}>
                         <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
                         {!p.cancelado && editavel && (
-                          <button className={styles.removeIconBtn} title="Cancelar pagamento"
+                          <button className={styles.removeIconBtn} title={tr('Cancelar pagamento')}
                             onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
                             <Trash2 size={12} />
                           </button>
@@ -1488,8 +1489,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                       <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
                     )}
                     {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
-                    {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
-                    {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                    {p.funcionario && <div className={styles.step3PagMeta}>{tr('registrado por')} {p.funcionario}</div>}
+                    {p.cancelado && <span className={styles.pagCardCanceladoBadge}>{tr('Cancelado')}</span>}
                   </div>
                 ))}
 
@@ -1500,7 +1501,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.rcActions}>
                   <button type="button" className={[styles.rcBtn, styles.rcBtnPay].join(' ')}
                     onClick={() => setShowPayModal(true)}>
-                    <DollarSign size={15} /> Registrar pagamento
+                    <DollarSign size={15} /> {tr('Registrar pagamento')}
                   </button>
                 </div>
               )}
@@ -1510,48 +1511,48 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         </div>
       </Modal>
 
-      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title="Remover pessoa"
-        footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>Remover</Button></div>}
-      ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?</p></Modal>
+      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
+        footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
+      ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>{tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}</p></Modal>
 
       <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
 
-      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title="Cancelar Pagamento"
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>Confirmar</Button></div>}
+      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title={tr('Cancelar Pagamento')}
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>{tr('Voltar')}</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>{tr('Confirmar')}</Button></div>}
       >
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>Informe o motivo do cancelamento deste pagamento.</p>
-        <textarea className={styles.motivoTextarea} placeholder="Motivo do cancelamento..." rows={3} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
+        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>{tr('Informe o motivo do cancelamento deste pagamento.')}</p>
+        <textarea className={styles.motivoTextarea} placeholder={tr('Motivo do cancelamento...')} rows={3} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
       </Modal>
 
-      <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title="Descartar alterações?"
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>Continuar editando</Button><Button variant="danger" onClick={() => { setShowDiscard(false); discardPendingOps(); setEditing(false); setEditActiveTab('dados'); }}>Descartar</Button></div>}
-      ><p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>Há alterações não salvas. Deseja descartá-las?</p></Modal>
+      <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title={tr('Descartar alterações?')}
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>{tr('Continuar editando')}</Button><Button variant="danger" onClick={() => { setShowDiscard(false); discardPendingOps(); setEditing(false); setEditActiveTab('dados'); }}>{tr('Descartar')}</Button></div>}
+      ><p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>{tr('Há alterações não salvas. Deseja descartá-las?')}</p></Modal>
 
-      <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm" title="Detalhes do Pagamento"
-        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>Fechar</Button></div>}
+      <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm" title={tr('Detalhes do Pagamento')}
+        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>{tr('Fechar')}</Button></div>}
       >
         {viewPagamento && (
           <div className={styles.kvDetailRoot}>
-            <div className={styles.kvSectionDivider}>Pagamento</div>
+            <div className={styles.kvSectionDivider}>{tr('Pagamento')}</div>
             <div className={styles.kvList}>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Forma</span><span className={styles.kvVal}>{viewPagamento.formaPagamento || '—'}</span></div>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Valor</span><span className={[styles.kvVal, viewPagamento.cancelado ? styles.pagCardValorCancelado : styles.finPago].join(' ')}>{fmtBRL(viewPagamento.valor)}</span></div>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Pagador</span><span className={styles.kvVal}>{viewPagamento.nomePagador || '—'}</span></div>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Situação</span><span className={viewPagamento.cancelado ? styles.pagCardCanceladoBadge : styles.pagStatusAtivo}>{viewPagamento.cancelado ? 'Cancelado' : 'Ativo'}</span></div>
-              {viewPagamento.descricao && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>Descrição</span><span className={styles.kvVal}>{viewPagamento.descricao}</span></div>}
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Forma')}</span><span className={styles.kvVal}>{viewPagamento.formaPagamento || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Valor')}</span><span className={[styles.kvVal, viewPagamento.cancelado ? styles.pagCardValorCancelado : styles.finPago].join(' ')}>{fmtBRL(viewPagamento.valor)}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Pagador')}</span><span className={styles.kvVal}>{viewPagamento.nomePagador || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Situação')}</span><span className={viewPagamento.cancelado ? styles.pagCardCanceladoBadge : styles.pagStatusAtivo}>{viewPagamento.cancelado ? tr('Cancelado') : tr('Ativo')}</span></div>
+              {viewPagamento.descricao && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>{tr('Descrição')}</span><span className={styles.kvVal}>{viewPagamento.descricao}</span></div>}
             </div>
-            <div className={styles.kvSectionDivider}>Registro</div>
+            <div className={styles.kvSectionDivider}>{tr('Registro')}</div>
             <div className={styles.kvList}>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Registrado por</span><span className={styles.kvVal}>{viewPagamento.funcionario || '—'}</span></div>
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Data</span><span className={styles.kvVal}>{viewPagamento.dataRegistro || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Registrado por')}</span><span className={styles.kvVal}>{viewPagamento.funcionario || '—'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Data')}</span><span className={styles.kvVal}>{viewPagamento.dataRegistro || '—'}</span></div>
             </div>
             {viewPagamento.cancelado && (
               <>
-                <div className={styles.kvSectionDividerCancel}>Cancelamento</div>
+                <div className={styles.kvSectionDividerCancel}>{tr('Cancelamento')}</div>
                 <div className={styles.kvListCancel}>
-                  <div className={styles.kvRow}><span className={styles.kvLabel}>Cancelado por</span><span className={styles.kvVal}>{viewPagamento.funcMotivo || '—'}</span></div>
-                  <div className={styles.kvRow}><span className={styles.kvLabel}>Data</span><span className={styles.kvVal}>{viewPagamento.dataMotivo || '—'}</span></div>
-                  {viewPagamento.motivoCancelamento && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>Motivo</span><span className={styles.kvVal}>{viewPagamento.motivoCancelamento}</span></div>}
+                  <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Cancelado por')}</span><span className={styles.kvVal}>{viewPagamento.funcMotivo || '—'}</span></div>
+                  <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Data')}</span><span className={styles.kvVal}>{viewPagamento.dataMotivo || '—'}</span></div>
+                  {viewPagamento.motivoCancelamento && <div className={[styles.kvRow, styles.kvRowFull].join(' ')}><span className={styles.kvLabel}>{tr('Motivo')}</span><span className={styles.kvVal}>{viewPagamento.motivoCancelamento}</span></div>}
                 </div>
               </>
             )}
@@ -1643,19 +1644,19 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           <div className={styles.rcHead}>
             <div className={styles.rcHeadLeft}>
               <div className={styles.rcHeadTop}>
-                <span className={styles.rcTitle}>Apartamento {fmtRoom(reserva.quarto)}</span>
+                <span className={styles.rcTitle}>{tr('Apartamento')} {fmtRoom(reserva.quarto)}</span>
                 {reserva.status === 'cancelado' && (
-                  <span className={[styles.rcChip, styles.rcChipRed].join(' ')}>Cancelada</span>
+                  <span className={[styles.rcChip, styles.rcChipRed].join(' ')}>{tr('Cancelada')}</span>
                 )}
                 {headChip && <span className={styles.rcChip}>{headChip}</span>}
               </div>
               {reserva.funcionario && (
-                <span className={styles.rcHeadMeta}>registrado por {reserva.funcionario}</span>
+                <span className={styles.rcHeadMeta}>{tr('registrado por')} {reserva.funcionario}</span>
               )}
             </div>
             <div className={styles.rcHeadRight}>
               <span className={styles.rcHeadMeta}>#{reserva.id}</span>
-              <button type="button" className={styles.rcCloseBtn} onClick={handleClose} aria-label="Fechar">
+              <button type="button" className={styles.rcCloseBtn} onClick={handleClose} aria-label={tr('Fechar')}>
                 <X size={17} />
               </button>
             </div>
@@ -1665,9 +1666,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           <div className={styles.rcSection}>
             <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
               <div className={styles.ovDateCell}>
-                <div className={styles.ovDateLabel}>Check-in</div>
+                <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
                 <div className={styles.ovDateValue}>{toBrDate(reserva.dataInicio)}</div>
-                <div className={styles.ovDateTime}>{checkinTime}h</div>
+                <div className={styles.ovDateTime}>{checkinTime}{tr('h')}</div>
               </div>
               <div className={styles.ovDateArrow}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1675,18 +1676,18 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 </svg>
               </div>
               <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                <div className={styles.ovDateLabel}>Check-out</div>
+                <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
                 <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
-                <div className={styles.ovDateTime}>{checkoutTime}h</div>
+                <div className={styles.ovDateTime}>{checkoutTime}{tr('h')}</div>
               </div>
               <div className={styles.ovNightsCell}>
                 <div className={styles.ovNightsNum}>{dias}</div>
-                <div className={styles.ovNightsLabel}>{dias === 1 ? 'Diária' : 'Diárias'}</div>
+                <div className={styles.ovNightsLabel}>{dias === 1 ? tr('Diária') : tr('Diárias')}</div>
               </div>
               {guestList.length > 0 && (
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{guestList.length}</div>
-                  <div className={styles.ovNightsLabel}>{guestList.length === 1 ? 'Pessoa' : 'Pessoas'}</div>
+                  <div className={styles.ovNightsLabel}>{guestList.length === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
                 </div>
               )}
             </div>
@@ -1695,10 +1696,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           {/* ── Hóspedes ── */}
           <div className={styles.rcSection}>
             <div className={styles.rcSectionHead}>
-              <span className={styles.rcSectionLabel}>Hóspedes</span>
+              <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
             </div>
             {guestList.length === 0 ? (
-              <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+              <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
             ) : (
               <div className={styles.hospedeList}>
                 {guestList.map((h, hi) => {
@@ -1711,7 +1712,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className={styles.hospedeName}>
                           {h.nome}
-                          {hi === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>Titular</span>}
+                          {hi === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>{tr('Titular')}</span>}
                         </div>
                         {(h.telefone || h.dataNascimento) && (
                           <div className={styles.hospedeCpf}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
@@ -1723,15 +1724,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                           {waNumber && (
                             <a className={[styles.rvContactBtn, styles.rvContactBtnWa].join(' ')}
                               href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
-                              title={`WhatsApp ${fmtPhone(h.telefone)}`} onClick={(e) => e.stopPropagation()}>
-                              <img src={whatsappIcon} alt="WhatsApp" className={styles.rvContactIcon}
+                              title={tr('WhatsApp {{v0}}', { v0: fmtPhone(h.telefone) })} onClick={(e) => e.stopPropagation()}>
+                              <img src={whatsappIcon} alt={tr('WhatsApp')} className={styles.rvContactIcon}
                                 loading="eager" decoding="sync" draggable={false} />
                             </a>
                           )}
                           {showEmail && (
                             <a className={[styles.rvContactBtn, styles.rvContactBtnMail].join(' ')}
-                              href={`mailto:${h.email}`} title={`E-mail: ${h.email}`} onClick={(e) => e.stopPropagation()}>
-                              <img src={emailIcon} alt="E-mail" className={styles.rvContactIcon}
+                              href={`mailto:${h.email}`} title={tr('E-mail: {{email}}', { email: h.email })} onClick={(e) => e.stopPropagation()}>
+                              <img src={emailIcon} alt={tr('E-mail')} className={styles.rvContactIcon}
                                 loading="eager" decoding="sync" draggable={false} />
                             </a>
                           )}
@@ -1750,7 +1751,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcSection}>
               {!pagamentoDeGrupo && pagamentos.length > 0 && (
                 <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>Pagamentos</span>
+                  <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
                 </div>
               )}
               {!pagamentoDeGrupo && pagamentos.map((p) => (
@@ -1758,15 +1759,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
                   onClick={() => setViewPagamento(p)}>
                   <div className={styles.step3PagRowTop}>
-                    <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                    <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || tr('Pagamento')}</span>
                     <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
                   </div>
                   {(p.dataRegistro || p.formaPagamento) && (
                     <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
                   )}
                   {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
-                  {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
-                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                  {p.funcionario && <div className={styles.step3PagMeta}>{tr('registrado por')} {p.funcionario}</div>}
+                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>{tr('Cancelado')}</span>}
                 </div>
               ))}
 
@@ -1782,21 +1783,21 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     {grupos.map((g, gi) => (
                       <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
                         <span>
-                          {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
+                          {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
                           {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
                           {isDiariaAdj && g.valor - g.valorOriginal !== 0 && (
                             <span className={styles.rcDiariaSub} style={{ color: g.valor < g.valorOriginal ? 'var(--emerald)' : '#f97316' }}>
-                              {' · '}{g.valor < g.valorOriginal ? 'Desconto ' : 'Adicional '}{fmtBRL(Math.abs(g.valor - g.valorOriginal))}
+                              {' · '}{g.valor < g.valorOriginal ? tr('Desconto ') : tr('Adicional ')}{fmtBRL(Math.abs(g.valor - g.valorOriginal))}
                             </span>
                           )}
                         </span>
                         <span className={styles.rcDiariaVal}>
                           {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
                           {pagoIntegral && gi === grupos.length - 1 && (
-                            <span className={styles.rcDiariaTag}>(pago 100%)</span>
+                            <span className={styles.rcDiariaTag}>{tr('(pago 100%)')}</span>
                           )}
                           {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
-                          {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
+                          {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}{tr('x')} </span>}
                           {fmtBRL(g.valor)}
                         </span>
                       </div>
@@ -1804,7 +1805,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     {adj && !isDiariaAdj && Math.abs(aggDiff) >= 0.005 && (
                       <div className={styles.rcDiariaRow}>
                         <span className={styles.rcDiariaSub}>
-                          {describeAdjustment(adj)}{funcAjuste ? ` · por ${funcAjuste}` : ''}
+                          {describeAdjustment(adj)}{funcAjuste ? tr(' · por {{funcAjuste}}', { funcAjuste }) : ''}
                         </span>
                         <span className={styles.rcDiariaVal} style={{ color: aggDiff < 0 ? 'var(--emerald)' : '#f97316' }}>
                           {aggDiff > 0 ? '+' : ''}{fmtBRL(aggDiff)}
@@ -1826,17 +1827,17 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={styles.rcResumoList}>
                     {showQuitado && (
                       <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>Total pago</span><span>{fmtBRL(totalPago)}</span>
+                        <span>{tr('Total pago')}</span><span>{fmtBRL(totalPago)}</span>
                       </div>
                     )}
                     {showTotal && (
                       <div className={styles.rcResumoRow}>
-                        <span>Total</span><span>{fmtBRL(cardTotal)}</span>
+                        <span>{tr('Total')}</span><span>{fmtBRL(cardTotal)}</span>
                       </div>
                     )}
                     {showPend && (
                       <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                        <span>Pendente</span><span>{fmtBRL(displayPendente)}</span>
+                        <span>{tr('Pendente')}</span><span>{fmtBRL(displayPendente)}</span>
                       </div>
                     )}
                   </div>
@@ -1854,21 +1855,21 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={[styles.rcResumoList, styles.rcResumoGrupo].join(' ')}>
                     {grpQuitado ? (
                       <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>Total pago · grupo ({aptsLabel})</span><span>{fmtBRL(groupInfo.pago)}</span>
+                        <span>{tr('Total pago · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.pago)}</span>
                       </div>
                     ) : (
                       <>
                         <div className={styles.rcResumoRow}>
-                          <span>Total · grupo ({aptsLabel})</span><span>{fmtBRL(groupInfo.total)}</span>
+                          <span>{tr('Total · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.total)}</span>
                         </div>
                         {groupInfo.pago > 0.005 && (
                           <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                            <span>Pago · grupo</span><span>{fmtBRL(groupInfo.pago)}</span>
+                            <span>{tr('Pago · grupo')}</span><span>{fmtBRL(groupInfo.pago)}</span>
                           </div>
                         )}
                         {groupInfo.pendente > 0.005 && (
                           <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                            <span>Pendente · grupo</span><span>{fmtBRL(groupInfo.pendente)}</span>
+                            <span>{tr('Pendente · grupo')}</span><span>{fmtBRL(groupInfo.pendente)}</span>
                           </div>
                         )}
                       </>
@@ -1884,7 +1885,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={[styles.rcSection, styles.rvCancelSection].join(' ')}>
               <div className={styles.rcSectionHead}>
                 <span className={[styles.rcSectionLabel, styles.rvCancelLabel].join(' ')}>
-                  <XCircle size={12} style={{ flexShrink: 0 }} /> Motivo do cancelamento
+                  <XCircle size={12} style={{ flexShrink: 0 }} /> {tr('Motivo do cancelamento')}
                 </span>
               </div>
               <div className={styles.rvObsText}>{reserva.motivoCancelamento}</div>
@@ -1898,7 +1899,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           ) : reserva.observacao ? (
             <div className={styles.rcSection}>
               <div className={styles.rcSectionHead}>
-                <span className={styles.rcSectionLabel}>Observação</span>
+                <span className={styles.rcSectionLabel}>{tr('Observação')}</span>
               </div>
               <div className={styles.rvObsText}>{reserva.observacao}</div>
             </div>
@@ -1914,23 +1915,23 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
               disabled={voucherLoading}
               onClick={() => limpezaBtnInfo.onFinalizar()}
-              title={limpezaBtnInfo.responsavel ? `Limpeza: ${limpezaBtnInfo.responsavel}` : undefined}>
-              <Check size={14} /> Finalizar Limpeza{limpezaBtnInfo.responsavel ? ` · ${limpezaBtnInfo.responsavel}` : ''}
+              title={limpezaBtnInfo.responsavel ? tr('Limpeza: {{responsavel}}', { responsavel: limpezaBtnInfo.responsavel }) : undefined}>
+              <Check size={14} /> {tr('Finalizar Limpeza')}{limpezaBtnInfo.responsavel ? ` · ${limpezaBtnInfo.responsavel}` : ''}
             </button>
           )}
           {isOvernight ? (() => {
             // Menu Ações dirigido por lista — único botão, itens conforme o contexto
             // (pernoite usa os callbacks padrão; reservado/etc. passam overnight.acoes).
             const acoesItems = (overnight.acoes ?? [
-              overnight.onAcionarLimpeza      && { label: 'Acionar Limpeza',      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 21h18"/><path d="M7 21V11l5-4 5 4v10"/><path d="M10 21v-4h4v4"/></svg>, onClick: overnight.onAcionarLimpeza },
-              overnight.onGerenciarDiarias    && { label: 'Gerenciar Diárias',    icon: <CalendarDays size={15}/>, onClick: overnight.onGerenciarDiarias },
-              overnight.onAdicionarConsumo    && { label: 'Adicionar Consumo',    icon: <Plus size={15}/>,        onClick: overnight.onAdicionarConsumo },
-              overnight.onGerenciarPagamentos && { label: 'Gerenciar Pagamentos', icon: <DollarSign size={15}/>,  onClick: overnight.onGerenciarPagamentos },
-              overnight.onGerenciarPreco      && { label: 'Gerenciar Preços',     icon: <Tag size={15}/>,         onClick: overnight.onGerenciarPreco },
-              overnight.onGerenciarPessoas    && { label: 'Gerenciar Pessoas',    icon: <Users size={15}/>,       onClick: overnight.onGerenciarPessoas },
-              overnight.onVoucher             && { label: 'Voucher',              icon: <FileDown size={15}/>,    onClick: overnight.onVoucher },
-              overnight.onFinalizar           && { label: 'Finalizar Pernoite',   icon: <Check size={15}/>,       onClick: overnight.onFinalizar, primary: true, divider: true },
-              overnight.onCancelar            && { label: 'Cancelar Pernoite',    icon: <XCircle size={14}/>,     onClick: overnight.onCancelar,  danger: true },
+              overnight.onAcionarLimpeza      && { label: tr('Acionar Limpeza'),      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 21h18"/><path d="M7 21V11l5-4 5 4v10"/><path d="M10 21v-4h4v4"/></svg>, onClick: overnight.onAcionarLimpeza },
+              overnight.onGerenciarDiarias    && { label: tr('Gerenciar Diárias'),    icon: <CalendarDays size={15}/>, onClick: overnight.onGerenciarDiarias },
+              overnight.onAdicionarConsumo    && { label: tr('Adicionar Consumo'),    icon: <Plus size={15}/>,        onClick: overnight.onAdicionarConsumo },
+              overnight.onGerenciarPagamentos && { label: tr('Gerenciar Pagamentos'), icon: <DollarSign size={15}/>,  onClick: overnight.onGerenciarPagamentos },
+              overnight.onGerenciarPreco      && { label: tr('Gerenciar Preços'),     icon: <Tag size={15}/>,         onClick: overnight.onGerenciarPreco },
+              overnight.onGerenciarPessoas    && { label: tr('Gerenciar Pessoas'),    icon: <Users size={15}/>,       onClick: overnight.onGerenciarPessoas },
+              overnight.onVoucher             && { label: tr('Voucher'),              icon: <FileDown size={15}/>,    onClick: overnight.onVoucher },
+              overnight.onFinalizar           && { label: tr('Finalizar Pernoite'),   icon: <Check size={15}/>,       onClick: overnight.onFinalizar, primary: true, divider: true },
+              overnight.onCancelar            && { label: tr('Cancelar Pernoite'),    icon: <XCircle size={14}/>,     onClick: overnight.onCancelar,  danger: true },
             ]).filter(Boolean);
             return (
               <div className={styles.rvAcoesWrap}>
@@ -1952,22 +1953,22 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   </>
                 )}
                 <button className={styles.rvAcoesBtn} onClick={() => setAcoesOpen((v) => !v)}>
-                  Outras Ações <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+                  {tr('Outras Ações')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
                 </button>
               </div>
             );
           })() : reserva.status === 'orcamento' ? (
             <>
-              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>Ativar Reserva</button>
-              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>Cancelar</button>
+              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>{tr('Ativar Reserva')}</button>
+              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>{tr('Cancelar')}</button>
             </>
           ) : reserva.status === 'solicitada' ? (
             <>
               <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onApprove?.(reserva.id, reserva.quarto); onClose(); } finally { setSaving(false); } }}>
-                {saving && <Loader2 size={14} className={styles.spin}/>} Aprovar
+                {saving && <Loader2 size={14} className={styles.spin}/>} {tr('Aprovar')}
               </button>
               <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onReject?.(reserva.id); onClose(); } finally { setSaving(false); } }}>
-                Rejeitar
+                {tr('Rejeitar')}
               </button>
             </>
           ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && reserva.status !== 'ausente' ? (
@@ -1979,52 +1980,52 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
                   <div className={styles.rvAcoesMenu}>
                     <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                      <Pencil size={15}/> Editar
+                      <Pencil size={15}/> {tr('Editar')}
                     </button>
                     <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
-                      <Users size={15}/> Gerenciar Pessoas
+                      <Users size={15}/> {tr('Gerenciar Pessoas')}
                     </button>
                     <button className={styles.rvAcoesItem}
                       disabled={pagamentoDeGrupo}
-                      title={pagamentoDeGrupo ? 'Pagamento único do grupo — acerte por "Grupos"' : undefined}
+                      title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
                       onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
-                      <DollarSign size={15}/> Gerenciar Pagamentos
+                      <DollarSign size={15}/> {tr('Gerenciar Pagamentos')}
                     </button>
                     <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
-                      <Tag size={15}/> Gerenciar Preços
+                      <Tag size={15}/> {tr('Gerenciar Preços')}
                     </button>
                     {reserva.status === 'confirmada' && (
                       <button className={styles.rvAcoesItem}
                         onClick={() => { setAcoesOpen(false); setConfirmAusente(true); }}>
-                        <UserX size={15}/> Reserva Ausente
+                        <UserX size={15}/> {tr('Reserva Ausente')}
                       </button>
                     )}
                     <div className={styles.rvAcoesDiv} />
                     <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
                       onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setConfirmCancel(true); }}>
-                      <Trash2 size={14}/> Cancelar
+                      <Trash2 size={14}/> {tr('Cancelar')}
                     </button>
                   </div>
                 </>
               )}
               <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={() => setAcoesOpen((v) => !v)}>
-                Outras Ações <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+                {tr('Outras Ações')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
               </button>
             </div>
             <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} disabled={voucherLoading} onClick={handleVoucherClick}>
-              {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> Gerando...</> : <><FileDown size={14}/> Voucher</>}
+              {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> {tr('Gerando...')}</> : <><FileDown size={14}/> {tr('Voucher')}</>}
             </button>
             <button className={[styles.rvBtn, styles.rvBtnGreen].join(' ')}
               disabled={!canCheckin || voucherLoading}
-              title={!canCheckin ? `Check-in: ${fmtDateBR(reserva.dataInicio)}` : undefined}
+              title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
               onClick={() => setConfirmPernoite(true)}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              Hospedar
+              {tr('Hospedar')}
             </button>
             </>
           ) : reserva.status === 'cancelado' ? null : (
             <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} disabled={voucherLoading} onClick={handleVoucherClick}>
-              {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> Gerando...</> : <><FileDown size={14}/> Voucher</>}
+              {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> {tr('Gerando...')}</> : <><FileDown size={14}/> {tr('Voucher')}</>}
             </button>
           )}
         </div>
@@ -2032,91 +2033,89 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       <Modal open={showVoucherScope} onClose={() => setShowVoucherScope(false)} size="sm"
-        title={<><FileDown size={14} /> Gerar Voucher</>}
+        title={<><FileDown size={14} /> {tr('Gerar Voucher')}</>}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button style={{ flex: 1 }} onClick={() => { setShowVoucherScope(false); requestVoucher(); }}>
-              Apenas esta reserva
+              {tr('Apenas esta reserva')}
             </Button>
             <Button variant="primary" style={{ flex: 1 }} onClick={() => { setShowVoucherScope(false); onVoucherGrupo?.(); }}>
-              <Users size={14} /> Grupo{groupInfo?.count ? ` (${groupInfo.count} apt${groupInfo.count !== 1 ? 's' : ''})` : ''}
+              <Users size={14} /> {tr('Grupo')}{groupInfo?.count ? tr(' ({{count}} apt{{v1}})', { count: groupInfo.count, v1: groupInfo.count !== 1 ? 's' : '' }) : ''}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          Esta reserva faz parte de um grupo. Deseja gerar o voucher apenas desta reserva ou do grupo inteiro?
+          {tr('Esta reserva faz parte de um grupo. Deseja gerar o voucher apenas desta reserva ou do grupo inteiro?')}
         </p>
       </Modal>
 
       <Modal open={showVoucherChoice} onClose={() => setShowVoucherChoice(false)} size="sm"
-        title={<><FileDown size={14} /> Gerar Voucher</>}
+        title={<><FileDown size={14} /> {tr('Gerar Voucher')}</>}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
             <Button style={{ flex: 1 }} onClick={() => { setShowVoucherChoice(false); handleDownloadVoucher(false); }}>
-              Sem consumos
+              {tr('Sem consumos')}
             </Button>
             <Button variant="primary" style={{ flex: 1 }} onClick={() => { setShowVoucherChoice(false); handleDownloadVoucher(true); }}>
-              Com consumos
+              {tr('Com consumos')}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          Esta hospedagem possui consumos registrados. Deseja incluí-los no voucher?
+          {tr('Esta hospedagem possui consumos registrados. Deseja incluí-los no voucher?')}
         </p>
       </Modal>
 
       <Modal open={confirmPernoite} onClose={() => setConfirmPernoite(false)} size="sm"
-        title="Hospedar"
+        title={tr('Hospedar')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmPernoite(false)}>Cancelar</Button>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmPernoite(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" style={{ flex: 1 }} onClick={() => { setConfirmPernoite(false); onMoverPernoite?.(reserva.id); onClose(); }}>
-              Confirmar
+              {tr('Confirmar')}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          Tem certeza que deseja mover a reserva de <b>{reserva.titularNome}</b> para pernoites?
-          O status será alterado para <b>Hospedado</b> e a reserva não poderá mais ser editada por aqui.
+          {tr('Tem certeza que deseja mover a reserva de')} <b>{reserva.titularNome}</b> {tr('para pernoites? O status será alterado para')} <b>{tr('Hospedado')}</b> {tr('e a reserva não poderá mais ser editada por aqui.')}
         </p>
       </Modal>
 
       <Modal open={confirmAusente} onClose={() => setConfirmAusente(false)} size="sm"
-        title="Reserva Ausente"
+        title={tr('Reserva Ausente')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmAusente(false)}>Cancelar</Button>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmAusente(false)}>{tr('Cancelar')}</Button>
             <Button variant="danger" style={{ flex: 1 }} disabled={saving}
               onClick={async () => { setSaving(true); try { await onAusente?.(reserva.id); setConfirmAusente(false); onClose(); } finally { setSaving(false); } }}>
-              {saving && <Loader2 size={14} className={styles.spin} />} Confirmar
+              {saving && <Loader2 size={14} className={styles.spin} />} {tr('Confirmar')}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          Tem certeza que deseja marcar a reserva de <b>{reserva.titularNome}</b> como <b>ausente</b>?
-          O status será alterado para <b>Reserva Ausente</b>.
+          {tr('Tem certeza que deseja marcar a reserva de')} <b>{reserva.titularNome}</b> {tr('como')} <b>{tr('ausente')}</b>{tr('? O status será alterado para')} <b>{tr('Reserva Ausente')}</b>.
         </p>
       </Modal>
 
       <Modal open={confirmCancel} onClose={() => setConfirmCancel(false)} size="sm"
-        title={reserva.status === 'orcamento' ? 'Cancelar Orçamento' : 'Cancelar Reserva'}
+        title={reserva.status === 'orcamento' ? tr('Cancelar Orçamento') : tr('Cancelar Reserva')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmCancel(false)}>Voltar</Button>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmCancel(false)}>{tr('Voltar')}</Button>
             <Button variant="danger" style={{ flex: 1 }} disabled={!cancelMotivRes.trim()}
               onClick={() => { setConfirmCancel(false); setConfirmCancel2(true); }}>
-              Avançar
+              {tr('Avançar')}
             </Button>
           </div>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-            Informe o motivo do cancelamento da reserva de <b>{reserva.titularNome}</b>:
+            {tr('Informe o motivo do cancelamento da reserva de')} <b>{reserva.titularNome}</b>:
           </p>
           <textarea
             style={{
@@ -2125,7 +2124,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               border: '1.5px solid var(--border)', background: 'var(--surface-2)',
               color: 'var(--text)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit',
             }}
-            placeholder="Ex: Solicitação do hóspede"
+            placeholder={tr('Ex: Solicitação do hóspede')}
             value={cancelMotivRes}
             onChange={(e) => setCancelMotivRes(e.target.value)}
             autoFocus
@@ -2134,10 +2133,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       <Modal open={confirmCancel2} onClose={() => setConfirmCancel2(false)} size="sm"
-        title="Confirmar Cancelamento"
+        title={tr('Confirmar Cancelamento')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => { setConfirmCancel2(false); setConfirmCancel(true); }}>Voltar</Button>
+            <Button style={{ flex: 1 }} onClick={() => { setConfirmCancel2(false); setConfirmCancel(true); }}>{tr('Voltar')}</Button>
             <Button variant="danger" style={{ flex: 1 }}
               onClick={() => {
                 setConfirmCancel2(false);
@@ -2146,34 +2145,34 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 onCancel(reserva.id, cancelMotivRes.trim(), orcId);
                 onClose();
               }}>
-              Cancelar Definitivamente
+              {tr('Cancelar Definitivamente')}
             </Button>
           </div>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-            Tem certeza? Esta ação não pode ser desfeita.
+            {tr('Tem certeza? Esta ação não pode ser desfeita.')}
           </p>
           <div style={{ padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)' }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>Motivo: </span>{cancelMotivRes}
+            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{tr('Motivo:')} </span>{cancelMotivRes}
           </div>
         </div>
       </Modal>
 
       <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm"
-        title="Remover pessoa"
+        title={tr('Remover pessoa')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>Cancelar</Button>
+            <Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button>
             <Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>
-              Remover
+              {tr('Remover')}
             </Button>
           </div>
         }
       >
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          Tem certeza que deseja remover <b>{confirmRemovePessoa?.nome}</b> desta reserva?
+          {tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}
         </p>
       </Modal>
 
@@ -2191,52 +2190,52 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       />
 
       <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
-        title="Detalhes do Pagamento"
-        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>Fechar</Button></div>}
+        title={tr('Detalhes do Pagamento')}
+        footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>{tr('Fechar')}</Button></div>}
       >
         {viewPagamento && (
           <div className={styles.kvDetailRoot}>
 
             {/* ── Pagamento ── */}
-            <div className={styles.kvSectionDivider}>Pagamento</div>
+            <div className={styles.kvSectionDivider}>{tr('Pagamento')}</div>
             <div className={styles.kvList}>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Forma de Pagamento</span>
+                <span className={styles.kvLabel}>{tr('Forma de Pagamento')}</span>
                 <span className={styles.kvVal}>{viewPagamento.formaPagamento || '—'}</span>
               </div>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Valor</span>
+                <span className={styles.kvLabel}>{tr('Valor')}</span>
                 <span className={[styles.kvVal, viewPagamento.cancelado ? styles.pagCardValorCancelado : styles.finPago].join(' ')}>
                   {fmtBRL(viewPagamento.valor)}
                 </span>
               </div>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Pagador</span>
+                <span className={styles.kvLabel}>{tr('Pagador')}</span>
                 <span className={styles.kvVal}>{viewPagamento.nomePagador || '—'}</span>
               </div>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Situação</span>
+                <span className={styles.kvLabel}>{tr('Situação')}</span>
                 <span className={viewPagamento.cancelado ? styles.pagCardCanceladoBadge : styles.pagStatusAtivo}>
-                  {viewPagamento.cancelado ? 'Cancelado' : 'Ativo'}
+                  {viewPagamento.cancelado ? tr('Cancelado') : tr('Ativo')}
                 </span>
               </div>
               {viewPagamento.descricao && (
                 <div className={[styles.kvRow, styles.kvRowFull].join(' ')}>
-                  <span className={styles.kvLabel}>Descrição</span>
+                  <span className={styles.kvLabel}>{tr('Descrição')}</span>
                   <span className={styles.kvVal}>{viewPagamento.descricao}</span>
                 </div>
               )}
             </div>
 
             {/* ── Registro ── */}
-            <div className={styles.kvSectionDivider}>Registro</div>
+            <div className={styles.kvSectionDivider}>{tr('Registro')}</div>
             <div className={styles.kvList}>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Registrado por</span>
+                <span className={styles.kvLabel}>{tr('Registrado por')}</span>
                 <span className={styles.kvVal}>{viewPagamento.funcionario || '—'}</span>
               </div>
               <div className={styles.kvRow}>
-                <span className={styles.kvLabel}>Data</span>
+                <span className={styles.kvLabel}>{tr('Data')}</span>
                 <span className={styles.kvVal}>{viewPagamento.dataRegistro || '—'}</span>
               </div>
             </div>
@@ -2244,19 +2243,19 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             {/* ── Cancelamento ── */}
             {viewPagamento.cancelado && (
               <>
-                <div className={styles.kvSectionDividerCancel}>Cancelamento</div>
+                <div className={styles.kvSectionDividerCancel}>{tr('Cancelamento')}</div>
                 <div className={styles.kvListCancel}>
                   <div className={styles.kvRow}>
-                    <span className={styles.kvLabel}>Cancelado por</span>
+                    <span className={styles.kvLabel}>{tr('Cancelado por')}</span>
                     <span className={styles.kvVal}>{viewPagamento.funcMotivo || '—'}</span>
                   </div>
                   <div className={styles.kvRow}>
-                    <span className={styles.kvLabel}>Data</span>
+                    <span className={styles.kvLabel}>{tr('Data')}</span>
                     <span className={styles.kvVal}>{viewPagamento.dataMotivo || '—'}</span>
                   </div>
                   {viewPagamento.motivoCancelamento && (
                     <div className={[styles.kvRow, styles.kvRowFull].join(' ')}>
-                      <span className={styles.kvLabel}>Motivo</span>
+                      <span className={styles.kvLabel}>{tr('Motivo')}</span>
                       <span className={styles.kvVal}>{viewPagamento.motivoCancelamento}</span>
                     </div>
                   )}
@@ -2269,24 +2268,24 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
-        title="Cancelar Pagamento"
+        title={tr('Cancelar Pagamento')}
         footer={
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => setCancelPagId(null)}>Voltar</Button>
+            <Button variant="secondary" onClick={() => setCancelPagId(null)}>{tr('Voltar')}</Button>
             <Button variant="danger"
               disabled={!cancelMotivo.trim()}
               onClick={handleConfirmCancelPagamento}>
-              Confirmar
+              {tr('Confirmar')}
             </Button>
           </div>
         }
       >
         <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>
-          Informe o motivo do cancelamento deste pagamento.
+          {tr('Informe o motivo do cancelamento deste pagamento.')}
         </p>
         <textarea
           className={styles.motivoTextarea}
-          placeholder="Motivo do cancelamento..."
+          placeholder={tr('Motivo do cancelamento...')}
           rows={3}
           value={cancelMotivo}
           onChange={(e) => setCancelMotivo(e.target.value)}
@@ -2295,16 +2294,16 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
       {/* ── Discard confirmation ── */}
       <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm"
-        title="Descartar alterações?"
+        title={tr('Descartar alterações?')}
         footer={
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => setShowDiscard(false)}>Continuar editando</Button>
-            <Button variant="danger" onClick={handleDiscard}>Descartar</Button>
+            <Button variant="secondary" onClick={() => setShowDiscard(false)}>{tr('Continuar editando')}</Button>
+            <Button variant="danger" onClick={handleDiscard}>{tr('Descartar')}</Button>
           </div>
         }
       >
         <p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>
-          Há alterações não salvas em pessoas ou pagamentos. Deseja descartá-las?
+          {tr('Há alterações não salvas em pessoas ou pagamentos. Deseja descartá-las?')}
         </p>
       </Modal>
 
@@ -2328,9 +2327,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             />
           );
         })() : (
-          <Modal open onClose={() => setShowAdjPreco(false)} size="sm" title="Gerenciar Preços">
+          <Modal open onClose={() => setShowAdjPreco(false)} size="sm" title={tr('Gerenciar Preços')}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
-              <Loader2 size={16} className={styles.spin} /> Calculando preço...
+              <Loader2 size={16} className={styles.spin} /> {tr('Calculando preço...')}
             </div>
           </Modal>
         )
@@ -2382,7 +2381,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
         <div className={styles.searchDropInfo}>
           <div className={styles.searchDropName}>{r.titularNome}</div>
           <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
         </div>
         <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
       </div>
@@ -2390,20 +2389,20 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
   };
 
   const daySecoes = [
-    { key: 'saidas',     label: 'Saídas',     sub: 'até 12:00',           color: '#f97316', list: saidas },
-    { key: 'chegadas',   label: 'Chegadas',   sub: 'a partir das 12:00',  color: '#10b981', list: chegadas },
-    { key: 'permanecem', label: 'Permanecem', sub: 'hospedados no dia',   color: '#6b7280', list: permanecem },
+    { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),           color: '#f97316', list: saidas },
+    { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'),  color: '#10b981', list: chegadas },
+    { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),   color: '#6b7280', list: permanecem },
   ].filter((s) => s.list.length > 0);
 
   const dayObj  = new Date(dateStr + 'T00:00:00');
-  const weekday = dayObj.toLocaleDateString('pt-BR', { weekday: 'long' });
+  const weekday = dayObj.toLocaleDateString(locale(), { weekday: 'long' });
   const cap     = weekday.charAt(0).toUpperCase() + weekday.slice(1);
   return (
     <Modal open onClose={onClose} size="lg" hideHeader
       footer={
         <div className={styles.footerRight}>
           <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
-            <Plus size={13} /> Nova Reserva
+            <Plus size={13} /> {tr('Nova Reserva')}
           </Button>
         </div>
       }
@@ -2425,24 +2424,24 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
               <>
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{occupiedRooms.size}/{totalRooms}</div>
-                  <div className={styles.ovNightsLabel}>Ocupados</div>
+                  <div className={styles.ovNightsLabel}>{tr('Ocupados')}</div>
                 </div>
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{dayReservas.length}</div>
-                  <div className={styles.ovNightsLabel}>{dayReservas.length === 1 ? 'Reserva' : 'Reservas'}</div>
+                  <div className={styles.ovNightsLabel}>{dayReservas.length === 1 ? tr('Reserva') : tr('Reservas')}</div>
                 </div>
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{totalPeople}</div>
-                  <div className={styles.ovNightsLabel}>{totalPeople === 1 ? 'Pessoa' : 'Pessoas'}</div>
+                  <div className={styles.ovNightsLabel}>{totalPeople === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
                 </div>
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{availableRooms.length}</div>
-                  <div className={styles.ovNightsLabel}>{availableRooms.length === 1 ? 'Livre' : 'Livres'}</div>
+                  <div className={styles.ovNightsLabel}>{availableRooms.length === 1 ? tr('Livre') : tr('Livres')}</div>
                 </div>
               </>
             )}
             <button type="button" className={styles.rcCloseBtn} style={{ marginLeft: 12 }}
-              onClick={onClose} aria-label="Fechar">
+              onClick={onClose} aria-label={tr('Fechar')}>
               <X size={17} />
             </button>
           </div>
@@ -2450,11 +2449,11 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
       </div>
 
       {loading ? (
-        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
+        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
       ) : (
         <>
           {dayReservas.length === 0 ? (
-            <div className={styles.emptyState}>Nenhuma reserva para este dia.</div>
+            <div className={styles.emptyState}>{tr('Nenhuma reserva para este dia.')}</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {daySecoes.map((sec) => (
@@ -2515,11 +2514,11 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
     try {
       const { _arquivo, _arquivoRemov, _quarto, _despesaInterna, ...limpo } = payment;
       await hospedagemApi.adicionarPagamentoGrupo(gid, limpo);
-      onNotify?.('Pagamento registrado no grupo!');
+      onNotify?.(tr('Pagamento registrado no grupo!'));
       setPagAberto(false);
       carregar();
     } catch (e) {
-      onNotify?.(e?.message ?? 'Erro ao registrar o pagamento.', 'error');
+      onNotify?.(e?.message ?? tr('Erro ao registrar o pagamento.'), 'error');
     } finally { setSalvando(false); }
   };
 
@@ -2530,7 +2529,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
       await hospedagemApi.renomearGrupo(gid, nome || null);
       onRenomeado?.(gid, nome || null);
     } catch (e) {
-      onNotify?.(e?.message ?? 'Erro ao renomear o grupo.', 'error');
+      onNotify?.(e?.message ?? tr('Erro ao renomear o grupo.'), 'error');
     }
   };
 
@@ -2565,18 +2564,18 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
   return (
     <>
       <Modal open onClose={onClose} size="lg" hideHeader
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>← Voltar</Button></div>}
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('← Voltar')}</Button></div>}
       >
         <div className={styles.rcCard} style={{ marginBottom: 14 }}>
           <div className={styles.rcHead}>
             <div className={styles.rcHeadLeft}>
               <div className={styles.rcHeadTop}>
                 <span className={styles.rcTitle}>{titulo}</span>
-                <span className={styles.rcChip}>{qtd} apartamento{qtd !== 1 ? 's' : ''}</span>
+                <span className={styles.rcChip}>{qtd} {tr('apartamento')}{qtd !== 1 ? 's' : ''}</span>
               </div>
-              <span className={styles.rcHeadMeta}>Grupo #{gid}</span>
+              <span className={styles.rcHeadMeta}>{tr('Grupo #')}{gid}</span>
             </div>
-            <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label="Fechar">
+            <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label={tr('Fechar')}>
               <X size={17} />
             </button>
           </div>
@@ -2584,25 +2583,25 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
           <div className={styles.rcActions}>
             <button type="button" className={[styles.rcBtn, styles.rcBtnPay].join(' ')}
               onClick={() => setPagAberto(true)}>
-              <DollarSign size={14} /> Pagamento
+              <DollarSign size={14} /> {tr('Pagamento')}
             </button>
             <button type="button" className={styles.rcBtn}
-              title={periodoUnico ? `Já abre em ${fmtDateBR(periodoUnico.dataInicio)} → ${fmtDateBR(periodoUnico.dataFim)}` : undefined}
+              title={periodoUnico ? tr('Já abre em {{v0}} → {{v1}}', { v0: fmtDateBR(periodoUnico.dataInicio), v1: fmtDateBR(periodoUnico.dataFim) }) : undefined}
               onClick={() => onNovaReservaGrupo(gid, periodoUnico)}>
-              <Plus size={14} /> Nova reserva
+              <Plus size={14} /> {tr('Nova reserva')}
             </button>
             <button type="button" className={styles.rcBtn}
-              title="Renomear o responsável do grupo"
+              title={tr('Renomear o responsável do grupo')}
               onClick={() => setNomeEdit(grupo.descricao ?? '')}>
-              <Pencil size={14} /> Responsável
+              <Pencil size={14} /> {tr('Responsável')}
             </button>
           </div>
 
           <div className={styles.rcSection}>
             {loading && lista.length === 0 ? (
-              <div className={styles.rcSectionLabel}>Carregando reservas…</div>
+              <div className={styles.rcSectionLabel}>{tr('Carregando reservas…')}</div>
             ) : lista.length === 0 ? (
-              <div className={styles.pagEmpty}>Nenhuma reserva neste grupo.</div>
+              <div className={styles.pagEmpty}>{tr('Nenhuma reserva neste grupo.')}</div>
             ) : (
               <>
                 <div className={styles.dayRoomList}>
@@ -2617,7 +2616,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                         <div className={styles.searchDropInfo}>
                           <div className={styles.searchDropName}>{r.titularNome}</div>
                           <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                         </div>
                         <span className={styles.rcHeadTotal}>{fmtBRL(r.valorTotal ?? 0)}</span>
                       </div>
@@ -2628,12 +2627,12 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                 {pagamentosGrupo.length > 0 && (
                   <>
                     <div className={styles.rcSectionHead}>
-                      <span className={styles.rcSectionLabel}>Pagamentos do grupo</span>
+                      <span className={styles.rcSectionLabel}>{tr('Pagamentos do grupo')}</span>
                     </div>
                     {pagamentosGrupo.map((p) => (
                       <div key={p.id} className={[styles.step3PagRow, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}>
                         <div className={styles.step3PagRowTop}>
-                          <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || 'Pagamento'}</span>
+                          <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || tr('Pagamento')}</span>
                           <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}
                             style={{ marginLeft: 'auto', flexShrink: 0 }}>{fmtBRL(p.valor)}</span>
                         </div>
@@ -2641,8 +2640,8 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                           <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
                         )}
                         {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
-                        {p.funcionario && <div className={styles.step3PagMeta}>registrado por {p.funcionario}</div>}
-                        {p.cancelado && <span className={styles.pagCardCanceladoBadge}>Cancelado</span>}
+                        {p.funcionario && <div className={styles.step3PagMeta}>{tr('registrado por')} {p.funcionario}</div>}
+                        {p.cancelado && <span className={styles.pagCardCanceladoBadge}>{tr('Cancelado')}</span>}
                       </div>
                     ))}
                   </>
@@ -2653,18 +2652,18 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                     {resumo.pendente > 0.005 ? (
                       <>
                         <div className={styles.rcResumoRow}>
-                          <span>Total</span><span>{fmtBRL(resumo.total)}</span>
+                          <span>{tr('Total')}</span><span>{fmtBRL(resumo.total)}</span>
                         </div>
                         <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                          <span>Pago</span><span>{fmtBRL(resumo.pago)}</span>
+                          <span>{tr('Pago')}</span><span>{fmtBRL(resumo.pago)}</span>
                         </div>
                         <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                          <span>Pendente</span><span>{fmtBRL(resumo.pendente)}</span>
+                          <span>{tr('Pendente')}</span><span>{fmtBRL(resumo.pendente)}</span>
                         </div>
                       </>
                     ) : (
                       <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>Total pago</span><span>{fmtBRL(resumo.pago)}</span>
+                        <span>{tr('Total pago')}</span><span>{fmtBRL(resumo.pago)}</span>
                       </div>
                     )}
                   </div>
@@ -2677,22 +2676,22 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
 
       {/* Responsável principal — grupo_reserva.descricao */}
       <Modal open={nomeEdit != null} onClose={() => setNomeEdit(null)} size="sm"
-        title="Responsável do grupo"
+        title={tr('Responsável do grupo')}
         footer={
           <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => setNomeEdit(null)}>Cancelar</Button>
-            <Button variant="primary" onClick={salvarNome}>Salvar</Button>
+            <Button variant="secondary" onClick={() => setNomeEdit(null)}>{tr('Cancelar')}</Button>
+            <Button variant="primary" onClick={salvarNome}>{tr('Salvar')}</Button>
           </div>
         }
       >
-        <FormField label="Nome do responsável">
-          <Input placeholder="Nome de quem responde pelo grupo"
+        <FormField label={tr('Nome do responsável')}>
+          <Input placeholder={tr('Nome de quem responde pelo grupo')}
             value={nomeEdit ?? ''}
             onChange={(e) => setNomeEdit(e.target.value.toUpperCase())}
             onKeyDown={(e) => { if (e.key === 'Enter') salvarNome(); }} />
         </FormField>
         <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-2)' }}>
-          É por este nome que o grupo aparece na lista e ao vincular novas reservas.
+          {tr('É por este nome que o grupo aparece na lista e ao vincular novas reservas.')}
         </p>
       </Modal>
 
@@ -2736,19 +2735,19 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
   return (
     <>
       <Modal open onClose={onClose} size="lg" hideHeader
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
+        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
       >
         <div className={styles.rcCard} style={{ marginBottom: 14 }}>
           <div className={styles.rcHead}>
             <div className={styles.rcHeadLeft}>
               <div className={styles.rcHeadTop}>
-                <span className={styles.rcTitle}>Reservas em grupo</span>
+                <span className={styles.rcTitle}>{tr('Reservas em grupo')}</span>
                 {!loading && grupos.length > 0 && (
-                  <span className={styles.rcChip}>{grupos.length} em aberto</span>
+                  <span className={styles.rcChip}>{grupos.length} {tr('em aberto')}</span>
                 )}
               </div>
             </div>
-            <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label="Fechar">
+            <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label={tr('Fechar')}>
               <X size={17} />
             </button>
           </div>
@@ -2756,10 +2755,10 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
 
         {loading ? (
           <div className={styles.emptyState}>
-            <Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...
+            <Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}
           </div>
         ) : grupos.length === 0 ? (
-          <div className={styles.emptyState}>Nenhum grupo em aberto.</div>
+          <div className={styles.emptyState}>{tr('Nenhum grupo em aberto.')}</div>
         ) : (
           <div className={styles.dayRoomList}>
             {grupos.map((g) => {
@@ -2769,7 +2768,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
                 <div key={g.grupo_id} className={styles.dayRoomRow} onClick={() => setDetalhe(g)}>
                   <div className={styles.searchDropInfo}>
                     <div className={styles.searchDropName}>{nome}</div>
-                    <div className={styles.searchDropMeta}>Grupo #{g.grupo_id} · {qtd} apartamento{qtd !== 1 ? 's' : ''}</div>
+                    <div className={styles.searchDropMeta}>{tr('Grupo #')}{g.grupo_id} · {qtd} {tr('apartamento')}{qtd !== 1 ? 's' : ''}</div>
                   </div>
                   <ChevronRight size={15} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
                 </div>
@@ -2795,7 +2794,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
 }
 
 // ─── Room Modal ───────────────────────────────────────────────────────────────
-const ROOM_MES_NOMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const ROOM_MES_NOMES = [tr('Janeiro'),tr('Fevereiro'),tr('Março'),tr('Abril'),tr('Maio'),tr('Junho'),tr('Julho'),tr('Agosto'),tr('Setembro'),tr('Outubro'),tr('Novembro'),tr('Dezembro')];
 
 function RoomModal({ room, onClose, categorias, onSelectReserva }) {
   const _hoje = new Date();
@@ -2827,12 +2826,12 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
     setMes(nm); setAno(ny); setPage(0);
   };
 
-  const FILTROS = [['mes', 'Por mês'], ['anteriores', 'Anteriores'], ['proximas', 'Próximas']];
+  const FILTROS = [['mes', tr('Por mês')], ['anteriores', tr('Anteriores')], ['proximas', tr('Próximas')]];
 
   return (
     <Modal open onClose={onClose} size="md"
-      title={<><BedDouble size={15} /> Apartamento {fmtRoom(room)} — {cat?.nome || ''}</>}
-      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>Fechar</Button></div>}
+      title={<><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)} — {cat?.nome || ''}</>}
+      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
     >
       {/* Filtro período */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
@@ -2852,47 +2851,47 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
       {/* Navegação de mês/ano (só no modo 'mes') */}
       {modo === 'mes' && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
-          <button className={styles.navBtn} onClick={() => shiftMonth(-1)} title="Mês anterior"><ChevronLeft size={14} /></button>
+          <button className={styles.navBtn} onClick={() => shiftMonth(-1)} title={tr('Mês anterior')}><ChevronLeft size={14} /></button>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', minWidth: 130, textAlign: 'center' }}>
             {ROOM_MES_NOMES[mes - 1]} {ano}
           </span>
-          <button className={styles.navBtn} onClick={() => shiftMonth(1)} title="Próximo mês"><ChevronRight size={14} /></button>
+          <button className={styles.navBtn} onClick={() => shiftMonth(1)} title={tr('Próximo mês')}><ChevronRight size={14} /></button>
         </div>
       )}
 
       {loading ? (
-        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
+        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
       ) : (
         <>
           <div className={[styles.dayMetrics, styles.dayMetricsRoom].join(' ')}>
             <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
               <div className={styles.metricHead}>
                 <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
-                <span className={styles.metricLabel}>Reservas</span>
+                <span className={styles.metricLabel}>{tr('Reservas')}</span>
               </div>
               <div className={styles.metricValueRow}>
                 <span className={styles.metricValue}>{res.totalElements}</span>
               </div>
               <span className={styles.metricSub}>
-                {modo === 'mes' ? `em ${ROOM_MES_NOMES[mes - 1]}` : modo === 'anteriores' ? 'anteriores' : 'próximas'}
+                {modo === 'mes' ? tr('em {{mes}}', { mes: ROOM_MES_NOMES[mes - 1] }) : modo === 'anteriores' ? tr('anteriores') : tr('próximas')}
               </span>
             </div>
 
             <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
               <div className={styles.metricHead}>
                 <span className={styles.metricIcon}><BedDouble size={14} /></span>
-                <span className={styles.metricLabel}>Categoria</span>
+                <span className={styles.metricLabel}>{tr('Categoria')}</span>
               </div>
               <div className={styles.metricValueRow}>
                 <span className={styles.metricValueText}>{cat?.nome || '—'}</span>
               </div>
-              <span className={styles.metricSub}>Apartamento {fmtRoom(room)}</span>
+              <span className={styles.metricSub}>{tr('Apartamento')} {fmtRoom(room)}</span>
             </div>
           </div>
 
           {res.content.length === 0 ? (
             <div className={styles.emptyState}>
-              {modo === 'mes' ? 'Nenhuma reserva neste mês.' : modo === 'anteriores' ? 'Nenhuma reserva anterior.' : 'Nenhuma reserva futura.'}
+              {modo === 'mes' ? tr('Nenhuma reserva neste mês.') : modo === 'anteriores' ? tr('Nenhuma reserva anterior.') : tr('Nenhuma reserva futura.')}
             </div>
           ) : (
             <div className={styles.dayRoomList}>
@@ -2905,7 +2904,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
                     <div className={styles.searchDropInfo}>
                       <div className={styles.searchDropName}>{r.titularNome}</div>
                       <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                      <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                      <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                     </div>
                     <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
                   </div>
@@ -2918,7 +2917,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
           {res.totalPages > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
               <button className={styles.navBtn} disabled={page === 0} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={14} /></button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>Página {page + 1} de {res.totalPages}</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>{tr('Página')} {page + 1} {tr('de')} {res.totalPages}</span>
               <button className={styles.navBtn} disabled={page >= res.totalPages - 1} onClick={() => setPage((p) => p + 1)}><ChevronRight size={14} /></button>
             </div>
           )}
@@ -2930,13 +2929,13 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
 
 // ─── Status Filter Modal ──────────────────────────────────────────────────────
 const STATUS_FILTER_OPTIONS = [
-  ['confirmada',          'Reserva Ativa'],
-  ['hospedado',           'Hospedado'],
-  ['finalizado',          'Finalizado'],
-  ['cancelado',           'Cancelada'],
-  ['ausente',             'Ausente'],
-  ['pernoite_cancelado',  'Pernoite Cancelado'],
-  ['pagamento_pendente',  'Pagamento Pendente'],
+  ['confirmada',          tr('Reserva Ativa')],
+  ['hospedado',           tr('Hospedado')],
+  ['finalizado',          tr('Finalizado')],
+  ['cancelado',           tr('Cancelada')],
+  ['ausente',             tr('Ausente')],
+  ['pernoite_cancelado',  tr('Pernoite Cancelado')],
+  ['pagamento_pendente',  tr('Pagamento Pendente')],
 ];
 const STATUS_PAGE_SIZE = 10;
 
@@ -2993,7 +2992,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
       title={<><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
       footer={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? 'carregando...' : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? tr('carregando...') : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
           {!loading && pages > 1 && (
             <div style={{ display: 'flex', gap: 4 }}>
               <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
@@ -3011,7 +3010,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
         <Search size={13} className={styles.statusFilterSearchIcon} />
         <input
           className={styles.statusFilterSearchInput}
-          placeholder="Buscar por nome..."
+          placeholder={tr('Buscar por nome...')}
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
         />
@@ -3021,9 +3020,9 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
       </div>
 
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Buscando reservas...</div>
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Buscando reservas...')}</div>
       ) : total === 0 ? (
-        <div className={styles.emptyState}>{search ? `Nenhum resultado para "${search}".` : `Nenhuma reserva com status "${label}".`}</div>
+        <div className={styles.emptyState}>{search ? tr('Nenhum resultado para "{{search}}".', { search }) : tr('Nenhuma reserva com status "{{label}}".', { label })}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {slice.map((r) => {
@@ -3035,7 +3034,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
                 <div className={styles.searchDropInfo}>
                   <div className={styles.searchDropName}>{r.titularNome}</div>
                   <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                 </div>
               </div>
             );
@@ -3119,20 +3118,20 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
 
   return (
     <Modal open onClose={onClose} size="md"
-      title={<><FileText size={15} /> Orçamento {solicitante ? `— ${solicitante}` : ''}</>}
+      title={<><FileText size={15} /> {tr('Orçamento')} {solicitante ? `— ${solicitante}` : ''}</>}
       footer={
         <div className={styles.footerSpread}>
-          <Button variant="secondary" onClick={onClose}>← Voltar</Button>
+          <Button variant="secondary" onClick={onClose}>{tr('← Voltar')}</Button>
           <button className={styles.orcDownloadBtn} onClick={handleDownload} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px', width: 'auto' }}>
-            <FileDown size={15} /> <span style={{ fontSize: 12 }}>Baixar PDF</span>
+            <FileDown size={15} /> <span style={{ fontSize: 12 }}>{tr('Baixar PDF')}</span>
           </button>
         </div>
       }
     >
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Carregando...</div>
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Carregando...')}</div>
       ) : !orc ? (
-        <div className={styles.emptyState}>Não foi possível carregar o orçamento.</div>
+        <div className={styles.emptyState}>{tr('Não foi possível carregar o orçamento.')}</div>
       ) : (
         <div className={styles.step3Root} style={{ padding: '14px 16px' }}>
 
@@ -3140,11 +3139,11 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
           <div className={styles.priceCard} style={{ marginBottom: 14 }}>
             <div className={styles.priceCardHeader} style={{ cursor: 'default' }}>
               <span className={styles.priceCardSummary}>
-                <span className={styles.finStripItem}>Valor Total <b>{fmtBRL(grandTotal)}</b></span>
+                <span className={styles.finStripItem}>{tr('Valor Total')} <b>{fmtBRL(grandTotal)}</b></span>
                 <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>Pago <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / grandTotal * 100)}%)</span>}</span>
+                <span className={styles.finStripItem}>{tr('Pago')} <b style={{ color: 'var(--emerald)' }}>{fmtBRL(totalPago)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(totalPago / grandTotal * 100)}%)</span>}</span>
                 <span className={styles.finStripDivider} />
-                <span className={styles.finStripItem}>Pendente <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(pendente / grandTotal * 100)}%)</span>}</span>
+                <span className={styles.finStripItem}>{tr('Pendente')} <b style={{ color: pendente > 0 ? '#f97316' : 'var(--emerald)' }}>{fmtBRL(pendente)}</b>{grandTotal > 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 3 }}>({Math.round(pendente / grandTotal * 100)}%)</span>}</span>
               </span>
             </div>
           </div>
@@ -3181,7 +3180,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
                       <div key={r.id} className={styles.orcRoomCard}>
                         {/* Room label */}
                         <div className={styles.orcRoomCardLabel}>
-                          Apartamento {fmtRoom(r.quarto)}
+                          {tr('Apartamento')} {fmtRoom(r.quarto)}
                           {!multiPeriod && <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 12, marginLeft: 8 }}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)} · {diariasTxt(dias)}</span>}
                         </div>
 
@@ -3201,7 +3200,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
                                         {h.dataNascimento ? ` · ${h.dataNascimento}` : ''}
                                       </div>
                                     </div>
-                                    {hi === 0 && <span className={styles.titularBadge} style={{ flexShrink: 0 }}>Titular</span>}
+                                    {hi === 0 && <span className={styles.titularBadge} style={{ flexShrink: 0 }}>{tr('Titular')}</span>}
                                   </div>
                                 );
                               })}
@@ -3216,13 +3215,13 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
                                 const to   = addDays(r.dataInicio, di + 1);
                                 return (
                                   <div key={di} className={styles.step3PriceRow}>
-                                    <span className={styles.step3PriceDesc}>Diária {di + 1} &nbsp;{fmtDateBR(from)} → {fmtDateBR(to)}</span>
+                                    <span className={styles.step3PriceDesc}>{tr('Diária')} {di + 1} &nbsp;{fmtDateBR(from)} → {fmtDateBR(to)}</span>
                                     <span className={styles.step3PriceVal}>{fmtBRL(valorDiaria)}</span>
                                   </div>
                                 );
                               })}
                               <div className={styles.step3PriceTotal}>
-                                <span>Total</span>
+                                <span>{tr('Total')}</span>
                                 <span>{fmtBRL(r.valorTotal)}</span>
                               </div>
                             </div>
@@ -3234,7 +3233,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
 
                           <div style={{ textAlign: 'right' }}>
                             <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }} onClick={() => onSelectReserva(r)}>
-                              Ver reserva →
+                              {tr('Ver reserva →')}
                             </button>
                           </div>
                         </div>
@@ -3248,7 +3247,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
 
           {dataRegistro && (
             <div className={styles.dadosRegistrado}>
-              <span className={styles.kvLabel}>Solicitado em</span>
+              <span className={styles.kvLabel}>{tr('Solicitado em')}</span>
               <span className={styles.kvVal}>{dataRegistro}</span>
             </div>
           )}
@@ -3414,11 +3413,11 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
     )}
 
     <Modal open={!showCreate} onClose={onClose} size="md"
-      title={<><FileText size={15} /> Orçamentos{!loading && ` (${orcamentos.length})`}</>}
+      title={<><FileText size={15} /> {tr('Orçamentos')}{!loading && ` (${orcamentos.length})`}</>}
       footer={
         <div className={styles.footerRight}>
           <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus size={14} /> Novo Orçamento
+            <Plus size={14} /> {tr('Novo Orçamento')}
           </Button>
         </div>
       }
@@ -3428,7 +3427,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
         <Search size={13} className={styles.statusFilterSearchIcon} />
         <input
           className={styles.statusFilterSearchInput}
-          placeholder="Buscar por nome do solicitante..."
+          placeholder={tr('Buscar por nome do solicitante...')}
           value={search}
           onChange={(e) => handleSearch(e.target.value)}
           autoFocus
@@ -3441,10 +3440,10 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       </div>
 
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> Buscando...</div>
+        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Buscando...')}</div>
       ) : orcamentos.length === 0 ? (
         <div className={styles.emptyState}>
-          {search ? `Nenhum orçamento encontrado para "${search}".` : 'Nenhum orçamento cadastrado.'}
+          {search ? tr('Nenhum orçamento encontrado para "{{search}}".', { search }) : tr('Nenhum orçamento cadastrado.')}
         </div>
       ) : (
         <div className={styles.orcListRoot}>
@@ -3478,13 +3477,13 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                     <div className={styles.orcListInfo}>
                       <span className={styles.orcListNameRow}>
                         <span className={styles.orcListName}>{orc.nome_solicitante}</span>
-                        {isCancelado && <span className={[styles.orcStatusPill, styles.orcStatusPillCancelado].join(' ')}>Cancelado</span>}
-                        {isExpired && <span className={[styles.orcStatusPill, styles.orcStatusPillVencido].join(' ')}>Vencido</span>}
+                        {isCancelado && <span className={[styles.orcStatusPill, styles.orcStatusPillCancelado].join(' ')}>{tr('Cancelado')}</span>}
+                        {isExpired && <span className={[styles.orcStatusPill, styles.orcStatusPillVencido].join(' ')}>{tr('Vencido')}</span>}
                       </span>
                       <span className={styles.orcListMeta}>
                         {orc.data_hora_registro}
                         {hospedagens.length > 0 && (
-                          <> · <b>{hospedagens.length}</b> hospedagem{hospedagens.length !== 1 ? 's' : ''}</>
+                          <> · <b>{hospedagens.length}</b> {tr('hospedagem')}{hospedagens.length !== 1 ? 's' : ''}</>
                         )}
                         {grandTotal > 0 && <> · {fmtBRL(grandTotal)}</>}
                       </span>
@@ -3500,7 +3499,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                     >
                       <button
                         className={[styles.orcMenuTrigger, openMenuId === orc.id ? styles.orcMenuTriggerActive : ''].join(' ')}
-                        title="Ações"
+                        title={tr('Ações')}
                         onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === orc.id ? null : orc.id); }}
                       >
                         <MoreVertical size={14} />
@@ -3509,21 +3508,21 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                       {openMenuId === orc.id && (
                         <div className={styles.orcMenuDrop}>
                           <button className={styles.orcMenuItem} onClick={(e) => { setOpenMenuId(null); openEditOrc(e, orc); }}>
-                            <Pencil size={12} /> Editar
+                            <Pencil size={12} /> {tr('Editar')}
                           </button>
                           <button className={styles.orcMenuItem} onClick={(e) => { setOpenMenuId(null); handleVoucher(e, orc); }}>
-                            <FileDown size={12} /> Gerar PDF
+                            <FileDown size={12} /> {tr('Gerar PDF')}
                           </button>
                           <button
                             className={[styles.orcMenuItem, styles.orcMenuItemApprove].join(' ')}
                             disabled={approveSaving || isExpired}
-                            title={isExpired ? 'Orçamento vencido: o check-out já passou e não pode ser aprovado.' : undefined}
+                            title={isExpired ? tr('Orçamento vencido: o check-out já passou e não pode ser aprovado.') : undefined}
                             onClick={() => handleApprove(orc)}>
-                            <Check size={12} /> {isExpired ? 'Vencido — não aprovável' : 'Aprovar Orçamento'}
+                            <Check size={12} /> {isExpired ? tr('Vencido — não aprovável') : tr('Aprovar Orçamento')}
                           </button>
                           <div className={styles.orcMenuDivider} />
                           <button className={[styles.orcMenuItem, styles.orcMenuItemDanger].join(' ')} onClick={(e) => { setOpenMenuId(null); openCancelOrc(e, orc); }}>
-                            <Trash2 size={12} /> Cancelar
+                            <Trash2 size={12} /> {tr('Cancelar')}
                           </button>
                         </div>
                       )}
@@ -3548,7 +3547,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                           key={h.id}
                           className={[styles.orcHospItem, st === 'cancelado' ? styles.orcHospItemCancelado : ''].join(' ')}
                           onClick={() => setEditHosp({ orc, hosp: h })}
-                          title="Clique para editar"
+                          title={tr('Clique para editar')}
                         >
                           {/* ── Banda de período escura ── */}
                           <div className={styles.orcHospBand}>
@@ -3561,7 +3560,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                           {/* Quarto */}
                           {quartoId && (
                             <div className={styles.orcHospRoomLabel}>
-                              Apartamento {fmtRoom(quartoId)}
+                              {tr('Apartamento')} {fmtRoom(quartoId)}
                             </div>
                           )}
 
@@ -3573,7 +3572,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                                 return (
                                   <div key={p.id} className={styles.orcHospPessoaRow}>
                                     <span className={styles.orcHospPessoaNome}>{p.nome}</span>
-                                    {age !== null && <span className={styles.orcHospPessoaAge}>{age} anos</span>}
+                                    {age !== null && <span className={styles.orcHospPessoaAge}>{age} {tr('anos')}</span>}
                                   </div>
                                 );
                               })}
@@ -3583,7 +3582,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                           {/* Valor total */}
                           {h.valor_total > 0 && (
                             <div className={styles.orcHospFooter}>
-                              <span className={styles.orcHospValor}>Total: {fmtBRL(h.valor_total)}</span>
+                              <span className={styles.orcHospValor}>{tr('Total:')} {fmtBRL(h.valor_total)}</span>
                             </div>
                           )}
 
@@ -3618,23 +3617,23 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
 
     {/* ── Modal: editar nome do orçamento ── */}
     <Modal open={!!editOrc} onClose={() => { setEditOrc(null); setEditNome(''); }} size="sm"
-      title={<><Pencil size={14} /> Editar Orçamento</>}
+      title={<><Pencil size={14} /> {tr('Editar Orçamento')}</>}
       footer={
         <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={() => { setEditOrc(null); setEditNome(''); }}>Cancelar</Button>
+          <Button variant="secondary" onClick={() => { setEditOrc(null); setEditNome(''); }}>{tr('Cancelar')}</Button>
           <Button variant="primary" disabled={!editNome.trim() || editSaving} onClick={handleSaveEditNome}>
-            {editSaving && <Loader2 size={13} className={styles.spin} />} Salvar
+            {editSaving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar')}
           </Button>
         </div>
       }
     >
       <div className={styles.formStack}>
-        <FormField label="Nome do Solicitante">
+        <FormField label={tr('Nome do Solicitante')}>
           <input
             className={styles.formInput}
             value={editNome}
             onChange={(e) => setEditNome(e.target.value.toUpperCase())}
-            placeholder="NOME DO SOLICITANTE"
+            placeholder={tr('NOME DO SOLICITANTE')}
             style={{ textTransform: 'uppercase' }}
             autoFocus
             onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEditNome(); }}
@@ -3646,21 +3645,21 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
     {/* ── Modal: editar hospedagem (placeholder — expande conforme necessidade) ── */}
     {editHosp && (
       <Modal open onClose={() => setEditHosp(null)} size="sm"
-        title={<><Pencil size={14} /> Editar Hospedagem</>}
-        footer={<div className={styles.footerRight}><Button onClick={() => setEditHosp(null)}>Fechar</Button></div>}
+        title={<><Pencil size={14} /> {tr('Editar Hospedagem')}</>}
+        footer={<div className={styles.footerRight}><Button onClick={() => setEditHosp(null)}>{tr('Fechar')}</Button></div>}
       >
         <div className={styles.formStack}>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            Orçamento: <b style={{ color: 'var(--text)' }}>{editHosp.orc.nome_solicitante}</b>
+            {tr('Orçamento:')} <b style={{ color: 'var(--text)' }}>{editHosp.orc.nome_solicitante}</b>
           </p>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-2)' }}>
-            Período:{' '}
+            {tr('Período:')}{' '}
             <b style={{ color: 'var(--text)' }}>
               {fmtDateBR(parseBrDate(editHosp.hosp.data_hora_checkin))} → {fmtDateBR(parseBrDate(editHosp.hosp.data_hora_checkout))}
             </b>
           </p>
           <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--text-2)' }}>
-            Edição de hospedagem em desenvolvimento.
+            {tr('Edição de hospedagem em desenvolvimento.')}
           </p>
         </div>
       </Modal>
@@ -3668,24 +3667,24 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
 
     {/* ── Modal: cancelar orçamento ── */}
     <Modal open={!!cancelOrc} onClose={() => { setCancelOrc(null); setCancelMotivo(''); }} size="sm"
-      title={<><Trash2 size={14} /> Cancelar Orçamento</>}
+      title={<><Trash2 size={14} /> {tr('Cancelar Orçamento')}</>}
       footer={
         <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={() => { setCancelOrc(null); setCancelMotivo(''); }}>Voltar</Button>
+          <Button variant="secondary" onClick={() => { setCancelOrc(null); setCancelMotivo(''); }}>{tr('Voltar')}</Button>
           <Button variant="danger" disabled={!cancelMotivo.trim() || cancelSaving} onClick={handleConfirmCancel}>
-            {cancelSaving && <Loader2 size={13} className={styles.spin} />} Cancelar Definitivamente
+            {cancelSaving && <Loader2 size={13} className={styles.spin} />} {tr('Cancelar Definitivamente')}
           </Button>
         </div>
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
-          Informe o motivo do cancelamento do orçamento de{' '}
+          {tr('Informe o motivo do cancelamento do orçamento de')}{' '}
           <b>{cancelOrc?.nome_solicitante}</b>:
         </p>
         <textarea
           className={styles.motivoTextarea}
-          placeholder="Ex.: Solicitação do cliente"
+          placeholder={tr('Ex.: Solicitação do cliente')}
           rows={3}
           value={cancelMotivo}
           onChange={(e) => setCancelMotivo(e.target.value)}
@@ -3739,19 +3738,19 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
       )}
 
       <Modal open={!showCreate} onClose={onClose} size="md"
-        title={<><Bell size={15} /> Solicitações{!loading && ` (${solicitacoes.length})`}</>}
+        title={<><Bell size={15} /> {tr('Solicitações')}{!loading && ` (${solicitacoes.length})`}</>}
         footer={
           <div className={styles.footerRight}>
             <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={14} /> Nova Solicitação
+              <Plus size={14} /> {tr('Nova Solicitação')}
             </Button>
           </div>
         }
       >
         {loading ? (
-          <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />Carregando...</div>
+          <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
         ) : solicitacoes.length === 0 ? (
-          <div className={styles.emptyState}>Nenhuma solicitação pendente.</div>
+          <div className={styles.emptyState}>{tr('Nenhuma solicitação pendente.')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {solicitacoes.map((r) => {
@@ -3766,7 +3765,7 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
                   <div className={styles.searchDropInfo}>
                     <div className={styles.searchDropName}>{nomeDisplay}</div>
                     <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                    <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                    <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                   </div>
                 </div>
               );
@@ -3838,8 +3837,8 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
 
   const fl = filter.toLowerCase();
   const label = value.length === 0
-    ? (singleSelect ? 'Selecione um apartamento...' : 'Selecione apartamento(s)...')
-    : `Apartamento ${fmtRoom(parseInt(value[0]))}${!singleSelect && value.length > 1 ? ` +${value.length - 1}` : ''}`;
+    ? (singleSelect ? tr('Selecione um apartamento...') : tr('Selecione apartamento(s)...'))
+    : tr('Apartamento {{v0}}{{v1}}', { v0: fmtRoom(parseInt(value[0])), v1: !singleSelect && value.length > 1 ? ` +${value.length - 1}` : '' });
 
   const dropdown = open && createPortal(
     <div ref={dropRef} className={styles.comboDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
@@ -3849,7 +3848,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
           className={styles.comboSearchInput}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filtrar apartamento..."
+          placeholder={tr('Filtrar apartamento...')}
           autoFocus
         />
       </div>
@@ -3872,9 +3871,9 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
                   {!singleSelect && (
                     <div className={[styles.comboCheck, sel ? styles.comboCheckSel : ''].join(' ')}>{sel && '✓'}</div>
                   )}
-                  <span className={styles.comboItemNum}>Apartamento {fmtRoom(r)}</span>
+                  <span className={styles.comboItemNum}>{tr('Apartamento')} {fmtRoom(r)}</span>
                   {roomDescMap[r] && <span className={styles.comboItemTipo}>{roomDescMap[r]}</span>}
-                  {!avail && <span className={styles.comboItemOcupado}>Ocupado</span>}
+                  {!avail && <span className={styles.comboItemOcupado}>{tr('Ocupado')}</span>}
                 </div>
               );
             })}
@@ -3893,13 +3892,13 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
       >
         {loading ? (
           <span className={styles.comboPlaceholder} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Loader2 size={13} className={styles.spin} /> Verificando disponibilidade...
+            <Loader2 size={13} className={styles.spin} /> {tr('Verificando disponibilidade...')}
           </span>
         ) : value.length > 0 ? (
           <div className={styles.comboChipsInline}>
             {value.map((q) => (
               <div key={q} className={styles.hospedeChipRect}>
-                <span>Apartamento {fmtRoom(parseInt(q))}</span>
+                <span>{tr('Apartamento')} {fmtRoom(parseInt(q))}</span>
                 <button type="button" className={styles.chipRemove}
                   onClick={(e) => { e.stopPropagation(); if (singleSelect) onChange([]); else handleSelect(parseInt(q)); }}><X size={10} /></button>
               </div>
@@ -3960,22 +3959,22 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
           className={styles.formInput}
           style={{ flex: 1, minWidth: 0 }}
           type="text"
-          placeholder="Nome do hóspede"
+          placeholder={tr('Nome do hóspede')}
           value={nome}
           onChange={(e) => setNome(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
         />
         <label className={styles.empresaModeToggle}>
           <input type="checkbox" checked={isAdulto} onChange={(e) => { setIsAdulto(e.target.checked); if (e.target.checked) setDob(null); }} />
-          <span>Adulto</span>
+          <span>{tr('Adulto')}</span>
         </label>
         {!isAdulto && (
           <div style={{ width: 150, flexShrink: 0 }}>
-            <DatePicker value={dob} onChange={setDob} placeholder="Nascimento" maxDate={new Date()} />
+            <DatePicker value={dob} onChange={setDob} placeholder={tr('Nascimento')} maxDate={new Date()} />
           </div>
         )}
         <button type="button" className={styles.addOrcGuestBtn} onClick={add} disabled={!canAdd}>
-          <Plus size={13} /> Adicionar Hóspede
+          <Plus size={13} /> {tr('Adicionar Hóspede')}
         </button>
       </div>
       {value.length > 0 && (
@@ -3984,7 +3983,7 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
             <div key={i} className={styles.hospedeChipRect}>
               <span>{p.nome}</span>
               {p._adulto
-                ? <span style={{ color: 'var(--text-2)', fontSize: 11 }}>Adulto</span>
+                ? <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{tr('Adulto')}</span>
                 : p.dataNascimento && <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{fmtDateBR(p.dataNascimento)}</span>
               }
               <button type="button" className={styles.chipRemove} onClick={() => rem(i)}><X size={10} /></button>
@@ -4158,7 +4157,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
       {pending ? (
         <>
           <div className={styles.companionHeader}>
-            <button className={styles.companionBack} onClick={() => setPending(null)}><ChevronLeft size={12} /> Voltar</button>
+            <button className={styles.companionBack} onClick={() => setPending(null)}><ChevronLeft size={12} /> {tr('Voltar')}</button>
             {pending.type === 'empresa' && (
               <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-2)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {pending.empresa.nome}
@@ -4178,7 +4177,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
                     <span className={styles.companionName}>{v.nome}</span>
                     {v.cpf && <span className={styles.companionMeta}>{fmtCpf(v.cpf)}</span>}
                   </div>
-                  {v.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                  {v.bloqueado && <span className={styles.blockedChip}>{tr('Bloqueado')}</span>}
                 </div>
               ))
             ) : (
@@ -4189,7 +4188,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
                     <span className={styles.companionName}>{pending.titular.nome}</span>
                     {pending.titular.cpf && <span className={styles.companionMeta}>{fmtCpf(pending.titular.cpf)}</span>}
                   </div>
-                  <span className={styles.titularChip}>Titular</span>
+                  <span className={styles.titularChip}>{tr('Titular')}</span>
                 </div>
                 {pending.titular.acompanhantes.map((a) => (
                   <div key={a.id}
@@ -4201,10 +4200,10 @@ function RoomHospedesPicker({ value = [], onChange }) {
                     <div className={styles.companionInfo}>
                       <span className={styles.companionName}>{a.nome}</span>
                       <span className={styles.companionMeta}>
-                        {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? ` · ${a.idade} anos` : ''}
+                        {a.cpf ? fmtCpf(a.cpf) : ''}{a.idade ? tr(' · {{idade}} anos', { idade: a.idade }) : ''}
                       </span>
                     </div>
-                    {a.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                    {a.bloqueado && <span className={styles.blockedChip}>{tr('Bloqueado')}</span>}
                   </div>
                 ))}
               </>
@@ -4213,15 +4212,15 @@ function RoomHospedesPicker({ value = [], onChange }) {
           <div className={styles.companionActions}>
             {pending.type === 'empresa' ? (
               <>
-                <button className={styles.companionBtnSecondary} onClick={() => setPending(null)}>Cancelar</button>
+                <button className={styles.companionBtnSecondary} onClick={() => setPending(null)}>{tr('Cancelar')}</button>
                 <button className={styles.companionBtnPrimary} onClick={confirmAdd} disabled={pending.selected.size === 0}>
-                  Adicionar{pending.selected.size > 0 ? ` (${pending.selected.size})` : ''} →
+                  {tr('Adicionar')}{pending.selected.size > 0 ? ` (${pending.selected.size})` : ''} →
                 </button>
               </>
             ) : (
               <>
-                <button className={styles.companionBtnSecondary} onClick={confirmPessoaOnly}>Só o titular</button>
-                <button className={styles.companionBtnPrimary} onClick={confirmAdd}>Adicionar →</button>
+                <button className={styles.companionBtnSecondary} onClick={confirmPessoaOnly}>{tr('Só o titular')}</button>
+                <button className={styles.companionBtnPrimary} onClick={confirmAdd}>{tr('Adicionar →')}</button>
               </>
             )}
           </div>
@@ -4235,8 +4234,8 @@ function RoomHospedesPicker({ value = [], onChange }) {
               <div className={styles.searchResultName}>{h.nome}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 {!h.isEmpresa && h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
-                {!h.isEmpresa && h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} acomp.</span>}
-                {!h.isEmpresa && h.bloqueado && <span className={styles.blockedChip}>Bloqueado</span>}
+                {!h.isEmpresa && h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.companionCountChip}>{h.acompanhantes.length} {tr('acomp.')}</span>}
+                {!h.isEmpresa && h.bloqueado && <span className={styles.blockedChip}>{tr('Bloqueado')}</span>}
               </div>
               <ChevronRight size={13} className={styles.addIcon} />
             </div>
@@ -4264,12 +4263,12 @@ function RoomHospedesPicker({ value = [], onChange }) {
             <input ref={inputRef} className={styles.hospInlineInput} value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={loadRecent}
-              placeholder={value.length === 0 ? (isEmpresaMode ? 'Buscar empresa...' : 'Buscar hóspede...') : ''} />
+              placeholder={value.length === 0 ? (isEmpresaMode ? tr('Buscar empresa...') : tr('Buscar hóspede...')) : ''} />
           </div>
         </div>
         <label className={styles.empresaModeToggle}>
           <input type="checkbox" checked={isEmpresaMode} onChange={(e) => toggleEmpresaMode(e.target.checked)} />
-          <span>Empresa</span>
+          <span>{tr('Empresa')}</span>
         </label>
       </div>
       {dropdown}
@@ -4292,11 +4291,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const hasPeriodoStep = tipo === 'grupo' && !initialRoom && !forcePernoite;
   const hasPagStep     = !forceSolicitacao && !forceOrcamento && tipo === 'grupo';
   const stepDefs = [
-    { id: 'tipo',     label: 'Tipo de Reserva' },
-    ...(hasPeriodoStep ? [{ id: 'periodo', label: 'Modo de Período' }] : []),
-    { id: 'dados',    label: isSolicitacao ? 'Período & Hóspedes' : 'Apartamento, Período & Hóspedes' },
-    ...(hasPagStep     ? [{ id: 'pagamento', label: 'Modo de Pagamento' }] : []),
-    { id: 'resumo',   label: isSolicitacao ? 'Resumo' : 'Resumo & Pagamento' },
+    { id: 'tipo',     label: tr('Tipo de Reserva') },
+    ...(hasPeriodoStep ? [{ id: 'periodo', label: tr('Modo de Período') }] : []),
+    { id: 'dados',    label: isSolicitacao ? tr('Período & Hóspedes') : tr('Apartamento, Período & Hóspedes') },
+    ...(hasPagStep     ? [{ id: 'pagamento', label: tr('Modo de Pagamento') }] : []),
+    { id: 'resumo',   label: isSolicitacao ? tr('Resumo') : tr('Resumo & Pagamento') },
   ];
   const STEPS        = stepDefs.map((s) => s.label);
   const stepNo       = (id) => stepDefs.findIndex((s) => s.id === id) + 1; // 0 = passo inexistente
@@ -4664,7 +4663,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
         {grupos.map((g, gi) => (
           <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
             <span>
-              {g.meia ? 'Meia diária' : g.qtd > 1 ? 'Diárias' : 'Diária'}
+              {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
               {diariaSubs(g, guestLabel) && (
                 <span className={styles.rcDiariaSub}> · {diariaSubs(g, guestLabel)}</span>
               )}
@@ -4672,10 +4671,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             <span className={styles.rcDiariaVal}>
               {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
               {pagoIntegral && gi === grupos.length - 1 && (
-                <span className={styles.rcDiariaTag}>(Pago 100%)</span>
+                <span className={styles.rcDiariaTag}>{tr('(Pago 100%)')}</span>
               )}
               {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
-              {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}x </span>}
+              {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}{tr('x')} </span>}
               {fmtBRL(g.valor)}
             </span>
           </div>
@@ -4837,7 +4836,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
       // Meia diária no dia do check-in: exige hora de entrada e não pode ser antes do término dela.
       if (halfDailyMinCheckin && (!checkinHour || checkinHour < halfDailyMinCheckin)) {
-        onNotify?.(`A hora de check-in deve ser após o término da meia diária (${halfDailyMinCheckin}).`, 'error');
+        onNotify?.(tr('A hora de check-in deve ser após o término da meia diária ({{halfDailyMinCheckin}}).', { halfDailyMinCheckin }), 'error');
         setSaving(false);
         return;
       }
@@ -4863,17 +4862,17 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       const allResults = Array.isArray(res) ? res : (res ? [res] : []);
       await onSave(forcePernoite ? { _isPernoite: true, results: allResults.filter(Boolean) } : { _isReserva: true, results: allResults.filter(Boolean) });
     } catch (e) {
-      onNotify?.(e?.message || 'Erro ao salvar reserva.', 'error');
+      onNotify?.(e?.message || tr('Erro ao salvar reserva.'), 'error');
     } finally { setSaving(false); }
   };
 
   return (
     <Modal open onClose={onClose} size="lg"
       bodyStyle={{ padding: '16px 22px' }}
-      title={<><Plus size={15} /> {forcePernoite ? 'Novo Pernoite' : isSolicitacao ? 'Nova Solicitação' : forceOrcamento ? 'Novo Orçamento' : 'Nova Reserva'}</>}
+      title={<><Plus size={15} /> {forcePernoite ? tr('Novo Pernoite') : isSolicitacao ? tr('Nova Solicitação') : forceOrcamento ? tr('Novo Orçamento') : tr('Nova Reserva')}</>}
       footer={
         <div className={styles.footerSpread}>
-          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === SUMMARY_STEP) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>Voltar</Button>}</div>
+          <div>{step > 1 && <Button variant="secondary" onClick={() => { setStep((s) => s - 1); if (step === SUMMARY_STEP) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>{tr('Voltar')}</Button>}</div>
           <div className={styles.footerRight}>
             {step < STEPS.length ? (
               <Button variant="primary"
@@ -4882,12 +4881,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   (step === DADOS_STEP && !canNext2)
                 }
                 onClick={step === SUMMARY_STEP - 1 ? handleGoToResumo : () => setStep((s) => s + 1)}>
-                Próximo
+                {tr('Próximo')}
               </Button>
             ) : (
               <Button variant="primary" disabled={saving || calcLoading || (!isSolicitacao && !canNext2)} onClick={handleSave}>
                 {saving && <Loader2 size={13} className={styles.spin} />}
-                {forcePernoite ? 'Criar Pernoite' : isSolicitacao ? 'Criar Solicitação' : forceOrcamento ? 'Gerar Orçamento' : 'Criar Reserva'}
+                {forcePernoite ? tr('Criar Pernoite') : isSolicitacao ? tr('Criar Solicitação') : forceOrcamento ? tr('Gerar Orçamento') : tr('Criar Reserva')}
               </Button>
             )}
           </div>
@@ -4910,10 +4909,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       {step === SUMMARY_STEP && (
         <div style={{ padding: '10px 0 0', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
           <div className={styles.summaryKv}>
-            <div className={styles.kvRow}><span className={styles.kvLabel}>Tipo</span><span className={styles.kvVal}>{tipo === 'grupo' ? 'Vários Apartamentos' : 'Apartamento Único'}{isSolicitacao ? ' · Solicitação' : isOrcamento ? ' · Orçamento' : ''}</span></div>
-            <div className={styles.kvRow}><span className={styles.kvLabel}>Modo</span><span className={styles.kvVal}>{periodoMode === 'unico' ? 'Período único' : 'Múltiplos períodos'}</span></div>
+            <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Tipo')}</span><span className={styles.kvVal}>{tipo === 'grupo' ? tr('Vários Apartamentos') : tr('Apartamento Único')}{isSolicitacao ? tr(' · Solicitação') : isOrcamento ? tr(' · Orçamento') : ''}</span></div>
+            <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Modo')}</span><span className={styles.kvVal}>{periodoMode === 'unico' ? tr('Período único') : tr('Múltiplos períodos')}</span></div>
             {hasPagStep && (
-              <div className={styles.kvRow}><span className={styles.kvLabel}>Pagamento</span><span className={styles.kvVal}>{pagModo === 'unico' ? 'Pagamento único' : 'Pagamento por quarto'}</span></div>
+              <div className={styles.kvRow}><span className={styles.kvLabel}>{tr('Pagamento')}</span><span className={styles.kvVal}>{pagModo === 'unico' ? tr('Pagamento único') : tr('Pagamento por quarto')}</span></div>
             )}
           </div>
         </div>
@@ -4929,13 +4928,13 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               {[
                 {
                   v: 'simples',
-                  titulo: 'Apartamento Único',
-                  desc: 'Um apartamento, um período e uma lista de hóspedes. É a opção do dia a dia, para a reserva de uma família ou de um hóspede só.',
+                  titulo: tr('Apartamento Único'),
+                  desc: tr('Um apartamento, um período e uma lista de hóspedes. É a opção do dia a dia, para a reserva de uma família ou de um hóspede só.'),
                 },
                 {
                   v: 'grupo',
-                  titulo: 'Vários Apartamentos',
-                  desc: 'Vários apartamentos na mesma reserva, com hóspedes por quarto. Permite períodos diferentes para cada grupo de apartamentos e voucher do grupo inteiro.',
+                  titulo: tr('Vários Apartamentos'),
+                  desc: tr('Vários apartamentos na mesma reserva, com hóspedes por quarto. Permite períodos diferentes para cada grupo de apartamentos e voucher do grupo inteiro.'),
                 },
               ].map((o) => (
                 <div key={o.v}
@@ -4952,11 +4951,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               ))}
           </div>
           {forceOrcamento && (
-            <FormField label="Nome do Solicitante">
+            <FormField label={tr('Nome do Solicitante')}>
               <input
                 className={styles.formInput}
                 type="text"
-                placeholder="Ex: JOÃO SILVA"
+                placeholder={tr('Ex: JOÃO SILVA')}
                 value={nomeSolicitante}
                 onChange={(e) => setNomeSolicitante(e.target.value.toUpperCase())}
                 style={{ textTransform: 'uppercase' }}
@@ -4974,13 +4973,13 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             {[
               {
                 v: 'unico',
-                titulo: 'Período Único',
-                desc: 'Todos os apartamentos entram e saem nas mesmas datas. Você escolhe o check-in, o check-out e depois os quartos com seus hóspedes.',
+                titulo: tr('Período Único'),
+                desc: tr('Todos os apartamentos entram e saem nas mesmas datas. Você escolhe o check-in, o check-out e depois os quartos com seus hóspedes.'),
               },
               {
                 v: 'multiplos',
-                titulo: 'Múltiplos Períodos',
-                desc: 'Cada grupo de apartamentos tem suas próprias datas. Você monta um período por vez — datas, quartos e hóspedes — e vai adicionando à reserva.',
+                titulo: tr('Múltiplos Períodos'),
+                desc: tr('Cada grupo de apartamentos tem suas próprias datas. Você monta um período por vez — datas, quartos e hóspedes — e vai adicionando à reserva.'),
               },
             ].map((o) => (
               <div key={o.v}
@@ -5006,7 +5005,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           {periodoMode === 'unico' && (
             <>
               <div className={styles.step2Grid}>
-                <FormField label={<>Check-in{checkinStr && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>{fmtDateBR(checkinStr)}</span>}</>}>
+                <FormField label={<>{tr('Check-in')}{checkinStr && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>{fmtDateBR(checkinStr)}</span>}</>}>
                   <div className={styles.dateCompact}>
                     <DatePicker mode="single" value={checkin}
                       onChange={(d) => {
@@ -5014,20 +5013,20 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
                         if (checkout && d && checkout <= d) setCheckout(null);
                       }}
-                      placeholder="Data de check-in" minDate={new Date()} />
+                      placeholder={tr('Data de check-in')} minDate={new Date()} />
                   </div>
                 </FormField>
-                <FormField label={<>Check-out{checkoutStr && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>{fmtDateBR(checkoutStr)}</span>}{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
+                <FormField label={<>{tr('Check-out')}{checkoutStr && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>{fmtDateBR(checkoutStr)}</span>}{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
                   <div className={styles.dateCompact}>
                     <DatePicker mode="single" value={checkout}
                       onChange={(d) => { setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }}
-                      placeholder="Data de check-out"
+                      placeholder={tr('Data de check-out')}
                       minDate={checkin ? new Date(checkin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
                       markedDate={checkin} />
                   </div>
                 </FormField>
               </div>
-              <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
+              <FormField label={tipo === 'grupo' ? tr('Apartamentos (múltipla seleção)') : tr('Apartamento')}>
                 <RoomCombobox value={quartos}
                   onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                   availableRooms={availableRooms}
@@ -5039,8 +5038,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                   <div className={styles.kvSectionDivider} style={{ margin: 0 }}>
-                    Hóspedes{quartos.length > 1 ? ` — Apartamento ${fmtRoom(parseInt(q))}` : ''}
-                    <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 11, marginLeft: 8 }}>· 1º hóspede = solicitante</span>
+                    {tr('Hóspedes')}{quartos.length > 1 ? tr(' — Apartamento {{v0}}', { v0: fmtRoom(parseInt(q)) }) : ''}
+                    <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 11, marginLeft: 8 }}>{tr('· 1º hóspede = solicitante')}</span>
                   </div>
                   <SemCadastroHospedesPicker
                     value={quartoHospedesOrc[q] || []}
@@ -5075,7 +5074,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                           {h.nome}{hi < hosp.length - 1 ? ',' : ''}
                                         </span>
                                       ))
-                                    : <span style={{ fontSize: 11, color: 'var(--text-2)' }}>sem hóspedes</span>
+                                    : <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{tr('sem hóspedes')}</span>
                                   }
                                 </div>
                               );
@@ -5095,7 +5094,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               )}
               <div className={styles.mpForm}>
                 <div className={styles.step2Grid}>
-                  <FormField label="Check-in">
+                  <FormField label={tr('Check-in')}>
                     <div className={styles.dateCompact}>
                       <DatePicker mode="single" value={mpCheckin}
                         onChange={(d) => {
@@ -5103,20 +5102,20 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           setMpRooms([]); setMpRoomHospedes({}); setMpRoomHospedesOrc({});
                           if (mpCheckout && d && mpCheckout <= d) setMpCheckout(null);
                         }}
-                        placeholder="Data de check-in" minDate={new Date()} />
+                        placeholder={tr('Data de check-in')} minDate={new Date()} />
                     </div>
                   </FormField>
-                  <FormField label="Check-out">
+                  <FormField label={tr('Check-out')}>
                     <div className={styles.dateCompact}>
                       <DatePicker mode="single" value={mpCheckout}
                         onChange={(d) => { setMpCheckout(d); setMpRooms([]); setMpRoomHospedes({}); setMpRoomHospedesOrc({}); }}
-                        placeholder="Data de check-out"
+                        placeholder={tr('Data de check-out')}
                         minDate={mpCheckin ? new Date(mpCheckin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
                         markedDate={mpCheckin} />
                     </div>
                   </FormField>
                 </div>
-                <FormField label="Apartamentos para este período">
+                <FormField label={tr('Apartamentos para este período')}>
                   <RoomCombobox value={mpRooms}
                     onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                     availableRooms={mpAvailableRooms} categorias={categorias} roomDescMap={roomDescMap}
@@ -5126,8 +5125,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                     <div className={styles.kvSectionDivider} style={{ margin: 0 }}>
-                      Hóspedes{mpRooms.length > 1 ? ` — Apartamento ${fmtRoom(parseInt(q))}` : ''}
-                      <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 11, marginLeft: 8 }}>· 1º hóspede = solicitante</span>
+                      {tr('Hóspedes')}{mpRooms.length > 1 ? tr(' — Apartamento {{v0}}', { v0: fmtRoom(parseInt(q)) }) : ''}
+                      <span style={{ fontWeight: 400, color: 'var(--text-2)', fontSize: 11, marginLeft: 8 }}>{tr('· 1º hóspede = solicitante')}</span>
                     </div>
                     <SemCadastroHospedesPicker
                       value={mpRoomHospedesOrc[q] || []}
@@ -5139,10 +5138,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <Button variant="orange"
                     disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => !(mpRoomHospedesOrc[q]?.length > 0))}
                     onClick={addPeriodo}>
-                    {editingPeriodoIdx !== null ? <><Check size={13} /> Salvar Alterações</> : <><Plus size={13} /> Adicionar Período</>}
+                    {editingPeriodoIdx !== null ? <><Check size={13} /> {tr('Salvar Alterações')}</> : <><Plus size={13} /> {tr('Adicionar Período')}</>}
                   </Button>
                   {editingPeriodoIdx !== null && (
-                    <Button variant="secondary" onClick={resetMpForm}>Cancelar</Button>
+                    <Button variant="secondary" onClick={resetMpForm}>{tr('Cancelar')}</Button>
                   )}
                 </div>
               </div>
@@ -5157,18 +5156,18 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           {/* Vincular esta(s) reserva(s) a um grupo já existente (opcional).
               Aberto pelo painel de grupos, o grupo já vem definido e não muda. */}
           {!isOrcamento && gruposExistentes.length > 0 && (
-            <FormField label={<><Users size={13} /> {initialGrupo != null ? 'Grupo da reserva' : 'Vincular a grupo existente (opcional)'}</>}>
+            <FormField label={<><Users size={13} /> {initialGrupo != null ? tr('Grupo da reserva') : tr('Vincular a grupo existente (opcional)')}</>}>
               <select
                 className={styles.formInput}
                 value={grupoVinculado ?? ''}
                 disabled={initialGrupo != null}
-                title={initialGrupo != null ? 'Reserva iniciada pelo painel do grupo' : undefined}
+                title={initialGrupo != null ? tr('Reserva iniciada pelo painel do grupo') : undefined}
                 onChange={(e) => setGrupoVinculado(e.target.value ? Number(e.target.value) : null)}
               >
-                {initialGrupo == null && <option value="">Não vincular a nenhum grupo</option>}
+                {initialGrupo == null && <option value="">{tr('Não vincular a nenhum grupo')}</option>}
                 {gruposExistentes.map((g) => (
                   <option key={g.grupo_id} value={g.grupo_id}>
-                    {g.descricao || (g.titulares || '').split(',')[0].trim() || `Grupo #${g.grupo_id}`} · #{g.grupo_id} ({g.count} apto{g.count !== 1 ? 's' : ''})
+                    {g.descricao || (g.titulares || '').split(',')[0].trim() || `Grupo #${g.grupo_id}`} · #{g.grupo_id} ({g.count} {tr('apto')}{g.count !== 1 ? 's' : ''})
                   </option>
                 ))}
               </select>
@@ -5179,7 +5178,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             <>
               <div className={styles.step2Grid}>
                 {/* Pernoite: check-in travado em hoje (só leitura). */}
-                <FormField label="Check-in">
+                <FormField label={tr('Check-in')}>
                   <div className={styles.dateCompact}>
                     <DatePicker mode="single" value={checkin}
                       readOnly={forcePernoite}
@@ -5189,10 +5188,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         // check-out anterior/igual ao novo check-in deixa de ser válido
                         if (checkout && d && checkout <= d) setCheckout(null);
                       }}
-                      placeholder="Data de check-in" minDate={new Date()} />
+                      placeholder={tr('Data de check-in')} minDate={new Date()} />
                   </div>
                 </FormField>
-                <FormField label={<>Check-out{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
+                <FormField label={<>{tr('Check-out')}{checkinStr && checkoutStr && dias > 0 && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(dias)}</span>}</>}>
                   <div className={styles.dateCompact}>
                     <DatePicker mode="single" value={checkout}
                       onChange={(d) => {
@@ -5200,7 +5199,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
                         setMeiaDiaria(false); setHoraSaidaMeia('');
                       }}
-                      placeholder={checkin ? 'Data de check-out' : 'Defina o check-in primeiro'}
+                      placeholder={checkin ? tr('Data de check-out') : tr('Defina o check-in primeiro')}
                       disabled={!checkin}
                       minDate={checkin ? new Date(checkin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
                       markedDate={checkin} />
@@ -5215,18 +5214,18 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                             setMeiaDiaria(e.target.checked);
                             if (!e.target.checked) setHoraSaidaMeia('');
                           }} />
-                        <span>Meia diária</span>
+                        <span>{tr('Meia diária')}</span>
                       </label>
                       {meiaDiaria && (
                         <div className={styles.meiaDiariaRow}>
-                          <span className={styles.meiaDiariaLabel}>Hora de saída</span>
+                          <span className={styles.meiaDiariaLabel}>{tr('Hora de saída')}</span>
                           <div className={styles.meiaDiariaInput}>
                             <TimeInput value={horaSaidaMeia} onChange={setHoraSaidaMeia} />
                           </div>
                           <span className={temMeiaDiaria ? styles.meiaDiariaAviso : styles.meiaDiariaHint}>
                             {temMeiaDiaria
-                              ? `Meio valor da diária de ${fmtDateBR(checkoutStr)}`
-                              : `Informe uma hora após o checkout da categoria (${checkoutCatHora})`}
+                              ? tr('Meio valor da diária de {{v0}}', { v0: fmtDateBR(checkoutStr) })
+                              : tr('Informe uma hora após o checkout da categoria ({{checkoutCatHora}})', { checkoutCatHora })}
                           </span>
                         </div>
                       )}
@@ -5234,7 +5233,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   )}
                 </FormField>
               </div>
-              <FormField label={tipo === 'grupo' ? 'Apartamentos (múltipla seleção)' : 'Apartamento'}>
+              <FormField label={tipo === 'grupo' ? tr('Apartamentos (múltipla seleção)') : tr('Apartamento')}>
                 <RoomCombobox value={quartos}
                   onChange={(v) => { setQuartos(v); setQuartoHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                   availableRooms={availableRooms}
@@ -5247,7 +5246,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
                   {tipo === 'grupo' && (
-                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}</div>
+                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>{tr('Apartamento')} {fmtRoom(parseInt(q))}</div>
                   )}
                   {isOrcSemCadastro ? (
                     <SemCadastroHospedesPicker
@@ -5267,11 +5266,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     <span className={styles.avisoBoxIcon}><AlertTriangle size={16} /></span>
                     <div className={styles.avisoBoxBody}>
                       <span className={styles.avisoBoxTitle}>
-                        Hora de check-in (meia diária anterior)
+                        {tr('Hora de check-in (meia diária anterior)')}
                       </span>
                       <p className={styles.avisoBoxText}>
-                        Há uma meia diária encerrando às <b>{halfDailyMinCheckin}</b> no dia do check-in.
-                        Defina a hora de entrada — não pode ser anterior a esse horário.
+                        {tr('Há uma meia diária encerrando às')} <b>{halfDailyMinCheckin}</b> {tr('no dia do check-in. Defina a hora de entrada — não pode ser anterior a esse horário.')}
                       </p>
                       <div style={{ maxWidth: 150 }}>
                         <TimeInput value={checkinHour} onChange={setCheckinHour} />
@@ -5306,7 +5304,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                           {h.nome}{hi < hosp.length - 1 ? ',' : ''}
                                         </span>
                                       ))
-                                    : <span style={{ fontSize: 11, color: 'var(--text-2)' }}>sem hóspedes</span>
+                                    : <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{tr('sem hóspedes')}</span>
                                   }
                                 </div>
                               );
@@ -5326,7 +5324,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               )}
               <div className={styles.mpForm}>
                 <div className={styles.step2Grid}>
-                  <FormField label="Check-in">
+                  <FormField label={tr('Check-in')}>
                     <div className={styles.dateCompact}>
                       <DatePicker mode="single" value={mpCheckin}
                         onChange={(d) => {
@@ -5335,21 +5333,21 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           // check-out anterior/igual ao novo check-in deixa de ser válido
                           if (mpCheckout && d && mpCheckout <= d) setMpCheckout(null);
                         }}
-                        placeholder="Data de check-in" minDate={new Date()} />
+                        placeholder={tr('Data de check-in')} minDate={new Date()} />
                     </div>
                   </FormField>
-                  <FormField label={<>Check-out{mpCheckin && mpCheckout && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(diffDays(formatDate(mpCheckin), formatDate(mpCheckout)))}</span>}</>}>
+                  <FormField label={<>{tr('Check-out')}{mpCheckin && mpCheckout && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(diffDays(formatDate(mpCheckin), formatDate(mpCheckout)))}</span>}</>}>
                     <div className={styles.dateCompact}>
                       <DatePicker mode="single" value={mpCheckout}
                         onChange={(d) => { setMpCheckout(d); setMpRooms([]); setMpRoomHospedes({}); setMpRoomHospedesOrc({}); }}
-                        placeholder={mpCheckin ? 'Data de check-out' : 'Defina o check-in primeiro'}
+                        placeholder={mpCheckin ? tr('Data de check-out') : tr('Defina o check-in primeiro')}
                         disabled={!mpCheckin}
                         minDate={mpCheckin ? new Date(mpCheckin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
                         markedDate={mpCheckin} />
                     </div>
                   </FormField>
                 </div>
-                <FormField label="Apartamentos para este período">
+                <FormField label={tr('Apartamentos para este período')}>
                   <RoomCombobox value={mpRooms}
                     onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
                     availableRooms={mpAvailableRooms} categorias={categorias} roomDescMap={roomDescMap}
@@ -5359,7 +5357,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                 {/* Per-room hospedes for this period */}
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>Apartamento {fmtRoom(parseInt(q))}{roomDescMap[q] ? ` — ${roomDescMap[q]}` : ''}</div>
+                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>{tr('Apartamento')} {fmtRoom(parseInt(q))}{roomDescMap[q] ? ` — ${roomDescMap[q]}` : ''}</div>
                     {isOrcSemCadastro ? (
                       <SemCadastroHospedesPicker
                         value={mpRoomHospedesOrc[q] || []}
@@ -5374,10 +5372,10 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                 ))}
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Button variant="orange" disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => isOrcSemCadastro ? !(mpRoomHospedesOrc[q]?.length > 0) : !(mpRoomHospedes[q]?.length > 0))} onClick={addPeriodo}>
-                    {editingPeriodoIdx !== null ? <><Check size={13} /> Salvar Alterações</> : <><Plus size={13} /> Adicionar Período</>}
+                    {editingPeriodoIdx !== null ? <><Check size={13} /> {tr('Salvar Alterações')}</> : <><Plus size={13} /> {tr('Adicionar Período')}</>}
                   </Button>
                   {editingPeriodoIdx !== null && (
-                    <Button variant="secondary" onClick={resetMpForm}>Cancelar</Button>
+                    <Button variant="secondary" onClick={resetMpForm}>{tr('Cancelar')}</Button>
                   )}
                 </div>
               </div>
@@ -5390,18 +5388,18 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       {/* ── Step 3: Modo de Pagamento ─────────────────────────────────────── */}
       {hasPagStep && step === PAG_STEP && (
         <div className={styles.formStack}>
-          <FormField label="Como o pagamento será registrado?">
+          <FormField label={tr('Como o pagamento será registrado?')}>
             <div className={styles.choiceCards}>
               {[
                 {
                   v: 'por_quarto',
-                  titulo: 'Pagamento por quarto',
-                  desc: 'Cada apartamento tem seus próprios pagamentos e seu próprio saldo. Use quando os hóspedes pagam separadamente — cada quarto recebe o seu voucher e a sua cobrança.',
+                  titulo: tr('Pagamento por quarto'),
+                  desc: tr('Cada apartamento tem seus próprios pagamentos e seu próprio saldo. Use quando os hóspedes pagam separadamente — cada quarto recebe o seu voucher e a sua cobrança.'),
                 },
                 {
                   v: 'unico',
-                  titulo: 'Pagamento único',
-                  desc: 'Um só pagamento cobre todos os apartamentos da reserva. Use quando um responsável paga a conta inteira — o valor é lançado uma vez e abatido do total do grupo.',
+                  titulo: tr('Pagamento único'),
+                  desc: tr('Um só pagamento cobre todos os apartamentos da reserva. Use quando um responsável paga a conta inteira — o valor é lançado uma vez e abatido do total do grupo.'),
                 },
               ].map((o) => (
                 <div key={o.v}
@@ -5491,7 +5489,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <div className={styles.rcHeadLeft}>
                     <div className={styles.rcHeadTop}>
                       <span className={styles.rcTitle}>
-                        {isOrcamento ? 'Orçamento' : isSolicitacao ? 'Solicitação' : 'Pagamento único'}
+                        {isOrcamento ? tr('Orçamento') : isSolicitacao ? tr('Solicitação') : tr('Pagamento único')}
                       </span>
                     </div>
                   </div>
@@ -5500,7 +5498,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       <button type="button" className={[styles.rcBtn, styles.rcBtnPay].join(' ')}
                         disabled={calcLoading}
                         onClick={() => setShowPagModal(true)}>
-                        <DollarSign size={14} /> Registrar pagamento
+                        <DollarSign size={14} /> {tr('Registrar pagamento')}
                       </button>
                     )}
                   </div>
@@ -5510,8 +5508,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     novas reservas. Em branco, o back-end usa o titular da primeira. */}
                 {totalAptos > 1 && !isOrcamento && !isSolicitacao && (
                   <div className={[styles.rcSection, styles.rcSectionNoLine].join(' ')}>
-                    <FormField label="Responsável pelo grupo">
-                      <Input placeholder="Nome de quem responde pelo grupo"
+                    <FormField label={tr('Responsável pelo grupo')}>
+                      <Input placeholder={tr('Nome de quem responde pelo grupo')}
                         value={grupoResponsavel}
                         onChange={(e) => setGrupoResponsavel(e.target.value.toUpperCase())} />
                     </FormField>
@@ -5521,7 +5519,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                 <div className={styles.rcSection}>
                   {!isOrcamento && !isSolicitacao && pagUnico.length > 0 && (
                     <div className={styles.rcSectionHead}>
-                      <span className={styles.rcSectionLabel}>Pagamentos</span>
+                      <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
                     </div>
                   )}
                   {!isOrcamento && !isSolicitacao && pagUnico.map((p) => {
@@ -5550,7 +5548,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     return (
                       <div key={rKey} className={styles.rcDiariaRow}>
                         <span>
-                          Apartamento {fmtRoom(parseInt(q))}
+                          {tr('Apartamento')} {fmtRoom(parseInt(q))}
                           {roomDescMap[q] && <span className={styles.rcDiariaSub}> · {roomDescMap[q]}</span>}
                         </span>
                         <span className={styles.rcDiariaVal}>
@@ -5565,18 +5563,18 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <div className={styles.rcResumoList}>
                     {quitado && !isSolicitacao && (
                       <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>Total pago</span><span>{fmtBRL(totalPago)}</span>
+                        <span>{tr('Total pago')}</span><span>{fmtBRL(totalPago)}</span>
                       </div>
                     )}
                     {showTotal && (
                       <div className={styles.rcResumoRow}>
-                        <span>Total</span>
+                        <span>{tr('Total')}</span>
                         <span>{calcLoading ? <Loader2 size={14} className={styles.spin} /> : fmtBRL(grandTotal)}</span>
                       </div>
                     )}
                     {showPend && (
                       <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                        <span>Pendente</span><span>{fmtBRL(pendente)}</span>
+                        <span>{tr('Pendente')}</span><span>{fmtBRL(pendente)}</span>
                       </div>
                     )}
                   </div>
@@ -5599,11 +5597,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <div className={styles.step3PeriodoCard}>
                     <div className={styles.step3PeriodoHead}>
                     {periodoMode === 'multiplos' && (
-                      <span className={styles.step3PeriodoBandLabel}>Período {pi + 1}</span>
+                      <span className={styles.step3PeriodoBandLabel}>{tr('Período')} {pi + 1}</span>
                     )}
                     <div className={styles.rcPeriodRow}>
                       <div className={styles.ovDateCell}>
-                        <div className={styles.ovDateLabel}>Check-in</div>
+                        <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
                         <div className={styles.ovDateValue}>{fmtDateBR(ci)}</div>
                       </div>
                       <div className={styles.ovDateArrow}>
@@ -5612,23 +5610,23 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         </svg>
                       </div>
                       <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                        <div className={styles.ovDateLabel}>Check-out</div>
+                        <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
                         <div className={styles.ovDateValue}>{fmtDateBR(co)}</div>
                       </div>
                       <div className={styles.ovNightsCell}>
                         <div className={styles.ovNightsNum}>{d2}</div>
-                        <div className={styles.ovNightsLabel}>{d2 === 1 ? 'Diária' : 'Diárias'}</div>
+                        <div className={styles.ovNightsLabel}>{d2 === 1 ? tr('Diária') : tr('Diárias')}</div>
                       </div>
                       <div className={styles.ovNightsCell}>
                         <div className={styles.ovNightsNum}>{p.rooms.length}</div>
-                        <div className={styles.ovNightsLabel}>{p.rooms.length === 1 ? 'Apto' : 'Aptos'}</div>
+                        <div className={styles.ovNightsLabel}>{p.rooms.length === 1 ? tr('Apto') : tr('Aptos')}</div>
                       </div>
                       {/* Reserva de um único apartamento: os hóspedes do quarto são os da reserva,
                           então cabe mostrar quantas pessoas ficam nele ao lado do total de aptos. */}
                       {totalAptos === 1 && pPessoas > 0 && (
                         <div className={styles.ovNightsCell}>
                           <div className={styles.ovNightsNum}>{pPessoas}</div>
-                          <div className={styles.ovNightsLabel}>{pPessoas === 1 ? 'Pessoa' : 'Pessoas'}</div>
+                          <div className={styles.ovNightsLabel}>{pPessoas === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
                         </div>
                       )}
                     </div>
@@ -5650,8 +5648,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     const nAdultos  = rHosp.filter((h) => { const a = calcAge(h.dataNascimento); return a === null || a >= 18; }).length;
                     const nCriancas = rHosp.length - nAdultos;
                     const guestLabel = [
-                      nAdultos  ? `${nAdultos} ${nAdultos === 1 ? 'adulto' : 'adultos'}`       : '',
-                      nCriancas ? `${nCriancas} ${nCriancas === 1 ? 'criança' : 'crianças'}`   : '',
+                      nAdultos  ? `${nAdultos} ${nAdultos === 1 ? tr('adulto') : tr('adultos')}`       : '',
+                      nCriancas ? `${nCriancas} ${nCriancas === 1 ? tr('criança') : tr('crianças')}`   : '',
                     ].filter(Boolean).join(' · ');
                     // Uma única diária que já vale o total: a linha da diária ("Diária ··· R$ 120,00")
                     // repete o valor, então o "Total" é omitido. Com desconto que muda o total,
@@ -5678,12 +5676,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           <div className={styles.rcHeadLeft}>
                             <div className={styles.rcHeadTop}>
                               <button type="button" className={styles.rcToggleBtn}
-                                title={aberto ? 'Ocultar detalhes' : 'Mostrar detalhes'}
+                                title={aberto ? tr('Ocultar detalhes') : tr('Mostrar detalhes')}
                                 aria-expanded={aberto}
                                 onClick={() => setRoomOpen((prev) => ({ ...prev, [rKey]: !prev[rKey] }))}>
                                 <ChevronDown size={16} className={aberto ? styles.rcToggleOpen : undefined} />
                               </button>
-                              <span className={styles.rcTitle}>Apartamento {fmtRoom(parseInt(q))}</span>
+                              <span className={styles.rcTitle}>{tr('Apartamento')} {fmtRoom(parseInt(q))}</span>
                               {roomDescMap[q] && <span className={styles.rcChip}>{roomDescMap[q]}</span>}
                             </div>
                           </div>
@@ -5698,14 +5696,14 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                 <button type="button" className={[styles.rcBtn, styles.rcBtnPay].join(' ')}
                                   disabled={calcLoading}
                                   onClick={() => { setShowPagModalRoom(rKey); setShowPagModal(true); }}>
-                                  <DollarSign size={14} /> Pagamento
+                                  <DollarSign size={14} /> {tr('Pagamento')}
                                 </button>
                               )}
                               <button type="button"
                                 className={[styles.rcBtn, styles.rcBtnWarn, priceAdj[rKey] ? styles.rcBtnWarnActive : ''].join(' ')}
                                 disabled={!rCalc}
                                 onClick={() => setAdjModalKey(rKey)}>
-                                <Tag size={14} /> Desconto
+                                <Tag size={14} /> {tr('Desconto')}
                               </button>
                             </div>
                           )}
@@ -5723,15 +5721,15 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                     <div>
                                       <div className={styles.hospedeName}>
                                         {h.nome}
-                                        {isSolicitacao && hi === 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 6, fontWeight: 400 }}>· Solicitante</span>}
+                                        {isSolicitacao && hi === 0 && <span style={{ fontSize: 10, color: 'var(--text-2)', marginLeft: 6, fontWeight: 400 }}>{tr('· Solicitante')}</span>}
                                       </div>
-                                      {h.dataNascimento && <div className={styles.hospedeCpf}>{calcAge(h.dataNascimento) !== null ? `${calcAge(h.dataNascimento)} anos · ` : ''}{fmtDateBR(h.dataNascimento)}</div>}
+                                      {h.dataNascimento && <div className={styles.hospedeCpf}>{calcAge(h.dataNascimento) !== null ? tr('{{v0}} anos · ', { v0: calcAge(h.dataNascimento) }) : ''}{fmtDateBR(h.dataNascimento)}</div>}
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                              <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
                             )
                           ) : (
                             qHosp.length > 0 ? (
@@ -5742,7 +5740,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                     <div>
                                       <div className={styles.hospedeName}>{h.nome}</div>
                                       <div className={styles.hospedeCpf}>
-                                        {calcAge(h.dataNascimento) !== null && <span>{calcAge(h.dataNascimento)} anos{h.cpf ? ' · ' : ''}</span>}
+                                        {calcAge(h.dataNascimento) !== null && <span>{calcAge(h.dataNascimento)} {tr('anos')}{h.cpf ? ' · ' : ''}</span>}
                                         {h.cpf && <span>{fmtCpf(h.cpf)}</span>}
                                       </div>
                                     </div>
@@ -5750,7 +5748,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                 ))}
                               </div>
                             ) : (
-                              <div className={styles.pagEmpty}>Sem hóspedes vinculados</div>
+                              <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
                             )
                           )}
                         </div>
@@ -5759,7 +5757,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         {(rCalc || calcLoading) && (
                           <div className={[styles.rcSection, styles.rcSectionNoLine].join(' ')}>
                             {calcLoading && !rCalc && (
-                              <div className={styles.rcSectionLabel}>Calculando…</div>
+                              <div className={styles.rcSectionLabel}>{tr('Calculando…')}</div>
                             )}
 
                             {/* Pagamentos lançados neste apartamento — acima das diárias e dos totais */}
@@ -5800,17 +5798,17 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                 <div className={styles.rcResumoList}>
                                   {showQuitado && (
                                     <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                                      <span>Total pago</span><span>{fmtBRL(rPago)}</span>
+                                      <span>{tr('Total pago')}</span><span>{fmtBRL(rPago)}</span>
                                     </div>
                                   )}
                                   {showTotal && (
                                     <div className={styles.rcResumoRow}>
-                                      <span>Total</span><span>{fmtBRL(rTotal)}</span>
+                                      <span>{tr('Total')}</span><span>{fmtBRL(rTotal)}</span>
                                     </div>
                                   )}
                                   {showPend && (
                                     <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                                      <span>Pendente</span><span>{fmtBRL(rPend)}</span>
+                                      <span>{tr('Pendente')}</span><span>{fmtBRL(rPend)}</span>
                                     </div>
                                   )}
                                 </div>
@@ -5823,14 +5821,14 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         {obsOpen[rKey] || quartosObs[rKey] ? (
                           <div className={styles.rcSection}>
                             <textarea className={styles.obsTextarea} rows={2}
-                              placeholder="Observação para este apartamento (opcional)..."
+                              placeholder={tr('Observação para este apartamento (opcional)...')}
                               value={quartosObs[rKey] || ''}
                               onChange={(e) => setQuartosObs((prev) => ({ ...prev, [rKey]: e.target.value }))} />
                           </div>
                         ) : (
                           <button type="button" className={styles.rcObsToggle}
                             onClick={() => setObsOpen((prev) => ({ ...prev, [rKey]: true }))}>
-                            <FileText size={15} /> Adicionar observação
+                            <FileText size={15} /> {tr('Adicionar observação')}
                           </button>
                         )}
                         </>)}
@@ -6153,7 +6151,7 @@ export default function BookingCalendar() {
 
   const shiftDay = (delta) => { setViewDate((d) => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; }); };
 
-  const monthLabel = viewDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const monthLabel = viewDate.toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
 
   const searchNorm = normalizeStr(searchTerm.trim());
 
@@ -6187,7 +6185,7 @@ export default function BookingCalendar() {
     for (const r of remoteSearchResults) {
       const d = new Date(r.dataInicio + 'T00:00:00');
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      const label = d.toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
       if (!groups[key]) groups[key] = { key, label, items: [] };
       groups[key].items.push(r);
     }
@@ -6223,12 +6221,12 @@ export default function BookingCalendar() {
     const normalized = normalizeReserva(upd);
     setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
     setReservas((rs) => [...rs.filter((r) => r.id !== id), normalized]);
-    notify('Solicitação aprovada!'); setShowSolicitacoes(false);
+    notify(tr('Solicitação aprovada!')); setShowSolicitacoes(false);
   };
   const handleRejectSolicitacao = async (id) => {
     await reservaApi.cancelar(id);
     setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
-    notify('Solicitação rejeitada.'); setShowSolicitacoes(false);
+    notify(tr('Solicitação rejeitada.')); setShowSolicitacoes(false);
   };
 
   const handleCellClick = (room, dateStr) => {
@@ -6329,14 +6327,14 @@ export default function BookingCalendar() {
 
     // ── Orçamento criado via orcamentoApi.criar ───────────────────────────────
     if (bodyOrFlag?._isOrcamento) {
-      notify('Orçamento criado!');
+      notify(tr('Orçamento criado!'));
       setShowCreateModal(false);
       return;
     }
 
     // ── Solicitação criada via reservaApi.solicitar ───────────────────────────
     if (bodyOrFlag?._isSolicitacao) {
-      notify('Solicitação criada!');
+      notify(tr('Solicitação criada!'));
       setShowCreateModal(false);
       return;
     }
@@ -6352,7 +6350,7 @@ export default function BookingCalendar() {
       } else {
         await loadReservas();
       }
-      notify(novas.length > 1 ? `${novas.length} reservas criadas!` : 'Reserva criada!');
+      notify(novas.length > 1 ? tr('{{length}} reservas criadas!', { length: novas.length }) : tr('Reserva criada!'));
       setShowCreateModal(false);
       return;
     }
@@ -6367,7 +6365,7 @@ export default function BookingCalendar() {
     }
     setReservas((rs) => rs.filter((r) => r.id !== id));
     setSolicitacoes((rs) => rs.filter((r) => r.id !== id));
-    notify(orcamentoId ? 'Orçamento cancelado.' : 'Reserva cancelada.');
+    notify(orcamentoId ? tr('Orçamento cancelado.') : tr('Reserva cancelada.'));
   };
 
   // Gera um voucher PDF completo com todas as reservas do grupo
@@ -6425,9 +6423,9 @@ export default function BookingCalendar() {
       await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO');
       setReservas((rs) => rs.map((r) => r.id === id ? { ...r, status: 'hospedado' } : r));
       setSelectedReserva((prev) => prev && prev.id === id ? { ...prev, status: 'hospedado' } : prev);
-      notify('Hospedagem iniciada!');
+      notify(tr('Hospedagem iniciada!'));
     } catch (e) {
-      notify(e?.message ?? 'Erro ao hospedar.', 'error');
+      notify(e?.message ?? tr('Erro ao hospedar.'), 'error');
     }
   };
 
@@ -6436,9 +6434,9 @@ export default function BookingCalendar() {
       await reservaApi.marcarAusente(id);
       // RESERVA_AUSENTE sai da listagem de ativas do calendário
       setReservas((rs) => rs.filter((r) => r.id !== id));
-      notify('Reserva marcada como ausente.');
+      notify(tr('Reserva marcada como ausente.'));
     } catch (e) {
-      notify(e?.message ?? 'Erro ao marcar reserva como ausente.', 'error');
+      notify(e?.message ?? tr('Erro ao marcar reserva como ausente.'), 'error');
     }
   };
 
@@ -6449,9 +6447,9 @@ export default function BookingCalendar() {
       const normalized = normalizeReserva(upd);
       setReservas((rs) => [...rs.filter((r) => r.id !== id), normalized]);
       setSelectedReserva(normalized);
-      notify('Reserva ativada!');
+      notify(tr('Reserva ativada!'));
     } catch (e) {
-      notify(e?.message ?? 'Erro ao ativar reserva.', 'error');
+      notify(e?.message ?? tr('Erro ao ativar reserva.'), 'error');
     }
   };
 
@@ -6462,9 +6460,9 @@ export default function BookingCalendar() {
       setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
       setSelectedReserva((prev) => prev?.id === id ? normalized : prev);
       setDragEditValues(null);
-      notify('Reserva atualizada!');
+      notify(tr('Reserva atualizada!'));
     } catch (e) {
-      notify(e?.message ?? 'Erro ao atualizar reserva.', 'error');
+      notify(e?.message ?? tr('Erro ao atualizar reserva.'), 'error');
       throw e;
     }
   };
@@ -6533,7 +6531,7 @@ export default function BookingCalendar() {
         if (!pagQuartoAlvo) return;
         await hospedagemApi.adicionarPagamentoMultiplo([pagQuartoAlvo.id], payment);
         await loadReservas();
-        notify(`Pagamento adicionado ao Ap. ${fmtRoom(pagQuartoAlvo.quarto)}!`);
+        notify(tr('Pagamento adicionado ao Ap. {{v0}}!', { v0: fmtRoom(pagQuartoAlvo.quarto) }));
         setShowPagMultiploModal(false);
         setPagQuartoAlvo(null);
         // permanece no modo de seleção para pagar outros quartos
@@ -6553,10 +6551,10 @@ export default function BookingCalendar() {
         await hospedagemApi.adicionarPagamentoMultiplo(ids, payment);
       }
       await loadReservas();
-      notify(`Pagamento adicionado a ${ids.length} reserva${ids.length !== 1 ? 's' : ''}!`);
+      notify(tr('Pagamento adicionado a {{length}} reserva{{v1}}!', { length: ids.length, v1: ids.length !== 1 ? 's' : '' }));
       exitSelectionMode();
     } catch (e) {
-      notify(e?.message ?? 'Erro ao adicionar pagamento.', 'error');
+      notify(e?.message ?? tr('Erro ao adicionar pagamento.'), 'error');
     } finally {
       setPagMultiploSaving(false);
     }
@@ -6697,12 +6695,12 @@ export default function BookingCalendar() {
             className={startInView ? styles.barStatusTag : styles.barStatusTagInline}
             style={grupoCor ? { background: `color-mix(in srgb, ${grupoCor} 70%, #000)` } : undefined}
           >
-            {orig.status === 'confirmada' && (grupoCor ? <>Reserva em grupo #{orig.grupo_id}</> : <><Check size={9} strokeWidth={3} /> Reserva Individual</>)}
-            {orig.status === 'solicitada' && <>Reserva solicitada</>}
-            {orig.status === 'hospedado'  && (grupoCor ? <>Hospedagem em grupo #{orig.grupo_id}</> : <><Check size={9} strokeWidth={3} /> Hospedado</>)}
-            {orig.status === 'finalizado' && <>Finalizado</>}
-            {orig.status === 'cancelado'  && <>Cancelado</>}
-            {orig.status === 'orcamento'  && <>Orçamento</>}
+            {orig.status === 'confirmada' && (grupoCor ? <>{tr('Reserva em grupo #')}{orig.grupo_id}</> : <><Check size={9} strokeWidth={3} /> {tr('Reserva Individual')}</>)}
+            {orig.status === 'solicitada' && <>{tr('Reserva solicitada')}</>}
+            {orig.status === 'hospedado'  && (grupoCor ? <>{tr('Hospedagem em grupo #')}{orig.grupo_id}</> : <><Check size={9} strokeWidth={3} /> {tr('Hospedado')}</>)}
+            {orig.status === 'finalizado' && <>{tr('Finalizado')}</>}
+            {orig.status === 'cancelado'  && <>{tr('Cancelado')}</>}
+            {orig.status === 'orcamento'  && <>{tr('Orçamento')}</>}
           </div>
         )}
 
@@ -6734,7 +6732,7 @@ export default function BookingCalendar() {
           <div
             className={styles.barHalf}
             style={{ width: HALF, ...(gColor ? { background: gColor } : {}) }}
-            title="Meia diária — saída tardia"
+            title={tr('Meia diária — saída tardia')}
           >
             <Clock size={12} />
           </div>
@@ -6768,7 +6766,7 @@ export default function BookingCalendar() {
                     <button className={styles.monthPickerArrow} onClick={() => setPickerYear((y) => y + 1)}><ChevronRight size={13} /></button>
                   </div>
                   <div className={styles.monthPickerGrid}>
-                    {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => {
+                    {[tr('Jan'),tr('Fev'),tr('Mar'),tr('Abr'),tr('Mai'),tr('Jun'),tr('Jul'),tr('Ago'),tr('Set'),tr('Out'),tr('Nov'),tr('Dez')].map((m, i) => {
                       const isActive = pickerYear === viewDate.getFullYear() && i === viewDate.getMonth();
                       return (
                         <button key={i}
@@ -6786,9 +6784,9 @@ export default function BookingCalendar() {
                 </div>
               )}
             </div>
-            <button className={styles.todayBtn} onClick={goToToday}>Hoje</button>
+            <button className={styles.todayBtn} onClick={goToToday}>{tr('Hoje')}</button>
             <button className={[styles.todayBtn, styles.groupsBtn].join(' ')} onClick={() => setShowGrupos(true)}>
-              <Users size={14} /> Grupos
+              <Users size={14} /> {tr('Grupos')}
             </button>
 
             {/* Search combobox */}
@@ -6797,7 +6795,7 @@ export default function BookingCalendar() {
               <input className={styles.searchInput} value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setShowSearchDropdown(true); }}
                 onFocus={() => searchTerm.length >= 2 && setShowSearchDropdown(true)}
-                placeholder="Buscar hóspede..." />
+                placeholder={tr('Buscar hóspede...')} />
               {searchTerm && (
                 <button className={styles.clearSearch} onClick={() => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); }}><X size={12} /></button>
               )}
@@ -6812,14 +6810,14 @@ export default function BookingCalendar() {
                         <div className={styles.searchDropInfo}>
                           <div className={styles.searchDropName}>{r.titularNome}</div>
                           <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                         </div>
                         <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
                       </div>
                     );
                   })}
                   {remoteSearchLoading && (
-                    <div className={styles.searchDropLoading}><Loader2 size={12} className={styles.spin} /> buscando outros meses...</div>
+                    <div className={styles.searchDropLoading}><Loader2 size={12} className={styles.spin} /> {tr('buscando outros meses...')}</div>
                   )}
                   {!remoteSearchLoading && remoteSearchByMonth.map((group) => (
                     <div key={group.key}>
@@ -6833,7 +6831,7 @@ export default function BookingCalendar() {
                             <div className={styles.searchDropInfo}>
                               <div className={styles.searchDropName}>{r.titularNome}</div>
                               <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                              <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} pessoa{nPessoas !== 1 ? 's' : ''}</div>
+                              <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
                             </div>
                             <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
                           </div>
@@ -6851,7 +6849,7 @@ export default function BookingCalendar() {
         {/* Selection hint */}
         {selStart && (
           <div className={styles.selHint}>
-            <span>Apartamento <strong>{fmtRoom(selRoom)}</strong> · a partir de <strong>{selStart}</strong> — clique outra data para definir fim</span>
+            <span>{tr('Apartamento')} <strong>{fmtRoom(selRoom)}</strong> {tr('· a partir de')} <strong>{selStart}</strong> {tr('— clique outra data para definir fim')}</span>
             <button className={styles.selHintClose} onClick={() => { setSelRoom(null); setSelStart(null); setSelHover(null); }}><X size={12} /></button>
           </div>
         )}
@@ -6863,14 +6861,14 @@ export default function BookingCalendar() {
               <button type="button"
                 className={`${styles.dayNavBtn} ${styles.dayNavBtnLeft}`}
                 onClick={() => shiftDay(-1)}
-                title="Dia anterior"
+                title={tr('Dia anterior')}
               >
                 <ChevronLeft size={16} />
               </button>
               <button type="button"
                 className={`${styles.dayNavBtn} ${styles.dayNavBtnRight}`}
                 onClick={() => shiftDay(1)}
-                title="Próximo dia"
+                title={tr('Próximo dia')}
               >
                 <ChevronRight size={16} />
               </button>
@@ -6878,30 +6876,30 @@ export default function BookingCalendar() {
           )}
         <div className={styles.gridScroll}>
           {loading ? (
-            <div className={styles.loadingRow}><Loader2 size={20} className={styles.spin} /> Carregando...</div>
+            <div className={styles.loadingRow}><Loader2 size={20} className={styles.spin} /> {tr('Carregando...')}</div>
           ) : (
             <>
               <div className={styles.dayHeaderRow} style={{ width: gridTotalW }}>
                 <div className={styles.cornerCell} style={{ width: leftW, height: HDR_H }}>
-                  Quarto
+                  {tr('Quarto')}
                 </div>
                 {days.map((day, idx) => {
                   const dStr      = daysStr[idx];
                   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                   const isToday   = dStr === todayStr;
-                  const weekday   = day.toLocaleDateString('pt-BR', { weekday: 'long' });
+                  const weekday   = day.toLocaleDateString(locale(), { weekday: 'long' });
                   return (
                     <div key={idx}
                       className={[styles.dayHeader, isWeekend ? styles.dayHeaderWeekend : '', isToday ? styles.dayHeaderToday : ''].join(' ')}
                       style={{ width: DAY_CELL_W, height: HDR_H }}
                       onClick={() => setDayModal({ dateStr: dStr })}
-                      title={`Ver reservas — ${fmtDateBR(dStr)}`}
+                      title={tr('Ver reservas — {{v0}}', { v0: fmtDateBR(dStr) })}
                     >
                       <span className={[styles.dayWeekday, isToday ? styles.dayWeekdayToday : ''].join(' ')}>
                         {weekday.charAt(0).toUpperCase() + weekday.slice(1)}
                       </span>
                       <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
-                        {day.getDate()}{isToday ? ' · Hoje' : ''}
+                        {day.getDate()}{isToday ? tr(' · Hoje') : ''}
                       </span>
                     </div>
                   );
@@ -6925,9 +6923,9 @@ export default function BookingCalendar() {
                       <div key={room} className={styles.roomRow} style={{ width: gridTotalW, height: ROOM_H }}>
                         <button className={styles.roomLabel} style={{ width: leftW, height: ROOM_H }}
                           onClick={() => setRoomModal({ room })}
-                          title={`Histórico quarto ${fmtRoom(room)}${roomDescMap[room] ? ` – ${roomDescMap[room]}` : ''}`}>
+                          title={tr('Histórico quarto {{v0}}{{v1}}', { v0: fmtRoom(room), v1: roomDescMap[room] ? ` – ${roomDescMap[room]}` : '' })}>
                           <span className={styles.roomTitle}>
-                            <span className={styles.roomNum}>Apt. {fmtRoom(room)}</span>
+                            <span className={styles.roomNum}>{tr('Apt.')} {fmtRoom(room)}</span>
                             {roomDescMap[room] && <span className={styles.roomDesc}> – {roomDescMap[room]}</span>}
                           </span>
                           {roomPaxMap[room] != null && (
@@ -6963,18 +6961,18 @@ export default function BookingCalendar() {
         {/* Legend */}
         <div className={styles.legend}>
           {[
-            { cls: 'legendDot_confirmada', label: 'Confirmada' },
-            { cls: 'legendDot_solicitada', label: 'Solicitada' },
-            { cls: 'legendDot_hospedado',  label: 'Hospedado'  },
-            { cls: 'legendDot_finalizado', label: 'Finalizado' },
-            { cls: 'legendDot_cancelado',  label: 'Cancelado'  },
+            { cls: 'legendDot_confirmada', label: tr('Confirmada') },
+            { cls: 'legendDot_solicitada', label: tr('Solicitada') },
+            { cls: 'legendDot_hospedado',  label: tr('Hospedado')  },
+            { cls: 'legendDot_finalizado', label: tr('Finalizado') },
+            { cls: 'legendDot_cancelado',  label: tr('Cancelado')  },
           ].map((l) => (
             <div key={l.label} className={styles.legendItem}>
               <div className={[styles.legendDot, styles[l.cls]].join(' ')} />
               <span>{l.label}</span>
             </div>
           ))}
-          <span className={styles.legendHint}>Clique dia/quarto · 2 células para criar · Arraste/borda para mover</span>
+          <span className={styles.legendHint}>{tr('Clique dia/quarto · 2 células para criar · Arraste/borda para mover')}</span>
         </div>
       </div>
 
@@ -7040,7 +7038,7 @@ export default function BookingCalendar() {
           <span className={styles.selectionCount}>
             <b>{reservasSelecionadas.size}</b>
             <span className={styles.selectionCountSub}>
-              {' '}reserva{reservasSelecionadas.size !== 1 ? 's' : ''} selecionada{reservasSelecionadas.size !== 1 ? 's' : ''}
+              {' '}{tr('reserva')}{reservasSelecionadas.size !== 1 ? 's' : ''} {tr('selecionada')}{reservasSelecionadas.size !== 1 ? 's' : ''}
             </span>
           </span>
           <button
@@ -7049,11 +7047,11 @@ export default function BookingCalendar() {
             onClick={() => setShowPagMultiploModal(true)}
           >
             <DollarSign size={13} />
-            Adicionar Pagamento
+            {tr('Adicionar Pagamento')}
           </button>
           <button className={styles.selectionBtnCancel} onClick={exitSelectionMode}>
             <X size={13} />
-            Cancelar
+            {tr('Cancelar')}
           </button>
         </div>
       )}
@@ -7063,12 +7061,12 @@ export default function BookingCalendar() {
         const ladoALado = pagQuartoAlvo != null && showPagMultiploModal;
         return (
         <Modal open onClose={exitSelectionMode} size="sm"
-          title={<><DollarSign size={15} /> Selecione o quarto</>}
+          title={<><DollarSign size={15} /> {tr('Selecione o quarto')}</>}
           containerStyle={ladoALado && winWide
             ? { transform: 'translateX(calc(-50% - 10px))', transition: 'transform 0.25s cubic-bezier(0.2,0.8,0.2,1)' }
             : (ladoALado ? { marginTop: 'clamp(8px, 3vh, 24px)' } : undefined)}
           backdropStyle={ladoALado && !winWide ? { alignItems: 'flex-start' } : undefined}  /* lista de quartos em cima */
-          footer={<div className={styles.footerRight}><Button variant="secondary" onClick={exitSelectionMode}>Fechar</Button></div>}
+          footer={<div className={styles.footerRight}><Button variant="secondary" onClick={exitSelectionMode}>{tr('Fechar')}</Button></div>}
         >
           <div className={styles.dayRoomList}>
             {allReservas.filter((r) => reservasSelecionadas.has(r.id)).map((r) => {
@@ -7082,7 +7080,7 @@ export default function BookingCalendar() {
                   <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
                   <div className={styles.searchDropInfo}>
                     <div className={styles.searchDropName}>{r.titularNome}</div>
-                    <div className={styles.searchDropMeta}>Total {fmtBRL(r.valorTotal)} · Pendente {fmtBRL(pendente)}</div>
+                    <div className={styles.searchDropMeta}>{tr('Total')} {fmtBRL(r.valorTotal)} {tr('· Pendente')} {fmtBRL(pendente)}</div>
                   </div>
                   <ChevronRight size={14} style={{ color: alvo ? 'var(--violet)' : 'var(--text-2)', flexShrink: 0 }} />
                 </div>
@@ -7153,11 +7151,11 @@ export default function BookingCalendar() {
               <div style={{ background: color, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6, position: 'sticky', top: 0 }}>
                 <Users size={13} style={{ color: '#fff', flexShrink: 0 }} />
                 <span style={{ color: '#fff', fontSize: 12, fontWeight: 600 }}>
-                  Grupo #{groupPanel.grupoId} · {members.length} reserva{members.length !== 1 ? 's' : ''}
+                  {tr('Grupo #')}{groupPanel.grupoId} · {members.length} {tr('reserva')}{members.length !== 1 ? 's' : ''}
                 </span>
                 <button
                   onClick={() => handleGroupVoucher(members)}
-                  title="Gerar voucher completo do grupo em PDF"
+                  title={tr('Gerar voucher completo do grupo em PDF')}
                   style={{
                     marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
                     background: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.35)',
@@ -7165,7 +7163,7 @@ export default function BookingCalendar() {
                     borderRadius: 6, cursor: 'pointer', flexShrink: 0,
                   }}
                 >
-                  <FileDown size={12} /> Voucher
+                  <FileDown size={12} /> {tr('Voucher')}
                 </button>
               </div>
 
@@ -7186,9 +7184,9 @@ export default function BookingCalendar() {
                     {/* Totals row */}
                     <div style={{ display: 'flex', gap: 0, marginBottom: 8 }}>
                       {[
-                        { label: 'Total',    val: totalGrupo, color: 'var(--text)' },
-                        { label: 'Pago',     val: pagoGrupo,  color: '#10b981' },
-                        { label: 'Pendente', val: pendente,   color: pendente > 0 ? '#f97316' : '#10b981' },
+                        { label: tr('Total'),    val: totalGrupo, color: 'var(--text)' },
+                        { label: tr('Pago'),     val: pagoGrupo,  color: '#10b981' },
+                        { label: tr('Pendente'), val: pendente,   color: pendente > 0 ? '#f97316' : '#10b981' },
                       ].map(({ label, val, color: c }, idx, arr) => (
                         <div key={label} style={{
                           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -7204,7 +7202,7 @@ export default function BookingCalendar() {
 
                     {/* Payments list */}
                     {uniquePags.length === 0
-                      ? <span style={{ fontSize: 11, color: 'var(--text-2)' }}>Nenhum pagamento registrado.</span>
+                      ? <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{tr('Nenhum pagamento registrado.')}</span>
                       : <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                           {uniquePags.map((p) => (
                             <div key={p.id} style={{
@@ -7214,7 +7212,7 @@ export default function BookingCalendar() {
                             }}>
                               <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                                 <span style={{ color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {p.descricao || p.formaPagamento || 'Pagamento'}
+                                  {p.descricao || p.formaPagamento || tr('Pagamento')}
                                 </span>
                                 {p.nomePagador && (
                                   <span style={{ color: 'var(--text-2)', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -7248,7 +7246,7 @@ export default function BookingCalendar() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ background: color, color: '#fff', borderRadius: 4, padding: '1px 6px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                        Ap. {fmtRoom(r.quarto)}
+                        {tr('Ap.')} {fmtRoom(r.quarto)}
                       </span>
                       <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {r.titularNome}
@@ -7269,7 +7267,7 @@ export default function BookingCalendar() {
       {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !showGrupos && !dayModal && !showMonthPicker && !roomModal && !pagamentoModoAtivo && <div className={styles.floatPanel}>
         <button className={[styles.floatBtn, styles.floatBtnPrimary].join(' ')} onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
           <Plus size={15} />
-          <span>Nova Reserva</span>
+          <span>{tr('Nova Reserva')}</span>
         </button>
 
         {/* Mobile-only toggle */}
@@ -7278,7 +7276,7 @@ export default function BookingCalendar() {
           onClick={() => setFloatExpanded((v) => !v)}
         >
           {floatExpanded ? <X size={14} /> : <SlidersHorizontal size={14} />}
-          <span>{floatExpanded ? 'Fechar' : 'Mais opções'}</span>
+          <span>{floatExpanded ? tr('Fechar') : tr('Mais opções')}</span>
         </button>
 
         {/* Secondary buttons — always visible on desktop, toggled on mobile */}
@@ -7291,7 +7289,7 @@ export default function BookingCalendar() {
               onClick={() => setShowStatusFilter((v) => !v)}
             >
               <SlidersHorizontal size={15} />
-              <span>Filtrar Status</span>
+              <span>{tr('Filtrar Status')}</span>
             </button>
             {showStatusFilter && (
               <div className={styles.floatFilterDrop}>
@@ -7311,14 +7309,14 @@ export default function BookingCalendar() {
           <div className={styles.floatBtnWrap}>
             <button className={styles.floatBtn} onClick={() => setShowOrcamentos(true)}>
               <FileText size={15} />
-              <span>Orçamentos</span>
+              <span>{tr('Orçamentos')}</span>
             </button>
           </div>
 
           <div className={styles.floatBtnWrap}>
             <button className={styles.floatBtn} onClick={() => setShowSolicitacoes(true)}>
               <Bell size={15} />
-              <span>Solicitações</span>
+              <span>{tr('Solicitações')}</span>
               {solicitadasCount > 0 && <span className={styles.floatBadge}>{solicitadasCount}</span>}
             </button>
           </div>

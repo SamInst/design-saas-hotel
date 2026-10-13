@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, Loader2, Check, ChevronRight, X } from 'lucide-react';
 import { cadastroApi } from '../../../services/api';
 import styles from '../recepcao.module.css';
+import { tr } from '../../../i18n';
 
 const fmtCpf = (v) => v ? v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : '';
 
@@ -104,7 +105,7 @@ export default function NhHospedesPicker({ value = [], onChange }) {
       {pending ? (
         <>
           <div className={styles.nhPickerBack}>
-            <button className={styles.nhPickerBackBtn} onClick={() => setPending(null)}><ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} /> Voltar</button>
+            <button className={styles.nhPickerBackBtn} onClick={() => setPending(null)}><ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} /> {tr('Voltar')}</button>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             <div className={styles.nhPickerRow}>
@@ -113,7 +114,7 @@ export default function NhHospedesPicker({ value = [], onChange }) {
                 <span className={styles.nhPickerName}>{pending.titular.nome}</span>
                 {pending.titular.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(pending.titular.cpf)}</span>}
               </div>
-              <span className={styles.titularTag}>Titular</span>
+              <span className={styles.titularTag}>{tr('Titular')}</span>
             </div>
             {pending.titular.acompanhantes.map((a) => (
               <div key={a.id} className={[styles.nhPickerRow, a.bloqueado ? styles.nhPickerBlocked : styles.nhPickerRowClick].join(' ')}
@@ -125,13 +126,13 @@ export default function NhHospedesPicker({ value = [], onChange }) {
                   <span className={styles.nhPickerName}>{a.nome}</span>
                   {a.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(a.cpf)}</span>}
                 </div>
-                {a.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+                {a.bloqueado && <span className={styles.nhPickerBlockedChip}>{tr('Bloqueado')}</span>}
               </div>
             ))}
           </div>
           <div className={styles.nhPickerActions}>
-            <button className={styles.nhPickerBtnSec} onClick={() => { addMany([pending.titular]); setPending(null); setSearch(''); setResults([]); }}>Só o titular</button>
-            <button className={styles.nhPickerBtnPrim} onClick={confirmAdd}>Adicionar →</button>
+            <button className={styles.nhPickerBtnSec} onClick={() => { addMany([pending.titular]); setPending(null); setSearch(''); setResults([]); }}>{tr('Só o titular')}</button>
+            <button className={styles.nhPickerBtnPrim} onClick={confirmAdd}>{tr('Adicionar →')}</button>
           </div>
         </>
       ) : (
@@ -142,8 +143,8 @@ export default function NhHospedesPicker({ value = [], onChange }) {
                 <span className={styles.nhPickerName}>{h.nome}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {h.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(h.cpf)}</span>}
-                  {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.nhPickerAcompChip}>{h.acompanhantes.length} acomp.</span>}
-                  {h.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+                  {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.nhPickerAcompChip}>{h.acompanhantes.length} {tr('acomp.')}</span>}
+                  {h.bloqueado && <span className={styles.nhPickerBlockedChip}>{tr('Bloqueado')}</span>}
                 </div>
               </div>
               <ChevronRight size={13} className={styles.nhPickerArrow} />
@@ -170,7 +171,7 @@ export default function NhHospedesPicker({ value = [], onChange }) {
         <input ref={inputRef} className={styles.nhPickerInput} value={search}
           onChange={(e) => setSearch(e.target.value)}
           onFocus={loadRecent}
-          placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
+          placeholder={value.length === 0 ? tr('Buscar hóspede...') : ''} />
       </div>
       {dropdown}
     </div>

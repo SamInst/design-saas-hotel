@@ -1,3 +1,4 @@
+import { tr, locale } from '../../i18n';
 // ─────────────────────────────────────────────────────────────
 //  financeiroReport.js
 //  Geração de relatórios PDF do Financeiro via impressão do navegador.
@@ -314,31 +315,31 @@ function kpiCard({ label, valor, accent, gradiente, icone, negativo = false, rod
 function blocoKpis({ total, caixa, mostrarCaixa }) {
   const lucro = total.lucro ?? 0;
   const margem = total.receitas > 0
-    ? `Margem de ${Math.round((lucro / total.receitas) * 100)}%`
+    ? tr('Margem de {{pct}}%', { pct: Math.round((lucro / total.receitas) * 100) })
     : '';
   return `
     <section class="kpiRow">
       ${kpiCard({
-        label: 'Receita total', valor: brl(total.receitas),
+        label: tr('Receita total'), valor: brl(total.receitas),
         accent: { bg: 'rgba(16,185,129,0.12)', fg: '#10b981' },
         gradiente: ['#10b981', '#34d399'], icone: ico('arrowUpRight', 13),
       })}
       ${kpiCard({
-        label: 'Despesa total', valor: brl(Math.abs(total.despesas ?? 0)),
+        label: tr('Despesa total'), valor: brl(Math.abs(total.despesas ?? 0)),
         accent: { bg: 'rgba(244,63,94,0.12)', fg: '#f43f5e' },
         gradiente: ['#f43f5e', '#fb7185'], icone: ico('arrowDownRight', 13),
       })}
       ${kpiCard({
-        label: 'Lucro', valor: brl(lucro), negativo: lucro < 0,
+        label: tr('Lucro'), valor: brl(lucro), negativo: lucro < 0,
         accent: { bg: 'rgba(124,58,237,0.14)', fg: '#7c3aed' },
         gradiente: ['#7c3aed', '#a78bfa'], icone: ico('wallet', 13),
         rodape: margem,
       })}
       ${mostrarCaixa ? kpiCard({
-        label: 'Saldo do caixa', valor: brl(caixa.lucro ?? 0), negativo: (caixa.lucro ?? 0) < 0,
+        label: tr('Saldo do caixa'), valor: brl(caixa.lucro ?? 0), negativo: (caixa.lucro ?? 0) < 0,
         accent: { bg: 'rgba(5,150,105,0.13)', fg: '#059669' },
         gradiente: ['#047857', '#34d399'], icone: ico('banknote', 13),
-        rodape: 'Dinheiro em espécie',
+        rodape: tr('Dinheiro em espécie'),
       }) : ''}
     </section>`;
 }
@@ -349,7 +350,7 @@ function blocoCaixaHero(caixa) {
     <section class="cashHero">
       <span class="cashIcon">${ico('banknote', 19)}</span>
       <div>
-        <div class="cashLabel">Saldo em caixa · Dinheiro</div>
+        <div class="cashLabel">${tr('Saldo em caixa · Dinheiro')}</div>
         <div class="cashSub">
           <span class="cashUp">${ico('arrowUpRight', 11)} Entradas ${brl(caixa.receitas)}</span>
           <span class="cashDown">${ico('arrowDownRight', 11)} Saídas ${brl(Math.abs(caixa.despesas ?? 0))}</span>
@@ -379,7 +380,7 @@ function blocoDistribuicao(entries, totalReceitas, periodo) {
   return `
     <section class="dist">
       <div class="distHead">
-        <span class="distTitle">Receita por forma de pagamento</span>
+        <span class="distTitle">${tr('Receita por forma de pagamento')}</span>
         ${periodo ? `<span class="distPeriodo">${escapeHtml(periodo)}</span>` : ''}
       </div>
       <div class="distBar">${segmentos}</div>
@@ -391,7 +392,7 @@ function blocoFiltros(filtros) {
   if (!filtros.length) return '';
   return `
     <section class="filtros">
-      <span class="filtrosTitle">Filtros aplicados:</span>
+      <span class="filtrosTitle">${tr('Filtros aplicados:')}</span>
       ${filtros.map(f => `
         <span class="chip">
           <span class="k">${escapeHtml(f.label)}:</span>
@@ -422,11 +423,11 @@ function linhaLancamento(t, { saldo: mostrarSaldo }) {
       </td>
       <td>
         <div class="desc">
-          ${t.editado ? '<span class="editadoTag">(Editado)</span>' : ''}${escapeHtml(t.relatorio ?? '—')}
+          ${t.editado ? `<span class="editadoTag">(${tr('Editado')})</span>` : ''}${escapeHtml(t.relatorio ?? '—')}
         </div>
         <div class="subdesc">
           <span>${escapeHtml(t.data_hora_registro ?? '—')} · ${escapeHtml(metodo ?? '—')}</span>
-          ${t.despesa_pessoal ? '<span class="pessoalTag">Despesa Interna</span>' : ''}
+          ${t.despesa_pessoal ? `<span class="pessoalTag">${tr('Despesa Interna')}</span>` : ''}
         </div>
       </td>
       <td class="cVal">
@@ -448,7 +449,7 @@ function blocoDia(g, perm) {
 
   const corpo = itens.length
     ? itens.map(t => linhaLancamento(t, perm)).join('')
-    : `<tr><td class="vazio" colspan="${nCols}">Sem lançamentos.</td></tr>`;
+    : `<tr><td class="vazio" colspan="${nCols}">${tr('Sem lançamentos.')}</td></tr>`;
 
   return `
     <section class="group">
@@ -456,20 +457,20 @@ function blocoDia(g, perm) {
         <div class="groupLeft">
           <span style="color:#7c3aed">${ico('calendar', 12)}</span>
           <span class="groupDate">${escapeHtml(g.data ?? '—')}</span>
-          <span class="badge">${itens.length} ${itens.length === 1 ? 'lançamento' : 'lançamentos'}</span>
+          <span class="badge">${itens.length} ${itens.length === 1 ? tr('lançamento') : tr('lançamentos')}</span>
         </div>
         ${perm.totaisDia ? `
         <div class="groupRight">
           <div class="groupStat">
-            <span class="groupStatLabel">Receita total do dia:</span>
+            <span class="groupStatLabel">${tr('Receita total do dia:')}</span>
             <b class="neutro">${brl(g.total_entrada_dia)}</b>
           </div>
           <div class="groupStat">
-            <span class="groupStatLabel">Total de despesas:</span>
+            <span class="groupStatLabel">${tr('Total de despesas:')}</span>
             <b class="neg">${brl(g.total_saida_dia)}</b>
           </div>
           <div class="groupStat">
-            <span class="groupStatLabel">Lucro do dia:</span>
+            <span class="groupStatLabel">${tr('Lucro do dia:')}</span>
             <b class="${lucro >= 0 ? 'pos' : 'neg'}">${brl(lucro)}</b>
           </div>
         </div>` : ''}
@@ -478,9 +479,9 @@ function blocoDia(g, perm) {
         <thead>
           <tr>
             <th class="cIco"></th>
-            <th>Descrição</th>
-            <th class="cVal">Valor</th>
-            ${perm.saldo ? '<th class="cSaldo">Saldo Dinheiro</th>' : ''}
+            <th>${tr('Descrição')}</th>
+            <th class="cVal">${tr('Valor')}</th>
+            ${perm.saldo ? `<th class="cSaldo">${tr('Saldo Dinheiro')}</th>` : ''}
           </tr>
         </thead>
         <tbody>${corpo}</tbody>
@@ -492,7 +493,7 @@ function blocoDia(g, perm) {
 
 function documento({ titulo, subtitulo, usuario, corpoHtml }) {
   const agora = new Date();
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+  return `<!doctype html><html lang="${locale()}"><head><meta charset="utf-8">
     <title>${escapeHtml(titulo)}</title><style>${CSS}</style></head>
     <body>
       <header class="head">
@@ -502,13 +503,13 @@ function documento({ titulo, subtitulo, usuario, corpoHtml }) {
           ${subtitulo ? `<div class="sub">${escapeHtml(subtitulo)}</div>` : ''}
         </div>
         <div class="emit">
-          <b>Emitido em</b>${escapeHtml(agora.toLocaleString('pt-BR'))}
-          ${usuario ? `<b style="margin-top:3px">Por</b>${escapeHtml(usuario)}` : ''}
+          <b>${tr('Emitido em')}</b>${escapeHtml(agora.toLocaleString('pt-BR'))}
+          ${usuario ? `<b style="margin-top:3px">${tr('Por')}</b>${escapeHtml(usuario)}` : ''}
         </div>
       </header>
       ${corpoHtml}
       <footer class="foot">
-        <span>maishospedagem · Relatório financeiro</span>
+        <span>maishospedagem · ${tr('Relatório financeiro')}</span>
         <span>${escapeHtml(agora.toLocaleDateString('pt-BR'))}</span>
       </footer>
     </body></html>`;
@@ -589,16 +590,16 @@ export function relatorioDiaPdf(grupo, { permissoes, usuario } = {}) {
   const entries  = pagamentosDoDia(itens);
   const receitas = entries.reduce((soma, [, v]) => soma + v.receitas, 0);
   const distribuicao = perm.dashboard
-    ? blocoDistribuicao(entries, receitas, `Total de transações: ${itens.length} · ${grupo.data ?? ''}`)
+    ? blocoDistribuicao(entries, receitas, tr('Total de transações: {{n}} · {{data}}', { n: itens.length, data: grupo.data ?? '' }))
     : '';
 
   const html = documento({
-    titulo: 'Relatório Diário',
+    titulo: tr('Relatório Diário'),
     subtitulo: grupo.data,
     usuario,
     corpoHtml: distribuicao + blocoDia(grupo, perm),
   });
-  imprimir(html, `Relatório ${grupo.data ?? ''}`);
+  imprimir(html, tr('Relatório {{data}}', { data: grupo.data ?? '' }));
 }
 
 // Relatório da busca filtrada — KPIs + distribuição + filtros + todos os dias.
@@ -614,7 +615,7 @@ export function relatorioFiltroPdf({
   // aceita tanto a lista de filtros da tela quanto uma string simples
   const listaFiltros = Array.isArray(filtros)
     ? filtros
-    : filtros ? [{ label: 'Filtros', value: filtros }] : [];
+    : filtros ? [{ label: tr('Filtros'), value: filtros }] : [];
 
   const cabecalho = perm.dashboard
     ? blocoKpis({ total: tot, caixa, mostrarCaixa: perm.caixa }) +
@@ -625,13 +626,13 @@ export function relatorioFiltroPdf({
 
   const corpo = grupos.length
     ? grupos.map(g => blocoDia(g, perm)).join('')
-    : '<p class="vazio" style="padding:24px">Nenhum lançamento no período filtrado.</p>';
+    : `<p class="vazio" style="padding:24px">${tr('Nenhum lançamento no período filtrado.')}</p>`;
 
   const html = documento({
-    titulo: 'Relatório Financeiro',
-    subtitulo: listaFiltros.map(f => `${f.label}: ${f.value}`).join(' · ') || 'Busca filtrada',
+    titulo: tr('Relatório Financeiro'),
+    subtitulo: listaFiltros.map(f => `${f.label}: ${f.value}`).join(' · ') || tr('Busca filtrada'),
     usuario,
     corpoHtml: cabecalho + blocoFiltros(listaFiltros) + corpo,
   });
-  imprimir(html, 'Relatório Financeiro');
+  imprimir(html, tr('Relatório Financeiro'));
 }

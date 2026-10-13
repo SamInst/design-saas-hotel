@@ -13,6 +13,7 @@ import { PaymentModal }             from '../../components/ui/PaymentModal';
 import { itemApi, categoriaApi, enumApi, quartoApi } from '../../services/api';
 import { usePermissions }           from '../../hooks/usePermissions';
 import styles from './InventoryManagement.module.css';
+import { tr } from '../../i18n';
 
 // ── Money helpers ────────────────────────────────────────────
 const maskBRL = (v) => {
@@ -25,7 +26,7 @@ const parseBRL = (v) => {
   const s = String(v ?? '').replace(/[R$\s.]/g, '').replace(',', '.');
   return parseFloat(s) || 0;
 };
-const fmtBRL  = (v) => v == null ? 'R$ 0,00' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+const fmtBRL  = (v) => v == null ? tr('R$ 0,00') : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtDate = (v) => v ?? '—';
 
 // ── Item field accessors ─────────────────────────────────────
@@ -70,7 +71,7 @@ const sk = (...extra) => [styles.sk, ...extra].join(' ');
 
 function SkeletonLista({ linhas = 7 }) {
   return (
-    <div role="status" aria-label="Carregando categorias">
+    <div role="status" aria-label={tr('Carregando categorias')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.listItem} aria-hidden="true">
           <span className={styles.listItemBody}>
@@ -85,7 +86,7 @@ function SkeletonLista({ linhas = 7 }) {
 
 function SkeletonPainel() {
   return (
-    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+    <div className={styles.statGrid} role="status" aria-label={tr('Carregando totais')}>
       {Array.from({ length: 4 }, (_, i) => (
         <div key={i} className={styles.statCard} aria-hidden="true">
           <span className={sk(styles.skLabel)} />
@@ -209,7 +210,7 @@ export default function InventoryManagement() {
       const cats = data?.categorias ?? [];
       setSections(cats.map((c) => ({ ...c, items: c.itens ?? [] })));
     } catch (e) {
-      showNotification('Erro ao carregar inventário: ' + e.message, 'error');
+      showNotification(tr('Erro ao carregar inventário: ') + e.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -242,7 +243,7 @@ export default function InventoryManagement() {
   const handleSaveItem = async () => {
     const { descricao, categoriaId, servico } = itemForm;
     if (!descricao.trim() || !categoriaId) {
-      showNotification('Preencha todos os campos obrigatórios.', 'error');
+      showNotification(tr('Preencha todos os campos obrigatórios.'), 'error');
       return;
     }
     setItemSaving(true);
@@ -254,15 +255,15 @@ export default function InventoryManagement() {
       };
       if (itemFormModal === 'create') {
         await itemApi.criar(body);
-        showNotification('Item criado com sucesso!');
+        showNotification(tr('Item criado com sucesso!'));
       } else {
         await itemApi.atualizar({ ...body, id: selectedItem.id });
-        showNotification('Item atualizado com sucesso!');
+        showNotification(tr('Item atualizado com sucesso!'));
       }
       setItemFormModal(null);
       loadSections();
     } catch (e) {
-      showNotification('Erro: ' + e.message, 'error');
+      showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
       setItemSaving(false);
     }
@@ -283,24 +284,24 @@ export default function InventoryManagement() {
 
   const handleSaveCat = async () => {
     if (!catForm.nome.trim()) {
-      showNotification('Informe o nome da categoria.', 'error');
+      showNotification(tr('Informe o nome da categoria.'), 'error');
       return;
     }
     setCatSaving(true);
     try {
       if (catFormModal === 'create') {
         await categoriaApi.criar({ nome: catForm.nome.trim(), descricao: catForm.descricao.trim() });
-        showNotification('Categoria criada com sucesso!');
+        showNotification(tr('Categoria criada com sucesso!'));
       } else {
         await categoriaApi.atualizar(editingCat.id, {
           id: editingCat.id, nome: catForm.nome.trim(), descricao: catForm.descricao.trim(),
         });
-        showNotification('Categoria atualizada com sucesso!');
+        showNotification(tr('Categoria atualizada com sucesso!'));
       }
       setCatFormModal(null);
       loadSections();
     } catch (e) {
-      showNotification('Erro: ' + e.message, 'error');
+      showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
       setCatSaving(false);
     }
@@ -326,7 +327,7 @@ export default function InventoryManagement() {
 
     // Serviço não tem quantidade, fornecedor nem custo: só o valor cobrado.
     if (!venda || (!servico && (!reporForm.quantidade_unidades || !reporForm.fornecedor.trim() || !compra))) {
-      showNotification('Preencha todos os campos obrigatórios.', 'error');
+      showNotification(tr('Preencha todos os campos obrigatórios.'), 'error');
       return;
     }
     setReporSaving(true);
@@ -338,11 +339,11 @@ export default function InventoryManagement() {
         valor_compra_unidade: servico ? 0 : compra,
         valor_venda_unidade:  venda,
       });
-      showNotification(servico ? 'Valor do serviço atualizado!' : 'Estoque reposto com sucesso!');
+      showNotification(servico ? tr('Valor do serviço atualizado!') : tr('Estoque reposto com sucesso!'));
       setReporModal(false);
       loadSections();
     } catch (e) {
-      showNotification('Erro: ' + e.message, 'error');
+      showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
       setReporSaving(false);
     }
@@ -363,29 +364,29 @@ export default function InventoryManagement() {
   const handleConsumir = async () => {
     const qty = Number(consumirQtd);
     if (!consumirQtd || qty <= 0) {
-      showNotification('Informe a quantidade.', 'error');
+      showNotification(tr('Informe a quantidade.'), 'error');
       return;
     }
     if (consumirQuarto) {
       const entrada = quartoItens.find(qi => qi.item?.id === consumirItem?.id);
       if (!entrada) {
-        showNotification('Este item não está configurado para o quarto selecionado.', 'error');
+        showNotification(tr('Este item não está configurado para o quarto selecionado.'), 'error');
         return;
       }
       if (qty > entrada.quantidade_atual) {
-        showNotification(`Quantidade maior que o disponível no quarto (${entrada.quantidade_atual} un.).`, 'error');
+        showNotification(tr('Quantidade maior que o disponível no quarto ({{quantidade_atual}} un.).', { quantidade_atual: entrada.quantidade_atual }), 'error');
         return;
       }
     }
     if (!consumirPagamento && !consumirDespesa) {
-      showNotification('Defina o pagamento antes de confirmar.', 'error');
+      showNotification(tr('Defina o pagamento antes de confirmar.'), 'error');
       return;
     }
     if (consumirPagamento && !consumirDespesa) {
       const esperado = qty * itemVenda(consumirItem);
       const pago     = consumirPagamento.valor ?? 0;
       if (Math.abs(esperado - pago) > 0.01) {
-        showNotification('O valor pago diverge do valor esperado. Corrija o pagamento ou marque como despesa pessoal.', 'error');
+        showNotification(tr('O valor pago diverge do valor esperado. Corrija o pagamento ou marque como despesa pessoal.'), 'error');
         return;
       }
     }
@@ -401,11 +402,11 @@ export default function InventoryManagement() {
         ...(pagamentoBody ? { pagamento: pagamentoBody } : {}),
         ...(consumirQuarto ? { quarto: { id: Number(consumirQuarto) } } : {}),
       });
-      showNotification('Item consumido com sucesso!');
+      showNotification(tr('Item consumido com sucesso!'));
       setConsumiModal(false);
       loadSections();
     } catch (e) {
-      showNotification('Erro: ' + e.message, 'error');
+      showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
       setConsumiSaving(false);
     }
@@ -423,7 +424,7 @@ export default function InventoryManagement() {
 
   const handleSaveHist = async () => {
     if (!editHistForm.quantidade_unidades || Number(editHistForm.quantidade_unidades) <= 0) {
-      showNotification('Informe a quantidade.', 'error');
+      showNotification(tr('Informe a quantidade.'), 'error');
       return;
     }
     setEditHistSaving(true);
@@ -433,13 +434,13 @@ export default function InventoryManagement() {
         quantidade_unidades: Number(editHistForm.quantidade_unidades),
         fornecedor:          editHistForm.fornecedor.trim() || null,
       });
-      showNotification('Reposição atualizada com sucesso!');
+      showNotification(tr('Reposição atualizada com sucesso!'));
       setEditHistModal(false);
       // recarrega o historico do item atual
       const repos = await itemApi.historicoReposicao(historicoItem.id);
       setHistoricoReposicao(Array.isArray(repos) ? repos : (repos?.itemReposicaoList ?? []));
     } catch (e) {
-      showNotification('Erro: ' + e.message, 'error');
+      showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
       setEditHistSaving(false);
     }
@@ -454,7 +455,7 @@ export default function InventoryManagement() {
       const data = await itemApi.listarConsumos();
       setConsumos(Array.isArray(data) ? data : []);
     } catch (e) {
-      showNotification('Erro ao carregar consumos: ' + e.message, 'error');
+      showNotification(tr('Erro ao carregar consumos: ') + e.message, 'error');
     } finally {
       setConsumosLoading(false);
     }
@@ -471,7 +472,7 @@ export default function InventoryManagement() {
       const repos = await itemApi.historicoReposicao(item.id);
       setHistoricoReposicao(Array.isArray(repos) ? repos : (repos?.itemReposicaoList ?? []));
     } catch (e) {
-      showNotification('Erro ao carregar histórico: ' + e.message, 'error');
+      showNotification(tr('Erro ao carregar histórico: ') + e.message, 'error');
     } finally {
       setHistoricoLoading(false);
     }
@@ -563,14 +564,14 @@ export default function InventoryManagement() {
     setCancelandoConsumo(true);
     try {
       await itemApi.cancelarConsumo(consumoDetalhe.id);
-      showNotification('Consumo cancelado com sucesso!');
+      showNotification(tr('Consumo cancelado com sucesso!'));
       setConsumoDetalhe(null);
       setConfirmCancelar(false);
       const data = await itemApi.listarConsumos();
       setConsumos(Array.isArray(data) ? data : []);
       loadSections();
     } catch (e) {
-      showNotification('Erro ao cancelar: ' + e.message, 'error');
+      showNotification(tr('Erro ao cancelar: ') + e.message, 'error');
       setConfirmCancelar(false);
     } finally {
       setCancelandoConsumo(false);
@@ -662,12 +663,12 @@ export default function InventoryManagement() {
               <button type="button"
                 className={[styles.segmentedBtn, !isQuartos ? styles.segmentedBtnActive : ''].join(' ')}
                 onClick={() => changeAba('cat')}>
-                Categorias
+                {tr('Categorias')}
               </button>
               <button type="button"
                 className={[styles.segmentedBtn, isQuartos ? styles.segmentedBtnActive : ''].join(' ')}
                 onClick={() => changeAba('quarto')}>
-                Quartos
+                {tr('Quartos')}
               </button>
             </div>
 
@@ -676,12 +677,12 @@ export default function InventoryManagement() {
               <Input
                 value={search}
                 onChange={handleSearch}
-                placeholder={isQuartos ? 'Buscar quarto...' : 'Buscar categoria...'}
+                placeholder={isQuartos ? tr('Buscar quarto...') : tr('Buscar categoria...')}
                 className={styles.searchInput}
-                aria-label={isQuartos ? 'Buscar quarto' : 'Buscar categoria'}
+                aria-label={isQuartos ? tr('Buscar quarto') : tr('Buscar categoria')}
               />
               {search.length > 0 && (
-                <button className={styles.searchClear} onClick={() => setSearch('')} aria-label="Limpar busca">
+                <button className={styles.searchClear} onClick={() => setSearch('')} aria-label={tr('Limpar busca')}>
                   <X size={14} />
                 </button>
               )}
@@ -690,7 +691,7 @@ export default function InventoryManagement() {
             <div className={styles.listMeta}>
               <span>
                 {loading
-                  ? 'Carregando...'
+                  ? tr('Carregando...')
                   : isQuartos
                     ? `${quartosFiltrados.length} quarto${quartosFiltrados.length !== 1 ? 's' : ''}`
                     : `${catsFiltradas.length} categoria${catsFiltradas.length !== 1 ? 's' : ''}`}
@@ -698,7 +699,7 @@ export default function InventoryManagement() {
               {!isQuartos && canAdicionarCategoria && (
                 <Button className={[styles.btnSolid, styles.btnSm, styles.btnPrimary].join(' ')}
                   onClick={openCreateCat}>
-                  Nova categoria
+                  {tr('Nova categoria')}
                 </Button>
               )}
             </div>
@@ -711,8 +712,8 @@ export default function InventoryManagement() {
                   <div className={styles.empty}>
                     <BedDouble size={24} opacity={0.3} />
                     <span>
-                      {search ? `Nenhum quarto encontrado para "${search}".`
-                        : 'Nenhum quarto cadastrado.'}
+                      {search ? tr('Nenhum quarto encontrado para "{{search}}".', { search })
+                        : tr('Nenhum quarto cadastrado.')}
                     </span>
                   </div>
                 ) : quartosFiltrados.map((q) => {
@@ -726,18 +727,18 @@ export default function InventoryManagement() {
                       onClick={() => setDetailQuarto(q)}>
                       <span className={styles.listItemBody}>
                         <span className={styles.listItemName}>
-                          <span className={styles.nome}>Quarto {q.id} · {q.descricao}</span>
+                          <span className={styles.nome}>{tr('Quarto')} {q.id} · {q.descricao}</span>
                         </span>
                         <span className={styles.listItemSub}>
                           <span className={styles.tag}>
-                            {itens.length} {itens.length === 1 ? 'item' : 'itens'}
+                            {itens.length} {itens.length === 1 ? tr('item') : tr('itens')}
                           </span>
                           {itens.length > 0 && (
-                            <span className={styles.tag}>{unidades} un</span>
+                            <span className={styles.tag}>{unidades} {tr('un')}</span>
                           )}
                           {abaixo > 0 && (
                             <span className={[styles.tag, styles.tagRose].join(' ')}>
-                              {abaixo} a repor
+                              {abaixo} {tr('a repor')}
                             </span>
                           )}
                         </span>
@@ -750,8 +751,8 @@ export default function InventoryManagement() {
                 <div className={styles.empty}>
                   <Tag size={24} opacity={0.3} />
                   <span>
-                    {search ? `Nenhuma categoria encontrada para "${search}".`
-                      : 'Nenhuma categoria cadastrada.'}
+                    {search ? tr('Nenhuma categoria encontrada para "{{search}}".', { search })
+                      : tr('Nenhuma categoria cadastrada.')}
                   </span>
                 </div>
               ) : catsFiltradas.map((section) => {
@@ -768,10 +769,10 @@ export default function InventoryManagement() {
                         <span className={styles.nome}>{catNome(section)}</span>
                       </span>
                       <span className={styles.listItemSub}>
-                        <span className={styles.tag}>{nItens} {nItens === 1 ? 'item' : 'itens'}</span>
+                        <span className={styles.tag}>{nItens} {nItens === 1 ? tr('item') : tr('itens')}</span>
                         {zerados > 0 && (
                           <span className={[styles.tag, styles.tagRose].join(' ')}>
-                            {zerados} sem estoque
+                            {zerados} {tr('sem estoque')}
                           </span>
                         )}
                       </span>
@@ -789,14 +790,14 @@ export default function InventoryManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <BedDouble size={16} />
-                  <span className={styles.dCardTitle}>Itens do quarto</span>
+                  <span className={styles.dCardTitle}>{tr('Itens do quarto')}</span>
                   <div className={styles.dCardActions}>
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar" aria-label="Fechar">
+                      title={tr('Fechar')} aria-label={tr('Fechar')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -806,14 +807,14 @@ export default function InventoryManagement() {
                   <div className={styles.idHead}>
                     <div className={styles.idHeadMain}>
                       <div className={styles.idName}>
-                        <h2 style={{ margin: 0, font: 'inherit' }}>Quarto {detailQuarto.id}</h2>
+                        <h2 style={{ margin: 0, font: 'inherit' }}>{tr('Quarto')} {detailQuarto.id}</h2>
                       </div>
                       <p className={styles.idSub}>{detailQuarto.descricao}</p>
                     </div>
                   </div>
 
                   {(detailQuarto.quarto_itens ?? []).length === 0 ? (
-                    <p className={styles.blockEmpty}>Nenhum item configurado para este quarto.</p>
+                    <p className={styles.blockEmpty}>{tr('Nenhum item configurado para este quarto.')}</p>
                   ) : (
                     <div className={styles.itemList}>
                       {(detailQuarto.quarto_itens ?? []).map((qi) => {
@@ -826,9 +827,9 @@ export default function InventoryManagement() {
                               <p className={styles.itemRowNome}>{qi.item?.descricao ?? '—'}</p>
                               <div className={styles.itemRowSub}>
                                 <span className={[styles.tag, falta > 0 ? styles.tagRose : styles.tagEmerald].join(' ')}>
-                                  {atual} de {padrao}
+                                  {atual} {tr('de')} {padrao}
                                 </span>
-                                {falta > 0 && <span>faltam {falta} un</span>}
+                                {falta > 0 && <span>{tr('faltam')} {falta} {tr('un')}</span>}
                               </div>
                             </div>
                             <div className={styles.itemRowPreco}>
@@ -851,10 +852,10 @@ export default function InventoryManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Boxes size={16} />
-                  <span className={styles.dCardTitle}>Visão geral do estoque</span>
+                  <span className={styles.dCardTitle}>{tr('Visão geral do estoque')}</span>
                   <div className={styles.dCardActions}>
                     {canHistoricoConsumo && (
-                      <Button className={styles.btnSolid} onClick={openConsumos}>Consumos</Button>
+                      <Button className={styles.btnSolid} onClick={openConsumos}>{tr('Consumos')}</Button>
                     )}
                   </div>
                 </h3>
@@ -863,22 +864,22 @@ export default function InventoryManagement() {
                   {loading ? <SkeletonPainel /> : (
                     <div className={styles.statGrid}>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Categorias</p>
+                        <p className={styles.statLabel}>{tr('Categorias')}</p>
                         <p className={styles.statVal}>{sections.length}</p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Itens</p>
+                        <p className={styles.statLabel}>{tr('Itens')}</p>
                         <p className={styles.statVal}>{totais.itens}</p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Sem estoque</p>
+                        <p className={styles.statLabel}>{tr('Sem estoque')}</p>
                         <p className={[styles.statVal, totais.semEstoque > 0 ? styles.statValRose : ''].join(' ')}>
                           {totais.semEstoque}
                         </p>
                       </div>
                       {canDashboardCategoria && (
                         <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Lucro potencial</p>
+                          <p className={styles.statLabel}>{tr('Lucro potencial')}</p>
                           <p className={[styles.statVal, styles.statValEmerald].join(' ')}>{fmtBRL(totais.lucro)}</p>
                         </div>
                       )}
@@ -892,13 +893,13 @@ export default function InventoryManagement() {
                 <section className={styles.dCard}>
                   <h3 className={styles.dCardHead}>
                     <AlertTriangle size={16} />
-                    <span className={styles.dCardTitle}>Estoque baixo</span>
+                    <span className={styles.dCardTitle}>{tr('Estoque baixo')}</span>
                   </h3>
 
                   <div className={styles.dCardBody}>
                     {estoqueBaixo.length === 0 ? (
                       <p className={styles.blockEmpty}>
-                        Nenhum item com {LIMITE_ESTOQUE_BAIXO} unidades ou menos.
+                        {tr('Nenhum item com')} {LIMITE_ESTOQUE_BAIXO} {tr('unidades ou menos.')}
                       </p>
                     ) : (
                       <div className={styles.itemList}>
@@ -910,7 +911,7 @@ export default function InventoryManagement() {
                                 <p className={styles.itemRowNome}>{itemDesc(item)}</p>
                                 <div className={styles.itemRowSub}>
                                   <span className={[styles.tag, styles.tagRose].join(' ')}>
-                                    {qty} {qty === 1 ? 'unidade' : 'unidades'}
+                                    {qty} {qty === 1 ? tr('unidade') : tr('unidades')}
                                   </span>
                                   <button type="button" className={styles.linkCat}
                                     onClick={() => setDetailCat(section)}>
@@ -920,7 +921,7 @@ export default function InventoryManagement() {
                               </div>
                               <div className={styles.itemRowPreco}>
                                 <p className={styles.itemRowVenda}>{fmtBRL(itemVenda(item))}</p>
-                                <p className={styles.itemRowCompra}>custo {fmtBRL(itemCompra(item))}</p>
+                                <p className={styles.itemRowCompra}>{tr('custo')} {fmtBRL(itemCompra(item))}</p>
                               </div>
                             </div>
                           );
@@ -932,7 +933,7 @@ export default function InventoryManagement() {
               )}
 
               <div className={styles.detailHint}>
-                Escolha uma categoria na lista ao lado para ver os itens dela.
+                {tr('Escolha uma categoria na lista ao lado para ver os itens dela.')}
               </div>
             </div>
           ) : (
@@ -943,19 +944,19 @@ export default function InventoryManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <Tag size={16} />
-                  <span className={styles.dCardTitle}>Dados da categoria</span>
+                  <span className={styles.dCardTitle}>{tr('Dados da categoria')}</span>
                   <div className={styles.dCardActions}>
                     {canEditarCategoria && (
                       <Button className={styles.btnSolid} onClick={() => openEditCat(detailCat)}>
-                        Editar
+                        {tr('Editar')}
                       </Button>
                     )}
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar" aria-label="Fechar">
+                      title={tr('Fechar')} aria-label={tr('Fechar')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -973,7 +974,7 @@ export default function InventoryManagement() {
 
                   <div className={styles.statGrid}>
                     <div className={styles.statCard}>
-                      <p className={styles.statLabel}>Itens</p>
+                      <p className={styles.statLabel}>{tr('Itens')}</p>
                       <p className={styles.statVal}>
                         {catDash.quantidade_itens ?? (detailCat.items ?? []).length}
                       </p>
@@ -981,13 +982,13 @@ export default function InventoryManagement() {
                     {canDashboardCategoria && (
                       <>
                         <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Investido</p>
+                          <p className={styles.statLabel}>{tr('Investido')}</p>
                           <p className={[styles.statVal, styles.statValRose].join(' ')}>
                             {fmtBRL(catDash.valor_investido)}
                           </p>
                         </div>
                         <div className={styles.statCard}>
-                          <p className={styles.statLabel}>Lucro potencial</p>
+                          <p className={styles.statLabel}>{tr('Lucro potencial')}</p>
                           <p className={[styles.statVal, styles.statValEmerald].join(' ')}>
                             {fmtBRL(catDash.lucro_potencial)}
                           </p>
@@ -1002,12 +1003,12 @@ export default function InventoryManagement() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Package size={16} />
-                  <span className={styles.dCardTitle}>Itens</span>
+                  <span className={styles.dCardTitle}>{tr('Itens')}</span>
                   <div className={styles.dCardActions}>
                     {canAdicionarItem && (
                       <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                         onClick={() => openCreateItem(detailCat)}>
-                        Novo item
+                        {tr('Novo item')}
                       </Button>
                     )}
                   </div>
@@ -1020,12 +1021,12 @@ export default function InventoryManagement() {
                       <Input
                         value={itemSearch}
                         onChange={(e) => setItemSearch(e.target.value)}
-                        placeholder="Buscar item nesta categoria..."
+                        placeholder={tr('Buscar item nesta categoria...')}
                         className={styles.searchInput}
-                        aria-label="Buscar item"
+                        aria-label={tr('Buscar item')}
                       />
                       {itemSearch.length > 0 && (
-                        <button className={styles.searchClear} onClick={() => setItemSearch('')} aria-label="Limpar busca">
+                        <button className={styles.searchClear} onClick={() => setItemSearch('')} aria-label={tr('Limpar busca')}>
                           <X size={14} />
                         </button>
                       )}
@@ -1034,7 +1035,7 @@ export default function InventoryManagement() {
 
                   {itensDaCat.length === 0 ? (
                     <p className={styles.blockEmpty}>
-                      {itemSearch ? `Nenhum item encontrado para "${itemSearch}".` : 'Nenhum item cadastrado nesta categoria.'}
+                      {itemSearch ? tr('Nenhum item encontrado para "{{itemSearch}}".', { itemSearch }) : tr('Nenhum item cadastrado nesta categoria.')}
                     </p>
                   ) : (
                     <div className={styles.itemGrid}>
@@ -1054,7 +1055,7 @@ export default function InventoryManagement() {
                                   className={[styles.itemMenuBtn, menu ? styles.itemMenuBtnOn : ''].join(' ')}
                                   onClick={(e) => abrirMenu(item.id, e)}
                                   aria-haspopup="menu" aria-expanded={menu}
-                                  title="Ações do item" aria-label="Ações do item">
+                                  title={tr('Ações do item')} aria-label={tr('Ações do item')}>
                                   <MenuIcon size={15} />
                                 </button>
 
@@ -1065,25 +1066,25 @@ export default function InventoryManagement() {
                                       <button type="button" role="menuitem"
                                         className={[styles.itemMenuItem, styles.itemMenuItemDanger].join(' ')}
                                         onClick={(e) => { setMenuAberto(null); openConsumir(item, e); }}>
-                                        <Minus size={14} /> Consumir
+                                        <Minus size={14} /> {tr('Consumir')}
                                       </button>
                                     )}
                                     {canReporItem && (
                                       <button type="button" role="menuitem" className={styles.itemMenuItem}
                                         onClick={(e) => { setMenuAberto(null); openRepor(item, e); }}>
-                                        <RefreshCw size={14} /> {servico ? 'Alterar valor' : 'Repor estoque'}
+                                        <RefreshCw size={14} /> {servico ? tr('Alterar valor') : tr('Repor estoque')}
                                       </button>
                                     )}
                                     {canHistReposicoes && (
                                       <button type="button" role="menuitem" className={styles.itemMenuItem}
                                         onClick={(e) => { setMenuAberto(null); openHistorico(item, e); }}>
-                                        <History size={14} /> Histórico
+                                        <History size={14} /> {tr('Histórico')}
                                       </button>
                                     )}
                                     {canAdicionarItem && (
                                       <button type="button" role="menuitem" className={styles.itemMenuItem}
                                         onClick={() => { setMenuAberto(null); openEditItem(item, detailCat.id); }}>
-                                        <Edit2 size={14} /> Editar
+                                        <Edit2 size={14} /> {tr('Editar')}
                                       </button>
                                     )}
                                   </div>,
@@ -1094,10 +1095,10 @@ export default function InventoryManagement() {
 
                             <div className={styles.itemCardTags}>
                               {servico ? (
-                                <span className={[styles.tag, styles.tagPrimary].join(' ')}>Serviço</span>
+                                <span className={[styles.tag, styles.tagPrimary].join(' ')}>{tr('Serviço')}</span>
                               ) : (
                                 <span className={[styles.tag, qty <= 5 ? styles.tagRose : styles.tagEmerald].join(' ')}>
-                                  {qty} {qty === 1 ? 'unidade' : 'unidades'}
+                                  {qty} {qty === 1 ? tr('unidade') : tr('unidades')}
                                 </span>
                               )}
                               {!servico && nosQ && (
@@ -1105,7 +1106,7 @@ export default function InventoryManagement() {
                                   onClick={() => toggleQuartos(item.id)}
                                   aria-expanded={aberto}>
                                   <BedDouble size={13} />
-                                  {nosQ.total} un em {nosQ.quartos.length} {nosQ.quartos.length === 1 ? 'quarto' : 'quartos'}
+                                  {nosQ.total} {tr('un em')} {nosQ.quartos.length} {nosQ.quartos.length === 1 ? tr('quarto') : tr('quartos')}
                                   <ChevronRight size={13}
                                     className={[styles.quartosChevron, aberto ? styles.quartosChevronOpen : ''].join(' ')} />
                                 </button>
@@ -1122,12 +1123,12 @@ export default function InventoryManagement() {
                               <div className={styles.quartosList}>
                                 {nosQ.quartos.map((q) => (
                                   <div key={q.id} className={styles.quartosRow}>
-                                    <span className={styles.quartosNome}>Quarto {q.id} · {q.descricao}</span>
+                                    <span className={styles.quartosNome}>{tr('Quarto')} {q.id} · {q.descricao}</span>
                                     <span className={[
                                       styles.quartosQtd,
                                       q.atual < q.padrao ? styles.quartosQtdBaixa : '',
                                     ].join(' ')}>
-                                      {q.atual} de {q.padrao}
+                                      {q.atual} {tr('de')} {q.padrao}
                                     </span>
                                   </div>
                                 ))}
@@ -1138,7 +1139,7 @@ export default function InventoryManagement() {
                             <div className={styles.itemCardPreco}>
                               <p className={styles.itemRowVenda}>{fmtBRL(itemVenda(item))}</p>
                               {!servico && (
-                                <p className={styles.itemRowCompra}>custo {fmtBRL(itemCompra(item))}</p>
+                                <p className={styles.itemRowCompra}>{tr('custo')} {fmtBRL(itemCompra(item))}</p>
                               )}
                             </div>
                           </div>
@@ -1160,31 +1161,31 @@ export default function InventoryManagement() {
         open={!!itemFormModal}
         onClose={() => setItemFormModal(null)}
         size="sm"
-        title={itemFormModal === 'create' ? <><Package size={15} /> Novo Item</> : <><Edit2 size={15} /> Editar Item</>}
+        title={itemFormModal === 'create' ? <><Package size={15} /> {tr('Novo Item')}</> : <><Edit2 size={15} /> {tr('Editar Item')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setItemFormModal(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setItemFormModal(null)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleSaveItem} disabled={itemSaving}>
               {itemSaving && <Loader2 size={14} className={styles.spinInline} />}
-              {itemFormModal === 'create' ? 'Criar Item' : 'Salvar'}
+              {itemFormModal === 'create' ? tr('Criar Item') : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Descrição *">
+          <FormField label={tr('Descrição *')}>
             <Input
-              placeholder="Ex: DETERGENTE NEUTRO 500ML"
+              placeholder={tr('Ex: DETERGENTE NEUTRO 500ML')}
               value={itemForm.descricao}
               onChange={(e) => setItemForm((f) => ({ ...f, descricao: e.target.value.toUpperCase() }))}
             />
           </FormField>
-          <FormField label="Categoria *">
+          <FormField label={tr('Categoria *')}>
             <Select
               value={itemForm.categoriaId}
               onChange={(e) => setItemForm((f) => ({ ...f, categoriaId: e.target.value }))}
             >
-              <option value="">Selecione...</option>
+              <option value="">{tr('Selecione...')}</option>
               {categorias.map((c) => (
                 <option key={c.id} value={c.id}>{c.nome}</option>
               ))}
@@ -1198,9 +1199,9 @@ export default function InventoryManagement() {
               onChange={(e) => setItemForm((f) => ({ ...f, servico: e.target.checked }))}
             />
             <div>
-              <span className={styles.checkboxLabel}>É um serviço</span>
+              <span className={styles.checkboxLabel}>{tr('É um serviço')}</span>
               <span className={styles.checkboxSub}>
-                Serviços não têm estoque: não se informa quantidade nem valor de compra.
+                {tr('Serviços não têm estoque: não se informa quantidade nem valor de compra.')}
               </span>
             </div>
           </label>
@@ -1214,28 +1215,28 @@ export default function InventoryManagement() {
         open={!!catFormModal}
         onClose={() => setCatFormModal(null)}
         size="sm"
-        title={catFormModal === 'create' ? <><Tag size={15} /> Nova Categoria</> : <><Edit2 size={15} /> Editar Categoria</>}
+        title={catFormModal === 'create' ? <><Tag size={15} /> {tr('Nova Categoria')}</> : <><Edit2 size={15} /> {tr('Editar Categoria')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setCatFormModal(null)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setCatFormModal(null)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleSaveCat} disabled={catSaving}>
               {catSaving && <Loader2 size={14} className={styles.spinInline} />}
-              {catFormModal === 'create' ? 'Criar Categoria' : 'Salvar'}
+              {catFormModal === 'create' ? tr('Criar Categoria') : tr('Salvar')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Nome da Categoria *">
+          <FormField label={tr('Nome da Categoria *')}>
             <Input
-              placeholder="EX: BEBIDAS"
+              placeholder={tr('EX: BEBIDAS')}
               value={catForm.nome}
               onChange={(e) => setCatForm((f) => ({ ...f, nome: e.target.value.toUpperCase() }))}
             />
           </FormField>
-          <FormField label="Descrição">
+          <FormField label={tr('Descrição')}>
             <Input
-              placeholder="DESCRIÇÃO DA CATEGORIA"
+              placeholder={tr('DESCRIÇÃO DA CATEGORIA')}
               value={catForm.descricao}
               onChange={(e) => setCatForm((f) => ({ ...f, descricao: e.target.value.toUpperCase() }))}
             />
@@ -1250,13 +1251,13 @@ export default function InventoryManagement() {
         open={reporModal}
         onClose={() => setReporModal(false)}
         size="md"
-        title={<><RefreshCw size={15} /> Repor Estoque</>}
+        title={<><RefreshCw size={15} /> {tr('Repor Estoque')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setReporModal(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setReporModal(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleRepor} disabled={reporSaving}>
               {reporSaving && <Loader2 size={14} className={styles.spinInline} />}
-              Confirmar Reposição
+              {tr('Confirmar Reposição')}
             </Button>
           </div>
         }
@@ -1265,12 +1266,12 @@ export default function InventoryManagement() {
           <div className={styles.formBody}>
             <div className={styles.itemInfoBox}>
               <span className={styles.itemInfoLabel}>
-                {itemServico(reporItem) ? 'Serviço selecionado' : 'Item selecionado'}
+                {itemServico(reporItem) ? tr('Serviço selecionado') : tr('Item selecionado')}
               </span>
               <span className={styles.itemInfoName}>{itemDesc(reporItem)}</span>
               {!itemServico(reporItem) && (
                 <span className={styles.itemInfoSub}>
-                  Qtd atual: <strong>{itemQty(reporItem)}</strong> unidades
+                  {tr('Qtd atual:')} <strong>{itemQty(reporItem)}</strong> {tr('unidades')}
                 </span>
               )}
             </div>
@@ -1278,16 +1279,16 @@ export default function InventoryManagement() {
             {/* Serviço não tem estoque: só o valor de venda faz sentido. */}
             {!itemServico(reporItem) && (
               <>
-                <FormField label="Quantidade (unidades) *">
+                <FormField label={tr('Quantidade (unidades) *')}>
                   <Input
                     type="number" placeholder="0" min="1"
                     value={reporForm.quantidade_unidades}
                     onChange={(e) => setReporForm((f) => ({ ...f, quantidade_unidades: e.target.value }))}
                   />
                 </FormField>
-                <FormField label="Fornecedor *">
+                <FormField label={tr('Fornecedor *')}>
                   <Input
-                    placeholder="NOME DO FORNECEDOR"
+                    placeholder={tr('NOME DO FORNECEDOR')}
                     value={reporForm.fornecedor}
                     onChange={(e) => setReporForm((f) => ({ ...f, fornecedor: e.target.value.toUpperCase() }))}
                   />
@@ -1297,17 +1298,17 @@ export default function InventoryManagement() {
 
             <div className={itemServico(reporItem) ? undefined : styles.formRow}>
               {!itemServico(reporItem) && (
-                <FormField label="Valor de Compra (un.) *">
+                <FormField label={tr('Valor de Compra (un.) *')}>
                   <Input
-                    placeholder="R$ 0,00"
+                    placeholder={tr('R$ 0,00')}
                     value={reporForm.valor_compra_unidade}
                     onChange={(e) => setReporForm((f) => ({ ...f, valor_compra_unidade: maskBRL(e.target.value) }))}
                   />
                 </FormField>
               )}
-              <FormField label={itemServico(reporItem) ? 'Valor cobrado *' : 'Valor de Venda (un.) *'}>
+              <FormField label={itemServico(reporItem) ? tr('Valor cobrado *') : tr('Valor de Venda (un.) *')}>
                 <Input
-                  placeholder="R$ 0,00"
+                  placeholder={tr('R$ 0,00')}
                   value={reporForm.valor_venda_unidade}
                   onChange={(e) => setReporForm((f) => ({ ...f, valor_venda_unidade: maskBRL(e.target.value) }))}
                 />
@@ -1326,7 +1327,7 @@ export default function InventoryManagement() {
         size="xl"
         title={
           <span className={styles.histModalTitle}>
-            <History size={16} /> Histórico — {historicoItem ? itemDesc(historicoItem) : ''}
+            <History size={16} /> {tr('Histórico —')} {historicoItem ? itemDesc(historicoItem) : ''}
           </span>
         }
       >
@@ -1336,21 +1337,21 @@ export default function InventoryManagement() {
           ) : !historicoReposicao.length ? (
             <div className={styles.emptyInline}>
               <Package size={24} color="var(--text-2)" />
-              <span>Nenhuma reposição registrada</span>
+              <span>{tr('Nenhuma reposição registrada')}</span>
             </div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th className={styles.thCenter}>Qtd</th>
-                    <th className={styles.thRight}>Compra Un.</th>
-                    <th className={styles.thRight}>Venda Un.</th>
-                    <th className={styles.thRight}>Margem</th>
-                    <th>Fornecedor</th>
-                    <th>Responsável</th>
-                    <th className={styles.thRight}>Ações</th>
+                    <th>{tr('Data')}</th>
+                    <th className={styles.thCenter}>{tr('Qtd')}</th>
+                    <th className={styles.thRight}>{tr('Compra Un.')}</th>
+                    <th className={styles.thRight}>{tr('Venda Un.')}</th>
+                    <th className={styles.thRight}>{tr('Margem')}</th>
+                    <th>{tr('Fornecedor')}</th>
+                    <th>{tr('Responsável')}</th>
+                    <th className={styles.thRight}>{tr('Ações')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1372,7 +1373,7 @@ export default function InventoryManagement() {
                       <td className={styles.tdRight}>
                         <div className={styles.actionBtns}>
                           <button type="button" className={styles.actionBtn} onClick={() => openEditHist(entry)}>
-                            <Edit2 size={11} /> Editar
+                            <Edit2 size={11} /> {tr('Editar')}
                           </button>
                         </div>
                       </td>
@@ -1392,13 +1393,13 @@ export default function InventoryManagement() {
         open={editHistModal}
         onClose={() => setEditHistModal(false)}
         size="sm"
-        title={<><Edit2 size={15} /> Editar Reposição</>}
+        title={<><Edit2 size={15} /> {tr('Editar Reposição')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setEditHistModal(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setEditHistModal(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleSaveHist} disabled={editHistSaving}>
               {editHistSaving && <Loader2 size={14} className={styles.spinInline} />}
-              Salvar
+              {tr('Salvar')}
             </Button>
           </div>
         }
@@ -1406,23 +1407,23 @@ export default function InventoryManagement() {
         {editHistEntry && (
           <div className={styles.formBody}>
             <div className={styles.itemInfoBox}>
-              <span className={styles.itemInfoLabel}>Registro</span>
+              <span className={styles.itemInfoLabel}>{tr('Registro')}</span>
               <span className={styles.itemInfoName}>{fmtDate(repData(editHistEntry))}</span>
               <span className={styles.itemInfoSub}>
-                Compra un.: <strong>{fmtBRL(repCompra(editHistEntry))}</strong>
-                {' · '}Venda un.: <strong>{fmtBRL(repVenda(editHistEntry))}</strong>
+                {tr('Compra un.:')} <strong>{fmtBRL(repCompra(editHistEntry))}</strong>
+                {' · '}{tr('Venda un.:')} <strong>{fmtBRL(repVenda(editHistEntry))}</strong>
               </span>
             </div>
-            <FormField label="Quantidade (unidades) *">
+            <FormField label={tr('Quantidade (unidades) *')}>
               <Input
                 type="number" placeholder="0" min="1"
                 value={editHistForm.quantidade_unidades}
                 onChange={(e) => setEditHistForm((f) => ({ ...f, quantidade_unidades: e.target.value }))}
               />
             </FormField>
-            <FormField label="Fornecedor">
+            <FormField label={tr('Fornecedor')}>
               <Input
-                placeholder="NOME DO FORNECEDOR"
+                placeholder={tr('NOME DO FORNECEDOR')}
                 value={editHistForm.fornecedor}
                 onChange={(e) => setEditHistForm((f) => ({ ...f, fornecedor: e.target.value.toUpperCase() }))}
               />
@@ -1438,13 +1439,13 @@ export default function InventoryManagement() {
         open={consumirModal}
         onClose={() => setConsumiModal(false)}
         size="sm"
-        title={<><Minus size={15} /> Consumir Item</>}
+        title={<><Minus size={15} /> {tr('Consumir Item')}</>}
         footer={
           <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setConsumiModal(false)}>Cancelar</Button>
+            <Button variant="secondary" onClick={() => setConsumiModal(false)}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleConsumir} disabled={consumirSaving}>
               {consumirSaving && <Loader2 size={14} className={styles.spinInline} />}
-              Confirmar
+              {tr('Confirmar')}
             </Button>
           </div>
         }
@@ -1457,15 +1458,15 @@ export default function InventoryManagement() {
           return (
             <div className={styles.formBody}>
               <div className={styles.itemInfoBox}>
-                <span className={styles.itemInfoLabel}>Item selecionado</span>
+                <span className={styles.itemInfoLabel}>{tr('Item selecionado')}</span>
                 <span className={styles.itemInfoName}>{itemDesc(consumirItem)}</span>
                 <span className={styles.itemInfoSub}>
-                  Qtd atual: <strong>{itemQty(consumirItem)}</strong> unidades
-                  {' · '}Venda un.: <strong>{fmtBRL(itemVenda(consumirItem))}</strong>
+                  {tr('Qtd atual:')} <strong>{itemQty(consumirItem)}</strong> {tr('unidades')}
+                  {' · '}{tr('Venda un.:')} <strong>{fmtBRL(itemVenda(consumirItem))}</strong>
                 </span>
               </div>
 
-              <FormField label="Quantidade a consumir *">
+              <FormField label={tr('Quantidade a consumir *')}>
                 <Input
                   type="number" placeholder="0" min="1"
                   value={consumirQtd}
@@ -1473,7 +1474,7 @@ export default function InventoryManagement() {
                 />
               </FormField>
 
-              <FormField label="Quarto">
+              <FormField label={tr('Quarto')}>
                 <Select
                   value={consumirQuarto}
                   onChange={async (e) => {
@@ -1489,9 +1490,9 @@ export default function InventoryManagement() {
                     finally { setQuartoItensLoading(false); }
                   }}
                 >
-                  <option value="">Nenhum</option>
+                  <option value="">{tr('Nenhum')}</option>
                   {quartos.map((q) => (
-                    <option key={q.id} value={q.id}>Quarto {q.id} - {q.descricao}</option>
+                    <option key={q.id} value={q.id}>{tr('Quarto')} {q.id} - {q.descricao}</option>
                   ))}
                 </Select>
               </FormField>
@@ -1500,13 +1501,13 @@ export default function InventoryManagement() {
                 if (quartoItensLoading) return (
                   <div className={styles.quartoItensBox}>
                     <Loader2 size={13} className={styles.spinInline} />
-                    <span>Carregando itens do quarto...</span>
+                    <span>{tr('Carregando itens do quarto...')}</span>
                   </div>
                 );
                 const entrada = quartoItens.find(qi => qi.item?.id === consumirItem?.id);
                 if (!entrada) return (
                   <div className={styles.quartoItensBox}>
-                    <span className={styles.quartoItensNone}>Item não configurado para este quarto</span>
+                    <span className={styles.quartoItensNone}>{tr('Item não configurado para este quarto')}</span>
                   </div>
                 );
                 const { quantidade_atual, quantidade_padrao } = entrada;
@@ -1515,14 +1516,14 @@ export default function InventoryManagement() {
                 return (
                   <div className={qtdExcede ? styles.quartoItensBoxErr : styles.quartoItensBox}>
                     <div className={styles.quartoItensRow}>
-                      <span className={styles.quartoItensLabel}>No quarto agora</span>
+                      <span className={styles.quartoItensLabel}>{tr('No quarto agora')}</span>
                       <span className={ok ? styles.quartoItensOk : styles.quartoItensLow}>
                         {quantidade_atual} / {quantidade_padrao}
                       </span>
                     </div>
                     {qtdExcede && (
                       <span className={styles.quartoItensNone} style={{ color: '#ef4444', fontStyle: 'normal' }}>
-                        Quantidade maior que o disponível no quarto ({quantidade_atual} un.)
+                        {tr('Quantidade maior que o disponível no quarto (')}{quantidade_atual} {tr('un.)')}
                       </span>
                     )}
                   </div>
@@ -1535,7 +1536,7 @@ export default function InventoryManagement() {
                   checked={consumirDespesa}
                   onChange={(e) => setConsumiDespesa(e.target.checked)}
                 />
-                <span>Despesa pessoal</span>
+                <span>{tr('Despesa pessoal')}</span>
               </label>
 
               {consumirPagamento ? (
@@ -1548,30 +1549,30 @@ export default function InventoryManagement() {
                     {' · '}{fmtBRL(pago)}
                   </span>
                   <button className={styles.pagamentoEdit} onClick={() => setShowConsumiPag(true)}>
-                    Alterar
+                    {tr('Alterar')}
                   </button>
                 </div>
               ) : (
                 <button className={styles.definePagamento} onClick={() => setShowConsumiPag(true)}>
-                  <CreditCard size={13} /> Definir Pagamento{consumirDespesa ? '' : ' *'}
+                  <CreditCard size={13} /> {tr('Definir Pagamento')}{consumirDespesa ? '' : ' *'}
                 </button>
               )}
 
               {qty > 0 && (
                 <div className={diverge ? styles.consumoAlertDiverg : styles.consumoAlert}>
                   <div className={styles.consumoAlertRow}>
-                    <span>Valor esperado</span>
+                    <span>{tr('Valor esperado')}</span>
                     <strong>{fmtBRL(esperado)}</strong>
                   </div>
                   {pago !== null && (
                     <div className={styles.consumoAlertRow}>
-                      <span>Valor informado</span>
+                      <span>{tr('Valor informado')}</span>
                       <strong className={diverge ? styles.valRose : styles.valVenda}>{fmtBRL(pago)}</strong>
                     </div>
                   )}
                   {diverge && !consumirDespesa && (
                     <p className={styles.consumoAlertMsg}>
-                      Os valores divergem. Corrija o pagamento ou marque como despesa pessoal.
+                      {tr('Os valores divergem. Corrija o pagamento ou marque como despesa pessoal.')}
                     </p>
                   )}
                 </div>
@@ -1598,7 +1599,7 @@ export default function InventoryManagement() {
         open={consumosModal}
         onClose={() => setConsumosModal(false)}
         size="xl"
-        title={<><History size={16} /> Histórico de Consumos</>}
+        title={<><History size={16} /> {tr('Histórico de Consumos')}</>}
       >
         <div className={styles.histTabBody}>
           {consumosLoading ? (
@@ -1606,21 +1607,21 @@ export default function InventoryManagement() {
           ) : !consumos.length ? (
             <div className={styles.emptyInline}>
               <Boxes size={24} color="var(--text-2)" />
-              <span>Nenhum consumo registrado</span>
+              <span>{tr('Nenhum consumo registrado')}</span>
             </div>
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
                 <thead>
                   <tr>
-                    <th>Data</th>
-                    <th>Item</th>
-                    <th className={styles.thCenter}>Qtd</th>
-                    <th>Pagamento</th>
-                    <th>Quarto</th>
-                    <th className={styles.thCenter}>Despesa pessoal</th>
-                    <th>Responsável</th>
-                    <th className={styles.thCenter}>Status</th>
+                    <th>{tr('Data')}</th>
+                    <th>{tr('Item')}</th>
+                    <th className={styles.thCenter}>{tr('Qtd')}</th>
+                    <th>{tr('Pagamento')}</th>
+                    <th>{tr('Quarto')}</th>
+                    <th className={styles.thCenter}>{tr('Despesa pessoal')}</th>
+                    <th>{tr('Responsável')}</th>
+                    <th className={styles.thCenter}>{tr('Status')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1652,17 +1653,17 @@ export default function InventoryManagement() {
                         )}
                       </td>
                       <td className={styles.tdSecondary}>
-                        {c.quarto ? `Quarto ${c.quarto.id} - ${c.quarto.descricao}` : '—'}
+                        {c.quarto ? tr('Quarto {{id}} - {{descricao}}', { id: c.quarto.id, descricao: c.quarto.descricao }) : '—'}
                       </td>
                       <td className={styles.tdCenter}>
                         {c.despesa_pessoal
-                          ? <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>Sim</span>
+                          ? <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>{tr('Sim')}</span>
                           : <span className={styles.tdSecondary}>—</span>}
                       </td>
                       <td className={styles.tdSecondary}>{c.funcionario?.nome ?? '—'}</td>
                       <td className={styles.tdCenter}>
                         {c.cancelado
-                          ? <span className={[styles.qtyBadge, styles.qtyBadgeLow].join(' ')}>Cancelado</span>
+                          ? <span className={[styles.qtyBadge, styles.qtyBadgeLow].join(' ')}>{tr('Cancelado')}</span>
                           : <span className={styles.tdSecondary}>—</span>}
                       </td>
                     </tr>
@@ -1681,26 +1682,26 @@ export default function InventoryManagement() {
         open={!!consumoDetalhe}
         onClose={() => { setConsumoDetalhe(null); setConfirmCancelar(false); }}
         size="sm"
-        title={<><History size={15} /> Detalhe do Consumo</>}
+        title={<><History size={15} /> {tr('Detalhe do Consumo')}</>}
         footer={
           <div className={styles.modalFooter}>
             {confirmCancelar ? (
               <>
-                <span style={{ fontSize: 12, color: 'var(--text-2)', flex: 1 }}>Confirmar cancelamento?</span>
+                <span style={{ fontSize: 12, color: 'var(--text-2)', flex: 1 }}>{tr('Confirmar cancelamento?')}</span>
                 <Button variant="secondary" onClick={() => setConfirmCancelar(false)} disabled={cancelandoConsumo}>
-                  Não
+                  {tr('Não')}
                 </Button>
                 <Button variant="danger" onClick={handleCancelarConsumo} disabled={cancelandoConsumo}>
                   {cancelandoConsumo && <Loader2 size={14} className={styles.spinInline} />}
-                  Sim, cancelar
+                  {tr('Sim, cancelar')}
                 </Button>
               </>
             ) : (
               <>
-                <Button variant="secondary" onClick={() => { setConsumoDetalhe(null); setConfirmCancelar(false); }}>Fechar</Button>
+                <Button variant="secondary" onClick={() => { setConsumoDetalhe(null); setConfirmCancelar(false); }}>{tr('Fechar')}</Button>
                 {consumoDetalhe && !consumoDetalhe.cancelado && (
                   <Button variant="danger" onClick={() => setConfirmCancelar(true)}>
-                    Cancelar Consumo
+                    {tr('Cancelar Consumo')}
                   </Button>
                 )}
               </>
@@ -1715,16 +1716,16 @@ export default function InventoryManagement() {
             <div className={styles.formBody}>
               {/* Item */}
               <div className={styles.itemInfoBox}>
-                <span className={styles.itemInfoLabel}>Item</span>
+                <span className={styles.itemInfoLabel}>{tr('Item')}</span>
                 <span className={styles.itemInfoName}>{c.item?.descricao ?? '—'}</span>
                 <span className={styles.itemInfoSub}>
-                  ID #{c.item?.id} · Quantidade: <strong>{c.quantidade}</strong>
+                  {tr('ID #')}{c.item?.id} {tr('· Quantidade:')} <strong>{c.quantidade}</strong>
                 </span>
               </div>
 
               {/* Pagamento */}
               <div className={styles.itemInfoBox}>
-                <span className={styles.itemInfoLabel}>Pagamento</span>
+                <span className={styles.itemInfoLabel}>{tr('Pagamento')}</span>
                 {pag ? (
                   <>
                     <span className={styles.itemInfoName}>
@@ -1733,44 +1734,44 @@ export default function InventoryManagement() {
                       <span className={styles.valVenda}>{fmtBRL(pag.valor)}</span>
                     </span>
                     <span className={styles.itemInfoSub}>
-                      Pagador: <strong>{pag.nome_pagador ?? '—'}</strong>
+                      {tr('Pagador:')} <strong>{pag.nome_pagador ?? '—'}</strong>
                     </span>
                     {pag.descricao && (
-                      <span className={styles.itemInfoSub}>Descrição: {pag.descricao}</span>
+                      <span className={styles.itemInfoSub}>{tr('Descrição:')} {pag.descricao}</span>
                     )}
                     {pag.desconto != null && (
-                      <span className={styles.itemInfoSub}>Desconto: <strong>{fmtBRL(pag.desconto)}</strong></span>
+                      <span className={styles.itemInfoSub}>{tr('Desconto:')} <strong>{fmtBRL(pag.desconto)}</strong></span>
                     )}
                     <span className={styles.itemInfoSub}>
-                      Registrado em: {pag.data_hora_registro ?? '—'}
+                      {tr('Registrado em:')} {pag.data_hora_registro ?? '—'}
                       {' · '}
                       {pag.cancelado
-                        ? <span className={styles.valRose}>Cancelado</span>
-                        : <span className={styles.valVenda}>Ativo</span>}
+                        ? <span className={styles.valRose}>{tr('Cancelado')}</span>
+                        : <span className={styles.valVenda}>{tr('Ativo')}</span>}
                     </span>
                   </>
                 ) : (
-                  <span className={styles.itemInfoSub}>Sem pagamento registrado</span>
+                  <span className={styles.itemInfoSub}>{tr('Sem pagamento registrado')}</span>
                 )}
               </div>
 
               {/* Meta */}
               <div className={styles.itemInfoBox}>
-                <span className={styles.itemInfoLabel}>Informações</span>
+                <span className={styles.itemInfoLabel}>{tr('Informações')}</span>
                 <span className={styles.itemInfoSub}>
-                  Data: <strong>{c.data_hora_registro ?? '—'}</strong>
+                  {tr('Data:')} <strong>{c.data_hora_registro ?? '—'}</strong>
                 </span>
                 <span className={styles.itemInfoSub}>
-                  Responsável: <strong>{c.funcionario?.nome ?? '—'}</strong>
+                  {tr('Responsável:')} <strong>{c.funcionario?.nome ?? '—'}</strong>
                 </span>
                 {c.quarto && (
                   <span className={styles.itemInfoSub}>
-                    Quarto: <strong>{c.quarto.descricao ?? `#${c.quarto.id}`}</strong>
+                    {tr('Quarto:')} <strong>{c.quarto.descricao ?? `#${c.quarto.id}`}</strong>
                   </span>
                 )}
                 <span className={styles.itemInfoSub}>
-                  Despesa pessoal:{' '}
-                  <strong>{c.despesa_pessoal ? 'Sim' : 'Não'}</strong>
+                  {tr('Despesa pessoal:')}{' '}
+                  <strong>{c.despesa_pessoal ? tr('Sim') : tr('Não')}</strong>
                 </span>
               </div>
             </div>

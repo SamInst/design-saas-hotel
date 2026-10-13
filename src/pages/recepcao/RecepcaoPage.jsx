@@ -35,10 +35,11 @@ import DescontoModal        from './pernoites/modals/DescontoModal';
 import ConsumoModal         from './pernoites/modals/ConsumoModal';
 import AtribuirLimpezaModal from './pernoites/modals/AtribuirLimpezaModal';
 import GerenciarDiariasModal from './pernoites/modals/GerenciarDiariasModal';
+import { tr } from '../../i18n';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtBRL = (v) =>
-  v == null ? 'R$ 0,00' :
+  v == null ? tr('R$ 0,00') :
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
 const maskBRL = (v) => {
@@ -112,7 +113,7 @@ function calcValorDayUse(precoBase, precoAdicional, horasBase, elapsedMin) {
 function fmtElapsed(min) {
   if (min <= 0) return '0min';
   const h = Math.floor(min / 60), m = min % 60;
-  return h === 0 ? `${m}min` : `${h}h ${String(m).padStart(2, '0')}min`;
+  return h === 0 ? `${m}min` : tr('{{h}}h {{v1}}min', { h, v1: String(m).padStart(2, '0') });
 }
 function fmtClock(sec) {
   if (sec <= 0) return '00:00';
@@ -136,12 +137,12 @@ function roomStatusKey(status) {
 }
 
 const FILTER_OPTIONS = [
-  { id: 'todos',     label: 'Todos'           },
-  { id: 'disponivel',label: 'Disponível'      },
-  { id: 'ocupado',   label: 'Ocupado'         },
-  { id: 'reservado', label: 'Reservado'       },
-  { id: 'limpeza',   label: 'Limpeza'         },
-  { id: 'servico',   label: 'Manutenção/Fora' },
+  { id: 'todos',     label: tr('Todos')           },
+  { id: 'disponivel',label: tr('Disponível')      },
+  { id: 'ocupado',   label: tr('Ocupado')         },
+  { id: 'reservado', label: tr('Reservado')       },
+  { id: 'limpeza',   label: tr('Limpeza')         },
+  { id: 'servico',   label: tr('Manutenção/Fora') },
 ];
 
 // ── Mock itens do quarto ──────────────────────────────────────────────────────
@@ -205,7 +206,7 @@ function QuartoCombobox({ value, onChange, quartos = [], categorias = [], curren
     <div ref={dropRef} className={styles.qcDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
       <div className={styles.qcSearchWrap}>
         <Search size={12} className={styles.qcSearchIcon} />
-        <input className={styles.qcSearchInput} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrar apartamento..." autoFocus />
+        <input className={styles.qcSearchInput} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={tr('Filtrar apartamento...')} autoFocus />
       </div>
       {categorias.map((cat) => {
         const rows = cat.quartos.filter((n) => {
@@ -226,9 +227,9 @@ function QuartoCombobox({ value, onChange, quartos = [], categorias = [], curren
                   className={[styles.qcItem, sel ? styles.qcItemSel : '', !avail ? styles.qcItemUnavail : ''].join(' ')}
                   onClick={() => { if (!avail) return; onChange(q.id); setOpen(false); setFilter(''); }}
                 >
-                  <span className={styles.qcItemNum}>Apt. {n}</span>
+                  <span className={styles.qcItemNum}>{tr('Apt.')} {n}</span>
                   {q && <span className={styles.qcItemTipo}>{q.categoria}</span>}
-                  {!avail && <span className={styles.qcItemOcupado}>Ocupado</span>}
+                  {!avail && <span className={styles.qcItemOcupado}>{tr('Ocupado')}</span>}
                 </div>
               );
             })}
@@ -245,8 +246,8 @@ function QuartoCombobox({ value, onChange, quartos = [], categorias = [], curren
         onClick={() => { setOpen((o) => !o); setFilter(''); }}
       >
         {selected
-          ? <span className={styles.qcSelected}>Apt. {selected.numero} — {selected.categoria}</span>
-          : <span className={styles.qcPlaceholder}>Selecione um apartamento...</span>
+          ? <span className={styles.qcSelected}>{tr('Apt.')} {selected.numero} — {selected.categoria}</span>
+          : <span className={styles.qcPlaceholder}>{tr('Selecione um apartamento...')}</span>
         }
         <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
       </button>
@@ -296,10 +297,10 @@ function DiariasCombobox({ value = [], onChange, diarias = [], atualNum = 1 }) {
 
   const allSelected = diarias.length > 0 && value.length === diarias.length;
   const label = value.length === 0
-    ? 'Selecione as diárias...'
+    ? tr('Selecione as diárias...')
     : value.length === diarias.length
-      ? `Todas as diárias (${diarias.length})`
-      : `${value.length} de ${diarias.length} diária(s)`;
+      ? tr('Todas as diárias ({{length}})', { length: diarias.length })
+      : tr('{{length}} de {{length1}} diária(s)', { length: value.length, length1: diarias.length });
 
   const toggle = (idx) => onChange(value.includes(idx) ? value.filter((x) => x !== idx) : [...value, idx]);
   const toggleAll = () => onChange(allSelected ? [] : diarias.map((d) => d.idx));
@@ -312,7 +313,7 @@ function DiariasCombobox({ value = [], onChange, diarias = [], atualNum = 1 }) {
         style={{ borderBottom: '1px solid var(--border)', marginBottom: 6, paddingBottom: 10 }}
       >
         <div className={[styles.qcCheck, allSelected ? styles.qcCheckSel : ''].join(' ')}>{allSelected ? '✓' : ''}</div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Selecionar todas</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{tr('Selecionar todas')}</span>
       </div>
       {diarias.map((d) => {
         const sel = value.includes(d.idx);
@@ -320,8 +321,8 @@ function DiariasCombobox({ value = [], onChange, diarias = [], atualNum = 1 }) {
         return (
           <div key={d.idx} className={[styles.qcItem, sel ? styles.qcItemSel : ''].join(' ')} onClick={() => toggle(d.idx)}>
             <div className={[styles.qcCheck, sel ? styles.qcCheckSel : ''].join(' ')}>{sel ? '✓' : ''}</div>
-            <span className={styles.qcItemNum}>Diária {d.num}</span>
-            {isCurrent && <span className={styles.qcItemTipo}>atual</span>}
+            <span className={styles.qcItemNum}>{tr('Diária')} {d.num}</span>
+            {isCurrent && <span className={styles.qcItemTipo}>{tr('atual')}</span>}
             <span style={{ fontSize: 11, color: 'var(--text-2)', marginLeft: 'auto' }}>{d.dataInicio?.split(' ')[0]}</span>
           </div>
         );
@@ -430,7 +431,7 @@ function NhHospedesPicker({ value = [], onChange }) {
       {pending ? (
         <>
           <div className={styles.nhPickerBack}>
-            <button className={styles.nhPickerBackBtn} onClick={() => setPending(null)}><ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} /> Voltar</button>
+            <button className={styles.nhPickerBackBtn} onClick={() => setPending(null)}><ChevronRight size={12} style={{ transform: 'rotate(180deg)' }} /> {tr('Voltar')}</button>
           </div>
           <div style={{ overflowY: 'auto', flex: 1 }}>
             <div className={styles.nhPickerRow}>
@@ -439,7 +440,7 @@ function NhHospedesPicker({ value = [], onChange }) {
                 <span className={styles.nhPickerName}>{pending.titular.nome}</span>
                 {pending.titular.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(pending.titular.cpf)}</span>}
               </div>
-              <span className={styles.titularTag}>Titular</span>
+              <span className={styles.titularTag}>{tr('Titular')}</span>
             </div>
             {pending.titular.acompanhantes.map((a) => (
               <div key={a.id} className={[styles.nhPickerRow, a.bloqueado ? styles.nhPickerBlocked : styles.nhPickerRowClick].join(' ')}
@@ -451,13 +452,13 @@ function NhHospedesPicker({ value = [], onChange }) {
                   <span className={styles.nhPickerName}>{a.nome}</span>
                   {a.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(a.cpf)}</span>}
                 </div>
-                {a.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+                {a.bloqueado && <span className={styles.nhPickerBlockedChip}>{tr('Bloqueado')}</span>}
               </div>
             ))}
           </div>
           <div className={styles.nhPickerActions}>
-            <button className={styles.nhPickerBtnSec} onClick={() => { addMany([pending.titular]); setPending(null); setSearch(''); setResults([]); }}>Só o titular</button>
-            <button className={styles.nhPickerBtnPrim} onClick={confirmAdd}>Adicionar →</button>
+            <button className={styles.nhPickerBtnSec} onClick={() => { addMany([pending.titular]); setPending(null); setSearch(''); setResults([]); }}>{tr('Só o titular')}</button>
+            <button className={styles.nhPickerBtnPrim} onClick={confirmAdd}>{tr('Adicionar →')}</button>
           </div>
         </>
       ) : (
@@ -468,8 +469,8 @@ function NhHospedesPicker({ value = [], onChange }) {
                 <span className={styles.nhPickerName}>{h.nome}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {h.cpf && <span className={styles.nhPickerMeta}>{fmtCpf(h.cpf)}</span>}
-                  {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.nhPickerAcompChip}>{h.acompanhantes.length} acomp.</span>}
-                  {h.bloqueado && <span className={styles.nhPickerBlockedChip}>Bloqueado</span>}
+                  {h.acompanhantes?.length > 0 && !h.bloqueado && <span className={styles.nhPickerAcompChip}>{h.acompanhantes.length} {tr('acomp.')}</span>}
+                  {h.bloqueado && <span className={styles.nhPickerBlockedChip}>{tr('Bloqueado')}</span>}
                 </div>
               </div>
               <ChevronRight size={13} className={styles.nhPickerArrow} />
@@ -495,7 +496,7 @@ function NhHospedesPicker({ value = [], onChange }) {
         ))}
         <input ref={inputRef} className={styles.nhPickerInput} value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={value.length === 0 ? 'Buscar hóspede...' : ''} />
+          placeholder={value.length === 0 ? tr('Buscar hóspede...') : ''} />
       </div>
       {dropdown}
     </div>
@@ -574,12 +575,12 @@ export default function RecepcaoPage() {
       });
       setShowAddQuarto(true);
       closeDetail();
-    } catch (e) { notify('Erro ao carregar quarto: ' + (e.message || ''), 'error'); }
+    } catch (e) { notify(tr('Erro ao carregar quarto: ') + (e.message || ''), 'error'); }
   };
   const handleSaveRoom = async () => {
     const f = roomForm;
-    if (!f.editing && !String(f.numero).trim()) { notify('Informe o número do quarto.', 'error'); return; }
-    if (!f.categoriaId) { notify('Selecione a categoria.', 'error'); return; }
+    if (!f.editing && !String(f.numero).trim()) { notify(tr('Informe o número do quarto.'), 'error'); return; }
+    if (!f.categoriaId) { notify(tr('Selecione a categoria.'), 'error'); return; }
     setSavingRoom(true);
     try {
       const base = {
@@ -593,15 +594,15 @@ export default function RecepcaoPage() {
       };
       if (f.editing) {
         await quartoApi.editar({ id: f.id, ...base, status: f.status });
-        notify(`Quarto ${f.numero} atualizado.`);
+        notify(tr('Quarto {{numero}} atualizado.', { numero: f.numero }));
       } else {
         await quartoApi.criar({ numero: Number(f.numero), ...base });
-        notify(`Quarto ${f.numero} criado.`);
+        notify(tr('Quarto {{numero}} criado.', { numero: f.numero }));
       }
       await load();
       closeAddQuarto();
     } catch (e) {
-      notify('Erro ao salvar quarto: ' + (e.message || ''), 'error');
+      notify(tr('Erro ao salvar quarto: ') + (e.message || ''), 'error');
     } finally { setSavingRoom(false); }
   };
 
@@ -777,7 +778,7 @@ export default function RecepcaoPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try { setQuartos(await overviewApi.listar()); }
-    catch (e) { notify('Erro ao carregar: ' + e.message, 'error'); }
+    catch (e) { notify(tr('Erro ao carregar: ') + e.message, 'error'); }
     finally   { setLoading(false); }
   }, []);
 
@@ -945,7 +946,7 @@ export default function RecepcaoPage() {
     const sections = [...withGroup.entries()]
       .sort((a, b) => Number(a[0]) - Number(b[0]))
       .map(([gid, rooms]) => ({ key: `g-${gid}`, gid, title: `Grupo #${gid}`, rooms }));
-    if (noGroup.length) sections.push({ key: 'no-group', gid: null, title: 'Sem grupo', rooms: noGroup });
+    if (noGroup.length) sections.push({ key: 'no-group', gid: null, title: tr('Sem grupo'), rooms: noGroup });
     return sections;
   }, [filteredQuartos]);
 
@@ -1056,7 +1057,7 @@ export default function RecepcaoPage() {
         if (norm.quarto == null) { norm.quarto = roomId; norm.quartoId = roomId; }
         setReservaFull(norm);
       })
-      .catch(() => { if (!cancelled) notify('Erro ao carregar reserva.', 'error'); });
+      .catch(() => { if (!cancelled) notify(tr('Erro ao carregar reserva.'), 'error'); });
     return () => { cancelled = true; };
   }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1096,7 +1097,7 @@ export default function RecepcaoPage() {
       quarto: room.numero,
       quartoId: room.numero,
       categoria: room.categoria ?? '',
-      titularNome: sv.titularNome || `Apartamento ${room.numero}`,
+      titularNome: sv.titularNome || tr('Apartamento {{numero}}', { numero: room.numero }),
       funcionario: sv.funcionario?.nome ?? sv.funcionario ?? null,
       observacao: sv.observacao ?? null,
       dataInicio: brToIso(sv.chegadaPrevista),
@@ -1142,7 +1143,7 @@ export default function RecepcaoPage() {
     const { adultos, criancas } = svOccupancy(sv.hospedes || []);
     const soData = (s) => (s || '').split(' ')[0];
     const fallback = (adultos > 0 || criancas > 0)
-      ? `${adultos} Adulto(s)${criancas > 0 ? ` + ${criancas} criança(s)` : ''}`
+      ? tr('{{adultos}} Adulto(s){{sufixo}}', { adultos, sufixo: criancas > 0 ? tr(' + {{criancas}} criança(s)', { criancas }) : '' })
       : '';
     return (sv.diarias || []).map((d) => ({
       descricao: `Diaria ${d.num} - (${soData(d.dataInicio)} -> ${soData(d.dataFim)}) `
@@ -1200,7 +1201,7 @@ export default function RecepcaoPage() {
         await load();
         notify(`Pagamento de ${fmtBRL(pag.valor)} adicionado ao Grupo #${gid}.`);
       } catch (e) {
-        notify('Erro: ' + (e?.message ?? 'falha ao adicionar pagamento.'), 'error');
+        notify(tr('Erro: ') + (e?.message ?? tr('falha ao adicionar pagamento.')), 'error');
       }
     });
   };
@@ -1233,10 +1234,10 @@ export default function RecepcaoPage() {
         await overviewApi.gerenciarPreco(mb.id, { ...r.requestFields, valor_total: r.valorTotal });
       }
       await load();
-      notify(`Preço do Grupo #${gid} atualizado.`);
+      notify(tr('Preço do Grupo #{{gid}} atualizado.', { gid }));
       setPrecoGrupoCtx(null);
     } catch (e) {
-      notify('Erro ao atualizar preço do grupo: ' + (e?.message ?? ''), 'error');
+      notify(tr('Erro ao atualizar preço do grupo: ') + (e?.message ?? ''), 'error');
     } finally {
       setPrecoGrupoSaving(false);
     }
@@ -1248,7 +1249,7 @@ export default function RecepcaoPage() {
     const gid = typeof roomOrGid === 'object' ? roomOrGid?.servico?.grupoId : roomOrGid;
     if (gid == null) return;
     const members = quartos.filter((q) => q.servico?.grupoId === gid && (q.servico?.tipo === 'reserva' || q.servico?.tipo === 'pernoite'));
-    if (members.length === 0) { notify('Nenhuma hospedagem no grupo para gerar voucher.', 'error'); return; }
+    if (members.length === 0) { notify(tr('Nenhuma hospedagem no grupo para gerar voucher.'), 'error'); return; }
     const toIso = (s) => { const d = (s || '').split(' ')[0]; const [dd, mm, yy] = d.split('/'); return (yy && mm && dd) ? `${yy}-${mm}-${dd}` : ''; };
     const periodMap = new Map();
     members.forEach((q) => {
@@ -1284,7 +1285,7 @@ export default function RecepcaoPage() {
       quartosObs,
       roomDescMap: roomDescMapFull,
       userName: '',
-      titulo: temPernoiteAtivo ? 'Voucher de Hospedagem' : 'Voucher de Reserva',
+      titulo: temPernoiteAtivo ? tr('Voucher de Hospedagem') : tr('Voucher de Reserva'),
       solicitante: {
         nome:     titular?.nome ?? members[0]?.servico?.titularNome ?? '',
         cpf:      titular?.cpf ?? '',
@@ -1321,9 +1322,9 @@ export default function RecepcaoPage() {
       setSaving(true);
       const updated = await overviewApi.finalizarManutencao(room.id);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Manutenção do Apt. ${room.numero} finalizada.`);
+      notify(tr('Manutenção do Apt. {{numero}} finalizada.', { numero: room.numero }));
       closeDetail();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1332,9 +1333,9 @@ export default function RecepcaoPage() {
       setSaving(true);
       const updated = await overviewApi.finalizarLimpeza(room.id);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Limpeza do Apt. ${room.numero} finalizada.`);
+      notify(tr('Limpeza do Apt. {{numero}} finalizada.', { numero: room.numero }));
       closeDetail();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1343,9 +1344,9 @@ export default function RecepcaoPage() {
       setSaving(true);
       const updated = await overviewApi.marcarDisponivel(room.id);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Quarto ${room.numero} marcado como Disponível.`);
+      notify(tr('Quarto {{numero}} marcado como Disponível.', { numero: room.numero }));
       closeDetail();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1372,9 +1373,9 @@ export default function RecepcaoPage() {
       });
       else                         updated = await overviewApi.marcarForaDeServico(room.id, svcForm);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Quarto ${room.numero} → ${updated.status}.`);
+      notify(tr('Quarto {{numero}} → {{status}}.', { numero: room.numero, status: updated.status }));
       setServiceModal(null);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1396,9 +1397,9 @@ export default function RecepcaoPage() {
 
   // ── Criar Pernoite (Nova Hospedagem) ─────────────────────────────────────────
   const handleCriarPernoite = async () => {
-    if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify('Preencha as data de chegada e saída.', 'error'); return; }
+    if (!novoRoom || !nhCheckinDate || !nhCheckoutDate) { notify(tr('Preencha as data de chegada e saída.'), 'error'); return; }
     const pessoas = nhHospedes.map((h) => h.id).filter(Boolean);
-    if (pessoas.length === 0) { notify('Adicione ao menos um hóspede.', 'error'); return; }
+    if (pessoas.length === 0) { notify(tr('Adicione ao menos um hóspede.'), 'error'); return; }
     setSavingNh(true);
     try {
       // Horários definidos pela categoria do quarto (fallback 14:00 / 12:00).
@@ -1422,15 +1423,15 @@ export default function RecepcaoPage() {
       };
       await hospedagemApi.criarPernoite([request]);
       await load();
-      notify(`Pernoite criado — Apt. ${novoRoom.numero}.`);
+      notify(tr('Pernoite criado — Apt. {{numero}}.', { numero: novoRoom.numero }));
       setNovoModal(null);
-    } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
+    } catch (e) { notify(tr('Erro: ') + (e.message || ''), 'error'); }
     finally { setSavingNh(false); }
   };
 
   // ── Criar Day Use ─────────────────────────────────────────────────────────────
   const handleCriarDayUse = async () => {
-    if (!novoRoom || !nduForm.horaEntrada) { notify('Informe a hora de entrada.', 'error'); return; }
+    if (!novoRoom || !nduForm.horaEntrada) { notify(tr('Informe a hora de entrada.'), 'error'); return; }
     setSaving(true);
     try {
       const pricing  = DAY_USE_PRICING[novoRoom.categoria] || { horasBase: 2, precoBase: 90, precoAdicional: 15 };
@@ -1445,9 +1446,9 @@ export default function RecepcaoPage() {
       };
       const updated = await overviewApi.criarDayUse(novoRoom.id, servico);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Day Use iniciado! ${titular || 'Sem titular'} — Apt. ${novoRoom.numero}.`);
+      notify(tr('Day Use iniciado! {{v0}} — Apt. {{numero}}.', { v0: titular || 'Sem titular', numero: novoRoom.numero }));
       setNovoModal(null);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1461,9 +1462,9 @@ export default function RecepcaoPage() {
       const vt        = calcValorDayUse(selectedRoom.servico.precoBase, selectedRoom.servico.precoAdicional, selectedRoom.servico.horasBase, min);
       const updated   = await overviewApi.encerrarDayUse(selectedRoom.id, { horaSaida, valorTotal: vt, pagamentoPendente: vt });
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Day Use encerrado — ${fmtBRL(vt)}`);
+      notify(tr('Day Use encerrado — {{v0}}', { v0: fmtBRL(vt) }));
       setEncerrarModal(false);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1471,14 +1472,14 @@ export default function RecepcaoPage() {
   const handleHospedarReserva = async () => {
     if (!selectedRoom) return;
     const reservaId = selectedRoom.servico?.id;
-    if (!reservaId) { notify('Reserva não identificada.', 'error'); return; }
+    if (!reservaId) { notify(tr('Reserva não identificada.'), 'error'); return; }
     setSaving(true);
     try {
       await recepcaoApi.criarPernoite({ reserva_id: reservaId });
       await load();
-      notify(`Hospedagem iniciada — Apt. ${selectedRoom.numero}.`);
+      notify(tr('Hospedagem iniciada — Apt. {{numero}}.', { numero: selectedRoom.numero }));
       closeDetail();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1528,12 +1529,12 @@ export default function RecepcaoPage() {
       });
       await load();
       const msg = status === 'FINALIZADO_PAGAMENTO_PENDENTE'
-        ? 'Finalizado com pagamento pendente.'
-        : 'Serviço finalizado.';
-      notify(funcId ? `${msg} Limpeza atribuída.` : `${msg} Quarto encaminhado para limpeza.`);
+        ? tr('Finalizado com pagamento pendente.')
+        : tr('Serviço finalizado.');
+      notify(funcId ? tr('{{msg}} Limpeza atribuída.', { msg }) : tr('{{msg}} Quarto encaminhado para limpeza.', { msg }));
       setAtribuirLimpezaModal(null);
       closeDetail();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1542,16 +1543,16 @@ export default function RecepcaoPage() {
     const sv = selectedRoom.servico;
     // Pernoite ativo → cancelar via HospedagemController (PUT /hospedagem/{id}/cancelar).
     if (sv?.tipo === 'pernoite' && sv?.id) {
-      if (!cancelMotivo.trim()) { notify('Informe o motivo do cancelamento.', 'error'); return; }
+      if (!cancelMotivo.trim()) { notify(tr('Informe o motivo do cancelamento.'), 'error'); return; }
       setSaving(true);
       try {
         await hospedagemApi.cancelar(sv.id, { fk_hospedagem: sv.id, motivo_cancelamento: cancelMotivo.trim() });
         await load();
-        notify('Pernoite cancelado.');
+        notify(tr('Pernoite cancelado.'));
         setConfirmModal(null);
         setCancelMotivo('');
         closeDetail();
-      } catch (e) { notify('Erro: ' + (e.message || ''), 'error'); }
+      } catch (e) { notify(tr('Erro: ') + (e.message || ''), 'error'); }
       finally { setSaving(false); }
       return;
     }
@@ -1560,9 +1561,9 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.cancelarServico(selectedRoom.id);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Serviço cancelado.');
+      notify(tr('Serviço cancelado.'));
       setConfirmModal(null);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1579,9 +1580,9 @@ export default function RecepcaoPage() {
 
   const handlePayConfirm = async () => {
     const valor = parseBRL(payValor);
-    if (!valor || valor <= 0) { notify('Informe um valor válido.', 'error'); return; }
-    if (!payDescricao.trim()) { notify('Informe uma descrição.', 'error'); return; }
-    if (!payNomePagador.trim()) { notify('Informe o nome do pagador.', 'error'); return; }
+    if (!valor || valor <= 0) { notify(tr('Informe um valor válido.'), 'error'); return; }
+    if (!payDescricao.trim()) { notify(tr('Informe uma descrição.'), 'error'); return; }
+    if (!payNomePagador.trim()) { notify(tr('Informe o nome do pagador.'), 'error'); return; }
     const now = new Date();
     const dataStr = `${dateToDisplay(now)} ${now.toTimeString().slice(0,5)}`;
     const pagamento = { descricao: payDescricao, nomePagador: payNomePagador, formaPagamento: payTipo, valor, data: dataStr };
@@ -1597,7 +1598,7 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.updateMinibarItem(selectedRoom.id, produtoId, -1);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
   };
 
   const handleMinibarRepor = async (produtoId) => {
@@ -1605,12 +1606,12 @@ export default function RecepcaoPage() {
     const item = selectedRoom.minibar?.find((m) => m.produtoId === produtoId);
     if (!item) return;
     const delta = item.qtdBase - item.qtdAtual;
-    if (delta <= 0) { notify('Item já está na quantidade base.', 'info'); return; }
+    if (delta <= 0) { notify(tr('Item já está na quantidade base.'), 'info'); return; }
     try {
       const updated = await overviewApi.updateMinibarItem(selectedRoom.id, produtoId, delta);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`${item.nome} reposto para ${item.qtdBase} unidade(s).`);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('{{nome}} reposto para {{qtdBase}} unidade(s).', { nome: item.nome, qtdBase: item.qtdBase }));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
   };
 
   const handleMinibarReporTudo = async () => {
@@ -1618,8 +1619,8 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.reporMinibar(selectedRoom.id);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Minibar reposto completamente.');
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('Minibar reposto completamente.'));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
   };
 
   const handleAddMinibarItem = async () => {
@@ -1631,9 +1632,9 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.adicionarMinibarItem(selectedRoom.id, { produtoId: prod.id, nome: prod.nome, quantidade: minibarQtyAdd });
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`${prod.nome} adicionado ao minibar.`);
+      notify(tr('{{nome}} adicionado ao minibar.', { nome: prod.nome }));
       setShowAddMinibar(false);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSavingMinibar(false); }
   };
 
@@ -1648,14 +1649,14 @@ export default function RecepcaoPage() {
     try {
       const res = await itemApi.estoque();
       setEstoqueCats(res?.categorias ?? []);
-    } catch (e) { notify('Erro ao carregar estoque: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro ao carregar estoque: ') + e.message, 'error'); }
     finally { setEstoqueLoading(false); }
   };
 
   const handleConfirmAddEstoque = async () => {
     if (!selectedRoom || !estoqueSelItem) return;
     const jaExiste = (selectedRoom.minibar ?? []).some((m) => m.produtoId === estoqueSelItem.id);
-    if (jaExiste) { notify(`${estoqueSelItem.descricao} já está no quarto.`, 'error'); return; }
+    if (jaExiste) { notify(tr('{{descricao}} já está no quarto.', { descricao: estoqueSelItem.descricao }), 'error'); return; }
     setSavingEstoque(true);
     try {
       await quartoApi.adicionarItem(selectedRoom.id, {
@@ -1663,10 +1664,10 @@ export default function RecepcaoPage() {
         quantidade_atual: estoqueQtdAtual,
         quantidade_padrao: estoqueQtdPadrao,
       });
-      notify(`${estoqueSelItem.descricao} adicionado ao quarto.`);
+      notify(tr('{{descricao}} adicionado ao quarto.', { descricao: estoqueSelItem.descricao }));
       setShowAddEstoque(false);
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSavingEstoque(false); }
   };
 
@@ -1688,8 +1689,8 @@ export default function RecepcaoPage() {
       };
       const updated = await overviewApi.adicionarConsumo(selectedRoom.id, consumo);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`${item.nome} consumido.`);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('{{nome}} consumido.', { nome: item.nome }));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setConsumoSaving(false); }
   };
 
@@ -1717,10 +1718,10 @@ export default function RecepcaoPage() {
       await Promise.all(internCart.map((c) =>
         quartoApi.consumirItem({ id: c.quartoItemId, quantidade: c.qtd })
       ));
-      notify(`${internCart.length} item(s) consumido(s).`);
+      notify(tr('{{length}} item(s) consumido(s).', { length: internCart.length }));
       setConsumoCart([]); setConsumoCartPag(null);
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setConsumoSaving(false); }
   };
 
@@ -1729,15 +1730,15 @@ export default function RecepcaoPage() {
     const itensParaRepor = (selectedRoom.minibar ?? [])
       .map((m) => ({ ...m, delta: m.qtdBase - m.qtdAtual }))
       .filter((m) => m.delta > 0);
-    if (!itensParaRepor.length) { notify('Todos os itens já estão no máximo.', 'info'); return; }
+    if (!itensParaRepor.length) { notify(tr('Todos os itens já estão no máximo.'), 'info'); return; }
     setReporLoading(true);
     try {
       await Promise.all(itensParaRepor.map((m) =>
         quartoApi.reporItem({ id: m.quartoItemId, quantidade: m.delta })
       ));
-      notify('Itens repostos.');
+      notify(tr('Itens repostos.'));
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setReporLoading(false); }
   };
 
@@ -1747,9 +1748,9 @@ export default function RecepcaoPage() {
     setReporItemLoading((prev) => new Set([...prev, item.produtoId]));
     try {
       await quartoApi.reporItem({ id: item.quartoItemId, quantidade: delta });
-      notify(`${item.nome} reposto.`);
+      notify(tr('{{nome}} reposto.', { nome: item.nome }));
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setReporItemLoading((prev) => { const s = new Set(prev); s.delete(item.produtoId); return s; }); }
   };
 
@@ -1793,7 +1794,7 @@ export default function RecepcaoPage() {
       const diarias     = selectedRoom.servico?.diarias ?? [];
       const diariaAtual = selectedRoom.servico?.diariaAtual ?? 0;
       const diaria      = diarias.find((d) => d.num === diariaAtual) ?? diarias[diarias.length - 1];
-      if (!diaria?.id) throw new Error('Diária atual não encontrada.');
+      if (!diaria?.id) throw new Error(tr('Diária atual não encontrada.'));
 
       const isDespesa = !!pag?.despesa_pessoal;
       const hasPag    = !isDespesa && pag?.tipo_pagamento?.id && pag?.nome_pagador;
@@ -1812,11 +1813,11 @@ export default function RecepcaoPage() {
       }));
 
       await recepcaoApi.adicionarConsumos(diaria.id, body);
-      notify(`${consumoCart.length} item(s) adicionado(s) ao consumo.`);
+      notify(tr('{{length}} item(s) adicionado(s) ao consumo.', { length: consumoCart.length }));
       setShowAddConsumoModal(false);
       setConsumoCart([]); setConsumoCartPag(null); setDetailConsumoCat('');
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setConsumoSaving(false); }
   };
 
@@ -1826,7 +1827,7 @@ export default function RecepcaoPage() {
   };
 
   const handleAdicionarDiaria = (dataInicio, dataFim) => {
-    if (!dataInicio || !dataFim) { notify('Preencha o período da nova diária.', 'error'); return; }
+    if (!dataInicio || !dataFim) { notify(tr('Preencha o período da nova diária.'), 'error'); return; }
     const formatDate = (d) => {
       const dd = String(d.getDate()).padStart(2, '0');
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1859,9 +1860,9 @@ export default function RecepcaoPage() {
         });
       }
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`${gdDiariaPendentes.length} diária(s) adicionada(s).`);
+      notify(tr('{{length}} diária(s) adicionada(s).', { length: gdDiariaPendentes.length }));
       setGdDiariaPendentes([]);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSavingGd(false); }
   };
 
@@ -1870,13 +1871,13 @@ export default function RecepcaoPage() {
     const diaria = selectedRoom.servico?.diarias?.[diariaIdx];
     const atual = selectedRoom.servico?.diariaAtual || 1;
     if (!diaria) return;
-    if (diaria.num < atual) { notify('Não é possível remover uma diária já encerrada.', 'error'); return; }
+    if (diaria.num < atual) { notify(tr('Não é possível remover uma diária já encerrada.'), 'error'); return; }
     setSavingGd(true);
     try {
       const updated = await overviewApi.removerDiaria(selectedRoom.id, diariaIdx);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Diária ${diaria.num} removida.`);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('Diária {{num}} removida.', { num: diaria.num }));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSavingGd(false); }
   };
 
@@ -1891,23 +1892,23 @@ export default function RecepcaoPage() {
   };
 
   const handleTrocarQuarto = async () => {
-    if (!selectedRoom || !tqNovoQuartoId) { notify('Selecione o quarto destino.', 'error'); return; }
+    if (!selectedRoom || !tqNovoQuartoId) { notify(tr('Selecione o quarto destino.'), 'error'); return; }
     setSavingTq(true);
     try {
       await overviewApi.trocarQuarto(selectedRoom.id, tqNovoQuartoId, tqDiariasIdxs);
-      notify('Quarto alterado com sucesso.');
+      notify(tr('Quarto alterado com sucesso.'));
       setShowTrocarQuarto(false);
       closeDetail();
       await load();
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSavingTq(false); }
   };
 
   // ── Aplicar Desconto ─────────────────────────────────────────────────────────
   const handleAplicarDesconto = async () => {
     const valor = parseBRL(descontoValor) || parseFloat(descontoValor) || 0;
-    if (!valor || valor <= 0) { notify('Informe um valor de desconto válido.', 'error'); return; }
-    if (!descontoDescricao.trim()) { notify('Informe uma descrição para o desconto.', 'error'); return; }
+    if (!valor || valor <= 0) { notify(tr('Informe um valor de desconto válido.'), 'error'); return; }
+    if (!descontoDescricao.trim()) { notify(tr('Informe uma descrição para o desconto.'), 'error'); return; }
     setDescontoSaving(true);
     try {
       const desconto = { tipo: descontoTipo, valor, descricao: descontoDescricao, scope: descontoScope };
@@ -1917,9 +1918,9 @@ export default function RecepcaoPage() {
       });
       setQuartos(updatedRooms);
       const label = descontoTipo === 'percentual' ? `${valor}%` : fmtBRL(valor);
-      notify(`Desconto de ${label} aplicado — ${descontoDescricao}.`);
+      notify(tr('Desconto de {{label}} aplicado — {{descontoDescricao}}.', { label, descontoDescricao }));
       setShowDescontoModal(false);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setDescontoSaving(false); }
   };
 
@@ -1938,9 +1939,9 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+      notify(tr('Pagamento de {{v0}} registrado.', { v0: fmtBRL(pag.valor) }));
       setPagModal(false);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1950,8 +1951,8 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.cancelarPagamento(selectedRoom.id, pagUuid);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Pagamento cancelado.');
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('Pagamento cancelado.'));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1963,10 +1964,10 @@ export default function RecepcaoPage() {
       await overviewApi.cancelarPagamento(selectedRoom.id, oldUuid);
       const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Pagamento atualizado.');
+      notify(tr('Pagamento atualizado.'));
       setEditingPag(null);
       setShowGerenciarPag(true);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1976,8 +1977,8 @@ export default function RecepcaoPage() {
     try {
       const updated = await overviewApi.removerConsumo(selectedRoom.id, consumoId);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Consumo removido.');
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('Consumo removido.'));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -1985,27 +1986,27 @@ export default function RecepcaoPage() {
     if (!selectedRoom) return;
     const diarias = selectedRoom.servico?.diarias ?? [];
     const selDiaria = diarias[apDiariaIdx];
-    if (!selDiaria?.id) { notify('Selecione uma diária primeiro.', 'error'); return; }
+    if (!selDiaria?.id) { notify(tr('Selecione uma diária primeiro.'), 'error'); return; }
     setSaving(true);
     try {
       const updated = await overviewApi.adicionarPessoaDiaria(selectedRoom.id, selDiaria.id, pessoaId);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Pessoa adicionada.');
+      notify(tr('Pessoa adicionada.'));
       setApSearch('');
       setApSearchResults([]);
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
   const handleRemoverPessoa = async (diariaId, pessoaId, nome) => {
     if (!selectedRoom) return;
-    if (!window.confirm(`Remover ${nome} desta diária?`)) return;
+    if (!window.confirm(tr('Remover {{nome}} desta diária?', { nome }))) return;
     setSaving(true);
     try {
       const updated = await overviewApi.removerPessoaDiaria(selectedRoom.id, diariaId, pessoaId);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-      notify('Pessoa removida.');
-    } catch (e) { notify('Erro: ' + e.message, 'error'); }
+      notify(tr('Pessoa removida.'));
+    } catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
     finally { setSaving(false); }
   };
 
@@ -2020,20 +2021,20 @@ export default function RecepcaoPage() {
   // ── Render helpers ─────────────────────────────────────────────────────────────
   const BedsRow = ({ camas }) => (
     <div className={styles.bedsRow}>
-      <span className={styles.bedItem}><BedDouble size={11} /> Cama Casal: {camas.casal || 0}</span>
-      <span className={styles.bedItem}><BedSingle size={11} /> Solteiro: {camas.solteiro || 0}</span>
-      <span className={styles.bedItem}><Layers size={11} /> Beliche: {camas.beliche || 0}</span>
-      <span className={styles.bedItem}><Waves size={11} /> Rede: {camas.rede || 0}</span>
+      <span className={styles.bedItem}><BedDouble size={11} /> {tr('Cama Casal:')} {camas.casal || 0}</span>
+      <span className={styles.bedItem}><BedSingle size={11} /> {tr('Solteiro:')} {camas.solteiro || 0}</span>
+      <span className={styles.bedItem}><Layers size={11} /> {tr('Beliche:')} {camas.beliche || 0}</span>
+      <span className={styles.bedItem}><Waves size={11} /> {tr('Rede:')} {camas.rede || 0}</span>
     </div>
   );
 
   const BedsDetailGrid = ({ camas }) => (
     <div className={styles.bedsDetailGrid}>
       {[
-        { key: 'casal',    label: 'Cama Casal',   Icon: BedDouble },
-        { key: 'solteiro', label: 'Cama Solteiro', Icon: BedSingle },
-        { key: 'beliche',  label: 'Beliches',      Icon: Layers    },
-        { key: 'rede',     label: 'Rede',          Icon: Waves     },
+        { key: 'casal',    label: tr('Cama Casal'),   Icon: BedDouble },
+        { key: 'solteiro', label: tr('Cama Solteiro'), Icon: BedSingle },
+        { key: 'beliche',  label: tr('Beliches'),      Icon: Layers    },
+        { key: 'rede',     label: tr('Rede'),          Icon: Waves     },
       ].map(({ key, label, Icon }) => (
         <div key={key} className={[styles.bedDetailItem, camas[key] > 0 ? styles.bedDetailItemActive : ''].join(' ')}>
           <Icon size={18} className={styles.bedDetailIcon} />
@@ -2050,15 +2051,15 @@ export default function RecepcaoPage() {
   // Reutilizada no quarto livre, no pernoite e na reserva.
   const renderDadosTab = (s) => (
     <div className={styles.tabContent}>
-      <div className={styles.sectionTitle}><BedDouble size={13} /> Configuração de Camas</div>
+      <div className={styles.sectionTitle}><BedDouble size={13} /> {tr('Configuração de Camas')}</div>
       <BedsDetailGrid camas={s.camas} />
       <div className={styles.infoGrid2}>
-        <div className={styles.infoRow}><span className={styles.infoLabel}>Categoria</span><span className={styles.infoValue}>{s.categoria}</span></div>
-        <div className={styles.infoRow}><span className={styles.infoLabel}>Tipo de Ocupação</span><span className={styles.infoValue}>{s.tipoOcupacao}</span></div>
+        <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Categoria')}</span><span className={styles.infoValue}>{s.categoria}</span></div>
+        <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Tipo de Ocupação')}</span><span className={styles.infoValue}>{s.tipoOcupacao}</span></div>
       </div>
       {s.descricao && (
         <div className={styles.descricaoBlock}>
-          <span className={styles.infoLabel}>Descrição</span>
+          <span className={styles.infoLabel}>{tr('Descrição')}</span>
           <p className={styles.descricaoText}>{s.descricao}</p>
         </div>
       )}
@@ -2085,27 +2086,27 @@ export default function RecepcaoPage() {
       <div className={styles.tabContent}>
         <div className={styles.consumoModalSection}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> Itens do quarto</div>
+            <div className={styles.consumoModalSectionTitle}><ShoppingCart size={13} /> {tr('Itens do quarto')}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               {hasSelected && (
                 <Button variant="primary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={consumoSaving} onClick={() => setShowDisponPay(true)}>
                   {consumoSaving && <Loader2 size={12} className={styles.spin} />}
-                  <ShoppingCart size={12} /> Consumir
+                  <ShoppingCart size={12} /> {tr('Consumir')}
                 </Button>
               )}
               {temParaRepor && !hasSelected && (
                 <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} disabled={reporLoading} onClick={handleReporTudo}>
                   {reporLoading ? <Loader2 size={12} className={styles.spin} /> : <RotateCcw size={12} />}
-                  Repor tudo
+                  {tr('Repor tudo')}
                 </Button>
               )}
               <Button variant="secondary" style={{ padding: '4px 10px', fontSize: 12 }} onClick={handleOpenAddEstoque}>
-                <Plus size={12} /> Adicionar Item
+                <Plus size={12} /> {tr('Adicionar Item')}
               </Button>
             </div>
           </div>
           {minibarItems.length === 0
-            ? <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>Nenhum item no quarto</span></div>
+            ? <div className={styles.emptyList}><Package size={24} color="var(--text-2)" /><span>{tr('Nenhum item no quarto')}</span></div>
             : (
               <div className={styles.consumoItemList}>
                 {minibarItems.map((item) => {
@@ -2116,14 +2117,14 @@ export default function RecepcaoPage() {
                     <div key={item.id} className={styles.consumoItemRow}>
                       <div className={styles.consumoItemInfo}>
                         <span className={styles.consumoItemNome}>{item.nome}</span>
-                        <span className={styles.consumoItemMeta}>{item.categoria}{item.preco > 0 ? ` · ${fmtBRL(item.preco)}/un.` : ''}</span>
+                        <span className={styles.consumoItemMeta}>{item.categoria}{item.preco > 0 ? tr(' · {{v0}}/un.', { v0: fmtBRL(item.preco) }) : ''}</span>
                       </div>
                       <div className={styles.minibarStockInfo}>
                         <span className={[styles.minibarStockBadge, esgotado ? styles.minibarStockBadgeEmpty : ''].join(' ')}>
                           {item.qtdAtual}/{item.qtdBase}
                         </span>
                         {item.qtdTotal != null && (
-                          <span className={styles.minibarStockTotal}>({item.qtdTotal} un. disp.)</span>
+                          <span className={styles.minibarStockTotal}>({item.qtdTotal} {tr('un. disp.)')}</span>
                         )}
                       </div>
                       {allowConsumo && (
@@ -2138,7 +2139,7 @@ export default function RecepcaoPage() {
                           className={styles.reporItemBtn}
                           disabled={reporItemLoading.has(item.produtoId)}
                           onClick={() => handleReporItem(item)}
-                          title="Repor item"
+                          title={tr('Repor item')}
                         >
                           {reporItemLoading.has(item.produtoId)
                             ? <Loader2 size={11} className={styles.spin} />
@@ -2166,8 +2167,8 @@ export default function RecepcaoPage() {
     // ── Disponível ────────────────────────────────────────────────────────────
     if (s.status === ROOM_STATUS.DISPONIVEL) {
       const dispTabs  = [
-        { id: 'dados',   label: 'Dados' },
-        { id: 'consumo', label: 'Itens' },
+        { id: 'dados',   label: tr('Dados') },
+        { id: 'consumo', label: tr('Itens') },
       ];
       return (
         <>
@@ -2191,16 +2192,16 @@ export default function RecepcaoPage() {
       return (
         <div className={styles.tabContent}>
           <div className={styles.infoGrid2}>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Categoria</span><span className={styles.infoValue}>{s.categoria}</span></div>
-            <div className={styles.infoRow}><span className={styles.infoLabel}>Tipo de Ocupação</span><span className={styles.infoValue}>{s.tipoOcupacao}</span></div>
+            <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Categoria')}</span><span className={styles.infoValue}>{s.categoria}</span></div>
+            <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Tipo de Ocupação')}</span><span className={styles.infoValue}>{s.tipoOcupacao}</span></div>
           </div>
           {s.status === ROOM_STATUS.LIMPEZA && s.limpeza && (
             <div className={styles.serviceBlock}>
               <Sparkles size={14} className={styles.serviceBlockIcon} />
               <div className={styles.serviceBlockInfo}>
-                <span className={styles.serviceBlockLabel}>Em Limpeza</span>
-                {s.limpeza.responsavel && <span className={styles.serviceBlockValue}>Responsável: {s.limpeza.responsavel}</span>}
-                {s.limpeza.inicio      && <span className={styles.serviceBlockSub}>Início: {s.limpeza.inicio}</span>}
+                <span className={styles.serviceBlockLabel}>{tr('Em Limpeza')}</span>
+                {s.limpeza.responsavel && <span className={styles.serviceBlockValue}>{tr('Responsável:')} {s.limpeza.responsavel}</span>}
+                {s.limpeza.inicio      && <span className={styles.serviceBlockSub}>{tr('Início:')} {s.limpeza.inicio}</span>}
               </div>
             </div>
           )}
@@ -2208,10 +2209,10 @@ export default function RecepcaoPage() {
             <div className={styles.serviceBlock}>
               <Wrench size={14} className={[styles.serviceBlockIcon, styles.serviceBlockIconAmber].join(' ')} />
               <div className={styles.serviceBlockInfo}>
-                <span className={styles.serviceBlockLabel}>{s.status}</span>
-                {s.manutencao.responsavel && <span className={styles.serviceBlockValue}>Responsável: {s.manutencao.responsavel}</span>}
+                <span className={styles.serviceBlockLabel}>{tr(s.status)}</span>
+                {s.manutencao.responsavel && <span className={styles.serviceBlockValue}>{tr('Responsável:')} {s.manutencao.responsavel}</span>}
                 {s.manutencao.descricao   && <span className={styles.serviceBlockSub}>{s.manutencao.descricao}</span>}
-                {s.manutencao.previsaoFim && <span className={styles.serviceBlockSub}>Previsão: {s.manutencao.previsaoFim}</span>}
+                {s.manutencao.previsaoFim && <span className={styles.serviceBlockSub}>{tr('Previsão:')} {s.manutencao.previsaoFim}</span>}
               </div>
             </div>
           )}
@@ -2235,11 +2236,11 @@ export default function RecepcaoPage() {
             <div className={styles.ovRoomBadge}>{s.numero}</div>
             <div className={styles.ovHeaderContent}>
               <div className={styles.ovHeaderTopRow}>
-                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_reservado`]].join(' ')}>{s.status}</span>
+                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_reservado`]].join(' ')}>{tr(s.status)}</span>
               </div>
-              <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
+              <div className={styles.ovHeaderName}>{sv.titularNome || tr('Apartamento {{numero}}', { numero: s.numero })}</div>
               <div className={styles.ovHeaderSub}>
-                {s.categoria} · {s.tipoOcupacao} · Reserva
+                {s.categoria} · {s.tipoOcupacao} {tr('· Reserva')}
               </div>
             </div>
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={15} /></button>
@@ -2248,11 +2249,11 @@ export default function RecepcaoPage() {
           {/* ── Tab bar ── */}
           <div className={styles.detailTabs}>
             {[
-              ['detalhes',   'Detalhes'],
-              ['pessoas',    `Pessoas (${svGuests.length})`],
-              ['pagamentos', `Pagamentos (${allPagamentos.length})`],
-              ['dados',      'Dados'],
-              ['itens',      'Itens'],
+              ['detalhes',   tr('Detalhes')],
+              ['pessoas',    tr('Pessoas ({{n}})', { n: svGuests.length })],
+              ['pagamentos', tr('Pagamentos ({{n}})', { n: allPagamentos.length })],
+              ['dados',      tr('Dados')],
+              ['itens',      tr('Itens')],
             ].map(([t, label]) => (
               <button key={t} className={[styles.detailTab, diariaTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
                 {label}
@@ -2267,7 +2268,7 @@ export default function RecepcaoPage() {
                 <div className={styles.ovPeriodDark}>
                   <div className={styles.ovDatesRow}>
                     <div className={styles.ovDateCell}>
-                      <div className={styles.ovDateLabel}>Check-in</div>
+                      <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
                       <div className={styles.ovDateValue}>{checkinDate}</div>
                       <div className={styles.ovDateTime}>{checkinHora}</div>
                     </div>
@@ -2277,32 +2278,32 @@ export default function RecepcaoPage() {
                       </svg>
                     </div>
                     <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                      <div className={styles.ovDateLabel}>Check-out</div>
+                      <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
                       <div className={styles.ovDateValue}>{checkoutDate}</div>
                       <div className={styles.ovDateTime}>{checkoutHora}</div>
                     </div>
                     <div className={styles.ovNightsCell}>
                       <div className={styles.ovNightsNum}>{sv.totalDiarias || '—'}</div>
-                      <div className={styles.ovNightsLabel}>Diárias</div>
+                      <div className={styles.ovNightsLabel}>{tr('Diárias')}</div>
                     </div>
                   </div>
                 </div>
                 <div className={styles.ovFinCard}>
                   <div className={styles.ovFinHeader}>
                     <DollarSign size={13} className={styles.ovFinIcon} />
-                    <span className={styles.ovFinTitle}>Resumo Financeiro</span>
+                    <span className={styles.ovFinTitle}>{tr('Resumo Financeiro')}</span>
                   </div>
                   <div className={styles.ovFinRow}>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinLabel}>{tr('Valor Total')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinLabel}>{tr('Total Pago')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago || 0)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={styles.ovFinLabel}>{tr('Pendente')}</span>
                       <span className={[styles.ovFinValue, (sv.pagamentoPendente || 0) > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
                         {fmtBRL(sv.pagamentoPendente || 0)}
                       </span>
@@ -2311,7 +2312,7 @@ export default function RecepcaoPage() {
                   {sv.valorTotal > 0 && (
                     <div className={styles.ovFinProgress}>
                       <div className={styles.ovFinProgressMeta}>
-                        <span>Progresso de pagamento</span>
+                        <span>{tr('Progresso de pagamento')}</span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
                       <div className={styles.ovFinBar}>
@@ -2325,7 +2326,7 @@ export default function RecepcaoPage() {
             {diariaTab === 'pessoas' && (
               <div className={styles.ovBodyPad}>
                 {svGuests.length === 0
-                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>{tr('Nenhum hóspede registrado')}</span></div>
                   : (
                     <div className={styles.ovGuestTable}>
                       {svGuests.map((h) => (
@@ -2339,13 +2340,13 @@ export default function RecepcaoPage() {
                           <div className={styles.contactActions}>
                             {h.telefone && (
                               <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                className={styles.quickBtn} title={tr('WhatsApp')} onClick={(e) => e.stopPropagation()}>
                                 <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                               </a>
                             )}
                             {h.email && (
                               <a href={`mailto:${h.email}`}
-                                className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                className={styles.quickBtn} title={tr('E-mail')} onClick={(e) => e.stopPropagation()}>
                                 <Mail size={11} />
                               </a>
                             )}
@@ -2360,7 +2361,7 @@ export default function RecepcaoPage() {
             {diariaTab === 'pagamentos' && (
               <div className={styles.subTabContent} style={{ padding: 16 }}>
                 {allPagamentos.length === 0
-                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>{tr('Nenhum pagamento registrado')}</span></div>
                   : (
                     <div className={styles.ovDiariasCard}>
                       {allPagamentos.map((p, i) => (
@@ -2374,14 +2375,14 @@ export default function RecepcaoPage() {
                                 <>{p.data && <span className={styles.ovPagDot}>·</span>}<span>{p.forma || p.formaPagamento}</span></>
                               )}
                             </div>
-                            {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
+                            {p.registradoPor && <div className={styles.ovPagRegistrado}>{tr('registrado por')} {p.registradoPor}</div>}
                           </div>
                           <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
                         </div>
                       ))}
                       {allPagamentos.length > 1 && (
                         <div className={styles.ovPriceConsumoTotal}>
-                          <span>Total pagamentos</span>
+                          <span>{tr('Total pagamentos')}</span>
                           <span>{fmtBRL(pagamentoTotal)}</span>
                         </div>
                       )}
@@ -2402,16 +2403,16 @@ export default function RecepcaoPage() {
                   <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
                   <div className={styles.ovAcoesMenu}>
                     <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
-                      <XCircle size={14} /> Cancelar Reserva
+                      <XCircle size={14} /> {tr('Cancelar Reserva')}
                     </button>
                     <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); handleHospedarReserva(); }} disabled={saving}>
-                      {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Hospedar
+                      {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} {tr('Hospedar')}
                     </button>
                   </div>
                 </>
               )}
               <button className={styles.ovAcoesBtn} onClick={() => { setOvAcoesOpen((v) => !v); setVoucherPicking(false); }}>
-                Ações
+                {tr('Ações')}
                 <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
               </button>
             </div>
@@ -2438,10 +2439,10 @@ export default function RecepcaoPage() {
             <div className={styles.ovRoomBadge}>{s.numero}</div>
             <div className={styles.ovHeaderContent}>
               <div className={styles.ovHeaderTopRow}>
-                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_${sk}`]].join(' ')}>{s.status}</span>
+                <span className={[styles.ovHeaderStatusPill, styles[`ovStatus_${sk}`]].join(' ')}>{tr(s.status)}</span>
               </div>
-              <div className={styles.ovHeaderName}>{sv.titularNome || `Apartamento ${s.numero}`}</div>
-              <div className={styles.ovHeaderSub}>{s.categoria} · {s.tipoOcupacao} · Pernoite</div>
+              <div className={styles.ovHeaderName}>{sv.titularNome || tr('Apartamento {{numero}}', { numero: s.numero })}</div>
+              <div className={styles.ovHeaderSub}>{s.categoria} · {s.tipoOcupacao} {tr('· Pernoite')}</div>
             </div>
             <button className={styles.ovCloseBtn} onClick={closeDetail}><X size={16} /></button>
           </div>
@@ -2449,12 +2450,12 @@ export default function RecepcaoPage() {
           {/* ── Tab bar ── */}
           <div className={styles.detailTabs}>
             {[
-              ['detalhes',   'Detalhes',   FileText],
-              ['pessoas',    'Pessoas',    Users],
-              ['pagamentos', 'Pagamentos', CreditCard],
-              ['dados',      'Dados',      BedDouble],
-              ['itens',      'Itens',      Package],
-              ['consumos',   'Consumos',   ShoppingCart],
+              ['detalhes',   tr('Detalhes'),   FileText],
+              ['pessoas',    tr('Pessoas'),    Users],
+              ['pagamentos', tr('Pagamentos'), CreditCard],
+              ['dados',      tr('Dados'),      BedDouble],
+              ['itens',      tr('Itens'),      Package],
+              ['consumos',   tr('Consumos'),   ShoppingCart],
             ].map(([t, label, Icon]) => (
               <button key={t} className={[styles.detailTab, diariaTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDiariaTab(t)}>
                 <Icon size={13} /> {label}
@@ -2469,7 +2470,7 @@ export default function RecepcaoPage() {
                 <div className={styles.ovPeriodDark}>
                   <div className={styles.ovDatesRow}>
                     <div className={styles.ovDateCell}>
-                      <div className={styles.ovDateLabel}>Check-in</div>
+                      <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
                       <div className={styles.ovDateValue}>{sv.chegadaPrevista?.split(' ')[0] || '—'}</div>
                       <div className={styles.ovDateTime}>{sv.chegadaPrevista?.split(' ')[1] || ''}</div>
                     </div>
@@ -2479,28 +2480,28 @@ export default function RecepcaoPage() {
                       </svg>
                     </div>
                     <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                      <div className={styles.ovDateLabel}>Check-out</div>
+                      <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
                       <div className={styles.ovDateValue}>{sv.saidaPrevista?.split(' ')[0] || '—'}</div>
                       <div className={styles.ovDateTime}>{sv.saidaPrevista?.split(' ')[1] || ''}</div>
                     </div>
                     <div className={styles.ovNightsCell}>
                       <div className={styles.ovNightsNum}><span style={{ color: '#ef4444' }}>{sv.diariaAtual}</span>/{sv.totalDiarias}</div>
-                      <div className={styles.ovNightsLabel}>Diárias</div>
+                      <div className={styles.ovNightsLabel}>{tr('Diárias')}</div>
                     </div>
                   </div>
                 </div>
                 <div className={styles.ovFinCard}>
                   <div className={styles.ovFinRow}>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinLabel}>{tr('Valor Total')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinLabel}>{tr('Total Pago')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={styles.ovFinLabel}>{tr('Pendente')}</span>
                       <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
                         {fmtBRL(sv.pagamentoPendente)}
                       </span>
@@ -2509,7 +2510,7 @@ export default function RecepcaoPage() {
                   {barTotal > 0 && (
                     <div className={styles.ovFinProgress}>
                       <div className={styles.ovFinProgressMeta}>
-                        <span>Progresso de pagamento{groupFin ? ' · grupo' : ''}</span>
+                        <span>{tr('Progresso de pagamento')}{groupFin ? tr(' · grupo') : ''}</span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
                       <div className={styles.ovFinBar}>
@@ -2528,10 +2529,10 @@ export default function RecepcaoPage() {
                             return (
                               <div key={d.num} className={styles.ovPriceCardRow}>
                                 <div className={styles.ovDiariaDesc}>
-                                  <span className={styles.ovDiariaNum}>Diária {d.num}</span>
+                                  <span className={styles.ovDiariaNum}>{tr('Diária')} {d.num}</span>
                                   {dateFrom && <span className={styles.ovDiariaDate}>{dateFrom}</span>}
                                   {dateTo   && <span className={styles.ovDiariaDate}>{dateTo}</span>}
-                                  <span className={styles.ovDiariaDate}>{nHosp} Adulto{nHosp !== 1 ? 's' : ''}</span>
+                                  <span className={styles.ovDiariaDate}>{nHosp} {tr('Adulto')}{nHosp !== 1 ? 's' : ''}</span>
                                 </div>
                                 <span className={styles.step3PriceVal}>{fmtBRL(d.valor)}</span>
                               </div>
@@ -2540,7 +2541,7 @@ export default function RecepcaoPage() {
                         </div>
                         {sv.diarias.length > 1 && (
                           <div className={styles.ovPriceConsumoTotal}>
-                            <span>Total diárias</span>
+                            <span>{tr('Total diárias')}</span>
                             <span>{fmtBRL(sv.diarias.reduce((s, d) => s + (d.valor ?? 0), 0))}</span>
                           </div>
                         )}
@@ -2553,7 +2554,7 @@ export default function RecepcaoPage() {
             {diariaTab === 'pessoas' && (
               <div className={styles.ovBodyPad}>
                 {svGuests.length === 0
-                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>{tr('Nenhum hóspede registrado')}</span></div>
                   : (
                     <div className={styles.ovGuestTable}>
                       {svGuests.map((h) => (
@@ -2567,13 +2568,13 @@ export default function RecepcaoPage() {
                           <div className={styles.contactActions}>
                             {h.telefone && (
                               <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                className={styles.quickBtn} title={tr('WhatsApp')} onClick={(e) => e.stopPropagation()}>
                                 <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                               </a>
                             )}
                             {h.email && (
                               <a href={`mailto:${h.email}`}
-                                className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                className={styles.quickBtn} title={tr('E-mail')} onClick={(e) => e.stopPropagation()}>
                                 <Mail size={11} />
                               </a>
                             )}
@@ -2590,15 +2591,15 @@ export default function RecepcaoPage() {
                 <div className={styles.ovFinCard}>
                   <div className={styles.ovFinRow}>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Valor Total</span>
+                      <span className={styles.ovFinLabel}>{tr('Valor Total')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.valorTotal)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Total Pago</span>
+                      <span className={styles.ovFinLabel}>{tr('Total Pago')}</span>
                       <span className={styles.ovFinValue}>{fmtBRL(sv.totalPago)}</span>
                     </div>
                     <div className={styles.ovFinItem}>
-                      <span className={styles.ovFinLabel}>Pendente</span>
+                      <span className={styles.ovFinLabel}>{tr('Pendente')}</span>
                       <span className={[styles.ovFinValue, sv.pagamentoPendente > 0 ? styles.ovFinPending : styles.ovFinPaid].join(' ')}>
                         {fmtBRL(sv.pagamentoPendente)}
                       </span>
@@ -2607,7 +2608,7 @@ export default function RecepcaoPage() {
                   {sv.valorTotal > 0 && (
                     <div className={styles.ovFinProgress}>
                       <div className={styles.ovFinProgressMeta}>
-                        <span>Progresso de pagamento</span>
+                        <span>{tr('Progresso de pagamento')}</span>
                         <span>{progressPercent.toFixed(0)}%</span>
                       </div>
                       <div className={styles.ovFinBar}>
@@ -2617,7 +2618,7 @@ export default function RecepcaoPage() {
                   )}
                 </div>
                 {allPagamentos.length === 0
-                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+                  ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>{tr('Nenhum pagamento registrado')}</span></div>
                   : (
                     <div className={styles.ovDiariasCard}>
                       {allPagamentos.map((p, i) => (
@@ -2634,14 +2635,14 @@ export default function RecepcaoPage() {
                                 </>
                               )}
                             </div>
-                            {p.registradoPor && <div className={styles.ovPagRegistrado}>registrado por {p.registradoPor}</div>}
+                            {p.registradoPor && <div className={styles.ovPagRegistrado}>{tr('registrado por')} {p.registradoPor}</div>}
                           </div>
                           <span className={styles.ovPagValor}>{fmtBRL(p.valor)}</span>
                         </div>
                       ))}
                       {allPagamentos.length > 1 && (
                         <div className={styles.ovPriceConsumoTotal}>
-                          <span>Total pagamentos</span>
+                          <span>{tr('Total pagamentos')}</span>
                           <span>{fmtBRL(allPagamentos.reduce((acc, p) => acc + (p.valor ?? 0), 0))}</span>
                         </div>
                       )}
@@ -2653,11 +2654,11 @@ export default function RecepcaoPage() {
             {diariaTab === 'consumos' && (
               <div className={styles.ovBodyPad}>
                 {(sv.consumos || []).length === 0
-                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>{tr('Nenhum consumo registrado')}</span></div>
                   : (
                     <div className={styles.receiptCard}>
                       <div className={styles.receiptHead}>
-                        <div className={styles.receiptTitle}>Consumos — Quarto {s.numero}</div>
+                        <div className={styles.receiptTitle}>{tr('Consumos — Quarto')} {s.numero}</div>
                         <div className={styles.receiptSub}>
                           {sv.chegadaPrevista?.split(' ')[0]}
                           {sv.saidaPrevista ? ` → ${sv.saidaPrevista.split(' ')[0]}` : ''}
@@ -2670,7 +2671,7 @@ export default function RecepcaoPage() {
                             {(c.categoria || c.despesaPessoal || c.pagamento?.formaPagamento) && (
                               <div className={styles.receiptItemSub}>
                                 {c.despesaPessoal
-                                  ? 'Despesa pessoal'
+                                  ? tr('Despesa pessoal')
                                   : [c.categoria, c.pagamento?.nomePagador, c.pagamento?.formaPagamento].filter(Boolean).join(' · ')
                                 }
                               </div>
@@ -2684,7 +2685,7 @@ export default function RecepcaoPage() {
                         </div>
                       ))}
                       <div className={styles.receiptFoot}>
-                        <span>Total</span>
+                        <span>{tr('Total')}</span>
                         <span>{fmtBRL((sv.consumos || []).reduce((s, c) => s + (c.valorTotal ?? 0), 0))}</span>
                       </div>
                     </div>
@@ -2706,53 +2707,53 @@ export default function RecepcaoPage() {
                     {voucherPicking ? (
                       <>
                         <button className={styles.ovAcoesSubBack} onClick={() => setVoucherPicking(false)}>
-                          <ChevronLeft size={12} /> Voucher de Hospedagem
+                          <ChevronLeft size={12} /> {tr('Voucher de Hospedagem')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { gerarVoucherHospedagem({ quarto: s, servico: sv, incluirConsumo: false }); closeAcoes(); }}>
-                          <FileText size={14} /> Sem Consumo
+                          <FileText size={14} /> {tr('Sem Consumo')}
                         </button>
                         {(sv.consumos || []).length > 0 && (
                           <button className={styles.ovAcoesItem} onClick={() => { gerarVoucherHospedagem({ quarto: s, servico: sv, incluirConsumo: true }); closeAcoes(); }}>
-                            <FileText size={14} /> Com Consumo
+                            <FileText size={14} /> {tr('Com Consumo')}
                           </button>
                         )}
                       </>
                     ) : (
                       <>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
-                          <Sparkles size={14} /> Limpeza
+                          <Sparkles size={14} /> {tr('Limpeza')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
-                          <Wrench size={14} /> Manutenção
+                          <Wrench size={14} /> {tr('Manutenção')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openGerenciarDiarias(); }}>
-                          <RefreshCw size={14} /> Gerenciar Diárias
+                          <RefreshCw size={14} /> {tr('Gerenciar Diárias')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openTrocarQuarto(); }}>
-                          <ArrowLeftRight size={14} /> Trocar Quarto
+                          <ArrowLeftRight size={14} /> {tr('Trocar Quarto')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPag(true); }}>
-                          <CreditCard size={14} /> Gerenciar Pagamentos
+                          <CreditCard size={14} /> {tr('Gerenciar Pagamentos')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarConsumo(true); }}>
-                          <ShoppingCart size={14} /> Gerenciar Consumos
+                          <ShoppingCart size={14} /> {tr('Gerenciar Consumos')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setShowGerenciarPreco(true); }}>
-                          <Tag size={14} /> Gerenciar Preços A
+                          <Tag size={14} /> {tr('Gerenciar Preços A')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
-                          <Users size={14} /> Gerenciar Pessoas
+                          <Users size={14} /> {tr('Gerenciar Pessoas')}
                         </button>
                         <button className={styles.ovAcoesItem} onClick={() => setVoucherPicking(true)}>
-                          <FileText size={14} /> Gerar Voucher
+                          <FileText size={14} /> {tr('Gerar Voucher')}
                           <ChevronRight size={12} className={styles.ovAcoesItemArrow} />
                         </button>
                         <div className={styles.ovAcoesDiv} />
                         <button className={[styles.ovAcoesItem, styles.ovAcoesItemDanger].join(' ')} onClick={() => { closeAcoes(); setConfirmModal({ action: 'cancelar' }); }}>
-                          <XCircle size={14} /> Cancelar Pernoite
+                          <XCircle size={14} /> {tr('Cancelar Pernoite')}
                         </button>
                         <button className={[styles.ovAcoesItem, styles.ovAcoesItemPrimary].join(' ')} onClick={() => { closeAcoes(); handleClickFinalizar(); }} disabled={saving}>
-                          {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} Finalizar
+                          {saving ? <Loader2 size={14} className={styles.spin} /> : <CheckCircle size={14} />} {tr('Finalizar')}
                         </button>
                       </>
                     )}
@@ -2760,7 +2761,7 @@ export default function RecepcaoPage() {
                 </>
               )}
               <button className={styles.ovAcoesBtn} onClick={() => { setOvAcoesOpen((v) => !v); setVoucherPicking(false); }}>
-                Ações
+                {tr('Ações')}
                 <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
               </button>
             </div>
@@ -2777,10 +2778,10 @@ export default function RecepcaoPage() {
         <>
           <div className={styles.detailTabs}>
             {[
-              ['dados',      'Dados'],
-              ['hospedes',   `Hóspedes (${sv.hospedes?.length || 0})`],
-              ['consumos',   `Consumo (${sv.consumos?.length || 0})`],
-              ['pagamentos', `Pagamentos (${sv.pagamentos?.length || 0})`],
+              ['dados',      tr('Dados')],
+              ['hospedes',   tr('Hóspedes ({{n}})', { n: sv.hospedes?.length || 0 })],
+              ['consumos',   tr('Consumo ({{n}})', { n: sv.consumos?.length || 0 })],
+              ['pagamentos', tr('Pagamentos ({{n}})', { n: sv.pagamentos?.length || 0 })],
             ].map(([t, label]) => (
               <button key={t} className={[styles.detailTab, detailTab === t ? styles.detailTabActive : ''].join(' ')} onClick={() => setDetailTab(t)}>
                 {label}
@@ -2792,36 +2793,36 @@ export default function RecepcaoPage() {
             {detailTab === 'dados' && (
               <div className={styles.tabContent}>
                 <div className={styles.pricingBlock}>
-                  <div className={styles.pricingBlockTitle}>Day Use — {s.categoria}</div>
+                  <div className={styles.pricingBlockTitle}>{tr('Day Use —')} {s.categoria}</div>
                   <div className={styles.pricingCols}>
                     <div className={styles.pricingCol}>
-                      <span className={styles.pricingColLabel}>Referência de Preços</span>
+                      <span className={styles.pricingColLabel}>{tr('Referência de Preços')}</span>
                       <span className={styles.pricingColVal}>{fmtBRL(sv.precoBase)}</span>
-                      <span className={styles.pricingColSub}>{sv.horasBase}h base · +{fmtBRL(sv.precoAdicional)}/h extra</span>
+                      <span className={styles.pricingColSub}>{sv.horasBase}{tr('h base · +')}{fmtBRL(sv.precoAdicional)}{tr('/h extra')}</span>
                     </div>
                     <div className={styles.pricingColSep} />
                     <div className={styles.pricingCol}>
-                      <span className={styles.pricingColLabel}>{isAtivo ? 'Tempo decorrido' : 'Tempo total'}</span>
+                      <span className={styles.pricingColLabel}>{isAtivo ? tr('Tempo decorrido') : tr('Tempo total')}</span>
                       {isAtivo
                         ? <span className={[styles.pricingColVal, styles.clockRunning].join(' ')}>{fmtClock(selElapsedSec)}</span>
                         : <span className={styles.pricingColVal}>{fmtElapsed(selElapsedMin)}</span>
                       }
-                      <span className={styles.pricingColSub}>{isAtivo ? 'em andamento' : (sv.horaEntrada + ' → ' + sv.horaSaida)}</span>
+                      <span className={styles.pricingColSub}>{isAtivo ? tr('em andamento') : (sv.horaEntrada + ' → ' + sv.horaSaida)}</span>
                     </div>
                   </div>
                 </div>
                 <div className={styles.financialBox}>
                   <div className={styles.financialGrid}>
                     <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>{isAtivo ? 'Hospedagem até agora' : 'Hospedagem'}</span>
+                      <span className={styles.financialLabel}>{isAtivo ? tr('Hospedagem até agora') : tr('Hospedagem')}</span>
                       <span className={styles.financialValue}>{fmtBRL(isAtivo ? selValorAtual : sv.valorTotal)}</span>
                     </div>
                     <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>Consumo</span>
+                      <span className={styles.financialLabel}>{tr('Consumo')}</span>
                       <span className={styles.financialValue}>{fmtBRL(selConsumoTotal)}</span>
                     </div>
                     <div className={styles.financialItem}>
-                      <span className={styles.financialLabel}>Total</span>
+                      <span className={styles.financialLabel}>{tr('Total')}</span>
                       <span className={[styles.financialValue, styles.valueGreen].join(' ')}>
                         {fmtBRL((isAtivo ? selValorAtual : sv.valorTotal) + selConsumoTotal)}
                       </span>
@@ -2835,18 +2836,18 @@ export default function RecepcaoPage() {
                       <>
                         <div className={styles.financialGrid} style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                           <div className={styles.financialItem}>
-                            <span className={styles.financialLabel}>Total Pago</span>
+                            <span className={styles.financialLabel}>{tr('Total Pago')}</span>
                             <span className={[styles.financialValue, styles.valueGreen].join(' ')}>{fmtBRL(sv.totalPago || 0)}</span>
                           </div>
                           <div className={styles.financialItem}>
-                            <span className={styles.financialLabel}>Falta Pagar</span>
+                            <span className={styles.financialLabel}>{tr('Falta Pagar')}</span>
                             <span className={[styles.financialValue, (sv.pagamentoPendente || 0) > 0 ? styles.valueAmber : styles.valueGreen].join(' ')}>
                               {fmtBRL(sv.pagamentoPendente || 0)}
                             </span>
                           </div>
                           {sv.desconto?.valor > 0 && (
                             <div className={styles.financialItem}>
-                              <span className={styles.financialLabel}>Desconto</span>
+                              <span className={styles.financialLabel}>{tr('Desconto')}</span>
                               <span className={[styles.financialValue, styles.valueGreen].join(' ')}>
                                 {sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}
                               </span>
@@ -2855,7 +2856,7 @@ export default function RecepcaoPage() {
                         </div>
                         <div className={styles.progressWrap} style={{ marginTop: 10 }}>
                           <div className={styles.progressLabels}>
-                            <span>Progresso de pagamento</span>
+                            <span>{tr('Progresso de pagamento')}</span>
                             <span>{duPct.toFixed(0)}%</span>
                           </div>
                           <div className={styles.progressBar}>
@@ -2867,21 +2868,21 @@ export default function RecepcaoPage() {
                   })()}
                 </div>
                 <div className={styles.infoGrid2}>
-                  <div className={styles.infoRow}><span className={styles.infoLabel}>Titular</span><span className={styles.infoValue}>{sv.titularNome || <em>Sem titular</em>}</span></div>
-                  <div className={styles.infoRow}><span className={styles.infoLabel}>Data de uso</span><span className={styles.infoValue}>{sv.dataUso}</span></div>
-                  <div className={styles.infoRow}><span className={styles.infoLabel}>Entrada</span><span className={styles.infoValue}>{sv.horaEntrada}</span></div>
-                  <div className={styles.infoRow}><span className={styles.infoLabel}>Saída</span><span className={styles.infoValue}>{sv.horaSaida || <em>Em aberto</em>}</span></div>
-                  {sv.pagamentoPendente > 0 && <div className={styles.infoRow}><span className={styles.infoLabel}>Pendente</span><span className={[styles.infoValue, styles.textAmber].join(' ')}>{fmtBRL(sv.pagamentoPendente)}</span></div>}
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Titular')}</span><span className={styles.infoValue}>{sv.titularNome || <em>{tr('Sem titular')}</em>}</span></div>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Data de uso')}</span><span className={styles.infoValue}>{sv.dataUso}</span></div>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Entrada')}</span><span className={styles.infoValue}>{sv.horaEntrada}</span></div>
+                  <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Saída')}</span><span className={styles.infoValue}>{sv.horaSaida || <em>{tr('Em aberto')}</em>}</span></div>
+                  {sv.pagamentoPendente > 0 && <div className={styles.infoRow}><span className={styles.infoLabel}>{tr('Pendente')}</span><span className={[styles.infoValue, styles.textAmber].join(' ')}>{fmtBRL(sv.pagamentoPendente)}</span></div>}
                 </div>
               </div>
             )}
             {detailTab === 'hospedes' && (
               <div className={styles.ovBodyPad}>
                 <Button variant="secondary" size="sm" onClick={() => { setApDiariaIdx(0); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); }}>
-                  <Users size={13} /> Gerenciar Pessoas
+                  <Users size={13} /> {tr('Gerenciar Pessoas')}
                 </Button>
                 {svGuests.length === 0
-                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>Nenhum hóspede registrado</span></div>
+                  ? <div className={styles.emptyList}><User size={24} color="var(--text-2)" /><span>{tr('Nenhum hóspede registrado')}</span></div>
                   : (
                     <div className={styles.ovGuestTable}>
                       {svGuests.map((h) => (
@@ -2891,13 +2892,13 @@ export default function RecepcaoPage() {
                               <div className={styles.contactActions}>
                                 {h.telefone && (
                                   <a href={`https://wa.me/55${h.telefone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer"
-                                    className={styles.quickBtn} title="WhatsApp" onClick={(e) => e.stopPropagation()}>
+                                    className={styles.quickBtn} title={tr('WhatsApp')} onClick={(e) => e.stopPropagation()}>
                                     <Phone size={11} />
                                   </a>
                                 )}
                                 {h.email && (
                                   <a href={`mailto:${h.email}`}
-                                    className={styles.quickBtn} title="E-mail" onClick={(e) => e.stopPropagation()}>
+                                    className={styles.quickBtn} title={tr('E-mail')} onClick={(e) => e.stopPropagation()}>
                                     <Mail size={11} />
                                   </a>
                                 )}
@@ -2909,7 +2910,7 @@ export default function RecepcaoPage() {
                               {h.email    && <div className={styles.ovGuestMeta}>{h.email}</div>}
                             </div>
                             <button type="button" className={styles.removeBtn}
-                              onClick={() => { if (window.confirm(`Remover ${h.nome}?`)) notify('Funcionalidade em desenvolvimento.', 'info'); }}>
+                              onClick={() => { if (window.confirm(tr('Remover {{nome}}?', { nome: h.nome }))) notify(tr('Funcionalidade em desenvolvimento.'), 'info'); }}>
                               <Trash2 size={12} />
                             </button>
                           </div>
@@ -2922,10 +2923,10 @@ export default function RecepcaoPage() {
             {detailTab === 'consumos' && (
               <div className={styles.subTabContent}>
                 <Button variant="primary" size="sm" onClick={() => setShowGerenciarConsumo(true)}>
-                  <ShoppingCart size={13} /> Gerenciar Consumos
+                  <ShoppingCart size={13} /> {tr('Gerenciar Consumos')}
                 </Button>
                 {(sv.consumos || []).length === 0
-                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+                  ? <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>{tr('Nenhum consumo registrado')}</span></div>
                   : (
                     <div className={styles.itemList}>
                       {(sv.consumos || []).map((c, i) => (
@@ -2934,7 +2935,7 @@ export default function RecepcaoPage() {
                             <ShoppingCart size={14} className={c.tipo === 'interno' ? styles.listItemIconGreen : styles.listItemIcon} />
                             <div>
                               <div className={styles.listItemName}>{c.item}</div>
-                              <div className={styles.listItemSub}>{c.categoria} · Qtd: {c.quantidade}{c.formaPagamento ? ` · ${c.formaPagamento}` : ''}</div>
+                              <div className={styles.listItemSub}>{c.categoria} {tr('· Qtd:')} {c.quantidade}{c.formaPagamento ? ` · ${c.formaPagamento}` : ''}</div>
                             </div>
                           </div>
                           <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
@@ -2948,11 +2949,11 @@ export default function RecepcaoPage() {
             {detailTab === 'pagamentos' && (
               <div className={styles.subTabContent}>
                 <Button variant="primary" size="sm" onClick={() => setShowGerenciarPag(true)}>
-                  <CreditCard size={13} /> Gerenciar Pagamentos
+                  <CreditCard size={13} /> {tr('Gerenciar Pagamentos')}
                 </Button>
                 <div className={styles.itemList}>
                   {(sv.pagamentos || []).length === 0
-                    ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+                    ? <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>{tr('Nenhum pagamento registrado')}</span></div>
                     : (sv.pagamentos || []).map((p) => (
                       <div key={p.id} className={styles.listItem}>
                         <div className={styles.listItemLeft}>
@@ -2964,7 +2965,7 @@ export default function RecepcaoPage() {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
-                          <button className={styles.removeBtn} onClick={() => notify('Em desenvolvimento')}><Trash2 size={13} /></button>
+                          <button className={styles.removeBtn} onClick={() => notify(tr('Em desenvolvimento'))}><Trash2 size={13} /></button>
                         </div>
                       </div>
                     ))
@@ -2994,26 +2995,26 @@ export default function RecepcaoPage() {
                 <div className={styles.ovAcoesBackdrop} onClick={closeAcoes} />
                 <div className={styles.ovAcoesMenu}>
                   <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openEditQuarto(s); }}>
-                    <Pencil size={14} /> Editar Quarto
+                    <Pencil size={14} /> {tr('Editar Quarto')}
                   </button>
                   <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('limpeza', s); }}>
-                    <Sparkles size={14} /> Limpeza
+                    <Sparkles size={14} /> {tr('Limpeza')}
                   </button>
                   <button className={styles.ovAcoesItem} onClick={() => { closeAcoes(); openService('manutencao', s); }}>
-                    <Wrench size={14} /> Manutenção
+                    <Wrench size={14} /> {tr('Manutenção')}
                   </button>
                   <div className={styles.ovAcoesDiv} />
                   <button className={styles.ovAcoesItem} style={{ color: 'var(--violet)' }} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
-                    <BedDouble size={14} /> Novo Pernoite
+                    <BedDouble size={14} /> {tr('Novo Pernoite')}
                   </button>
-                  <button className={styles.ovAcoesItem} style={{ color: 'var(--text-2)', opacity: 0.5, cursor: 'not-allowed' }} disabled title="Em breve">
-                    <Clock size={14} /> Novo Day Use
+                  <button className={styles.ovAcoesItem} style={{ color: 'var(--text-2)', opacity: 0.5, cursor: 'not-allowed' }} disabled title={tr('Em breve')}>
+                    <Clock size={14} /> {tr('Novo Day Use')}
                   </button>
                 </div>
               </>
             )}
             <button className={styles.ovAcoesBtn} onClick={() => setOvAcoesOpen((v) => !v)}>
-              Ações
+              {tr('Ações')}
               <ChevronDown size={14} className={ovAcoesOpen ? styles.ovAcoesBtnChevronOpen : styles.ovAcoesBtnChevron} />
             </button>
           </div>
@@ -3026,7 +3027,7 @@ export default function RecepcaoPage() {
         <div className={styles.footerRight}>
           <Button variant="primary" className={styles.btnBlue} onClick={() => handleFinalizarLimpeza(s)} disabled={saving}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            <Sparkles size={14} /> Finalizar Limpeza
+            <Sparkles size={14} /> {tr('Finalizar Limpeza')}
           </Button>
         </div>
       );
@@ -3037,7 +3038,7 @@ export default function RecepcaoPage() {
         <div className={styles.footerRight}>
           <Button variant="primary" className={styles.btnPurple} onClick={() => handleFinalizarManutencao(s)} disabled={saving}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            <Wrench size={14} /> Finalizar Manutenção
+            <Wrench size={14} /> {tr('Finalizar Manutenção')}
           </Button>
         </div>
       );
@@ -3046,10 +3047,10 @@ export default function RecepcaoPage() {
     if (s.status === ROOM_STATUS.FORA_DE_SERVICO) {
       return (
         <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={closeDetail}>Fechar</Button>
+          <Button variant="secondary" onClick={closeDetail}>{tr('Fechar')}</Button>
           <Button variant="primary" className={styles.btnGreen} onClick={() => handleMarcarDisponivel(s)} disabled={saving}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            <BedDouble size={14} /> Marcar Disponível
+            <BedDouble size={14} /> {tr('Marcar Disponível')}
           </Button>
         </div>
       );
@@ -3059,11 +3060,11 @@ export default function RecepcaoPage() {
       return (
         <div className={styles.footerRight}>
           <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
-            <XCircle size={14} /> Cancelar Reserva
+            <XCircle size={14} /> {tr('Cancelar Reserva')}
           </Button>
           <Button variant="primary" onClick={handleHospedarReserva} disabled={saving}>
             {saving && <Loader2 size={14} className={styles.spin} />}
-            <BedDouble size={14} /> Hospedar
+            <BedDouble size={14} /> {tr('Hospedar')}
           </Button>
         </div>
       );
@@ -3074,13 +3075,13 @@ export default function RecepcaoPage() {
         <div className={styles.footerBetween}>
           <div className={styles.footerLeft}>
             <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
-              <XCircle size={14} /> Cancelar
+              <XCircle size={14} /> {tr('Cancelar')}
             </Button>
           </div>
           <div className={styles.footerRight}>
             <Button variant="primary" onClick={handleClickFinalizar} disabled={saving}>
               {saving && <Loader2 size={14} className={styles.spin} />}
-              <CheckCircle size={14} /> Finalizar
+              <CheckCircle size={14} /> {tr('Finalizar')}
             </Button>
           </div>
         </div>
@@ -3095,18 +3096,18 @@ export default function RecepcaoPage() {
         <div className={styles.footerBetween}>
           <div className={styles.footerLeft}>
             <Button variant="danger" onClick={() => setConfirmModal({ action: 'cancelar' })}>
-              <XCircle size={14} /> Cancelar
+              <XCircle size={14} /> {tr('Cancelar')}
             </Button>
             {isEncerrado && (
               <Button variant="secondary" onClick={() => openService('limpeza', s)}>
-                <Sparkles size={14} /> Limpeza
+                <Sparkles size={14} /> {tr('Limpeza')}
               </Button>
             )}
           </div>
           <div className={styles.footerRight}>
             {isAtivo && (
               <Button variant="primary" onClick={() => setEncerrarModal(true)}>
-                <Square size={14} /> Encerrar tempo
+                <Square size={14} /> {tr('Encerrar tempo')}
               </Button>
             )}
             {isEncerrado && (
@@ -3116,11 +3117,11 @@ export default function RecepcaoPage() {
                   setDescontoValor(''); setDescontoDescricao('');
                   setShowDescontoModal(true);
                 }}>
-                  <Tag size={14} /> Desconto
+                  <Tag size={14} /> {tr('Desconto')}
                 </Button>
                 <Button variant="primary" onClick={handleClickFinalizar} disabled={saving}>
                   {saving && <Loader2 size={14} className={styles.spin} />}
-                  <CheckCircle size={14} /> Finalizar
+                  <CheckCircle size={14} /> {tr('Finalizar')}
                 </Button>
               </>
             )}
@@ -3129,7 +3130,7 @@ export default function RecepcaoPage() {
       );
     }
 
-    return <div className={styles.footerRight}><Button variant="secondary" onClick={closeDetail}>Fechar</Button></div>;
+    return <div className={styles.footerRight}><Button variant="secondary" onClick={closeDetail}>{tr('Fechar')}</Button></div>;
   };
 
   // ── Detail modal title ────────────────────────────────────────────────────
@@ -3140,8 +3141,8 @@ export default function RecepcaoPage() {
     const sv = s.servico;
     const mainLine = sv?.titularNome
       ? sv.titularNome
-      : sv?.tipo === 'dayuse' ? 'Day Use em andamento'
-      : `Apartamento ${s.numero}`;
+      : sv?.tipo === 'dayuse' ? tr('Day Use em andamento')
+      : tr('Apartamento {{numero}}', { numero: s.numero });
 
     return (
       <div className={styles.detailModalTitle}>
@@ -3153,13 +3154,13 @@ export default function RecepcaoPage() {
             {mainLine}
           </div>
           <div className={styles.detailMeta}>
-            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{s.status}</span>
+            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{tr(s.status)}</span>
             <span className={styles.detailCategoria}>{s.categoria}</span>
             <span className={styles.detailSep}>·</span>
             <span className={styles.detailTipo}>{s.tipoOcupacao}</span>
             {sv?.periodo && <span className={styles.detailPeriodo}>{sv.periodo}</span>}
-            {sv?.tipo === 'pernoite' && <span className={styles.pernoiteBadge}>Pernoite</span>}
-            {sv?.tipo === 'dayuse'   && <span className={styles.dayuseBadge}>Day Use</span>}
+            {sv?.tipo === 'pernoite' && <span className={styles.pernoiteBadge}>{tr('Pernoite')}</span>}
+            {sv?.tipo === 'dayuse'   && <span className={styles.dayuseBadge}>{tr('Day Use')}</span>}
           </div>
         </div>
       </div>
@@ -3204,11 +3205,11 @@ export default function RecepcaoPage() {
           <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
           {splitClean ? (
             <span className={styles.statusBadgeSplit}>
-              <span className={[styles.statusSeg, sk === 'reservado' ? styles.statusSegReservado : styles.statusSegOcupado].join(' ')}>{room.status}</span>
-              <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>Em Limpeza</span>
+              <span className={[styles.statusSeg, sk === 'reservado' ? styles.statusSegReservado : styles.statusSegOcupado].join(' ')}>{tr(room.status)}</span>
+              <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>{tr('Em Limpeza')}</span>
             </span>
           ) : (
-            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{room.status}</span>
+            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{tr(room.status)}</span>
           )}
         </div>
 
@@ -3217,10 +3218,10 @@ export default function RecepcaoPage() {
           {room.status === ROOM_STATUS.DISPONIVEL && (
             <div className={styles.bedGrid}>
               {[
-                { key: 'casal',    Icon: BedDouble, label: 'Casal'    },
-                { key: 'solteiro', Icon: BedSingle, label: 'Solteiro' },
-                { key: 'beliche',  Icon: Layers,    label: 'Beliche'  },
-                { key: 'rede',     Icon: Waves,     label: 'Rede'     },
+                { key: 'casal',    Icon: BedDouble, label: tr('Casal')    },
+                { key: 'solteiro', Icon: BedSingle, label: tr('Solteiro') },
+                { key: 'beliche',  Icon: Layers,    label: tr('Beliche')  },
+                { key: 'rede',     Icon: Waves,     label: tr('Rede')     },
               ].map(({ key, Icon, label }) => {
                 const qty = room.camas?.[key] || 0;
                 return (
@@ -3235,14 +3236,14 @@ export default function RecepcaoPage() {
 
           {room.status === ROOM_STATUS.LIMPEZA && (
             <>
-              <span className={styles.roomCardLabel}>Em Limpeza</span>
+              <span className={styles.roomCardLabel}>{tr('Em Limpeza')}</span>
               {room.limpeza?.responsavel && <span className={styles.roomCardMeta}><User size={10} /> {room.limpeza.responsavel}</span>}
             </>
           )}
 
           {(room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) && (
             <>
-              <span className={styles.roomCardLabel}>{room.status === ROOM_STATUS.MANUTENCAO ? 'Manutenção' : 'Fora de Serviço'}</span>
+              <span className={styles.roomCardLabel}>{room.status === ROOM_STATUS.MANUTENCAO ? tr('Manutenção') : tr('Fora de Serviço')}</span>
               {room.manutencao?.responsavel && <span className={styles.roomCardMeta}><Wrench size={10} /> {room.manutencao.responsavel}</span>}
               {room.manutencao?.descricao   && <span className={styles.roomCardDesc}>{room.manutencao.descricao.slice(0, 50)}</span>}
             </>
@@ -3257,16 +3258,16 @@ export default function RecepcaoPage() {
               <div className={styles.roomCardBadges}>
                 {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
                 {sv.totalDiarias > 0 && <span className={styles.diariaBadge}><Calendar size={9} />{sv.diariaAtual}/{sv.totalDiarias}</span>}
-                <span className={styles.pernoiteBadge}>Pernoite</span>
+                <span className={styles.pernoiteBadge}>{tr('Pernoite')}</span>
                 {hasDesconto && (
                   <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
                 )}
               </div>
               {sv.pagamentoPendente > 0 && (
-                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
+                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} {tr('pendente')}</span>
               )}
               {splitClean && room.limpeza?.responsavel && (
-                <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> Limpeza: {room.limpeza.responsavel}</span>
+                <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> {tr('Limpeza:')} {room.limpeza.responsavel}</span>
               )}
             </>
           )}
@@ -3274,7 +3275,7 @@ export default function RecepcaoPage() {
           {sv?.tipo === 'dayuse' && (
             <>
               <span className={styles.roomCardGuest}>
-                {sv.titularNome || (sv.status === DAYUSE_STATUS.ENCERRADO ? 'Day use encerrado' : sv.status === DAYUSE_STATUS.FINALIZADO ? 'Day use finalizado' : 'Day Use')}
+                {sv.titularNome || (sv.status === DAYUSE_STATUS.ENCERRADO ? tr('Day use encerrado') : sv.status === DAYUSE_STATUS.FINALIZADO ? tr('Day use finalizado') : tr('Day Use'))}
               </span>
               <span className={styles.roomCardPeriod}>
                 {isDuAtivo
@@ -3284,13 +3285,13 @@ export default function RecepcaoPage() {
               </span>
               <div className={styles.roomCardBadges}>
                 {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
-                <span className={styles.dayuseBadge}>Day Use</span>
+                <span className={styles.dayuseBadge}>{tr('Day Use')}</span>
                 {hasDesconto && (
                   <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
                 )}
               </div>
               {sv.pagamentoPendente > 0 && (
-                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} pendente</span>
+                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} {tr('pendente')}</span>
               )}
             </>
           )}
@@ -3304,13 +3305,13 @@ export default function RecepcaoPage() {
             return (
               <>
                 <span className={styles.roomCardGuest} style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'unset', lineHeight: 1.25 }}>{sv.titularNome || '—'}</span>
-                {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> Check-in: {sv.chegadaPrevista}</span>}
+                {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> {tr('Check-in:')} {sv.chegadaPrevista}</span>}
                 <div className={styles.roomCardBadges} style={{ marginTop: 2 }}>
                   {nPessoas > 0 && <span className={styles.guestCountBadge}><Users size={10} /> {nPessoas}</span>}
                   {noites > 0   && <span className={styles.guestCountBadge}><Calendar size={10} /> {noites}</span>}
                 </div>
                 {splitClean && room.limpeza?.responsavel && (
-                  <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> Limpeza: {room.limpeza.responsavel}</span>
+                  <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> {tr('Limpeza:')} {room.limpeza.responsavel}</span>
                 )}
               </>
             );
@@ -3344,14 +3345,14 @@ export default function RecepcaoPage() {
           <div className={styles.tableHeaderActions}>
             <div className={[styles.searchWrap, styles.headerControl].join(' ')}>
               <Search size={13} className={styles.searchIcon} />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nº ou hóspede..." className={styles.searchInput} />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={tr('Nº ou hóspede...')} className={styles.searchInput} />
               {search.trim() && (
                 <button
                   type="button"
                   className={styles.searchClearBtn}
                   onClick={() => setSearch('')}
-                  aria-label="Limpar busca"
-                  title="Limpar busca"
+                  aria-label={tr('Limpar busca')}
+                  title={tr('Limpar busca')}
                 >
                   <X size={12} />
                 </button>
@@ -3362,16 +3363,16 @@ export default function RecepcaoPage() {
                 mode="single"
                 value={filterDateStart}
                 onChange={(date) => { setFilterDateStart(date); setFilterDateEnd(null); setDateGroupCollapsed({}); }}
-                placeholder="Data de check-in..."
+                placeholder={tr('Data de check-in...')}
                 className={styles.datePickerWrap}
                 triggerClassName={styles.headerControlField}
               />
             </div>
             <Button variant="primary" className={styles.headerControlBtn} onClick={openAddQuarto}>
-              <Plus size={14} /> Adicionar Quarto
+              <Plus size={14} /> {tr('Adicionar Quarto')}
             </Button>
             <Button variant="primary" className={[styles.headerControlBtn, styles.btnPurple].join(' ')} onClick={() => setShowNovoPernoite(true)}>
-              <BedDouble size={14} /> Novo Pernoite
+              <BedDouble size={14} /> {tr('Novo Pernoite')}
             </Button>
           </div>
         </div>
@@ -3389,7 +3390,7 @@ export default function RecepcaoPage() {
                   statusFilter !== 'todos' ? styles.filterSelectWithClear : '',
                 ].join(' ')}
               >
-                <option value="todos">Todos os quartos</option>
+                <option value="todos">{tr('Todos os quartos')}</option>
                 {FILTER_OPTIONS.filter((f) => f.id !== 'todos').map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.label}{filterCounts[f.id] != null ? ` (${filterCounts[f.id]})` : ''}
@@ -3401,8 +3402,8 @@ export default function RecepcaoPage() {
                   type="button"
                   className={styles.filterClearBtn}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setStatusFilter('todos'); }}
-                  aria-label="Limpar filtro de status"
-                  title="Limpar filtro"
+                  aria-label={tr('Limpar filtro de status')}
+                  title={tr('Limpar filtro')}
                 >
                   <X size={12} />
                 </button>
@@ -3420,7 +3421,7 @@ export default function RecepcaoPage() {
                   filterTipoOcupacao ? styles.filterSelectWithClear : '',
                 ].join(' ')}
               >
-                <option value="">Tipo de ocupação</option>
+                <option value="">{tr('Tipo de ocupação')}</option>
                 {TIPOS_OCUPACAO.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
               {filterTipoOcupacao && (
@@ -3428,8 +3429,8 @@ export default function RecepcaoPage() {
                   type="button"
                   className={styles.filterClearBtn}
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); setFilterTipoOcupacao(''); }}
-                  aria-label="Limpar filtro de tipo de ocupação"
-                  title="Limpar filtro"
+                  aria-label={tr('Limpar filtro de tipo de ocupação')}
+                  title={tr('Limpar filtro')}
                 >
                   <X size={12} />
                 </button>
@@ -3440,28 +3441,28 @@ export default function RecepcaoPage() {
             type="button"
             className={[styles.filterToggleBtn, groupByGroup ? styles.filterToggleBtnActive : ''].join(' ')}
             onClick={() => setGroupByGroup((v) => !v)}
-            title="Agrupar por grupo"
+            title={tr('Agrupar por grupo')}
           >
-            <Users size={14} /> Por grupo
+            <Users size={14} /> {tr('Por grupo')}
           </button>
         </div>
 
         {/* ── Category / Date groups ── */}
         {loading ? (
-          <div className={styles.emptyState}><Loader2 size={28} className={styles.spin} /> Carregando...</div>
+          <div className={styles.emptyState}><Loader2 size={28} className={styles.spin} /> {tr('Carregando...')}</div>
         ) : isDateFilterActive ? (
           /* ── Date-sorted view (when date range active) ── */
           dateGroups.length === 0
-            ? <div className={styles.emptyState}>Nenhum pernoite encontrado neste período.</div>
+            ? <div className={styles.emptyState}>{tr('Nenhum pernoite encontrado neste período.')}</div>
             : dateGroups.map((group) => (
               <div key={group.date} className={styles.dateSection}>
                 <button className={styles.dateGroupHeader} onClick={() => toggleDateGroup(group.date)}>
                   <div className={styles.dateGroupHeaderLeft}>
                     <ChevronDown size={14} className={[styles.catChevron, isDateGroupCollapsed(group.date) ? styles.catChevronClosed : ''].join(' ')} />
                     <Calendar size={13} style={{ color: 'var(--text-2)' }} />
-                    <span className={styles.dateGroupTitle}>Check-in {group.date}</span>
+                    <span className={styles.dateGroupTitle}>{tr('Check-in')} {tr(group.date)}</span>
                   </div>
-                  <span className={styles.dateGroupCount}>{group.rooms.length} quarto{group.rooms.length !== 1 ? 's' : ''}</span>
+                  <span className={styles.dateGroupCount}>{group.rooms.length} {tr('quarto')}{group.rooms.length !== 1 ? 's' : ''}</span>
                 </button>
                 {!isDateGroupCollapsed(group.date) && (
                   <div className={styles.catBody}>
@@ -3475,7 +3476,7 @@ export default function RecepcaoPage() {
         ) : groupByGroup ? (
           /* ── Group view (Por grupo) ── */
           groupSections.length === 0
-            ? <div className={styles.emptyState}>Nenhum quarto com os filtros aplicados.</div>
+            ? <div className={styles.emptyState}>{tr('Nenhum quarto com os filtros aplicados.')}</div>
             : groupSections.map((g) => {
               const fin = g.gid != null ? groupFinFromRooms(g.rooms) : null;
               const grpPagamentos = fin ? groupPaymentsFromRooms(g.rooms) : [];
@@ -3489,20 +3490,20 @@ export default function RecepcaoPage() {
                         <div className={styles.groupPriceHead}>
                           <Users size={14} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
                           <span className={styles.catName} style={{ marginRight: 0 }}>{g.title}</span>
-                          <span className={styles.groupRoomChip}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                          <span className={styles.groupRoomChip}>{g.rooms.length} {tr('quarto')}{g.rooms.length !== 1 ? 's' : ''}</span>
                         </div>
                         <div className={styles.groupPriceBody}>
                           <div className={styles.groupPriceStats}>
                             <div className={styles.groupPriceStat}>
-                              <span className={styles.groupPriceLabel}>Total</span>
+                              <span className={styles.groupPriceLabel}>{tr('Total')}</span>
                               <span className={styles.groupPriceVal}>{fmtBRL(fin.total)}</span>
                             </div>
                             <div className={styles.groupPriceStat}>
-                              <span className={styles.groupPriceLabel}>Pago</span>
+                              <span className={styles.groupPriceLabel}>{tr('Pago')}</span>
                               <span className={[styles.groupPriceVal, styles.groupPricePaid].join(' ')}>{fmtBRL(fin.pago)}</span>
                             </div>
                             <div className={styles.groupPriceStat}>
-                              <span className={styles.groupPriceLabel}>Pendente</span>
+                              <span className={styles.groupPriceLabel}>{tr('Pendente')}</span>
                               <span className={[styles.groupPriceVal, fin.pendente > 0 ? styles.groupPricePending : styles.groupPricePaid].join(' ')}>{fmtBRL(fin.pendente)}</span>
                             </div>
                           </div>
@@ -3513,12 +3514,12 @@ export default function RecepcaoPage() {
                             <div className={styles.groupPricePayments}>
                               <div className={styles.groupPricePayHead}>
                                 <CreditCard size={11} />
-                                <span>Pagamentos ({grpPagamentos.length})</span>
+                                <span>{tr('Pagamentos (')}{grpPagamentos.length})</span>
                               </div>
                               {grpPagamentos.map((p) => (
                                 <div key={p.id} className={styles.groupPricePayRow}>
                                   <div className={styles.groupPricePayMain}>
-                                    <span className={styles.groupPricePayDesc}>{p.descricaoOrig || 'Pagamento'}</span>
+                                    <span className={styles.groupPricePayDesc}>{p.descricaoOrig || tr('Pagamento')}</span>
                                     {p.nomePagador && <span className={styles.groupPricePayName}>{p.nomePagador}</span>}
                                     <span className={styles.groupPricePaySub}>
                                       {[p.formaPagamento, p.data].filter(Boolean).join(' · ') || '—'}
@@ -3535,20 +3536,20 @@ export default function RecepcaoPage() {
                       <div className={styles.groupHeaderTitleRow}>
                         <Users size={14} style={{ color: 'var(--text-2)' }} />
                         <span className={styles.catName} style={{ marginRight: 0 }}>{g.title}</span>
-                        <span className={styles.groupRoomChip}>{g.rooms.length} quarto{g.rooms.length !== 1 ? 's' : ''}</span>
+                        <span className={styles.groupRoomChip}>{g.rooms.length} {tr('quarto')}{g.rooms.length !== 1 ? 's' : ''}</span>
                       </div>
                     )}
                   </div>
                   {fin && (
                     <div className={styles.groupHeaderActions}>
                       <Button variant="primary" size="sm" onClick={() => handleAddPagamentoGrupo(g.gid, fin)}>
-                        <DollarSign size={13} /> Adicionar Pagamento
+                        <DollarSign size={13} /> {tr('Adicionar Pagamento')}
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => openGerenciarPrecoGrupo(g.gid, g.rooms)}>
-                        <Tag size={13} /> Gerenciar Preços
+                        <Tag size={13} /> {tr('Gerenciar Preços')}
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => gerarVoucherGrupoReserva(g.gid)}>
-                        <FileText size={13} /> Voucher
+                        <FileText size={13} /> {tr('Voucher')}
                       </Button>
                     </div>
                   )}
@@ -3579,7 +3580,7 @@ export default function RecepcaoPage() {
               {!collapsed[cat.id] && (
                 <div className={styles.catBody}>
                   {cat.rooms.length === 0
-                    ? <div className={styles.catEmpty}>Nenhum quarto com os filtros aplicados.</div>
+                    ? <div className={styles.catEmpty}>{tr('Nenhum quarto com os filtros aplicados.')}</div>
                     : <div className={styles.roomGrid}>{cat.rooms.map((room) => <RoomCard key={room.id} room={room} />)}</div>
                   }
                 </div>
@@ -3646,32 +3647,32 @@ export default function RecepcaoPage() {
               const upd = await reservaApi.editar(id, body);
               setReservaFull(normalizeReserva(upd ?? { ...body, id }));
               await load();
-              notify('Reserva atualizada!');
+              notify(tr('Reserva atualizada!'));
             }}
             onMoverPernoite={async (id) => {
-              try { await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO'); await load(); notify('Hospedagem iniciada.'); }
-              catch (e) { notify('Erro: ' + e.message, 'error'); }
+              try { await hospedagemApi.alterarStatus(id, 'PERNOITE_ATIVO'); await load(); notify(tr('Hospedagem iniciada.')); }
+              catch (e) { notify(tr('Erro: ') + e.message, 'error'); }
             }}
             onCancel={async (id, motivo) => {
               await reservaApi.cancelar(id, motivo);
               await load();
               setReservaFull(null);
               closeDetail();
-              notify('Reserva cancelada.');
+              notify(tr('Reserva cancelada.'));
             }}
             onAusente={async (id) => {
               await reservaApi.marcarAusente(id);
               await load();
               setReservaFull(null);
               closeDetail();
-              notify('Reserva marcada como ausente.');
+              notify(tr('Reserva marcada como ausente.'));
             }}
             onSync={(norm) => { setReservaFull(norm); load(); }}
           />
         ) : (
-          <Modal open onClose={closeDetail} size="sm" title="Reserva">
+          <Modal open onClose={closeDetail} size="sm" title={tr('Reserva')}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
-              <Loader2 size={16} className={styles.spin} /> Carregando reserva...
+              <Loader2 size={16} className={styles.spin} /> {tr('Carregando reserva...')}
             </div>
           </Modal>
         )
@@ -3722,7 +3723,7 @@ export default function RecepcaoPage() {
           roomDescMap={roomDescMapFull}
           onClose={() => setShowNovoPernoite(false)}
           onNotify={notify}
-          onSave={async () => { setShowNovoPernoite(false); await load(); notify('Pernoite(s) criado(s)!'); }}
+          onSave={async () => { setShowNovoPernoite(false); await load(); notify(tr('Pernoite(s) criado(s)!')); }}
         />
       )}
 
@@ -3761,13 +3762,13 @@ export default function RecepcaoPage() {
             open
             onClose={() => setShowAddEstoque(false)}
             size="sm"
-            title={<><Package size={15} /> Adicionar Item — Apt. {selectedRoom.numero}</>}
+            title={<><Package size={15} /> {tr('Adicionar Item — Apt.')} {selectedRoom.numero}</>}
             footer={
               <div className={styles.footerRight}>
-                <Button variant="secondary" onClick={() => setShowAddEstoque(false)}>Cancelar</Button>
+                <Button variant="secondary" onClick={() => setShowAddEstoque(false)}>{tr('Cancelar')}</Button>
                 <Button variant="primary" onClick={handleConfirmAddEstoque} disabled={savingEstoque || !estoqueSelItem}>
                   {savingEstoque && <Loader2 size={14} className={styles.spin} />}
-                  Adicionar
+                  {tr('Adicionar')}
                 </Button>
               </div>
             }
@@ -3775,28 +3776,28 @@ export default function RecepcaoPage() {
             <div className={styles.formStack}>
               {estoqueLoading ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-2)', fontSize: 13 }}>
-                  <Loader2 size={14} className={styles.spin} /> Carregando estoque...
+                  <Loader2 size={14} className={styles.spin} /> {tr('Carregando estoque...')}
                 </div>
               ) : (
                 <>
-                  <FormField label="Categoria *">
+                  <FormField label={tr('Categoria *')}>
                     <Select value={estoqueSelCat} onChange={(e) => { setEstoqueSelCat(e.target.value); setEstoqueSelItem(null); }}>
-                      <option value="">Selecione...</option>
+                      <option value="">{tr('Selecione...')}</option>
                       {estoqueCats.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </Select>
                   </FormField>
                   {catSel && (
-                    <FormField label="Item *">
+                    <FormField label={tr('Item *')}>
                       <Select value={estoqueSelItem?.id ?? ''} onChange={(e) => {
                         const found = catItems.find((i) => String(i.id) === e.target.value);
                         setEstoqueSelItem(found ?? null);
                       }}>
-                        <option value="">Selecione...</option>
+                        <option value="">{tr('Selecione...')}</option>
                         {catItems.map((i) => {
                           const jaNoQuarto = minibarIds.has(i.id);
                           return (
                             <option key={i.id} value={i.id} disabled={jaNoQuarto}>
-                              {i.descricao}{jaNoQuarto ? ' (já no quarto)' : ''}{i.valor_venda ? ` — ${fmtBRL(i.valor_venda)}` : ''}{i.quantidade != null ? ` (estoque: ${i.quantidade})` : ''}
+                              {i.descricao}{jaNoQuarto ? tr(' (já no quarto)') : ''}{i.valor_venda ? ` — ${fmtBRL(i.valor_venda)}` : ''}{i.quantidade != null ? tr(' (estoque: {{quantidade}})', { quantidade: i.quantidade }) : ''}
                             </option>
                           );
                         })}
@@ -3809,18 +3810,18 @@ export default function RecepcaoPage() {
                         <Package size={13} />
                         <span>{estoqueSelItem.descricao}</span>
                         {estoqueSelItem.valor_venda != null && (
-                          <span className={styles.estoqueItemPrice}>{fmtBRL(estoqueSelItem.valor_venda)}/un.</span>
+                          <span className={styles.estoqueItemPrice}>{fmtBRL(estoqueSelItem.valor_venda)}{tr('/un.')}</span>
                         )}
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        <FormField label="Qtd. atual *">
+                        <FormField label={tr('Qtd. atual *')}>
                           <Input
                             type="number" min="0"
                             value={estoqueQtdAtual}
                             onChange={(e) => setEstoqueQtdAtual(Math.max(0, parseInt(e.target.value) || 0))}
                           />
                         </FormField>
-                        <FormField label="Qtd. padrão *">
+                        <FormField label={tr('Qtd. padrão *')}>
                           <Input
                             type="number" min="1"
                             value={estoqueQtdPadrao}
@@ -3895,16 +3896,16 @@ export default function RecepcaoPage() {
           size="sm"
           title={
             serviceModal.type === 'limpeza'
-              ? <><Sparkles size={15} /> Acionar Limpeza — Apt. {serviceModal.room.numero}</>
+              ? <><Sparkles size={15} /> {tr('Acionar Limpeza — Apt.')} {serviceModal.room.numero}</>
               : serviceModal.type === 'manutencao'
-              ? <><Wrench size={15} /> Acionar Manutenção — Apt. {serviceModal.room.numero}</>
-              : <><AlertTriangle size={15} /> Fora de Serviço — Apt. {serviceModal.room.numero}</>
+              ? <><Wrench size={15} /> {tr('Acionar Manutenção — Apt.')} {serviceModal.room.numero}</>
+              : <><AlertTriangle size={15} /> {tr('Fora de Serviço — Apt.')} {serviceModal.room.numero}</>
           }
           footer={
             <div className={styles.footerRight}>
               <Button variant="primary" onClick={handleService} disabled={saving}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                Confirmar
+                {tr('Confirmar')}
               </Button>
             </div>
           }
@@ -3912,13 +3913,13 @@ export default function RecepcaoPage() {
           <div className={styles.formStack}>
             {serviceModal.type === 'limpeza' ? (
               <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>Selecione o funcionário</label>
+                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)', display: 'block', marginBottom: 8 }}>{tr('Selecione o funcionário')}</label>
                 {funcLoading ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-2)', fontSize: 13 }}>
-                    <Loader2 size={13} className={styles.spin} /> Carregando...
+                    <Loader2 size={13} className={styles.spin} /> {tr('Carregando...')}
                   </div>
                 ) : funcList.length === 0 ? (
-                  <div style={{ color: 'var(--text-2)', fontSize: 13 }}>Nenhum funcionário disponível</div>
+                  <div style={{ color: 'var(--text-2)', fontSize: 13 }}>{tr('Nenhum funcionário disponível')}</div>
                 ) : (
                   <div className={styles.funcList}>
                     {funcList.map((f) => (
@@ -3936,23 +3937,23 @@ export default function RecepcaoPage() {
                 )}
               </div>
             ) : (<>
-              <FormField label="Responsável">
-                <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder="Nome do responsável (opcional)" />
+              <FormField label={tr('Responsável')}>
+                <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder={tr('Nome do responsável (opcional)')} />
               </FormField>
               {serviceModal.type === 'manutencao' && (
                 <div className={styles.grid2}>
-                  <FormField label="Início (data e hora)">
+                  <FormField label={tr('Início (data e hora)')}>
                     <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraInicio}
                       onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
                   </FormField>
-                  <FormField label="Término (data e hora)">
+                  <FormField label={tr('Término (data e hora)')}>
                     <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraFim}
                       onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
                   </FormField>
                 </div>
               )}
-              <FormField label="Descrição">
-                <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder="Descreva o serviço a ser realizado" />
+              <FormField label={tr('Descrição')}>
+                <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder={tr('Descreva o serviço a ser realizado')} />
               </FormField>
             </>)}
           </div>
@@ -3967,38 +3968,38 @@ export default function RecepcaoPage() {
           open
           onClose={closeAddQuarto}
           size="sm"
-          title={<><Plus size={15} /> {roomForm.editing ? `Editar Quarto ${roomForm.numero}` : 'Adicionar Quarto'}</>}
+          title={<><Plus size={15} /> {roomForm.editing ? tr('Editar Quarto {{numero}}', { numero: roomForm.numero }) : tr('Adicionar Quarto')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={closeAddQuarto} disabled={savingRoom}>Cancelar</Button>
+              <Button variant="secondary" className={styles.addRoomCancelBtn} onClick={closeAddQuarto} disabled={savingRoom}>{tr('Cancelar')}</Button>
               <Button variant="primary" className={styles.addRoomSaveBtn} onClick={handleSaveRoom} disabled={savingRoom}>
-                {savingRoom ? <><Loader2 size={14} className={styles.spin} /> Salvando...</> : (roomForm.editing ? 'Salvar alterações' : 'Salvar quarto')}
+                {savingRoom ? <><Loader2 size={14} className={styles.spin} /> {tr('Salvando...')}</> : (roomForm.editing ? tr('Salvar alterações') : tr('Salvar quarto'))}
               </Button>
             </div>
           }
         >
           <div className={styles.addRoomModal}>
             <div className={styles.grid2}>
-              <FormField label="Número *">
+              <FormField label={tr('Número *')}>
                 <Input className={styles.addRoomField} type="number" value={roomForm.numero}
                   onChange={(e) => setRF('numero', e.target.value)}
-                  readOnly={roomForm.editing} placeholder={`Ex: ${nextRoomNumero}`} />
+                  readOnly={roomForm.editing} placeholder={tr('Ex: {{nextRoomNumero}}', { nextRoomNumero })} />
               </FormField>
-              <FormField label="Categoria *">
+              <FormField label={tr('Categoria *')}>
                 <Select className={styles.addRoomField} value={roomForm.categoriaId} onChange={(e) => setRF('categoriaId', e.target.value)}>
-                  <option value="">Categoria do quarto</option>
+                  <option value="">{tr('Categoria do quarto')}</option>
                   {apiCategories.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </Select>
               </FormField>
             </div>
 
             {/* Descrição (campo principal) + Tipo de Ocupação (multi-select mesclado) */}
-            <FormField label="Descrição">
+            <FormField label={tr('Descrição')}>
               <Input
                 className={styles.addRoomField}
                 value={roomForm.descricao}
                 readOnly
-                placeholder="Selecione os tipos de ocupação abaixo..."
+                placeholder={tr('Selecione os tipos de ocupação abaixo...')}
               />
               <div className={styles.tipoChips}>
                 {TIPOS_OCUPACAO.map((t) => {
@@ -4017,25 +4018,25 @@ export default function RecepcaoPage() {
               </div>
             </FormField>
 
-            <FormField label="Qtd. máx. de pessoas">
+            <FormField label={tr('Qtd. máx. de pessoas')}>
               <Input className={styles.addRoomField} type="number" min="1" max="10" value={roomForm.quantidade_pessoas}
-                onChange={(e) => setRF('quantidade_pessoas', e.target.value)} placeholder="Ex: 2" />
+                onChange={(e) => setRF('quantidade_pessoas', e.target.value)} placeholder={tr('Ex: 2')} />
             </FormField>
 
             <div className={styles.addRoomBedsGrid}>
-              <FormField label="Camas de casal">
+              <FormField label={tr('Camas de casal')}>
                 <Input className={styles.addRoomField} type="number" min="0" value={roomForm.casal}
                   onChange={(e) => setRF('casal', e.target.value)} placeholder="0" />
               </FormField>
-              <FormField label="Camas solteiro">
+              <FormField label={tr('Camas solteiro')}>
                 <Input className={styles.addRoomField} type="number" min="0" value={roomForm.solteiro}
                   onChange={(e) => setRF('solteiro', e.target.value)} placeholder="0" />
               </FormField>
-              <FormField label="Beliches">
+              <FormField label={tr('Beliches')}>
                 <Input className={styles.addRoomField} type="number" min="0" value={roomForm.beliche}
                   onChange={(e) => setRF('beliche', e.target.value)} placeholder="0" />
               </FormField>
-              <FormField label="Redes">
+              <FormField label={tr('Redes')}>
                 <Input className={styles.addRoomField} type="number" min="0" value={roomForm.rede}
                   onChange={(e) => setRF('rede', e.target.value)} placeholder="0" />
               </FormField>
@@ -4052,16 +4053,16 @@ export default function RecepcaoPage() {
           open
           onClose={() => setShowDetailAddHospede(false)}
           size="sm"
-          title={<><User size={15} /> Adicionar Hóspede</>}
+          title={<><User size={15} /> {tr('Adicionar Hóspede')}</>}
           footer={
             <div className={styles.footerRight}>
-              <Button variant="secondary" onClick={() => setShowDetailAddHospede(false)}>Cancelar</Button>
+              <Button variant="secondary" onClick={() => setShowDetailAddHospede(false)}>{tr('Cancelar')}</Button>
               <Button
                 variant="primary"
                 disabled={!detailHospedeSelected}
-                onClick={() => { notify('Em desenvolvimento'); setShowDetailAddHospede(false); }}
+                onClick={() => { notify(tr('Em desenvolvimento')); setShowDetailAddHospede(false); }}
               >
-                Adicionar
+                {tr('Adicionar')}
               </Button>
             </div>
           }
@@ -4070,7 +4071,7 @@ export default function RecepcaoPage() {
             <Input
               value={detailHospedeSearch}
               onChange={(e) => { setDetailHospedeSearch(e.target.value); setDetailHospedeSelected(null); }}
-              placeholder="Buscar por nome..."
+              placeholder={tr('Buscar por nome...')}
             />
             {detailHospResults.length > 0 && (
               <div className={styles.guestList}>
@@ -4124,7 +4125,7 @@ export default function RecepcaoPage() {
             onClose={() => { setShowAlterarPessoas(false); setApSearch(''); setApSearchResults([]); }}
             size="md"
             bodyStyle={{ padding: 0 }}
-            title={<><Users size={15} /> Gerenciar Pessoas</>}
+            title={<><Users size={15} /> {tr('Gerenciar Pessoas')}</>}
           >
             {/* Diária selector */}
             {_diarias.length > 1 && (
@@ -4134,8 +4135,8 @@ export default function RecepcaoPage() {
                   <button type="button" className={styles.diariaComboTrigger} onClick={() => setApComboOpen((v) => !v)}>
                     <span className={styles.diariaComboLabel}>
                       {_selDiaria
-                        ? `Diária ${_selDiaria.num ?? apDiariaIdx + 1}${_selDiaria.dataInicio ? ` — ${_selDiaria.dataInicio} → ${_selDiaria.dataFim}` : ''}`
-                        : 'Selecione uma diária'}
+                        ? tr('Diária {{v0}}{{v1}}', { v0: _selDiaria.num ?? apDiariaIdx + 1, v1: _selDiaria.dataInicio ? ` — ${_selDiaria.dataInicio} → ${_selDiaria.dataFim}` : '' })
+                        : tr('Selecione uma diária')}
                     </span>
                     <ChevronDown size={13} className={apComboOpen ? styles.diariaComboChevronOpen : styles.diariaComboChevron} />
                   </button>
@@ -4146,7 +4147,7 @@ export default function RecepcaoPage() {
                           className={[styles.diariaComboOption, i === apDiariaIdx ? styles.diariaComboOptionActive : ''].join(' ')}
                           onClick={() => { setApDiariaIdx(i); setApComboOpen(false); }}>
                           <span className={styles.diariaComboOptionLabel}>
-                            Diária {d.num ?? i + 1}{d.dataInicio ? ` — ${d.dataInicio} → ${d.dataFim}` : ''}
+                            {tr('Diária')} {d.num ?? i + 1}{d.dataInicio ? ` — ${d.dataInicio} → ${d.dataFim}` : ''}
                           </span>
                         </div>
                       ))}
@@ -4159,7 +4160,7 @@ export default function RecepcaoPage() {
             {/* Guests in selected diária */}
             <div className={styles.apHospedesBody}>
               {_hospedes.length === 0 ? (
-                <div className={styles.emptyList}><User size={20} color="var(--text-2)" /><span>Sem hóspedes nesta diária</span></div>
+                <div className={styles.emptyList}><User size={20} color="var(--text-2)" /><span>{tr('Sem hóspedes nesta diária')}</span></div>
               ) : (
                 <div className={styles.ovGuestTable}>
                   {_hospedes.map((h, idx) => (
@@ -4168,14 +4169,14 @@ export default function RecepcaoPage() {
                       <div className={styles.ovGuestInfo}>
                         <div className={styles.ovGuestName}>
                           {h.nome}
-                          {(h.titular || idx === 0) && <span className={styles.titularTag}>Titular</span>}
+                          {(h.titular || idx === 0) && <span className={styles.titularTag}>{tr('Titular')}</span>}
                         </div>
                         {h.telefone && <div className={styles.ovGuestMeta}>{h.telefone}</div>}
                       </div>
                       <div className={styles.contactActions}>
                         {!h.titular && idx !== 0 && (
-                          <button type="button" className={styles.quickBtn} title="Tornar Titular"
-                            onClick={() => notify('Troca de titular indisponível pela API.', 'info')}>
+                          <button type="button" className={styles.quickBtn} title={tr('Tornar Titular')}
+                            onClick={() => notify(tr('Troca de titular indisponível pela API.'), 'info')}>
                             <ArrowLeftRight size={11} />
                           </button>
                         )}
@@ -4195,11 +4196,11 @@ export default function RecepcaoPage() {
               <Input
                 value={apSearch}
                 onChange={(e) => { setApSearch(e.target.value); }}
-                placeholder="Buscar pessoa para adicionar..."
+                placeholder={tr('Buscar pessoa para adicionar...')}
               />
               {apSearchLoading && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 0', color: 'var(--text-2)', fontSize: 12 }}>
-                  <Loader2 size={12} className={styles.spin} /> Buscando...
+                  <Loader2 size={12} className={styles.spin} /> {tr('Buscando...')}
                 </div>
               )}
               {!apSearchLoading && apSearchResults.length > 0 && (
@@ -4256,16 +4257,16 @@ export default function RecepcaoPage() {
             open
             onClose={() => setShowGerenciarPag(false)}
             size="sm"
-            title={<><CreditCard size={15} /> Gerenciar Pagamentos</>}
+            title={<><CreditCard size={15} /> {tr('Gerenciar Pagamentos')}</>}
             footer={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 {gi ? (
                   <span style={{ fontSize: 12, color: 'var(--text-2)' }}>
-                    Pago (Grupo · {gi.count} apt{gi.count !== 1 ? 's' : ''}): <b style={{ color: 'var(--text)' }}>{fmtBRL(gi.pago)}</b>
-                    {gi.pendente > 0 && <> · Pendente <b style={{ color: '#f97316' }}>{fmtBRL(gi.pendente)}</b></>}
+                    {tr('Pago (Grupo ·')} {gi.count} {tr('apt')}{gi.count !== 1 ? 's' : ''}): <b style={{ color: 'var(--text)' }}>{fmtBRL(gi.pago)}</b>
+                    {gi.pendente > 0 && <> {tr('· Pendente')} <b style={{ color: '#f97316' }}>{fmtBRL(gi.pendente)}</b></>}
                   </span>
                 ) : (
-                  pags.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>
+                  pags.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{tr('Total:')} <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>
                 )}
                 <div style={{ marginLeft: 'auto' }}>
                   <Button variant="primary" size="sm" onClick={() => {
@@ -4273,18 +4274,18 @@ export default function RecepcaoPage() {
                     openPayModal(async (pag) => {
                       const updated = await overviewApi.adicionarPagamento(selectedRoom.id, pag);
                       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
-                      notify(`Pagamento de ${fmtBRL(pag.valor)} registrado.`);
+                      notify(tr('Pagamento de {{v0}} registrado.', { v0: fmtBRL(pag.valor) }));
                       setShowGerenciarPag(true);
                     }, sv.titularNome);
                   }}>
-                    <Plus size={13} /> Adicionar
+                    <Plus size={13} /> {tr('Adicionar')}
                   </Button>
                 </div>
               </div>
             }
           >
             {pags.length === 0 ? (
-              <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>Nenhum pagamento registrado</span></div>
+              <div className={styles.emptyList}><CreditCard size={24} color="var(--text-2)" /><span>{tr('Nenhum pagamento registrado')}</span></div>
             ) : (
               <div className={styles.itemList}>
                 {pags.map((p) => (
@@ -4299,16 +4300,16 @@ export default function RecepcaoPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span className={[styles.listItemValue, styles.valueGreen].join(' ')}>{fmtBRL(p.valor)}</span>
-                      <button className={styles.quickBtn} title="Editar" disabled={saving}
+                      <button className={styles.quickBtn} title={tr('Editar')} disabled={saving}
                         onClick={() => {
                           setShowGerenciarPag(false);
                           setEditingPag(p);
                         }}>
                         <Pencil size={12} />
                       </button>
-                      <button className={styles.removeBtn} title="Cancelar pagamento" disabled={saving}
+                      <button className={styles.removeBtn} title={tr('Cancelar pagamento')} disabled={saving}
                         onClick={async () => {
-                          if (!window.confirm('Cancelar este pagamento?')) return;
+                          if (!window.confirm(tr('Cancelar este pagamento?'))) return;
                           await handleCancelarPagamento(p.id);
                         }}>
                         {saving ? <Loader2 size={12} className={styles.spin} /> : <Trash2 size={12} />}
@@ -4354,10 +4355,10 @@ export default function RecepcaoPage() {
             open
             onClose={() => setShowGerenciarConsumo(false)}
             size="sm"
-            title={<><ShoppingCart size={15} /> Gerenciar Consumos</>}
+            title={<><ShoppingCart size={15} /> {tr('Gerenciar Consumos')}</>}
             footer={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                {consumos.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>Total: <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>}
+                {consumos.length > 1 && <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{tr('Total:')} <b style={{ color: 'var(--text)' }}>{fmtBRL(total)}</b></span>}
                 <div style={{ marginLeft: 'auto' }}>
                   <Button variant="primary" size="sm" onClick={() => {
                     setShowGerenciarConsumo(false);
@@ -4370,14 +4371,14 @@ export default function RecepcaoPage() {
                     setConsumoCatsLoading(true);
                     itemApi.estoque().then((r) => setConsumoCats(r?.categorias ?? [])).catch(() => {}).finally(() => setConsumoCatsLoading(false));
                   }}>
-                    <Plus size={13} /> Adicionar
+                    <Plus size={13} /> {tr('Adicionar')}
                   </Button>
                 </div>
               </div>
             }
           >
             {consumos.length === 0 ? (
-              <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>Nenhum consumo registrado</span></div>
+              <div className={styles.emptyList}><ShoppingCart size={24} color="var(--text-2)" /><span>{tr('Nenhum consumo registrado')}</span></div>
             ) : (
               <div className={styles.itemList}>
                 {consumos.map((c, i) => (
@@ -4388,16 +4389,16 @@ export default function RecepcaoPage() {
                         <div className={styles.listItemName}>{c.item}</div>
                         <div className={styles.listItemSub}>
                           {c.categoria}{c.quantidade ? ` · ×${c.quantidade}` : ''}
-                          {c.valorUnitario > 0 ? ` · ${fmtBRL(c.valorUnitario)}/un.` : ''}
-                          {c.despesaPessoal ? ' · Despesa pessoal' : ''}
+                          {c.valorUnitario > 0 ? tr(' · {{v0}}/un.', { v0: fmtBRL(c.valorUnitario) }) : ''}
+                          {c.despesaPessoal ? tr(' · Despesa pessoal') : ''}
                         </div>
                       </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span className={styles.listItemValue}>{fmtBRL(c.valorTotal)}</span>
-                      <button className={styles.removeBtn} title="Remover consumo" disabled={saving}
+                      <button className={styles.removeBtn} title={tr('Remover consumo')} disabled={saving}
                         onClick={async () => {
-                          if (!window.confirm(`Remover "${c.item}"?`)) return;
+                          if (!window.confirm(tr('Remover "{{item}}"?', { item: c.item }))) return;
                           await handleRemoverConsumo(c.id);
                         }}>
                         {saving ? <Loader2 size={12} className={styles.spin} /> : <Trash2 size={12} />}
@@ -4435,9 +4436,9 @@ export default function RecepcaoPage() {
                 };
                 const updated = await overviewApi.gerenciarPreco(selectedRoom.id, body);
                 if (updated) setQuartos((prev) => prev.map((q) => (q.id === updated.id ? updated : q)));
-                notify('Preço atualizado.');
+                notify(tr('Preço atualizado.'));
               } catch (e) {
-                notify('Erro ao atualizar preço: ' + e.message, 'error');
+                notify(tr('Erro ao atualizar preço: ') + e.message, 'error');
               } finally {
                 setSaving(false);
               }
@@ -4450,7 +4451,7 @@ export default function RecepcaoPage() {
       {precoGrupoCtx && (
         <PriceAdjustmentModal
           open
-          title="Gerenciar Preços — Grupo"
+          title={tr('Gerenciar Preços — Grupo')}
           allowDiaria={false}
           baseTotal={precoGrupoCtx.groupBase}
           baseDiarias={[]}

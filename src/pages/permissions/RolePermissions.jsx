@@ -11,6 +11,7 @@ import { Notification }          from '../../components/ui/Notification';
 import { cargoApi } from '../../services/api';
 
 import styles from './RolePermissions.module.css';
+import { tr } from '../../i18n';
 
 const PAGE_SIZE = 10;
 const up = v => (v ?? '').toUpperCase().trim();
@@ -41,7 +42,7 @@ const sk = (...extra) => [styles.sk, ...extra].join(' ');
 
 function SkeletonLista({ linhas = 7 }) {
   return (
-    <div role="status" aria-label="Carregando cargos">
+    <div role="status" aria-label={tr('Carregando cargos')}>
       {Array.from({ length: linhas }, (_, i) => (
         <div key={i} className={styles.listItem} aria-hidden="true">
           <span className={styles.listItemBody}>
@@ -56,7 +57,7 @@ function SkeletonLista({ linhas = 7 }) {
 
 function SkeletonPainel() {
   return (
-    <div className={styles.statGrid} role="status" aria-label="Carregando totais">
+    <div className={styles.statGrid} role="status" aria-label={tr('Carregando totais')}>
       {Array.from({ length: 3 }, (_, i) => (
         <div key={i} className={styles.statCard} aria-hidden="true">
           <span className={sk(styles.skLabel)} />
@@ -124,7 +125,7 @@ export default function RolePermissions() {
       ));
       if (Object.keys(map).length) setPermDescMap(prev => ({ ...prev, ...map }));
     } catch (err) {
-      notify(err.message || 'Erro ao carregar cargos', 'error');
+      notify(err.message || tr('Erro ao carregar cargos'), 'error');
     } finally {
       setLoading(false);
       setSearchLoading(false);
@@ -327,7 +328,7 @@ export default function RolePermissions() {
   // ── create ────────────────────────────────────────────────
   const handleCreate = async () => {
     const desc = up(formDescricao);
-    if (!desc) { notify('Informe o nome do cargo', 'error'); return; }
+    if (!desc) { notify(tr('Informe o nome do cargo'), 'error'); return; }
     setSaving(true);
     try {
       await cargoApi.criar({
@@ -335,11 +336,11 @@ export default function RolePermissions() {
         telas: [...formTelasIds].map(id => ({ id })),
         permissoes: [...formPermissoesIds].map(id => ({ id })),
       });
-      notify('Cargo criado com sucesso!');
+      notify(tr('Cargo criado com sucesso!'));
       setFormModal(false);
       loadCargos(0, search);
     } catch (err) {
-      notify(err.message || 'Erro ao criar cargo', 'error');
+      notify(err.message || tr('Erro ao criar cargo'), 'error');
     } finally {
       setSaving(false);
     }
@@ -348,7 +349,7 @@ export default function RolePermissions() {
   // ── update ────────────────────────────────────────────────
   const handleUpdate = async () => {
     const desc = up(formDescricao);
-    if (!desc) { notify('Informe o nome do cargo', 'error'); return; }
+    if (!desc) { notify(tr('Informe o nome do cargo'), 'error'); return; }
     setSaving(true);
     try {
       await cargoApi.atualizar({
@@ -357,11 +358,11 @@ export default function RolePermissions() {
         telas: [...formTelasIds].map(id => ({ id })),
         permissoes: [...formPermissoesIds].map(id => ({ id })),
       });
-      notify('Cargo atualizado com sucesso!');
+      notify(tr('Cargo atualizado com sucesso!'));
       setFormModal(false);
       loadCargos(page, search);
     } catch (err) {
-      notify(err.message || 'Erro ao atualizar cargo', 'error');
+      notify(err.message || tr('Erro ao atualizar cargo'), 'error');
     } finally {
       setSaving(false);
     }
@@ -389,14 +390,14 @@ export default function RolePermissions() {
               <Input
                 value={search}
                 onChange={handleSearch}
-                placeholder="Buscar cargo..."
+                placeholder={tr('Buscar cargo...')}
                 className={styles.searchInput}
-                aria-label="Buscar"
+                aria-label={tr('Buscar')}
               />
               {searchLoading
                 ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
                 : search.length > 0 && (
-                  <button className={styles.searchClear} onClick={clearSearch} aria-label="Limpar busca">
+                  <button className={styles.searchClear} onClick={clearSearch} aria-label={tr('Limpar busca')}>
                     <X size={14} />
                   </button>
                 )}
@@ -404,11 +405,11 @@ export default function RolePermissions() {
 
             <div className={styles.listMeta}>
               <span>
-                {loading ? 'Carregando...' : `${totalElements} cargo${totalElements !== 1 ? 's' : ''}`}
+                {loading ? tr('Carregando...') : `${totalElements} cargo${totalElements !== 1 ? 's' : ''}`}
               </span>
               <Button className={[styles.btnSolid, styles.btnSm, styles.btnPrimary].join(' ')}
                 onClick={openCreate}>
-                Novo cargo
+                {tr('Novo cargo')}
               </Button>
             </div>
 
@@ -418,7 +419,7 @@ export default function RolePermissions() {
               ) : cargos.length === 0 ? (
                 <div className={styles.empty}>
                   <ShieldCheck size={24} opacity={0.3} />
-                  <span>{search ? 'Nenhum cargo encontrado.' : 'Nenhum cargo cadastrado.'}</span>
+                  <span>{search ? tr('Nenhum cargo encontrado.') : tr('Nenhum cargo cadastrado.')}</span>
                 </div>
               ) : cargos.map(cargo => {
                 const telas = cargo.telas ?? [];
@@ -445,12 +446,12 @@ export default function RolePermissions() {
             {totalPages > 1 && (
               <div className={styles.pagination}>
                 <button className={styles.pageBtn} disabled={page === 0}
-                  onClick={() => handlePageChange(page - 1)} aria-label="Página anterior">
+                  onClick={() => handlePageChange(page - 1)} aria-label={tr('Página anterior')}>
                   <ChevronLeft size={16} />
                 </button>
-                <span className={styles.pageCurrent}>{page + 1} de {totalPages}</span>
+                <span className={styles.pageCurrent}>{page + 1} {tr('de')} {totalPages}</span>
                 <button className={styles.pageBtn} disabled={page >= totalPages - 1}
-                  onClick={() => handlePageChange(page + 1)} aria-label="Próxima página">
+                  onClick={() => handlePageChange(page + 1)} aria-label={tr('Próxima página')}>
                   <ChevronRight size={16} />
                 </button>
               </div>
@@ -464,7 +465,7 @@ export default function RolePermissions() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <ShieldCheck size={16} />
-                  <span className={styles.dCardTitle}>Visão geral de acessos</span>
+                  <span className={styles.dCardTitle}>{tr('Visão geral de acessos')}</span>
                 </h3>
 
                 <div className={styles.dCardBody}>
@@ -473,15 +474,15 @@ export default function RolePermissions() {
                   ) : (
                     <div className={styles.statGrid}>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Cargos</p>
+                        <p className={styles.statLabel}>{tr('Cargos')}</p>
                         <p className={styles.statVal}>{totalElements}</p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Telas do sistema</p>
+                        <p className={styles.statLabel}>{tr('Telas do sistema')}</p>
                         <p className={styles.statVal}>{systemTelas.length}</p>
                       </div>
                       <div className={styles.statCard}>
-                        <p className={styles.statLabel}>Permissões do sistema</p>
+                        <p className={styles.statLabel}>{tr('Permissões do sistema')}</p>
                         <p className={styles.statVal}>{totalPermsSistema}</p>
                       </div>
                     </div>
@@ -490,7 +491,7 @@ export default function RolePermissions() {
               </section>
 
               <div className={styles.detailHint}>
-                Escolha um cargo na lista ao lado para ver as telas e permissões.
+                {tr('Escolha um cargo na lista ao lado para ver as telas e permissões.')}
               </div>
             </div>
           ) : (
@@ -501,17 +502,17 @@ export default function RolePermissions() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
-                    title="Voltar para a lista" aria-label="Voltar para a lista">
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
                   <ShieldCheck size={16} />
-                  <span className={styles.dCardTitle}>Dados do cargo</span>
+                  <span className={styles.dCardTitle}>{tr('Dados do cargo')}</span>
                   <div className={styles.dCardActions}>
                     <Button className={styles.btnSolid} onClick={() => openEdit(selectedCargo)}>
-                      Editar
+                      {tr('Editar')}
                     </Button>
                     <button type="button" className={styles.idClose} onClick={closeDetail}
-                      title="Fechar ficha" aria-label="Fechar ficha">
+                      title={tr('Fechar ficha')} aria-label={tr('Fechar ficha')}>
                       <X size={16} />
                     </button>
                   </div>
@@ -526,7 +527,7 @@ export default function RolePermissions() {
                       </div>
                       {telasDoCargo.length === 0 && (
                         <div className={styles.idTags}>
-                          <span className={[styles.tag, styles.tagMuted].join(' ')}>Sem acesso a nenhuma tela</span>
+                          <span className={[styles.tag, styles.tagMuted].join(' ')}>{tr('Sem acesso a nenhuma tela')}</span>
                         </div>
                       )}
                     </div>
@@ -536,13 +537,13 @@ export default function RolePermissions() {
                       do sistema este cargo alcança. */}
                   <div className={styles.fieldGrid}>
                     <Field
-                      label="Telas com acesso"
+                      label={tr('Telas com acesso')}
                       value={systemDataLoaded
                         ? `${telasDoCargo.length} de ${systemTelas.length}`
                         : telasDoCargo.length}
                     />
                     <Field
-                      label="Permissões concedidas"
+                      label={tr('Permissões concedidas')}
                       value={systemDataLoaded && totalPermsSistema > 0
                         ? `${permsDoCargo} de ${totalPermsSistema}`
                         : permsDoCargo}
@@ -555,12 +556,12 @@ export default function RolePermissions() {
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
                   <Lock size={16} />
-                  <span className={styles.dCardTitle}>Telas e permissões</span>
+                  <span className={styles.dCardTitle}>{tr('Telas e permissões')}</span>
                 </h3>
 
                 <div className={styles.dCardBody}>
                   {telasDoCargo.length === 0 ? (
-                    <p className={styles.blockEmpty}>Nenhuma tela vinculada a este cargo.</p>
+                    <p className={styles.blockEmpty}>{tr('Nenhuma tela vinculada a este cargo.')}</p>
                   ) : (
                     <div className={styles.telaGrid}>
                       {telasDoCargo.map(tela => {
@@ -578,7 +579,7 @@ export default function RolePermissions() {
                             )}
 
                             {perms.length === 0 ? (
-                              <p className={styles.permEmpty}>Sem permissões específicas.</p>
+                              <p className={styles.permEmpty}>{tr('Sem permissões específicas.')}</p>
                             ) : (
                               <div className={styles.permList}>
                                 {perms.map(p => (
@@ -606,12 +607,12 @@ export default function RolePermissions() {
       <Modal
         open={formModal}
         onClose={() => setFormModal(false)}
-        title={isEditing ? `Editar: ${selectedCargo?.descricao ?? ''}` : 'Novo Cargo'}
+        title={isEditing ? tr('Editar: {{v0}}', { v0: selectedCargo?.descricao ?? '' }) : tr('Novo Cargo')}
         size="md"
         footer={
           <div className={styles.modalFooter}>
             <Button variant="secondary" className={styles.full} onClick={() => setFormModal(false)} disabled={saving}>
-              Cancelar
+              {tr('Cancelar')}
             </Button>
             <Button
               variant="primary"
@@ -620,15 +621,15 @@ export default function RolePermissions() {
               disabled={saving}
             >
               {saving && <Loader2 size={14} className={styles.spin} />}
-              {isEditing ? 'Salvar alterações' : 'Criar cargo'}
+              {isEditing ? tr('Salvar alterações') : tr('Criar cargo')}
             </Button>
           </div>
         }
       >
         <div className={styles.formBody}>
-          <FormField label="Nome do cargo *">
+          <FormField label={tr('Nome do cargo *')}>
             <Input
-              placeholder="Ex: GERENTE, RECEPCIONISTA..."
+              placeholder={tr('Ex: GERENTE, RECEPCIONISTA...')}
               value={formDescricao}
               onChange={e => setFormDescricao(e.target.value.toUpperCase())}
               disabled={saving}
@@ -640,16 +641,16 @@ export default function RolePermissions() {
           <div className={styles.telasSection}>
             <div className={styles.telasSectionTitle}>
               <Lock size={12} />
-              Telas e Permissões
+              {tr('Telas e Permissões')}
             </div>
 
             {!systemDataLoaded ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', color: 'var(--text-2)', fontSize: 13 }}>
                 <Loader2 size={14} className={styles.spin} />
-                Carregando telas…
+                {tr('Carregando telas…')}
               </div>
             ) : systemTelas.length === 0 ? (
-              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Nenhuma tela disponível</div>
+              <div style={{ fontSize: 13, color: 'var(--text-2)' }}>{tr('Nenhuma tela disponível')}</div>
             ) : (
               systemTelas.map(tela => {
                 const isChecked    = formTelasIds.has(tela.id);
@@ -682,7 +683,7 @@ export default function RolePermissions() {
                     {/* permissões (só quando a tela está ativa) */}
                     {isChecked && (
                       !perms || perms.length === 0 ? (
-                        <div className={styles.permissaoEmpty}>Nenhuma permissão disponível para esta tela</div>
+                        <div className={styles.permissaoEmpty}>{tr('Nenhuma permissão disponível para esta tela')}</div>
                       ) : (
                         <>
                           {/* Acesso Total */}
@@ -693,9 +694,9 @@ export default function RolePermissions() {
                               checked={hasTotal}
                               onChange={() => toggleAcessoTotal(tela.id)}
                             />
-                            <span className={styles.acessoTotalLabel}>Acesso Total</span>
+                            <span className={styles.acessoTotalLabel}>{tr('Acesso Total')}</span>
                             {hasTotal && (
-                              <span className={styles.acessoTotalBadge}>Todas selecionadas</span>
+                              <span className={styles.acessoTotalBadge}>{tr('Todas selecionadas')}</span>
                             )}
                           </label>
 
@@ -751,7 +752,7 @@ export default function RolePermissions() {
 // Só as duas primeiras telas cabem na linha da lista; o resto vira "+n".
 function TelaTags({ telas }) {
   if (!telas || telas.length === 0) {
-    return <span className={[styles.tag, styles.tagMuted].join(' ')}>Sem telas</span>;
+    return <span className={[styles.tag, styles.tagMuted].join(' ')}>{tr('Sem telas')}</span>;
   }
   const visible = telas.slice(0, 2);
   const rest    = telas.length - visible.length;

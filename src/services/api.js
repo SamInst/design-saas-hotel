@@ -1,3 +1,4 @@
+import { tr } from '../i18n';
 // ─────────────────────────────────────────────────────────────
 //  api.js  –  Serviço global de integração com o backend
 //  Base URL: produção (Heroku) ou local via VITE_API_URL
@@ -134,7 +135,7 @@ async function request(path, { method = 'GET', body, headers = {}, params, formD
     }
 
     const message =
-      data?.mensagem || data?.message || data?.error || data?.detail || `Erro ${res.status}`;
+      data?.mensagem || data?.message || data?.error || data?.detail || tr('Erro {{status}}', { status: res.status });
     const err = new Error(message);
     err.status = res.status;
     err.data   = data;
@@ -165,14 +166,14 @@ export const authApi = {
     try { data = await res.json(); } catch { data = null; }
 
     if (!res.ok) {
-      const message = data?.message || data?.error || 'Usuário ou senha inválidos';
+      const message = data?.message || data?.error || tr('Usuário ou senha inválidos');
       const err = new Error(message);
       err.status = res.status;
       throw err;
     }
 
     const token = data?.token;
-    if (!token) throw new Error('Token não recebido do servidor');
+    if (!token) throw new Error(tr('Token não recebido do servidor'));
 
     // Decodifica o payload JWT para extrair o objeto funcionario
     let funcionario;
@@ -180,7 +181,7 @@ export const authApi = {
       const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
       funcionario = payload.funcionario;
     } catch {
-      throw new Error('Erro ao processar autenticação');
+      throw new Error(tr('Erro ao processar autenticação'));
     }
 
     tokenStorage.set(token);
@@ -274,7 +275,7 @@ export const arquivoApi = {
       `${BASE_URL}/arquivo/download?path=${encodeURIComponent(path)}`,
       { headers },
     );
-    if (!res.ok) throw new Error('Erro ao baixar arquivo');
+    if (!res.ok) throw new Error(tr('Erro ao baixar arquivo'));
     const contentType = res.headers.get('Content-Type') || 'application/octet-stream';
     const buffer = await res.arrayBuffer();
     const blob   = new Blob([buffer], { type: contentType });
@@ -867,7 +868,7 @@ export const funcionarioApi = {
     try { data = await res.json(); } catch { data = null; }
 
     if (!res.ok) {
-      const message = data?.message || data?.error || data?.detail || `Erro ${res.status}`;
+      const message = data?.message || data?.error || data?.detail || tr('Erro {{status}}', { status: res.status });
       const err = new Error(message);
       err.status = res.status;
       err.data = data;
@@ -900,7 +901,7 @@ export const funcionarioApi = {
     try { data = await res.json(); } catch { data = null; }
 
     if (!res.ok) {
-      const message = data?.message || data?.error || data?.detail || `Erro ${res.status}`;
+      const message = data?.message || data?.error || data?.detail || tr('Erro {{status}}', { status: res.status });
       const err = new Error(message);
       err.status = res.status;
       err.data = data;

@@ -5,6 +5,7 @@ import { Modal }            from './Modal';
 import { Button }           from './Button';
 import { Input, Select, FormField } from './Input';
 import styles from './PaymentModal.module.css';
+import { tr } from '../../i18n';
 
 // ── Money helpers (same pattern as InventoryManagement) ──────
 const maskBRL = (v) => {
@@ -52,50 +53,50 @@ function DiscountModal({ open, onClose, onConfirm, valorBase = 0 }) {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Aplicar Desconto"
+    <Modal open={open} onClose={onClose} title={tr('Aplicar Desconto')}
       footer={
         <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
-          <Button variant="primary" onClick={handleConfirm} style={{ flex: 1 }}>Aplicar</Button>
+          <Button onClick={onClose} style={{ flex: 1 }}>{tr('Cancelar')}</Button>
+          <Button variant="primary" onClick={handleConfirm} style={{ flex: 1 }}>{tr('Aplicar')}</Button>
         </div>
       }>
       <div className={styles.tipoRow}>
         <button
           className={[styles.tipoBtn, tipo === 'porcentagem' ? styles.tipoBtnActive : ''].join(' ')}
           onClick={() => setTipo('porcentagem')}>
-          <Percent size={13} /> Porcentagem
+          <Percent size={13} /> {tr('Porcentagem')}
         </button>
         <button
           className={[styles.tipoBtn, tipo === 'fixo' ? styles.tipoBtnActive : ''].join(' ')}
           onClick={() => setTipo('fixo')}>
-          <DollarSign size={13} /> Valor Fixo
+          <DollarSign size={13} /> {tr('Valor Fixo')}
         </button>
       </div>
 
       {tipo === 'porcentagem' ? (
-        <FormField label="Porcentagem (%)">
-          <Input type="number" min="1" max="100" placeholder="Ex: 10"
+        <FormField label={tr('Porcentagem (%)')}>
+          <Input type="number" min="1" max="100" placeholder={tr('Ex: 10')}
             value={pct} onChange={e => setPct(e.target.value.replace(/[^0-9]/g, ''))} />
         </FormField>
       ) : (
-        <FormField label="Valor do Desconto (R$)">
-          <Input type="text" placeholder="R$ 0,00"
+        <FormField label={tr('Valor do Desconto (R$)')}>
+          <Input type="text" placeholder={tr('R$ 0,00')}
             value={fixo} onChange={e => setFixo(maskBRL(e.target.value))} />
         </FormField>
       )}
 
       <div className={styles.discountPreview}>
         <div className={styles.discountRow}>
-          <span>Valor original</span>
+          <span>{tr('Valor original')}</span>
           <b>{fmtBRL(valorBase)}</b>
         </div>
         <div className={styles.discountRow}>
-          <span>Desconto</span>
+          <span>{tr('Desconto')}</span>
           <b className={styles.discountMinus}>−{fmtBRL(valorBase - valorFinal)}</b>
         </div>
         <div className={styles.discountDivider} />
         <div className={styles.discountRow}>
-          <span>Valor final</span>
+          <span>{tr('Valor final')}</span>
           <b className={styles.discountFinal}>{fmtBRL(valorFinal)}</b>
         </div>
       </div>
@@ -276,16 +277,16 @@ export function PaymentModal({
 
   return (
     <>
-      <Modal open={open} onClose={onClose} title="Pagamento"
+      <Modal open={open} onClose={onClose} title={tr('Pagamento')}
         containerStyle={containerStyle}
         backdropStyle={backdropStyle}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
+            <Button onClick={onClose} style={{ flex: 1 }}>{tr('Cancelar')}</Button>
             <Button variant="primary" onClick={handleConfirm}
               disabled={localSubmitting || isSubmitting || !canConfirm}
               style={{ flex: 1 }}>
-              {(localSubmitting || isSubmitting) ? <><Loader2 size={13} className={styles.spin} /> Salvando...</> : 'Confirmar'}
+              {(localSubmitting || isSubmitting) ? <><Loader2 size={13} className={styles.spin} /> {tr('Salvando...')}</> : tr('Confirmar')}
             </Button>
           </div>
         }>
@@ -293,13 +294,13 @@ export function PaymentModal({
         {emGrupo && (
           <div className={styles.resumoList}>
             <div className={styles.resumoRow}>
-              <span>Total · grupo</span><span>{fmtBRL(grupoTotal)}</span>
+              <span>{tr('Total · grupo')}</span><span>{fmtBRL(grupoTotal)}</span>
             </div>
             <div className={[styles.resumoRow, styles.resumoGreen].join(' ')}>
-              <span>Pago · grupo</span><span>{fmtBRL(grupoPago)}</span>
+              <span>{tr('Pago · grupo')}</span><span>{fmtBRL(grupoPago)}</span>
             </div>
             <div className={[styles.resumoRow, grupoTotal - grupoPago > 0.005 ? styles.resumoDanger : styles.resumoGreen].join(' ')}>
-              <span>Pendente · grupo</span><span>{fmtBRL(Math.max(0, grupoTotal - grupoPago))}</span>
+              <span>{tr('Pendente · grupo')}</span><span>{fmtBRL(Math.max(0, grupoTotal - grupoPago))}</span>
             </div>
           </div>
         )}
@@ -307,13 +308,13 @@ export function PaymentModal({
         {valorTotal !== null && valorPago !== null && (
           <div className={[styles.resumoList, emGrupo ? styles.resumoListDivided : ''].join(' ')}>
             <div className={styles.resumoRow}>
-              <span>{emGrupo ? 'Total do pernoite' : 'Total'}</span><span>{fmtBRL(valorTotal)}</span>
+              <span>{emGrupo ? tr('Total do pernoite') : tr('Total')}</span><span>{fmtBRL(valorTotal)}</span>
             </div>
             <div className={[styles.resumoRow, styles.resumoGreen].join(' ')}>
-              <span>Pago</span><span>{fmtBRL(valorPago)}</span>
+              <span>{tr('Pago')}</span><span>{fmtBRL(valorPago)}</span>
             </div>
             <div className={[styles.resumoRow, valorTotal - valorPago > 0.005 ? styles.resumoDanger : styles.resumoGreen].join(' ')}>
-              <span>Pendente</span><span>{fmtBRL(Math.max(0, valorTotal - valorPago))}</span>
+              <span>{tr('Pendente')}</span><span>{fmtBRL(Math.max(0, valorTotal - valorPago))}</span>
             </div>
           </div>
         )}
@@ -321,10 +322,10 @@ export function PaymentModal({
         {valorTotal !== null && valorPago === null && (
           <div className={styles.resumoList}>
             <div className={styles.resumoRow}>
-              <span>Total dos itens</span><span>{fmtBRL(valorTotal)}</span>
+              <span>{tr('Total dos itens')}</span><span>{fmtBRL(valorTotal)}</span>
             </div>
             <div className={[styles.resumoRow, valorNum > 0 ? styles.resumoGreen : styles.resumoDanger].join(' ')}>
-              <span>A pagar</span><span>{valorNum > 0 ? fmtBRL(valorNum) : '—'}</span>
+              <span>{tr('A pagar')}</span><span>{valorNum > 0 ? fmtBRL(valorNum) : '—'}</span>
             </div>
           </div>
         )}
@@ -332,16 +333,16 @@ export function PaymentModal({
         {canDespesaPessoal && (
           <label className={styles.despesaPessoalRow}>
             <input type="checkbox" checked={despesaPessoal} onChange={e => setDespesaPessoal(e.target.checked)} />
-            <span>Despesa pessoal <span className={styles.despesaPessoalHint}>(sem cobrança)</span></span>
+            <span>{tr('Despesa pessoal')} <span className={styles.despesaPessoalHint}>{tr('(sem cobrança)')}</span></span>
           </label>
         )}
 
         {quartos.length > 0 && (
-          <FormField label="Quarto">
+          <FormField label={tr('Quarto')}>
             <Select value={quartoSel} onChange={e => setQuartoSel(e.target.value)}>
-              <option value="">Nenhum</option>
+              <option value="">{tr('Nenhum')}</option>
               {quartos.map(q => (
-                <option key={q.id} value={q.id}>{`Quarto ${q.id} - ${q.descricao}`}</option>
+                <option key={q.id} value={q.id}>{tr('Quarto {{id}} - {{descricao}}', { id: q.id, descricao: q.descricao })}</option>
               ))}
             </Select>
           </FormField>
@@ -350,13 +351,13 @@ export function PaymentModal({
         {despesaInternaEnabled && (
           <label className={styles.checkRow}>
             <input type="checkbox" checked={despesaInterna} onChange={e => setDespesaInterna(e.target.checked)} />
-            <span>Despesa interna do Hotel</span>
+            <span>{tr('Despesa interna do Hotel')}</span>
           </label>
         )}
 
         {!despesaPessoal && (
           <>
-            <FormField label="Nome do Pagador *">
+            <FormField label={tr('Nome do Pagador *')}>
               {(() => {
                 const up = lastPayerName?.toUpperCase();
                 const isDup = !up || up === titularNome?.toUpperCase() || up === loggedUser?.pessoa?.nome?.toUpperCase();
@@ -365,18 +366,18 @@ export function PaymentModal({
                     <input type="checkbox"
                       checked={nomePagador === up}
                       onChange={e => setNomePagador(e.target.checked ? up : '')} />
-                    <span>Último pagador: <b>{lastPayerName}</b></span>
+                    <span>{tr('Último pagador:')} <b>{lastPayerName}</b></span>
                   </label>
                 ) : null;
               })()}
-              <Input placeholder="Nome completo"
+              <Input placeholder={tr('Nome completo')}
                 value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
               {titularNome && (
                 <label className={styles.checkRow}>
                   <input type="checkbox"
                     checked={nomePagador === titularNome.toUpperCase()}
                     onChange={e => setNomePagador(e.target.checked ? titularNome.toUpperCase() : '')} />
-                  <span>Nome do titular</span>
+                  <span>{tr('Nome do titular')}</span>
                 </label>
               )}
               {loggedUser?.pessoa?.nome && (
@@ -384,7 +385,7 @@ export function PaymentModal({
                   <input type="checkbox"
                     checked={nomePagador === loggedUser.pessoa.nome.toUpperCase()}
                     onChange={e => setNomePagador(e.target.checked ? loggedUser.pessoa.nome.toUpperCase() : '')} />
-                  <span>Nome do funcionário</span>
+                  <span>{tr('Nome do funcionário')}</span>
                 </label>
               )}
             </FormField>
@@ -394,32 +395,32 @@ export function PaymentModal({
                 {metade != null && !excedeTeto(metade) && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is50} onChange={e => aplicar50(e.target.checked)} />
-                    <span>Pago 50% <b>({fmtBRL(metade)})</b></span>
+                    <span>{tr('Pago 50%')} <b>({fmtBRL(metade)})</b></span>
                   </label>
                 )}
                 {total100 != null && !excedeTeto(total100) && (
                   <label className={styles.checkRow}>
                     <input type="checkbox" checked={is100} onChange={e => aplicar100(e.target.checked)} />
-                    <span>Pago 100% <b>({fmtBRL(total100)})</b></span>
+                    <span>{tr('Pago 100%')} <b>({fmtBRL(total100)})</b></span>
                   </label>
                 )}
               </div>
             )}
 
             <div className={styles.rowGrid}>
-              <FormField label="Tipo de Pagamento *">
+              <FormField label={tr('Tipo de Pagamento *')}>
                 <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
-                  <option value="">Selecione...</option>
+                  <option value="">{tr('Selecione...')}</option>
                   {tiposPagamento.map(tp => (
                     <option key={tp.id} value={tp.id}>{tp.descricao}</option>
                   ))}
                 </Select>
               </FormField>
 
-              <FormField label={<>Valor *{maxPagavel !== null && (
-                <span className={styles.despesaPessoalHint}> · máx. {fmtBRL(maxPagavel)}</span>
+              <FormField label={<>{tr('Valor *')}{maxPagavel !== null && (
+                <span className={styles.despesaPessoalHint}> {tr('· máx.')} {fmtBRL(maxPagavel)}</span>
               )}</>}>
-                <Input type="text" placeholder="R$ 0,00"
+                <Input type="text" placeholder={tr('R$ 0,00')}
                   value={valor} onChange={e => handleValorChange(e.target.value)}
                   style={tipoRegistro === 'SAIDA'
                     ? { borderColor: '#f43f5e', color: '#f43f5e' }
@@ -430,8 +431,8 @@ export function PaymentModal({
                 {limiteAtingido && (
                   <div className={styles.limiteAviso}>
                     {maxPagavel > 0
-                      ? `O valor não pode passar do pendente (${fmtBRL(maxPagavel)}).`
-                      : 'Não há valor pendente para este pagamento.'}
+                      ? tr('O valor não pode passar do pendente ({{v0}}).', { v0: fmtBRL(maxPagavel) })
+                      : tr('Não há valor pendente para este pagamento.')}
                   </div>
                 )}
               </FormField>
@@ -440,8 +441,8 @@ export function PaymentModal({
         )}
 
         {!despesaPessoal && (
-          <FormField label="Descrição">
-            <Input placeholder="Descrição do pagamento"
+          <FormField label={tr('Descrição')}>
+            <Input placeholder={tr('Descrição do pagamento')}
               value={descricao} onChange={e => setDescricao(e.target.value.toUpperCase())} />
           </FormField>
         )}
@@ -451,7 +452,7 @@ export function PaymentModal({
           <div className={styles.descontoApplied}>
             <Tag size={12} />
             <span>
-              Desconto:&nbsp;
+              {tr('Desconto:')}&nbsp;
               {desconto.porcentagem !== undefined
                 ? `${desconto.porcentagem}%`
                 : fmtBRL(desconto.valor ?? 0)}
@@ -463,23 +464,23 @@ export function PaymentModal({
           </div>
         ) : (
           <button className={styles.addDesconto} onClick={() => setShowDesc(true)}>
-            <Tag size={12} /> Aplicar desconto
+            <Tag size={12} /> {tr('Aplicar desconto')}
           </button>
         ))}
 
         {/* Comprovante */}
-        {!despesaPessoal && <FormField label="Comprovante (opcional)">
+        {!despesaPessoal && <FormField label={tr('Comprovante (opcional)')}>
           {/* arquivo existente (edição) */}
           {arquivoAtual && !arquivoRemov && !arquivo && (
             <div className={styles.arquivoAtual}>
               <span className={styles.arquivoNome}>
                 {arquivoAtual.split(/[\\/]/).pop()}
               </span>
-              <button className={styles.arquivoBtn} title="Ver"
+              <button className={styles.arquivoBtn} title={tr('Ver')}
                 onClick={() => arquivoApi.abrir(arquivoAtual)}>
                 <Eye size={13} />
               </button>
-              <button className={styles.arquivoBtnRemove} title="Remover"
+              <button className={styles.arquivoBtnRemove} title={tr('Remover')}
                 onClick={() => setArquivoRemov(true)}>
                 <Trash2 size={13} />
               </button>
@@ -490,7 +491,7 @@ export function PaymentModal({
           {arquivo && (
             <div className={styles.arquivoAtual}>
               <span className={styles.arquivoNome}>{arquivo.name}</span>
-              <button className={styles.arquivoBtnRemove} title="Cancelar"
+              <button className={styles.arquivoBtnRemove} title={tr('Cancelar')}
                 onClick={() => { setArquivo(null); }}>
                 <X size={13} />
               </button>
@@ -501,7 +502,7 @@ export function PaymentModal({
           {(!arquivoAtual || arquivoRemov || arquivo) && !arquivo && (
             <label className={styles.fileLabel}>
               <FileUp size={13} />
-              <span>{arquivoRemov ? 'Selecionar novo arquivo...' : 'Selecionar arquivo...'}</span>
+              <span>{arquivoRemov ? tr('Selecionar novo arquivo...') : tr('Selecionar arquivo...')}</span>
               <input type="file" style={{ display: 'none' }}
                 accept="image/*,application/pdf"
                 onChange={e => setArquivo(e.target.files?.[0] ?? null)} />

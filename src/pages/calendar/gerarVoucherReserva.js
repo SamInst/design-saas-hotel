@@ -1,4 +1,5 @@
 import { NOME_HOTEL } from '../../constants/hotel';
+import { tr, locale } from '../../i18n';
 
 // Prefixo da linha de observação gerada ao ajustar o preço ("Gerenciar Preços").
 // É um registro interno e NÃO deve ser impresso no voucher.
@@ -20,7 +21,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
   const brl  = (v) => Number(v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const dt   = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
   const dias = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
-  const fn   = (n) => `${n} diária${n !== 1 ? 's' : ''}`;
+  const fn   = (n) => tr('{{n}} diária{{v1}}', { n, v1: n !== 1 ? 's' : '' });
   const rm   = (n) => String(n).padStart(2, '0');
   const addD = (s, n) => {
     const d2 = new Date(s + 'T00:00:00');
@@ -48,7 +49,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     const d = dias(p.checkin, p.checkout);
     const periodLabel = bandaUnica
       ? ''
-      : `<div class="periodo-band">Período ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>`;
+      : `<div class="periodo-band">${tr('Período')} ${pi + 1} &nbsp;·&nbsp; ${dt(p.checkin)} → ${dt(p.checkout)} · ${fn(d)}</div>`;
     let roomsHtml = '';
 
     p.rooms.forEach((quartoId) => {
@@ -83,7 +84,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
         for (let di = 0; di < d; di++) {
           detalhesHtml += `
             <div class="price-row">
-              <span class="price-desc">Diária ${di + 1} &nbsp; ${dt(addD(p.checkin, di))} → ${dt(addD(p.checkin, di + 1))}</span>
+              <span class="price-desc">${tr('Diária')} ${di + 1} &nbsp; ${dt(addD(p.checkin, di))} → ${dt(addD(p.checkin, di + 1))}</span>
               <span class="price-val">${brl(valorDiaria)}</span>
             </div>`;
         }
@@ -104,13 +105,13 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 
       roomsHtml += `
         <div class="room-block">
-          ${isOrcamento ? '' : `<div class="room-card"><div class="room-label">Apartamento ${desc || rm(quartoId)}</div></div>`}
+          ${isOrcamento ? '' : `<div class="room-card"><div class="room-label">${tr('Apartamento')} ${desc || rm(quartoId)}</div></div>`}
           ${hospedes.length > 0 ? `<div class="quarto-section">${hospedesHtml}</div>` : ''}
           ${detalhesHtml}
           ${sazHtml}
-          ${obs ? `<div><span class="obs-label">Observação</span><div class="obs-box">${obs.replace(/\n/g, '<br>')}</div></div>` : ''}
+          ${obs ? `<div><span class="obs-label">${tr('Observação')}</span><div class="obs-box">${obs.replace(/\n/g, '<br>')}</div></div>` : ''}
           <div class="total-row">
-            <span class="total-label">${umaDiaria ? '1 Diária' : 'Total'}</span>
+            <span class="total-label">${umaDiaria ? tr('1 Diária') : tr('Total')}</span>
             <span class="total-val">${brl(calc.valor_total)}</span>
           </div>
         </div>`;
@@ -128,8 +129,8 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
   const unicoBand = unico ? `<div class="periodo-band">${dt(unico.checkin)} → ${dt(unico.checkout)} · ${fn(unicoD)}</div>` : '';
 
   const totalRooms = [...new Set(displayPeriodos.flatMap((p) => p.rooms))].length;
-  const tipoLabel = totalRooms > 1 ? 'Vários Apartamentos' : 'Apartamento Único';
-  const modoLabel = bandaUnica ? 'Período único' : 'Múltiplos períodos';
+  const tipoLabel = totalRooms > 1 ? tr('Vários Apartamentos') : tr('Apartamento Único');
+  const modoLabel = bandaUnica ? tr('Período único') : tr('Múltiplos períodos');
 
   const titularNome = (solicitante?.nome || (() => {
     for (const p of displayPeriodos) {
@@ -146,7 +147,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     return `${pad(n.getDate())}-${pad(n.getMonth()+1)}-${n.getFullYear()} ${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
   })();
   // Título do documento: orçamento, ou personalizado (ex.: "Voucher de Hospedagem"), ou padrão
-  const headerTitle = isOrcamento ? 'Orçamento' : (titulo || 'Voucher de Reserva');
+  const headerTitle = isOrcamento ? tr('Orçamento') : (titulo || tr('Voucher de Reserva'));
   const docTitle = `${nowFmt} ${headerTitle.toUpperCase()}${titularNome ? ` | ${titularNome}` : ''}`;
 
   // ── Consumos (opcional) ─────────────────────────────────────
@@ -154,7 +155,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
   const consumosTotal = consumosList.reduce((s, c) => s + (c.valorTotal ?? 0), 0);
   const consumosHtml = consumosList.length > 0 ? `
     <div class="pags-section" style="margin-top:20px">
-      <div class="pags-title">Consumos</div>
+      <div class="pags-title">${tr('Consumos')}</div>
       ${consumosList.map((c) => `
         <div class="pag-row">
           <div class="pag-left">
@@ -164,7 +165,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
           <span class="pag-val" style="color:#0f172a">${brl(c.valorTotal)}</span>
         </div>`).join('')}
       <div class="pag-row" style="background:#f8fafc">
-        <div class="pag-left"><span class="pag-forma">Total de consumos</span></div>
+        <div class="pag-left"><span class="pag-forma">${tr('Total de consumos')}</span></div>
         <span class="pag-val" style="color:#0f172a">${brl(consumosTotal)}</span>
       </div>
     </div>` : '';
@@ -177,7 +178,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 
   const pagsHtml = pagamentos.length > 0 ? `
     <div class="pags-section" style="margin-top:20px">
-      <div class="pags-title">Pagamentos</div>
+      <div class="pags-title">${tr('Pagamentos')}</div>
       ${pagamentos.map((p) => {
         const dtPag = (() => {
           if (!p.dataRegistro) return '';
@@ -191,7 +192,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
             ${p.descricao ? `<span class="pag-forma">${p.descricao}</span>` : ''}
             ${p.nomePagador ? `<span class="pag-nome">${p.nomePagador}</span>` : ''}
             ${dtPag || p.formaPagamento ? `<span class="pag-data">${[dtPag, p.formaPagamento].filter(Boolean).join(' · ')}</span>` : ''}
-            ${p.funcionario ? `<span class="pag-func">registrado por ${p.funcionario}</span>` : ''}
+            ${p.funcionario ? `<span class="pag-func">${tr('registrado por {{nome}}', { nome: p.funcionario })}</span>` : ''}
           </div>
           <span class="pag-val"${isPagPendente(p.formaPagamento) ? ' style="color:#f97316"' : ''}>${brl(p.valor)}</span>
         </div>`;
@@ -202,14 +203,14 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
     ${consumosHtml}
     ${pagsHtml}
     <div class="price-strip" ${pagamentos.length === 0 && !consumosHtml ? 'style="margin-top:20px;border-radius:0 0 8px 8px;border-top:1px solid #e2e8f0"' : ''}>
-      ${pendente > 0 ? `<div class="price-strip-item">Pendente &nbsp;<b class="pendente-val">${brl(pendente)}</b></div><div class="price-strip-divider"></div>` : ''}
-      <div class="price-strip-item">Pago &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
+      ${pendente > 0 ? `<div class="price-strip-item">${tr('Pendente')} &nbsp;<b class="pendente-val">${brl(pendente)}</b></div><div class="price-strip-divider"></div>` : ''}
+      <div class="price-strip-item">${tr('Pago')} &nbsp;<b class="pago-val">${brl(totalPago)}</b></div>
       <div class="price-strip-divider"></div>
-      <div class="price-strip-item">Valor Total &nbsp;<b>${brl(totalGeral)}</b></div>
+      <div class="price-strip-item">${tr('Valor Total')} &nbsp;<b>${brl(totalGeral)}</b></div>
     </div>`;
 
 
-  const html = `<!DOCTYPE html><html lang="pt-BR"><head>
+  const html = `<!DOCTYPE html><html lang="${locale()}"><head>
   <meta charset="utf-8">
   <title>${docTitle}</title>
   <style>
@@ -272,11 +273,11 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 <div class="page">
   <div class="doc-header">
     <div class="doc-title">${NOME_HOTEL} &nbsp;|&nbsp; ${headerTitle}</div>
-    <div class="doc-sub">Gerado em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}${userName ? ` por ${userName}` : ''}</div>
+    <div class="doc-sub">${tr('Gerado em {{data}}', { data: new Date().toLocaleDateString(locale(), { day: '2-digit', month: 'long', year: 'numeric' }) })}${userName ? ` ${tr('por {{nome}}', { nome: userName })}` : ''}</div>
     <div class="info-grid"${titularNome ? ' style="grid-template-columns:repeat(3,1fr)"' : ''}>
-      ${titularNome ? `<div class="info-item"><label>Responsável</label><span>${titularNome}</span></div>` : ''}
-      <div class="info-item"><label>Tipo</label><span>${tipoLabel}</span></div>
-      <div class="info-item"><label>Modo</label><span>${modoLabel}</span></div>
+      ${titularNome ? `<div class="info-item"><label>${tr('Responsável')}</label><span>${titularNome}</span></div>` : ''}
+      <div class="info-item"><label>${tr('Tipo')}</label><span>${tipoLabel}</span></div>
+      <div class="info-item"><label>${tr('Modo')}</label><span>${modoLabel}</span></div>
     </div>
   </div>
   ${bandaUnica ? unicoBand : ''}

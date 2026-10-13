@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 import styles from '../recepcao.module.css';
+import { tr } from '../../../i18n';
 
 export default function DiariasCombobox({ value = [], onChange, diarias = [], atualNum = 1 }) {
   const [open,      setOpen]      = useState(false);
@@ -43,10 +44,10 @@ export default function DiariasCombobox({ value = [], onChange, diarias = [], at
 
   const allSelected = diarias.length > 0 && value.length === diarias.length;
   const label = value.length === 0
-    ? 'Selecione as diárias...'
+    ? tr('Selecione as diárias...')
     : value.length === diarias.length
-      ? `Todas as diárias (${diarias.length})`
-      : `${value.length} de ${diarias.length} diária(s)`;
+      ? tr('Todas as diárias ({{length}})', { length: diarias.length })
+      : tr('{{length}} de {{length1}} diária(s)', { length: value.length, length1: diarias.length });
 
   const toggle    = (idx) => onChange(value.includes(idx) ? value.filter((x) => x !== idx) : [...value, idx]);
   const toggleAll = () => onChange(allSelected ? [] : diarias.map((d) => d.idx));
@@ -59,7 +60,7 @@ export default function DiariasCombobox({ value = [], onChange, diarias = [], at
         style={{ borderBottom: '1px solid var(--border)', marginBottom: 6, paddingBottom: 10 }}
       >
         <div className={[styles.qcCheck, allSelected ? styles.qcCheckSel : ''].join(' ')}>{allSelected ? '✓' : ''}</div>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>Selecionar todas</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{tr('Selecionar todas')}</span>
       </div>
       {diarias.map((d) => {
         const sel       = value.includes(d.idx);
@@ -67,8 +68,8 @@ export default function DiariasCombobox({ value = [], onChange, diarias = [], at
         return (
           <div key={d.idx} className={[styles.qcItem, sel ? styles.qcItemSel : ''].join(' ')} onClick={() => toggle(d.idx)}>
             <div className={[styles.qcCheck, sel ? styles.qcCheckSel : ''].join(' ')}>{sel ? '✓' : ''}</div>
-            <span className={styles.qcItemNum}>Diária {d.num}</span>
-            {isCurrent && <span className={styles.qcItemTipo}>atual</span>}
+            <span className={styles.qcItemNum}>{tr('Diária')} {d.num}</span>
+            {isCurrent && <span className={styles.qcItemTipo}>{tr('atual')}</span>}
             <span style={{ fontSize: 11, color: 'var(--text-2)', marginLeft: 'auto' }}>{d.dataInicio?.split(' ')[0]}</span>
           </div>
         );

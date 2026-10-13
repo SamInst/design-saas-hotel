@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/layout/AppLayout';
 import LoginPage from '../pages/LoginPage';
 import { useTheme } from '../hooks/useTheme';
@@ -12,6 +13,7 @@ import InventoryManagement from '../pages/inventory/InventoryManagement';
 import PricingManagement   from '../pages/pricing/PricingManagement';
 import RecepcaoPage from '../pages/recepcao/RecepcaoPage';
 import BookingCalendar    from '../pages/calendar/BookingCalendar';
+import SettingsPage       from '../pages/settings/SettingsPage';
 
 const PAGE_MAP = {
   financial:   <FinancialDashboard />,
@@ -22,6 +24,7 @@ const PAGE_MAP = {
   pricing:     <PricingManagement />,
   reception:   <RecepcaoPage />,
   bookings:    <BookingCalendar />,
+  settings:    <SettingsPage />,
 };
 
 export default function App() {
@@ -31,6 +34,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const { isDark, toggleTheme } = useTheme();
+  const { t } = useTranslation();
 
   // Salva a página atual no localStorage quando muda
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function App() {
   if (isLoading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-        <div>Carregando...</div>
+        <div>{t('common.loading')}</div>
       </div>
     );
   }

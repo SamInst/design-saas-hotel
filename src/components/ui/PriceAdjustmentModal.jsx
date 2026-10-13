@@ -4,6 +4,7 @@ import { Modal } from './Modal';
 import { Button } from './Button';
 import { Input, FormField } from './Input';
 import styles from './PriceAdjustmentModal.module.css';
+import { tr } from '../../i18n';
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const fmtBRL = (v) =>
@@ -94,29 +95,29 @@ export function describeAdjustment(raw) {
   if (!raw) return '';
   const { mode, sign, value } = raw;
   const v = Number(value) || 0;
-  if (mode === 'diaria') return `Diária definida para ${fmtBRL(v)}`;
-  if (mode === 'desconto') return sign === 'desconto' ? 'Desconto sobre o total' : 'Adicional sobre o total';
+  if (mode === 'diaria') return tr('Diária definida para {{v0}}', { v0: fmtBRL(v) });
+  if (mode === 'desconto') return sign === 'desconto' ? tr('Desconto sobre o total') : tr('Adicional sobre o total');
   return sign === 'desconto'
-    ? `Desconto de ${v}% sobre o total`
-    : `Adicional de ${v}% sobre o total`;
+    ? tr('Desconto de {{v}}% sobre o total', { v })
+    : tr('Adicional de {{v}}% sobre o total', { v });
 }
 
 const MODE_ICONS = { diaria: CalendarDays, desconto: Tag, porcentagem: Percent };
 
 const modeLabel = (key, sign) => {
-  if (key === 'diaria') return 'Por diária';
+  if (key === 'diaria') return tr('Por diária');
   if (key === 'desconto') {
-    return sign === 'desconto' ? 'Sobre o total' : 'Sobre o total';
+    return sign === 'desconto' ? tr('Sobre o total') : tr('Sobre o total');
   }
   return sign === 'desconto'
-    ? 'Porcentagem sobre o total'
-    : 'Porcentagem sobre o total';
+    ? tr('Porcentagem sobre o total')
+    : tr('Porcentagem sobre o total');
 };
 
 const modeHint = (key) => {
-  if (key === 'diaria') return 'Sobrescreve o valor de cada diária.';
-  if (key === 'desconto') return 'Ajuste em reais sobre o total.';
-  return 'Ajuste percentual sobre o total.';
+  if (key === 'diaria') return tr('Sobrescreve o valor de cada diária.');
+  if (key === 'desconto') return tr('Ajuste em reais sobre o total.');
+  return tr('Ajuste percentual sobre o total.');
 };
 
 /**
@@ -127,7 +128,7 @@ const modeHint = (key) => {
  * @param initial      estado inicial (use novoPrecoToState para reconstruir de um snapshot).
  * @param onApply      (result, raw) => void  — result de computeAdjustedTotal.
  */
-export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = 'Gerenciar Preços' }) {
+export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = tr('Gerenciar Preços') }) {
   // Modos disponíveis. allowDiaria=false (ex.: ajuste de grupo) remove o "Por diária".
   const modeKeys = allowDiaria ? ['diaria', 'desconto', 'porcentagem'] : ['desconto', 'porcentagem'];
   const [sign, setSign] = useState(initial?.sign ?? 'desconto');
@@ -147,7 +148,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
   const showSign = mode !== 'diaria';
 
   const fieldLabel =
-    mode === 'porcentagem' ? 'Porcentagem (%)' : mode === 'diaria' ? 'Novo valor da diária (R$)' : 'Valor (R$)';
+    mode === 'porcentagem' ? tr('Porcentagem (%)') : mode === 'diaria' ? tr('Novo valor da diária (R$)') : tr('Valor (R$)');
 
   return (
     <Modal
@@ -157,7 +158,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
       size="sm"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+          <Button variant="secondary" onClick={onClose}>{tr('Cancelar')}</Button>
           <Button
             variant="primary"
             disabled={!canApply}
@@ -166,7 +167,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
               onClose();
             }}
           >
-            Aplicar
+            {tr('Aplicar')}
           </Button>
         </>
       }
@@ -176,8 +177,8 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
         {showSign && (
           <div className={[styles.choiceCards, styles.choiceCardsRow].join(' ')}>
             {[
-              { k: 'desconto',  t: 'Desconto (−)', d: 'Diminui o total.' },
-              { k: 'adicional', t: 'Adicional (+)', d: 'Aumenta o total.' },
+              { k: 'desconto',  t: tr('Desconto (−)'), d: tr('Diminui o total.') },
+              { k: 'adicional', t: tr('Adicional (+)'), d: tr('Aumenta o total.') },
             ].map(({ k, t, d }) => (
               <button
                 key={k}
@@ -229,7 +230,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
               step="1"
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="Ex.: 10"
+              placeholder={tr('Ex.: 10')}
             />
           ) : (
             <Input
@@ -237,7 +238,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
               inputMode="numeric"
               value={value}
               onChange={(e) => setValue(maskBRL(e.target.value))}
-              placeholder="R$ 0,00"
+              placeholder={tr('R$ 0,00')}
             />
           )}
         </FormField>
@@ -250,7 +251,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
               const dd = novo - (d.valor || 0);
               return (
                 <div key={i} className={styles.diariaRow}>
-                  <span className={styles.diariaLabel}>Diária {i + 1}</span>
+                  <span className={styles.diariaLabel}>{tr('Diária')} {i + 1}</span>
                   <span className={styles.diariaVals}>
                     <span className={styles.diariaOld}>{fmtBRL(d.valor)}</span>
                     <span>{fmtBRL(novo)}</span>
@@ -267,17 +268,17 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
         {/* Prévia — mostra a diferença em relação ao valor original */}
         <div className={styles.preview}>
           <div className={styles.previewRow}>
-            <span>{mode === 'diaria' ? 'Total atual (diárias)' : 'Total atual'}</span>
+            <span>{mode === 'diaria' ? tr('Total atual (diárias)') : tr('Total atual')}</span>
             <span>{fmtBRL(baseTotal)}</span>
           </div>
           <div className={styles.previewRow}>
-            <span>Diferença</span>
+            <span>{tr('Diferença')}</span>
             <span className={diff < 0 ? styles.previewDown : diff > 0 ? styles.previewUp : ''}>
               {diff > 0 ? '+' : ''}{fmtBRL(diff)}
             </span>
           </div>
           <div className={[styles.previewRow, styles.previewTotal].join(' ')}>
-            <span>Novo total</span><span>{fmtBRL(result.valorTotal)}</span>
+            <span>{tr('Novo total')}</span><span>{fmtBRL(result.valorTotal)}</span>
           </div>
         </div>
       </div>

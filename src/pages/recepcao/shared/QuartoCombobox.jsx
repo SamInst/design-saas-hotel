@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Search, ChevronDown } from 'lucide-react';
 import { ROOM_STATUS } from './overviewApi';
 import styles from '../recepcao.module.css';
+import { tr } from '../../../i18n';
 
 export default function QuartoCombobox({ value, onChange, quartos = [], categorias = [], currentNumero = null }) {
   const [open,      setOpen]      = useState(false);
@@ -50,7 +51,7 @@ export default function QuartoCombobox({ value, onChange, quartos = [], categori
     <div ref={dropRef} className={styles.qcDropdown} style={{ ...dropStyle, overflowY: 'auto' }}>
       <div className={styles.qcSearchWrap}>
         <Search size={12} className={styles.qcSearchIcon} />
-        <input className={styles.qcSearchInput} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filtrar apartamento..." autoFocus />
+        <input className={styles.qcSearchInput} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={tr('Filtrar apartamento...')} autoFocus />
       </div>
       {categorias.map((cat) => {
         const rows = cat.quartos.filter((n) => {
@@ -71,9 +72,9 @@ export default function QuartoCombobox({ value, onChange, quartos = [], categori
                   className={[styles.qcItem, sel ? styles.qcItemSel : '', !avail ? styles.qcItemUnavail : ''].join(' ')}
                   onClick={() => { if (!avail) return; onChange(q.id); setOpen(false); setFilter(''); }}
                 >
-                  <span className={styles.qcItemNum}>Apt. {n}</span>
+                  <span className={styles.qcItemNum}>{tr('Apt.')} {n}</span>
                   {q && <span className={styles.qcItemTipo}>{q.categoria}</span>}
-                  {!avail && <span className={styles.qcItemOcupado}>Ocupado</span>}
+                  {!avail && <span className={styles.qcItemOcupado}>{tr('Ocupado')}</span>}
                 </div>
               );
             })}
@@ -90,8 +91,8 @@ export default function QuartoCombobox({ value, onChange, quartos = [], categori
         onClick={() => { setOpen((o) => !o); setFilter(''); }}
       >
         {selected
-          ? <span className={styles.qcSelected}>Apt. {selected.numero} — {selected.categoria}</span>
-          : <span className={styles.qcPlaceholder}>Selecione um apartamento...</span>
+          ? <span className={styles.qcSelected}>{tr('Apt.')} {selected.numero} — {selected.categoria}</span>
+          : <span className={styles.qcPlaceholder}>{tr('Selecione um apartamento...')}</span>
         }
         <ChevronDown size={13} style={{ flexShrink: 0, transition: 'transform 0.18s', transform: open ? 'rotate(180deg)' : '' }} />
       </button>

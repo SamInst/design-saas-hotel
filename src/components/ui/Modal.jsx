@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import styles from './Modal.module.css';
+import { tr } from '../../i18n';
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', bodyStyle, hideHeader, containerStyle, backdropStyle, closeOnBackdrop }) {
   if (!open) return null;
@@ -15,7 +16,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', bod
         {!hideHeader && (
           <div className={styles.header}>
             <div className={styles.title}>{title}</div>
-            <button className={styles.close} onClick={onClose} type="button" aria-label="Fechar">
+            <button className={styles.close} onClick={onClose} type="button" aria-label={tr('Fechar')}>
               <X size={18} />
             </button>
           </div>
