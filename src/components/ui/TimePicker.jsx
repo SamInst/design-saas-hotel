@@ -1,9 +1,60 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './TimePicker.module.css';
 
 const HOURS   = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
-const ITEM_H  = 36;
+const ITEM_H  = 34;
+const VISIVEIS = 5; // itens visíveis na roda (ímpar: o do meio é o selecionado)
+const DROP_H  = ITEM_H * VISIVEIS + 60; // altura aproximada do popup
+
+/** Coluna em roda, no estilo do seletor de horas do iPhone. */
+function Roda({ itens, valor, onPick }) {
+  const ref = useRef(null);
+  const [top, setTop] = useState(valor * ITEM_H);
+  const timer = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = valor * ITEM_H;
+    // só na abertura; depois quem manda é a rolagem
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onScroll = () => {
+    const st = ref.current.scrollTop;
+    setTop(st);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      const idx = Math.min(itens.length - 1, Math.max(0, Math.round(st / ITEM_H)));
+      if (idx !== valor) onPick(idx);
+    }, 120);
+  };
+
+  const irPara = (i) => ref.current?.scrollTo({ top: i * ITEM_H, behavior: 'smooth' });
+
+  return (
+    <div className={styles.roda}>
+      <div ref={ref} className={styles.rodaScroll} onScroll={onScroll}>
+        <div style={{ height: ITEM_H * ((VISIVEIS - 1) / 2) }} />
+        {itens.map((n, i) => {
+          const dist = (i * ITEM_H - top) / ITEM_H;
+          const abs  = Math.min(Math.abs(dist), 3);
+          return (
+            <button key={n} type="button" onClick={() => irPara(i)}
+              className={[styles.rodaItem, Math.round(dist) === 0 ? styles.rodaItemSel : ''].join(' ')}
+              style={{
+                transform: `rotateX(${Math.max(-60, Math.min(60, -dist * 22))}deg)`,
+                opacity: 1 - abs * 0.28,
+              }}>
+              {String(n).padStart(2, '0')}
+            </button>
+          );
+        })}
+        <div style={{ height: ITEM_H * ((VISIVEIS - 1) / 2) }} />
+      </div>
+    </div>
+  );
+}
 
 export function TimePicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -11,8 +62,6 @@ export function TimePicker({ value, onChange }) {
   const [text, setText] = useState(value || '');
   const inputRef = useRef(null);
   const dropRef  = useRef(null);
-  const hourRef  = useRef(null);
-  const minRef   = useRef(null);
 
   const parse = (v) => {
     const parts = (v || '00:00').split(':');
@@ -21,25 +70,20 @@ export function TimePicker({ value, onChange }) {
     return { h, m };
   };
   const { h, m } = parse(value);
+  const atual = useRef(value);
+  atual.current = value;
 
   useEffect(() => { setText(value || ''); }, [value]);
 
   const openDrop = () => {
     if (inputRef.current) {
       const r = inputRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left });
+      // sem espaço embaixo, abre para cima
+      const cima = window.innerHeight - r.bottom < DROP_H + 8 && r.top > DROP_H + 8;
+      setPos({ top: cima ? r.top - DROP_H - 4 : r.bottom + 4, left: r.left });
     }
     setOpen(true);
   };
-
-  useEffect(() => {
-    if (!open) return;
-    const t = setTimeout(() => {
-      if (hourRef.current) hourRef.current.scrollTop = h * ITEM_H;
-      if (minRef.current)  minRef.current.scrollTop  = m * ITEM_H;
-    }, 10);
-    return () => clearTimeout(t);
-  }, [open, h, m]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -68,13 +112,6 @@ export function TimePicker({ value, onChange }) {
     }
   };
 
-  const stepH = (dir) => emit((h + dir + 24) % 24, m);
-  const stepM = (dir) => emit(h, (m + dir + 60) % 60);
-
-  const scrollTo = (ref, idx) => {
-    if (ref.current) ref.current.scrollTop = idx * ITEM_H;
-  };
-
   return (
     <div className={styles.timeWrap}>
       <input
@@ -86,44 +123,17 @@ export function TimePicker({ value, onChange }) {
         placeholder="HH:MM"
         maxLength={5}
       />
-      {open && (
+      {open && createPortal(
         <div ref={dropRef} className={styles.timeDrop} style={{ top: pos.top, left: pos.left }}>
-          <div className={styles.timeColWrap}>
-            <span className={styles.timeColLabel}>Hora</span>
-            <button type="button" className={styles.timeArrow}
-              onClick={() => { stepH(-1); scrollTo(hourRef, (h - 1 + 24) % 24); }}>▲</button>
-            <div ref={hourRef} className={styles.timeCol}>
-              {HOURS.map((hh) => (
-                <button key={hh} type="button"
-                  className={[styles.timeItem, hh === h ? styles.timeItemActive : ''].join(' ')}
-                  onClick={() => { emit(hh, m); scrollTo(hourRef, hh); }}>
-                  {String(hh).padStart(2, '0')}
-                </button>
-              ))}
-            </div>
-            <button type="button" className={styles.timeArrow}
-              onClick={() => { stepH(1); scrollTo(hourRef, (h + 1) % 24); }}>▼</button>
+          <div className={styles.rodas} style={{ height: ITEM_H * VISIVEIS }}>
+            <div className={styles.faixa} style={{ height: ITEM_H, top: ITEM_H * ((VISIVEIS - 1) / 2) }} />
+            <Roda itens={HOURS}   valor={h} onPick={(hh) => emit(hh, parse(atual.current).m)} />
+            <span className={styles.timeSep}>:</span>
+            <Roda itens={MINUTES} valor={m} onPick={(mm) => emit(parse(atual.current).h, mm)} />
           </div>
-
-          <span className={styles.timeSep}>:</span>
-
-          <div className={styles.timeColWrap}>
-            <span className={styles.timeColLabel}>Min</span>
-            <button type="button" className={styles.timeArrow}
-              onClick={() => { stepM(-1); scrollTo(minRef, (m - 1 + 60) % 60); }}>▲</button>
-            <div ref={minRef} className={styles.timeCol}>
-              {MINUTES.map((mm) => (
-                <button key={mm} type="button"
-                  className={[styles.timeItem, mm === m ? styles.timeItemActive : ''].join(' ')}
-                  onClick={() => { emit(h, mm); scrollTo(minRef, mm); setOpen(false); }}>
-                  {String(mm).padStart(2, '0')}
-                </button>
-              ))}
-            </div>
-            <button type="button" className={styles.timeArrow}
-              onClick={() => { stepM(1); scrollTo(minRef, (m + 1) % 60); }}>▼</button>
-          </div>
-        </div>
+          <button type="button" className={styles.timeOk} onClick={() => setOpen(false)}>OK</button>
+        </div>,
+        document.body,
       )}
     </div>
   );

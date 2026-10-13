@@ -6,7 +6,7 @@
    radius 0.75rem → md 10px, lg 12px, xl 16px.
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.988 0.003 250);
+  --l-bg:            oklch(0.955 0.01 255);   /* mesmo fundo da tela de Cadastros */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
   --l-muted-fg:      oklch(0.52 0.03 258);
@@ -31,10 +31,10 @@
   --l-slate-bg: oklch(0.955 0.008 255);
   --l-slate-fg: oklch(0.45 0.03 258);
 
-  --l-radius: 0.75rem;
+  --l-radius: 0.5rem;
   --l-r-md: calc(var(--l-radius) - 2px);
   --l-r-lg: var(--l-radius);
-  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-r-xl: calc(var(--l-radius) + 2px);
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
@@ -83,8 +83,16 @@
   padding: 10px 24px 24px;
 }
 @media (min-width: 1024px) {
-  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
+  .split {
+    grid-template-columns: 400px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start; overflow: hidden;
+  }
 }
+
+/* Topo da lista: abas Categorias/Sazonalidades e o "Cadastrar" ao lado */
+.listTopo { display: flex; align-items: stretch; gap: 8px; }
+.listTopo .segmented { flex: 1; min-width: 0; }
 
 /* ══ LISTA ═══════════════════════════════════════════════════ */
 .listPanel {
@@ -92,14 +100,14 @@
   border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
   background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
 }
-@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+@media (min-width: 1024px) { .listPanel { height: 100%; align-self: stretch; } }
 
 /* Categorias / Sazonalidades */
 .segmented {
   display: flex; gap: 4px;
   border-radius: var(--l-r-lg);
   border: 1px solid var(--l-border);
-  background: var(--l-bg);
+  background: transparent;
   padding: 4px;
 }
 .segmentedBtn {
@@ -116,22 +124,26 @@
 
 .searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
 .searchWrapFull { min-width: 0; width: 100%; margin-top: 12px; }
-.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchIcon     { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
 .searchInput    { padding-left: 36px !important; }
 .searchWrapFull .searchInput {
   height: 40px; width: 100%;
   border-radius: var(--l-r-lg) !important;
   border: 1px solid var(--l-border) !important;
-  background: var(--l-bg) !important;
+  background: transparent !important;
   color: var(--l-fg) !important;
   padding-right: 12px !important;
   font-size: 14px !important;
   box-shadow: none !important;
 }
+/* foco azul (o --l-primary) só na borda, como em Cadastros — vale para a busca e o formulário */
+.page input:focus,
+.page select:focus,
+.page textarea:focus,
 .searchWrapFull .searchInput:focus {
   outline: none;
-  border-color: var(--l-ring) !important;
-  box-shadow: 0 0 0 2px var(--l-ring) !important;
+  border-color: var(--l-primary) !important;
+  box-shadow: none !important;
 }
 .searchClear {
   position: absolute; right: 10px;
@@ -141,6 +153,9 @@
   cursor: pointer; opacity: .6; transition: opacity .12s; flex-shrink: 0;
 }
 .searchClear:hover { opacity: 1; }
+/* busca preenchida: borda e lupa em destaque */
+.searchAtiva .searchInput { border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border)) !important; }
+.searchAtiva .searchIcon  { color: var(--l-primary); }
 
 .listMeta {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -186,6 +201,7 @@
 .tagPrimary { border-color: color-mix(in oklch, var(--l-primary) 35%, transparent); background: color-mix(in oklch, var(--l-primary) 12%, transparent); color: var(--l-primary); }
 .tagAmber   { border-color: var(--l-amber-border); background: var(--l-amber-bg); color: var(--l-amber-fg); }
 .tagEmerald { border-color: color-mix(in oklch, var(--l-emerald-fg) 30%, transparent); background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
+.tagRed     { border-color: color-mix(in oklch, #dc2626 35%, transparent); background: color-mix(in oklch, #dc2626 12%, transparent); color: #dc2626; flex-shrink: 0; }
 .tagSlate   { background: var(--l-slate-bg); color: var(--l-slate-fg); }
 
 /* ── Vazio / carregando ── */
@@ -212,8 +228,87 @@
 .skNumero { width: 46%; height: 22px; margin-top: 8px; }
 
 /* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
-.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 @media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+
+/* ── Ficha / formulário num cartão só: cabeçalho fixo, abas e conteúdo ──
+   Mesmo desenho da ficha do hóspede em Cadastros. */
+.dCard.fichaCard { padding: 0; flex-shrink: 0; }
+@media (max-width: 1023.98px) {
+  /* celular: quem rola é a página (.split); o cabeçalho com os botões gruda no alto */
+  .fichaHead {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (min-width: 1024px) {
+  .fichaCard {
+    flex: 0 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fichaHead { flex-shrink: 0; }
+  .fichaBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* nome e abas ficam presos no alto; só o conteúdo da aba rola */
+  .fichaCard .fichaBody { padding-top: 0; }
+  .fichaTopo {
+    position: sticky; top: 0; z-index: 4;
+    padding-top: 8px;
+    background: var(--l-card);
+  }
+}
+.fichaHead {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--l-border);
+  font-weight: 600;
+}
+.fichaHead > svg { color: var(--l-muted-fg); }
+.fichaHead .dCardTitle { font-weight: 600; }
+.fichaBody { margin-top: 0; padding: 8px 20px 20px; }
+
+.fichaId { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.fichaIcone {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--l-secondary); color: var(--l-muted-fg);
+  border: 1px solid var(--l-border);
+}
+.fichaIcone svg { stroke-width: 1.5; }
+.fichaIconeSea { background: var(--l-secondary); color: var(--l-muted-fg); }
+.fichaNome {
+  margin: 0; font-size: 22px; line-height: 30px; font-weight: 700;
+  color: var(--l-fg); overflow-wrap: anywhere;
+}
+.fichaSub { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+
+.fichaTabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+  scrollbar-width: none;
+}
+.fichaTab {
+  position: relative; flex-shrink: 0;
+  padding: 0 0 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--l-muted-fg);
+  transition: color .15s;
+}
+.fichaTab:hover { color: var(--l-fg); }
+.fichaTabAtiva { color: var(--l-fg); }
+.fichaTabAtiva::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--l-fg);
+}
+.fichaTab:focus-visible { outline: 2px solid var(--l-ring); outline-offset: 2px; border-radius: 4px; }
+
+/* rodapé do formulário: Limpar/Cancelar e Avançar/Salvar, depois de tudo */
+.formFoot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  margin-top: 24px; padding-top: 16px;
+  border-top: 1px solid var(--l-border);
+}
 
 .dCard {
   border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
@@ -223,7 +318,7 @@
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
 }
-.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
 .dCardTitle { font-weight: 700; }
 .dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .dCardBody { margin-top: 16px; }
@@ -271,7 +366,7 @@
   display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
   font-size: 13px; line-height: 18px; font-weight: 700; color: var(--l-fg);
 }
-.blockHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.blockHead > svg { color: var(--l-muted-fg); flex-shrink: 0; }
 .blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
 
 /* ── Botões: cor sólida, sem brilho nem ícone ── */
@@ -335,7 +430,7 @@
 .pillWrap { display: flex; flex-wrap: wrap; gap: 6px; }
 .pill {
   display: inline-flex; align-items: center;
-  padding: 4px 10px; border-radius: 999px;
+  padding: 4px 10px; border-radius: 3px;
   border: 1px solid var(--l-border); background: var(--l-bg); color: var(--l-fg);
   font-size: 12px; line-height: 16px; font-weight: 500;
 }
@@ -406,6 +501,10 @@
 
 @media (max-width: 640px) {
   .page  { margin: -12px -12px -24px; }
+  .fichaHead { padding: 12px 14px; }
+  .fichaBody { padding: 18px 14px 14px; }
+  .fichaIcone { width: 52px; height: 52px; }
+  .fichaNome { font-size: 19px; line-height: 26px; }
   .split { padding: 6px 12px 12px; gap: 12px; }
   .listPanel { padding: 12px; }
   .dCard { padding: 14px; }
@@ -415,6 +514,7 @@
   .dCardActions { margin-left: 0; flex: 1 1 100%; }
   .dCardActions > * { flex: 1; }
   .dCardActions > .idClose { flex: 0 0 auto; }
+  .fichaCard .dCardActions { margin-left: auto; flex: 0 1 auto; }
   .blockHead { flex-wrap: wrap; }
   .statVal { font-size: 20px; line-height: 26px; }
   .subBlock { margin-top: 18px; padding-top: 16px; }
@@ -430,129 +530,158 @@
 }
 
 /* ═════════════════════════════════════════════════════════════
-   FORMULÁRIOS (modais de criar/editar) — estilo anterior mantido
+   FORMULÁRIOS — no painel da direita, com o visual dos campos de Cadastros
    ═════════════════════════════════════════════════════════════ */
 
-/* ── Modal footer ── */
 .modalFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
 
-/* ── Tabs (dentro do modal) ── */
-.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
-.tab {
-  padding: 8px 14px; font-size: 12px; font-weight: 600;
-  color: var(--text-2); background: none; border: none;
-  border-bottom: 2px solid transparent; cursor: pointer;
-  transition: color .15s, border-color .15s; white-space: nowrap;
+/* ── Corpo ── */
+.formBody { display: flex; flex-direction: column; gap: 12px; }
+.formRow  { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
+.formBody { container: priceForm / inline-size; }
+.formGrid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 12px; align-items: start; }
+.span2 { grid-column: span 2; min-width: 0; }
+@container priceForm (max-width: 620px) {
+  .formGrid4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.tab:hover  { color: var(--text); }
-.tabActive  { color: var(--violet); border-bottom-color: var(--violet); }
+@container priceForm (max-width: 360px) {
+  .formGrid4 { grid-template-columns: minmax(0, 1fr); }
+  .span2 { grid-column: auto; }
+}
 
-/* ── Form body ── */
-.formBody { display: flex; flex-direction: column; gap: 14px; }
-.formRow  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 480px) { .formRow { grid-template-columns: 1fr; } }
+/* campos compactos e sem adornos, iguais aos do cadastro de hóspede */
+.formBody input:not([type="checkbox"]),
+.formBody select {
+  height: 34px; box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.formBody select { padding-right: 28px; background-position: right 9px center; }
+.formBody label:not(.checkItem):not(.checkboxRow) {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  margin-bottom: -2px;
+}
 
+/* divisória de seção — mesma dos blocos "Endereço" do cadastro */
 .sectionTitle {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--text-2); margin-top: 4px;
+  display: flex; align-items: center; gap: 7px;
+  margin: 10px 0 2px;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--l-muted-fg);
 }
-.sectionTitle::before {
-  content: ''; width: 3px; height: 12px; border-radius: 2px;
-  background: var(--violet); flex-shrink: 0;
-}
-.sectionTitle::after {
-  content: ''; flex: 1; height: 1px; background: var(--border);
-}
+.sectionTitle::after { content: ''; flex: 1; height: 1px; background: var(--l-border); }
 
-/* ── Mode cards (seleção tipo radio) ── */
-.modeCards { display: flex; gap: 6px; flex-wrap: wrap; }
+/* ── Cartões de modo (seleção tipo rádio) ── */
+.modeCards { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
 .modeCard {
   display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
-  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+  padding: 10px 12px; border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border); background: var(--l-card);
+  font-family: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s, background-color .15s;
 }
-.modeCard:hover { border-color: rgba(124,58,237,.3); }
-.modeCardActive { border-color: var(--violet); background: rgba(124,58,237,.08); }
-.modeCardLabel  { font-size: 11px; font-weight: 600; color: var(--text); }
-.modeCardDesc   { font-size: 10px; color: var(--text-2); }
+.modeCard:hover { border-color: color-mix(in oklch, var(--l-primary) 35%, var(--l-border)); }
+.modeCardActive,
+.modeCardActive:hover {
+  border-color: var(--l-primary);
+  background: color-mix(in oklch, var(--l-primary) 8%, transparent);
+}
+.modeCardLabel { font-size: 12.5px; font-weight: 600; color: var(--l-fg); }
+.modeCardDesc  { font-size: 11px; color: var(--l-muted-fg); }
 
-/* ── Chips (dias da semana, meses) ── */
-.chipGroup { display: flex; gap: 5px; flex-wrap: wrap; }
+/* ── Chips (dias da semana, meses, dias do mês) ── */
+.chipGroup { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
-  padding: 5px 10px; border-radius: 7px; border: 1px solid var(--border);
-  background: var(--surface); font-size: 11px; color: var(--text);
-  cursor: pointer; transition: all .12s;
+  padding: 6px 11px; border-radius: var(--l-r-md);
+  border: 1px solid var(--l-border); background: var(--l-card);
+  font-family: inherit; font-size: 12px; color: var(--l-fg);
+  cursor: pointer; transition: border-color .12s, background-color .12s, color .12s;
 }
-.chip:hover { border-color: rgba(124,58,237,.4); }
-.chipActive { background: rgba(124,58,237,.12); border-color: var(--violet); color: var(--violet); font-weight: 600; }
+.chip:hover { border-color: color-mix(in oklch, var(--l-primary) 40%, var(--l-border)); }
+.chipActive,
+.chipActive:hover {
+  border-color: var(--l-primary); color: var(--l-primary); font-weight: 600;
+  background: color-mix(in oklch, var(--l-primary) 10%, transparent);
+}
+.dayGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 6px; }
 
-.dayGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-
-/* ── Grade de inputs (3 por linha — hospedagem + crianças) ── */
-.inputGrid      { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.fieldCard      { display: flex; flex-direction: column; gap: 6px; }
-.fieldCardLabel { font-size: 11px; font-weight: 600; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+/* ── Grade de preços (pessoas, crianças) ── */
+.inputGrid      { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px 12px; }
+.fieldCard      { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.fieldCardLabel { font-size: 10.5px; font-weight: 600; color: var(--l-muted-fg); text-transform: uppercase; letter-spacing: .03em; }
 .fieldCardRow   { display: flex; align-items: center; gap: 4px; }
 
-/* ── Lista de checkboxes (quartos / sazonais) ── */
-.checkList { display: flex; flex-direction: column; gap: 6px; }
+/* ── Listas de seleção (quartos / sazonalidades) ── */
+.checkList { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px; }
 .checkItem {
   display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+  padding: 9px 12px; border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border); background: var(--l-card);
+  cursor: pointer; transition: border-color .15s, background-color .15s;
 }
-.checkItem:hover { border-color: rgba(124,58,237,.3); }
-.checkItemActive { border-color: var(--violet); background: rgba(124,58,237,.06); }
-.checkItemCb     { width: 14px; height: 14px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; }
-.checkItemLabel  { font-size: 13px; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.checkItemSub    { font-size: 11px; color: var(--text-2); margin-left: auto; }
+.checkItem:hover { border-color: color-mix(in oklch, var(--l-primary) 35%, var(--l-border)); }
+.checkItemActive,
+.checkItemActive:hover { border-color: var(--l-primary); }
+.checkItemCb     { width: 15px; height: 15px; accent-color: var(--l-primary); cursor: pointer; flex-shrink: 0; }
+.checkItemLabel  { font-size: 13px; font-weight: 500; color: var(--l-fg); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.checkItemSub    { font-size: 11px; color: var(--l-muted-fg); margin-left: auto; white-space: nowrap; }
 .checkItemUnavailable { opacity: .5; cursor: not-allowed; }
-.checkItemUnavailable:hover { border-color: var(--border); }
+.checkItemUnavailable:hover { border-color: var(--l-border); }
 .checkItemUnavailable .checkItemCb { cursor: not-allowed; }
 .checkItemTag {
   font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px;
-  background: rgba(100,116,139,.15); color: var(--text-2);
+  background: var(--l-secondary); color: var(--l-muted-fg);
 }
 
-/* ── Seletor de categorias da sazonalidade ── */
+/* ── Categoria como referência (sazonalidade) ── */
 .seaRefBtn {
-  flex-shrink: 0; padding: 4px 10px; border-radius: 6px;
-  border: 1px solid rgba(124,58,237,.3); background: rgba(124,58,237,.08);
-  color: var(--violet); font-size: 11px; font-weight: 600; cursor: pointer;
-  transition: background .15s;
+  flex-shrink: 0; padding: 5px 10px; border-radius: var(--l-r-md);
+  border: 1px solid color-mix(in oklch, var(--l-primary) 35%, transparent);
+  background: color-mix(in oklch, var(--l-primary) 8%, transparent);
+  color: var(--l-primary); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: background-color .15s;
 }
-.seaRefBtn:hover { background: rgba(124,58,237,.16); }
+.seaRefBtn:hover { background: color-mix(in oklch, var(--l-primary) 16%, transparent); }
 
-/* ── Linha de checkbox ── */
+/* ── Linha de checkbox com título e explicação ── */
 .checkboxRow {
   display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--surface); cursor: pointer; transition: border-color .15s, background .15s;
+  padding: 11px 12px; border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border); background: var(--l-card);
+  cursor: pointer; transition: border-color .15s, background-color .15s;
 }
-.checkboxRowActive { border-color: var(--violet); background: rgba(124,58,237,.06); }
-.checkbox      { width: 15px; height: 15px; accent-color: var(--violet); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
-.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
-.checkboxSub   { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
+.checkboxRowActive { border-color: var(--l-primary); background: color-mix(in oklch, var(--l-primary) 6%, transparent); }
+.checkbox      { width: 15px; height: 15px; accent-color: var(--l-primary); cursor: pointer; flex-shrink: 0; margin-top: 2px; }
+.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--l-fg); display: block; }
+.checkboxSub   { font-size: 11.5px; color: var(--l-muted-fg); display: block; margin-top: 1px; }
 
 /* ── Gratuidade (formulário) ── */
 .gratuidadeBox {
   display: flex; flex-direction: column; gap: 8px;
-  padding: 10px 12px; border-radius: 8px;
-  border: 1px solid rgba(16,185,129,.25); background: rgba(16,185,129,.06);
+  padding: 11px 12px; border-radius: var(--l-r-lg);
+  border: 1px solid color-mix(in oklch, var(--l-emerald-fg) 30%, transparent);
+  background: var(--l-emerald-bg);
 }
 
 /* ── Linhas de preço de menores ── */
 .childInputAge { width: 58px !important; min-width: 0; flex-shrink: 0; }
 .childInputVal { flex: 1; min-width: 0; }
-.childSep      { font-size: 12px; color: var(--text-2); flex-shrink: 0; }
+.childSep      { font-size: 12px; color: var(--l-muted-fg); flex-shrink: 0; }
 .childRemoveBtn {
   display: flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
-  border: none; background: transparent; color: var(--text-2);
-  cursor: pointer; transition: color .15s, background .15s;
+  width: 28px; height: 28px; border-radius: var(--l-r-md); flex-shrink: 0;
+  border: none; background: transparent; color: var(--l-muted-fg);
+  cursor: pointer; transition: color .15s, background-color .15s;
 }
-.childRemoveBtn:hover { color: #ef4444; background: rgba(239,68,68,.08); }
+.childRemoveBtn:hover { color: var(--l-destructive); background: color-mix(in oklch, var(--l-destructive) 10%, transparent); }
+.page .btnAdd { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
+/* no formulário não há nome/ícone acima das abas: só um respiro curto */
+@media (min-width: 1024px) { .fichaBody > .fichaTopoForm { padding-top: 14px; } }
+/* celular: o .fichaBody já tem o recuo de cima; tira parte dele */
+@media (max-width: 1023.98px) { .fichaBody > .fichaTopoForm { margin-top: 6px; } }
+.fichaTopoForm .fichaTabs { margin-bottom: 16px; }
 
-/* ── Corpo das abas do formulário — evita o modal pular de altura ── */
-.formTabBody { padding: 16px 0 0; height: 420px; overflow-y: auto; overflow-x: hidden; }
+/* aba "Quartos e sazonalidades" da ficha: as caixas do formulário, só leitura */
+.checkItemView, .checkItemView:hover { cursor: default; border-color: var(--l-border); }
+.checkItemIco { color: var(--l-primary); flex-shrink: 0; }

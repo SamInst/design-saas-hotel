@@ -803,6 +803,7 @@ export const sazonalidadeApi = {
   vincular(body)         { return request('/sazonalidade/vincular', { method: 'POST', body }); },
   toggleVinculo(body)    { return request('/sazonalidade/vincular', { method: 'PUT',  body }); },
   removerVinculo(id)     { return request(`/sazonalidade/vincular/${id}`, { method: 'DELETE' }); },
+  excluir(id)            { return request(`/sazonalidade/${id}`, { method: 'DELETE' }); },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -815,6 +816,7 @@ export const quartoCategoriApi = {
   listar(params)  { return request('/quarto-categoria', { params }); },
   criar(body)     { return request('/quarto-categoria', { method: 'POST', body }); },
   atualizar(body) { return request('/quarto-categoria', { method: 'PUT',  body }); },
+  excluir(id)     { return request(`/quarto-categoria/${id}`, { method: 'DELETE' }); },
 };
 
 // ─────────────────────────────────────────────────────────────

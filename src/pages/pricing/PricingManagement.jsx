@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  BedDouble, Calendar, DollarSign, Tag, Users, Clock,
-  Plus, Edit2, Trash2, Loader2,
+  BedDouble, Calendar, Tag, Users, Clock,
+  Plus, Trash2, Loader2, Check,
   Search, X, ChevronLeft, ChevronRight, AlertCircle,
-  Baby, Sun, Layers, Link2,
+  Layers,
 } from 'lucide-react';
 import { Modal }                    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
@@ -327,6 +327,14 @@ function isSeaValid(f) {
 }
 
 // ── Resumo curto do agendamento — cabe no subtítulo da lista ─────────────────
+/** Data específica cuja data final já passou. */
+function expirada(s) {
+  if (s.modoOperacao !== 'data-especifica' || !s.dataFim) return false;
+  const d = new Date();
+  const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return s.dataFim < hoje;
+}
+
 function resumoSchedule(s) {
   switch (s.modoOperacao) {
     case 'data-especifica': return `${fmtDataBR(s.dataInicio) || '—'} → ${fmtDataBR(s.dataFim) || '—'}`;
@@ -428,15 +436,13 @@ function ScheduleFields({ form, onChange }) {
 
   if (mode === 'data-especifica') return (
     <>
-      <div className={styles.formRow}>
+      <div className={styles.formGrid4}>
         <FormField label="Data início *">
           <DatePicker value={strToDate(form.dataInicio)} onChange={(d) => onChange('dataInicio', dateToStr(d))} placeholder="DD/MM/AAAA" />
         </FormField>
         <FormField label="Data fim *">
           <DatePicker value={strToDate(form.dataFim)} onChange={(d) => onChange('dataFim', dateToStr(d))} placeholder="DD/MM/AAAA" />
         </FormField>
-      </div>
-      <div className={styles.formRow}>
         <FormField label="Check-in *"><TimePicker value={form.horaInicio} onChange={(v) => onChange('horaInicio', v)} /></FormField>
         <FormField label="Check-out *"><TimePicker value={form.horaFim} onChange={(v) => onChange('horaFim', v)} /></FormField>
       </div>
@@ -517,21 +523,27 @@ function PricingFields({ form, setField, setOcc }) {
   return (
     <>
       <div className={styles.sectionTitle}>Hospedagem</div>
-      <FormField label="Modelo de cobrança">
-        <Select value={modelo} onChange={(e) => handleModeloChange(e.target.value)}>
-          <option value="Por ocupação">Por ocupação</option>
-          <option value="Por quarto (tarifa fixa)">Por quarto (tarifa fixa)</option>
-        </Select>
-      </FormField>
-      {modelo === 'Por quarto (tarifa fixa)' ? (
-        <FormField label="Tarifa fixa (R$) *">
-          <Input placeholder="R$ 0,00" value={form.precoFixo} onChange={(e) => setField('precoFixo', maskBRL(e.target.value))} />
-        </FormField>
-      ) : (
-        <>
+      <div className={styles.formGrid4}>
+        <div className={styles.span2}>
+          <FormField label="Modelo de cobrança">
+            <Select value={modelo} onChange={(e) => handleModeloChange(e.target.value)}>
+              <option value="Por ocupação">Por ocupação</option>
+              <option value="Por quarto (tarifa fixa)">Por quarto (tarifa fixa)</option>
+            </Select>
+          </FormField>
+        </div>
+        {modelo === 'Por quarto (tarifa fixa)' ? (
+          <FormField label="Tarifa fixa (R$) *">
+            <Input placeholder="R$ 0,00" value={form.precoFixo} onChange={(e) => setField('precoFixo', maskBRL(e.target.value))} />
+          </FormField>
+        ) : (
           <FormField label="Máximo de pessoas">
             <Input type="number" min="1" max="10" value={maxPessoas} onChange={(e) => handleMaxChange(e.target.value)} />
           </FormField>
+        )}
+      </div>
+      {modelo !== 'Por quarto (tarifa fixa)' && (
+        <>
           <div className={styles.sectionTitle}>Preço por número de hóspedes *</div>
           <OccInputs occ={occ} maxPessoas={maxPessoas} onChange={(q, v) => setOcc(q, v)} />
         </>
@@ -569,8 +581,6 @@ function DayUseFields({ du, maxPessoas, onChange }) {
               <div className={styles.formRow}>
                 <FormField label="Preço base"><Input placeholder="R$ 0,00" value={du.precoFixo} onChange={(e) => setDu('precoFixo', maskBRL(e.target.value))} /></FormField>
                 <FormField label="Horas (Preço Base)"><Input type="number" min="1" placeholder="Ex: 4" value={du.horasBase} onChange={(e) => setDu('horasBase', e.target.value)} /></FormField>
-              </div>
-              <div className={styles.formRow}>
                 <FormField label="Valor da Hora adicional"><Input placeholder="R$ 0,00" value={du.precoAdicional} onChange={(e) => setDu('precoAdicional', maskBRL(e.target.value))} /></FormField>
               </div>
             </>
@@ -685,7 +695,7 @@ function ChildPricingFields({ criancas, onChange }) {
                   </div>
                 ))}
               </div>
-              <Button variant="secondary" onClick={addEntrada}>
+              <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addEntrada}>
                 <Plus size={13} /> Adicionar linha
               </Button>
             </>
@@ -719,7 +729,7 @@ function ChildPricingFields({ criancas, onChange }) {
                   </div>
                 ))}
               </div>
-              <Button variant="secondary" onClick={addFaixa}>
+              <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addFaixa}>
                 <Plus size={13} /> Adicionar faixa
               </Button>
             </>
@@ -743,7 +753,7 @@ function ChildPricingFields({ criancas, onChange }) {
                   </div>
                 ))}
               </div>
-              <Button variant="secondary" onClick={addEntrada}>
+              <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={addEntrada}>
                 <Plus size={13} /> Adicionar linha
               </Button>
             </>
@@ -829,6 +839,17 @@ export default function PricingManagement() {
   // Ficha aberta no painel de detalhe
   const [detailItem, setDetailItem] = useState(null);
   const [detailType, setDetailType] = useState(null); // 'cat' | 'sea'
+  // aba aberta na ficha: dados | precos | dayuse | menores | vinculos/categorias
+  const [abaFicha, setAbaFicha]     = useState('dados');
+
+  // desktop: sem ficha aberta, o cadastro da aba atual já fica aberto na direita
+  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   // Category form modal
   const [catModal, setCatModal]     = useState(null);
@@ -879,15 +900,58 @@ export default function PricingManagement() {
 
   const { categorias, sazonalidades } = data;
 
+  // ── Qual formulário ocupa a direita ───────────────────────────────────────
+  // Aberto pelo "Cadastrar"/"Editar" (explícito) ou, no desktop sem ficha
+  // aberta, o cadastro da aba atual — como na tela de Cadastros.
+  const formExplicito = !!(catModal || seaModal);
+  const formAtivo = catModal ? 'cat' : seaModal ? 'sea'
+    : (!detailItem && isDesktop ? (aba === 'sea' ? 'sea' : 'cat') : null);
+  const formModo = formAtivo === 'cat' ? (catModal ?? 'create')
+    : formAtivo === 'sea' ? (seaModal ?? 'create') : null;
+
+  const formSujo = () => {
+    if (formModo === 'edit') return true;
+    if (formAtivo === 'cat') return JSON.stringify(catForm) !== JSON.stringify(blankCat());
+    if (formAtivo === 'sea') return JSON.stringify(seaForm) !== JSON.stringify(blankSea());
+    return false;
+  };
+
+  /** Fecha o formulário aberto; com algo digitado, pergunta antes. */
+  const descartarForm = () => {
+    if (formSujo() && !window.confirm(formModo === 'edit'
+      ? 'Deseja descartar as alterações em andamento?'
+      : 'Deseja descartar o cadastro em andamento?')) return false;
+    setCatModal(null); setSeaModal(null);
+    setEditingCat(null); setEditingSea(null);
+    setCatForm(blankCat()); setSeaForm(blankSea());
+    setCatTab('precos'); setSeaTab('agenda');
+    return true;
+  };
+  const cancelarForm = () => { descartarForm(); };
+
   // ── Painel de detalhe ─────────────────────────────────────────────────────
-  const openDetail = (item, type) => { setDetailItem(item); setDetailType(type); };
+  const openDetail = (item, type) => {
+    if (!descartarForm()) return;
+    setDetailItem(item); setDetailType(type); setAbaFicha('dados');
+  };
   const closeDetail = () => { setDetailItem(null); setDetailType(null); };
 
   // Trocar de aba fecha a ficha aberta — ela é da outra lista.
   const changeAba = (nova) => {
     if (nova === aba) return;
+    if (!descartarForm()) return;
     setAba(nova); setSearchTerm(''); closeDetail();
   };
+
+  // Ao abrir a tela no desktop, já mostra as tarifas da primeira categoria.
+  const fichaInicial = useRef(false);
+  useEffect(() => {
+    if (fichaInicial.current || !isDesktop || !categorias.length) return;
+    fichaInicial.current = true;
+    if (detailItem || catModal || seaModal) return;
+    setDetailItem(categorias[0]); setDetailType('cat'); setAbaFicha('precos');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorias, isDesktop]);
 
   // Depois de salvar, `load()` recria os objetos: a ficha aberta precisa
   // apontar para a versão nova, ou fica mostrando os dados antigos.
@@ -906,7 +970,7 @@ export default function PricingManagement() {
     setCatTab(CAT_FORM_TABS[(idx + 1) % CAT_FORM_TABS.length]);
   };
 
-  const openCreateCat = () => { setCatForm(blankCat()); setEditingCat(null); setCatTab('precos'); setCatModal('create'); };
+  const openCreateCat = () => { if (!descartarForm()) return; closeDetail(); setCatModal('create'); };
 
   const openEditCat = (cat) => {
     const occ = normOcc(cat.precosOcupacao, cat.maxPessoas);
@@ -1030,14 +1094,15 @@ export default function PricingManagement() {
         menores_idade,
       };
 
-      if (catModal === 'create') {
+      if (catModal !== 'edit') {
         await quartoCategoriApi.criar(payload);
         notify('Categoria criada com sucesso!');
       } else {
         await quartoCategoriApi.atualizar({ id: editingCat.id, ...payload });
         notify('Categoria atualizada com sucesso!');
       }
-      setCatModal(null);
+      setCatModal(null); setEditingCat(null);
+      setCatForm(blankCat()); setCatTab('precos');
       load();
     } catch (e) {
       notify('Erro: ' + e.message, 'error');
@@ -1052,7 +1117,7 @@ export default function PricingManagement() {
     setSeaTab(SEA_FORM_TABS[(idx + 1) % SEA_FORM_TABS.length]);
   };
 
-  const openCreateSea = () => { setSeaForm(blankSea()); setEditingSea(null); setSeaTab('agenda'); setSeaModal('create'); };
+  const openCreateSea = () => { if (!descartarForm()) return; closeDetail(); setSeaModal('create'); };
 
   const openEditSea = (s) => {
     const occ = normOcc(s.precosOcupacao, s.maxPessoas);
@@ -1231,14 +1296,15 @@ export default function PricingManagement() {
         fk_categorias: f.categoriasIds,
       };
 
-      if (seaModal === 'create') {
+      if (seaModal !== 'edit') {
         await sazonalidadeApi.criar(payload);
         notify('Sazonalidade criada com sucesso!');
       } else {
         await sazonalidadeApi.atualizar({ id: editingSea.id, ...payload });
         notify('Sazonalidade atualizada com sucesso!');
       }
-      setSeaModal(null);
+      setSeaModal(null); setEditingSea(null);
+      setSeaForm(blankSea()); setSeaTab('agenda');
       load();
     } catch (e) {
       notify('Erro: ' + e.message, 'error');
@@ -1252,13 +1318,15 @@ export default function PricingManagement() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      if (deleteTarget.type === 'cat' || deleteTarget.type === 'sea') {
-        notify('Exclusão não disponível no momento.', 'error');
-        setDeleteTarget(null);
-        return;
+      if (deleteTarget.type === 'cat') {
+        await quartoCategoriApi.excluir(deleteTarget.id);
+        notify('Categoria excluída.');
+      } else {
+        await sazonalidadeApi.excluir(deleteTarget.id);
+        notify('Sazonalidade excluída.');
       }
-      notify('Sazonalidade removida.');
       setDeleteTarget(null);
+      closeDetail();
       load();
     } catch (e) {
       notify('Erro: ' + e.message, 'error');
@@ -1348,7 +1416,7 @@ export default function PricingManagement() {
     ) : null
   );
 
-  /** Barra de ações da ficha — voltar, editar, excluir, fechar. */
+  /** Barra de ações da ficha — editar, excluir, fechar. */
   const FichaActions = ({ onEdit }) => (
     <div className={styles.dCardActions}>
       <Button className={styles.btnSolid} onClick={onEdit}>Editar</Button>
@@ -1363,11 +1431,25 @@ export default function PricingManagement() {
     </div>
   );
 
-  const BackBtn = () => (
-    <button type="button" className={styles.backBtn} onClick={closeDetail}
-      title="Voltar para a lista" aria-label="Voltar para a lista">
+  // só aparece quando a ficha/formulário ocupa a tela e a lista está fora
+  const BackBtn = ({ onClick = closeDetail, title = 'Voltar para a lista' }) => (
+    <button type="button" className={styles.backBtn} onClick={onClick}
+      title={title} aria-label={title}>
       <ChevronLeft size={17} />
     </button>
+  );
+
+  /** Abas da ficha (mesmo desenho das abas da ficha do hóspede). */
+  const FichaTabs = ({ abas, atual, onChange }) => (
+    <div className={styles.fichaTabs} role="tablist">
+      {abas.map(([k, label]) => (
+        <button key={k} type="button" role="tab" aria-selected={atual === k}
+          className={[styles.fichaTab, atual === k ? styles.fichaTabAtiva : ''].join(' ')}
+          onClick={() => onChange(k)}>
+          {label}
+        </button>
+      ))}
+    </div>
   );
 
   // ── Ficha da categoria ─────────────────────────────────────────────────────
@@ -1375,115 +1457,103 @@ export default function PricingManagement() {
     const seas   = seasOf(cat);
     const fixo   = cat.modeloCobranca === 'Por quarto (tarifa fixa)';
     const nQuart = (cat.quartos ?? []).length;
+    const abas = [
+      ['dados', 'Dados da categoria'],
+      ['precos', 'Tarifas'],
+      ['dayuse', 'Day Use'],
+      ['menores', 'Menores de idade'],
+      ['vinculos', 'Quartos e sazonalidades'],
+    ];
 
     return (
       <div className={styles.detailPanel}>
-
-        {/* ── Identificação ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
+        <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+          <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
             <BackBtn />
             <Tag size={16} />
-            <span className={styles.dCardTitle}>Dados da categoria</span>
+            <span className={styles.dCardTitle}>Ficha da categoria</span>
             <FichaActions onEdit={() => openEditCat(cat)} />
           </h3>
 
-          <div className={styles.dCardBody}>
-            <div className={styles.idHead}>
-              <div className={styles.idHeadMain}>
-                <div className={styles.idName}>
-                  <h2 style={{ margin: 0, font: 'inherit' }}>{cat.nome}</h2>
-                </div>
-                {cat.descricao && <p className={styles.idSub}>{cat.descricao}</p>}
-                <div className={styles.idTags}>
-                  <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
-                  {cat.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
-                  {cat.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
-                  <Pill>{nQuart} quarto{nQuart !== 1 ? 's' : ''}</Pill>
+          <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
+            <div className={styles.fichaTopo}>
+              <div className={styles.fichaId}>
+                <span className={styles.fichaIcone}><Tag size={26} /></span>
+                <div className={styles.idHeadMain}>
+                  <h2 className={styles.fichaNome}>{cat.nome}</h2>
+                  {cat.descricao && <p className={styles.fichaSub}>{cat.descricao}</p>}
+                  <div className={styles.idTags}>
+                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
+                    {cat.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
+                    {cat.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
+                    <Pill>{nQuart} quarto{nQuart !== 1 ? 's' : ''}</Pill>
+                  </div>
                 </div>
               </div>
+              <FichaTabs abas={abas} atual={abaFicha} onChange={setAbaFicha} />
             </div>
 
-            <div className={styles.fieldGrid}>
-              <Field label="Modelo de cobrança" value={cat.modeloCobranca} />
-              {!fixo && <Field label="Capacidade" value={`${cat.maxPessoas} pessoa${cat.maxPessoas !== 1 ? 's' : ''}`} />}
-              <Field label="Check-in"  value={cat.hora_checkin} />
-              <Field label="Check-out" value={cat.hora_checkout} />
-            </div>
+            {abaFicha === 'dados' && (<>
+              <div className={styles.fieldGrid}>
+                <Field label="Modelo de cobrança" value={cat.modeloCobranca} />
+                {!fixo && <Field label="Capacidade" value={`${cat.maxPessoas} pessoa${cat.maxPessoas !== 1 ? 's' : ''}`} />}
+                <Field label="Check-in"  value={cat.hora_checkin} />
+                <Field label="Check-out" value={cat.hora_checkout} />
+                <Field label="Quartos vinculados" value={String(nQuart)} />
+                <Field label="Sazonalidades" value={String(seas.length)} />
+              </div>
+              <AuditFooter item={cat} />
+            </>)}
 
-            <AuditFooter item={cat} />
-          </div>
-        </section>
+            {abaFicha === 'precos' && (
+              <Comparado base={cat} seas={seas} render={(item) => <PrecoBloco item={item} />} />
+            )}
 
-        {/* ── Tarifas de hospedagem ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <DollarSign size={16} />
-            <span className={styles.dCardTitle}>Tarifas de hospedagem</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <Comparado base={cat} seas={seas} render={(item) => <PrecoBloco item={item} />} />
-          </div>
-        </section>
+            {abaFicha === 'dayuse' && (
+              <Comparado base={cat} seas={seas} render={(item) => <DayUseBloco item={item} />} />
+            )}
 
-        {/* ── Day Use ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <Sun size={16} />
-            <span className={styles.dCardTitle}>Day Use</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <Comparado base={cat} seas={seas} render={(item) => <DayUseBloco item={item} />} />
-          </div>
-        </section>
+            {abaFicha === 'menores' && (
+              <Comparado base={cat} seas={seas} render={(item) => <ChildPricingDisplay criancas={item.criancas} />} />
+            )}
 
-        {/* ── Menores de idade ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <Baby size={16} />
-            <span className={styles.dCardTitle}>Menores de idade</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <Comparado base={cat} seas={seas} render={(item) => <ChildPricingDisplay criancas={item.criancas} />} />
-          </div>
-        </section>
-
-        {/* ── Quartos e sazonalidades ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <BedDouble size={16} />
-            <span className={styles.dCardTitle}>Quartos e sazonalidades</span>
-          </h3>
-
-          <div className={styles.dCardBody}>
-            <div className={styles.pillWrap}>
-              {(cat.quartosObj ?? []).length === 0
-                ? <span className={styles.detailEmpty}>Nenhum quarto vinculado.</span>
-                : (cat.quartosObj ?? []).map((q) => {
+            {/* mesmo desenho da aba "Quartos & Sazonais" do formulário, só leitura */}
+            {abaFicha === 'vinculos' && (<div className={styles.formBody}>
+              <div className={styles.sectionTitle}>Quartos vinculados</div>
+              {(cat.quartosObj ?? []).length === 0 ? (
+                <p className={styles.blockEmpty}>Nenhum quarto vinculado.</p>
+              ) : (
+                <div className={styles.checkList}>
+                  {(cat.quartosObj ?? []).map((q) => {
                     const full = quartos.find((x) => x.id === q.id);
+                    const desc = full?.tipoOcupacao || q.descricao || full?.descricao;
                     return (
-                      <span key={q.id} className={styles.pill}>
-                        Quarto {full?.numero ?? q.id}{q.descricao ? ` · ${q.descricao}` : ''}
-                      </span>
+                      <div key={q.id} className={[styles.checkItem, styles.checkItemView].join(' ')}>
+                        <Check size={14} className={styles.checkItemIco} />
+                        <span className={styles.checkItemLabel}>
+                          Quarto {full?.numero ?? q.id}{desc ? ` - ${desc.toUpperCase()}` : ''}
+                        </span>
+                      </div>
                     );
                   })}
-            </div>
+                </div>
+              )}
 
-            <div className={styles.subBlock}>
-              <div className={styles.blockHead}><Calendar size={15} /><span>Sazonalidades ativas</span></div>
+              <div className={styles.sectionTitle}>Sazonalidades ativas</div>
               {seas.length === 0 ? (
                 <p className={styles.blockEmpty}>Nenhuma sazonalidade ativa nesta categoria.</p>
               ) : (
-                <div className={styles.rowsBlock}>
+                <div className={styles.checkList}>
                   {seas.map((s) => (
-                    <div key={s.id} className={styles.duRow}>
-                      <span className={styles.duLabel}>{s.nome}</span>
-                      <span className={styles.duVal}>{MODO_LABEL[s.modoOperacao]} · {resumoSchedule(s)}</span>
+                    <div key={s.id} className={[styles.checkItem, styles.checkItemView].join(' ')}>
+                      <Check size={14} className={styles.checkItemIco} />
+                      <span className={styles.checkItemLabel}>{s.nome}</span>
+                      <span className={styles.checkItemSub}>{MODO_LABEL[s.modoOperacao]}</span>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </div>)}
           </div>
         </section>
       </div>
@@ -1496,113 +1566,289 @@ export default function PricingManagement() {
     const vinculadas = categorias.filter((c) =>
       (c.sazonaisAtivas ?? []).includes(s.id) || (s.categoriasIds ?? []).includes(c.id)
     );
+    const abas = [
+      ['dados', 'Agendamento'],
+      ['precos', 'Tarifas'],
+      ['dayuse', 'Day Use'],
+      ['menores', 'Menores de idade'],
+      ['categorias', 'Categorias vinculadas'],
+    ];
 
     return (
       <div className={styles.detailPanel}>
-
-        {/* ── Identificação e agendamento ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
+        <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+          <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
             <BackBtn />
             <Calendar size={16} />
-            <span className={styles.dCardTitle}>Dados da sazonalidade</span>
+            <span className={styles.dCardTitle}>Ficha da sazonalidade</span>
             <FichaActions onEdit={() => openEditSea(s)} />
           </h3>
 
-          <div className={styles.dCardBody}>
-            <div className={styles.idHead}>
-              <div className={styles.idHeadMain}>
-                <div className={styles.idName}>
-                  <h2 style={{ margin: 0, font: 'inherit' }}>{s.nome}</h2>
-                </div>
-                <p className={styles.idSub}>{describeSchedule(s)}</p>
-                <div className={styles.idTags}>
-                  <Pill tom="tagAmber">{MODO_LABEL[s.modoOperacao]}</Pill>
-                  <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
-                  {s.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
-                  {s.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
+          <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
+            <div className={styles.fichaTopo}>
+              <div className={styles.fichaId}>
+                <span className={[styles.fichaIcone, styles.fichaIconeSea].join(' ')}><Calendar size={26} /></span>
+                <div className={styles.idHeadMain}>
+                  <h2 className={styles.fichaNome}>{s.nome}</h2>
+                  <p className={styles.fichaSub}>{describeSchedule(s)}</p>
+                  <div className={styles.idTags}>
+                    {expirada(s) && <Pill tom="tagRed">Expirado</Pill>}
+                    <Pill tom="tagAmber">{MODO_LABEL[s.modoOperacao]}</Pill>
+                    <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
+                    {s.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
+                    {s.criancas?.ativo && <Pill tom="tagPrimary">Menores</Pill>}
+                  </div>
                 </div>
               </div>
+              <FichaTabs abas={abas} atual={abaFicha} onChange={setAbaFicha} />
             </div>
 
-            <div className={styles.fieldGrid}>
-              <Field label="Modo de operação" value={MODO_LABEL[s.modoOperacao]} />
-              {s.modoOperacao === 'data-especifica' && <>
-                <Field label="Início" value={[fmtDataBR(s.dataInicio), s.horaInicio].filter(Boolean).join(' · ')} />
-                <Field label="Fim"    value={[fmtDataBR(s.dataFim), s.horaFim].filter(Boolean).join(' · ')} />
-              </>}
-              {s.modoOperacao === 'semanal' && (
-                <Field label="Dias da semana" value={(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ')} />
+            {abaFicha === 'dados' && (<>
+              <div className={styles.fieldGrid}>
+                <Field label="Modo de operação" value={MODO_LABEL[s.modoOperacao]} />
+                {s.modoOperacao === 'data-especifica' && <>
+                  <Field label="Início" value={[fmtDataBR(s.dataInicio), s.horaInicio].filter(Boolean).join(' · ')} />
+                  <Field label="Fim"    value={[fmtDataBR(s.dataFim), s.horaFim].filter(Boolean).join(' · ')} />
+                </>}
+                {s.modoOperacao === 'semanal' && (
+                  <Field label="Dias da semana" value={(s.diasSemana || []).map((d) => DIAS_SEMANA[d]).join(', ')} />
+                )}
+                {s.modoOperacao === 'mensal' && (
+                  <Field label="Dias do mês" value={(s.diasMes || []).join(', ')} />
+                )}
+                {s.modoOperacao === 'anual' && (
+                  <Field label="Meses" value={(s.meses || []).map((m) => MESES_NOME[m]).join(', ')} />
+                )}
+                <Field label="Check-in"  value={s.horaCheckin} />
+                <Field label="Check-out" value={s.horaCheckout} />
+              </div>
+              <AuditFooter item={s} />
+            </>)}
+
+            {abaFicha === 'precos'  && <PrecoBloco item={s} />}
+            {abaFicha === 'dayuse'  && <DayUseBloco item={s} />}
+            {abaFicha === 'menores' && <ChildPricingDisplay criancas={s.criancas} />}
+
+            {abaFicha === 'categorias' && (
+              vinculadas.length === 0 ? (
+                <p className={styles.blockEmpty}>Esta sazonalidade não está vinculada a nenhuma categoria.</p>
+              ) : (
+                <div className={styles.rowsBlock}>
+                  {vinculadas.map((c) => (
+                    <div key={c.id} className={styles.duRow}>
+                      <span className={styles.duLabel}>{c.nome}</span>
+                      <span className={styles.duVal}>
+                        {c.modeloCobranca === 'Por quarto (tarifa fixa)' ? 'Tarifa fixa' : 'Por ocupação'}
+                        {c.dayUse?.ativo ? ' · Day Use' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  // ── Formulário (cadastro / edição) no painel da direita ───────────────────
+  const catFormContent = () => (<>
+    {catTab === 'precos' && (<>
+      <div className={styles.formGrid4}>
+        <div className={styles.span2}>
+          <FormField label="Nome da Categoria *">
+            <Input value={catForm.nome} onChange={(e) => setCatField('nome', e.target.value.toUpperCase())} placeholder="EX: STANDARD ATÉ 5 PESSOAS" />
+          </FormField>
+        </div>
+        <div className={styles.span2}>
+          <FormField label="Descrição">
+            <Input value={catForm.descricao} onChange={(e) => setCatField('descricao', e.target.value.toUpperCase())} placeholder="DESCRIÇÃO DA CATEGORIA" />
+          </FormField>
+        </div>
+        <FormField label="Check-in">
+          <TimePicker value={catForm.hora_checkin} onChange={(v) => setCatField('hora_checkin', v)} />
+        </FormField>
+        <FormField label="Check-out">
+          <TimePicker value={catForm.hora_checkout} onChange={(v) => setCatField('hora_checkout', v)} />
+        </FormField>
+      </div>
+      <PricingFields form={catForm} setField={setCatField} setOcc={setCatOcc} />
+    </>)}
+    {catTab === 'dayuse' && (
+      <DayUseFields du={catForm.dayUse} maxPessoas={catForm.maxPessoas} onChange={(du) => setCatField('dayUse', du)} />
+    )}
+    {catTab === 'criancas' && (
+      <ChildPricingFields criancas={catForm.criancas} onChange={(c) => setCatField('criancas', c)} />
+    )}
+    {catTab === 'vinculos' && (<>
+      <div className={styles.sectionTitle}>Quartos vinculados</div>
+      <div className={styles.checkList}>
+        {quartos.map((q) => {
+          const active = catForm.quartos.includes(q.id);
+          const outraCat = data.categorias.find(
+            (c) => c.id !== editingCat?.id && (c.quartos ?? []).includes(q.id)
+          );
+          const unavailable = !!outraCat && !active;
+          return (
+            <label key={q.id} className={[
+              styles.checkItem,
+              active ? styles.checkItemActive : '',
+              unavailable ? styles.checkItemUnavailable : '',
+            ].join(' ')}>
+              <input type="checkbox" className={styles.checkItemCb} checked={active} disabled={unavailable} onChange={() => !unavailable && toggleCatQuarto(q.id)} />
+              <span className={styles.checkItemLabel}>
+                Quarto {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}
+                {unavailable && <span className={styles.checkItemTag}>{outraCat.nome}</span>}
+              </span>
+            </label>
+          );
+        })}
+      </div>
+      <div className={styles.sectionTitle}>Sazonalidades ativas</div>
+      {sazonalidades.length === 0
+        ? <div className={styles.detailEmpty}>Nenhuma sazonalidade cadastrada.</div>
+        : (
+          <div className={styles.checkList}>
+            {sazonalidades.map((s) => {
+              const active = catForm.sazonaisAtivas.includes(s.id);
+              return (
+                <label key={s.id} className={[styles.checkItem, active ? styles.checkItemActive : ''].join(' ')}>
+                  <input type="checkbox" className={styles.checkItemCb} checked={active} onChange={() => toggleCatSazonais(s.id)} />
+                  <span className={styles.checkItemLabel}>{s.nome}</span>
+                  <span className={styles.checkItemSub}>{MODO_LABEL[s.modoOperacao]}</span>
+                </label>
+              );
+            })}
+          </div>
+        )}
+    </>)}
+  </>);
+
+  const seaFormContent = () => (<>
+    {seaTab === 'agenda' && (<>
+      <FormField label="Nome da Sazonalidade *">
+        <Input value={seaForm.nome} onChange={(e) => setSeaField('nome', e.target.value.toUpperCase())} placeholder="EX: ALTA TEMPORADA VERÃO" />
+      </FormField>
+
+      <div className={styles.sectionTitle}>Modo de Operação *</div>
+      <div className={styles.modeCards}>
+        {[
+          { value: 'data-especifica', label: 'Data Específica', desc: 'Período fixo' },
+          { value: 'semanal',         label: 'Semanal',         desc: 'Dias da semana' },
+          { value: 'mensal',          label: 'Mensal',          desc: 'Dias do mês' },
+          { value: 'anual',           label: 'Anual',           desc: 'Meses do ano' },
+        ].map((m) => (
+          <button key={m.value} type="button"
+            className={[styles.modeCard, seaForm.modoOperacao === m.value ? styles.modeCardActive : ''].join(' ')}
+            onClick={() => setSeaField('modoOperacao', m.value)}
+          >
+            <span className={styles.modeCardLabel}>{m.label}</span>
+            <span className={styles.modeCardDesc}>{m.desc}</span>
+          </button>
+        ))}
+      </div>
+      <ScheduleFields form={seaForm} onChange={setSeaField} />
+    </>)}
+    {seaTab === 'precos' && (
+      <PricingFields form={seaForm} setField={setSeaField} setOcc={setSeaOcc} />
+    )}
+    {seaTab === 'dayuse' && (
+      <DayUseFields du={seaForm.dayUse} maxPessoas={seaForm.maxPessoas} onChange={(du) => setSeaField('dayUse', du)} />
+    )}
+    {seaTab === 'criancas' && (
+      <ChildPricingFields criancas={seaForm.criancas} onChange={(c) => setSeaField('criancas', c)} />
+    )}
+    {seaTab === 'categorias' && (<>
+      <div className={styles.sectionTitle}>Vincular categorias</div>
+      <div className={styles.checkList}>
+        {categorias.map((cat) => {
+          const active = seaForm.categoriasIds.includes(cat.id);
+          const duLabel = cat.dayUse?.ativo
+            ? (cat.dayUse.modo === 'ocupacao' ? 'Day Use · por ocupação' : 'Day Use · preço fixo')
+            : 'Sem Day Use';
+          const criLabel = cat.criancas?.ativo
+            ? `Menores · ${CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo}`
+            : 'Sem cobrança de menores';
+          return (
+            <label key={cat.id} className={[styles.checkboxRow, active ? styles.checkboxRowActive : ''].join(' ')}>
+              <input type="checkbox" className={styles.checkbox} checked={active}
+                onChange={() => toggleSeaCat(cat.id)} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span className={styles.checkboxLabel}>{cat.nome}</span>
+                <span className={styles.checkboxSub}>{cat.modeloCobranca} · {duLabel} · {criLabel}</span>
+              </div>
+              {active && (
+                <button type="button" className={styles.seaRefBtn}
+                  onClick={(e) => { e.preventDefault(); preencherDeCat(cat); }}>
+                  Usar como referência
+                </button>
               )}
-              {s.modoOperacao === 'mensal' && (
-                <Field label="Dias do mês" value={(s.diasMes || []).join(', ')} />
-              )}
-              {s.modoOperacao === 'anual' && (
-                <Field label="Meses" value={(s.meses || []).map((m) => MESES_NOME[m]).join(', ')} />
-              )}
-              <Field label="Check-in"  value={s.horaCheckin} />
-              <Field label="Check-out" value={s.horaCheckout} />
-            </div>
+            </label>
+          );
+        })}
+        {categorias.length === 0 && (
+          <span className={styles.detailEmpty}>Nenhuma categoria cadastrada</span>
+        )}
+      </div>
+    </>)}
+  </>);
 
-            <AuditFooter item={s} />
-          </div>
-        </section>
+  const renderForm = () => {
+    const isCat   = formAtivo === 'cat';
+    const editar  = formModo === 'edit';
+    const abas    = (isCat ? CAT_FORM_TABS : SEA_FORM_TABS).map((k, i) => [k, (isCat ? CAT_FORM_LABELS : SEA_FORM_LABELS)[i]]);
+    const tabs    = isCat ? CAT_FORM_TABS : SEA_FORM_TABS;
+    const ultima  = (isCat ? catTab : seaTab) === tabs[tabs.length - 1];
+    const valido  = (isCat ? isCatValid(catForm) : isSeaValid(seaForm)) && (editar || ultima);
+    const salvando = isCat ? catSaving : seaSaving;
+    const titulo  = isCat
+      ? (editar ? 'Editar categoria' : 'Nova categoria')
+      : (editar ? 'Editar sazonalidade' : 'Nova sazonalidade');
 
-        {/* ── Tarifas de hospedagem ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <DollarSign size={16} />
-            <span className={styles.dCardTitle}>Tarifas de hospedagem</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <PrecoBloco item={s} />
-          </div>
-        </section>
-
-        {/* ── Day Use ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <Sun size={16} />
-            <span className={styles.dCardTitle}>Day Use</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <DayUseBloco item={s} />
-          </div>
-        </section>
-
-        {/* ── Menores de idade ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <Baby size={16} />
-            <span className={styles.dCardTitle}>Menores de idade</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            <ChildPricingDisplay criancas={s.criancas} />
-          </div>
-        </section>
-
-        {/* ── Categorias vinculadas ── */}
-        <section className={styles.dCard}>
-          <h3 className={styles.dCardHead}>
-            <Link2 size={16} />
-            <span className={styles.dCardTitle}>Categorias vinculadas</span>
-          </h3>
-          <div className={styles.dCardBody}>
-            {vinculadas.length === 0 ? (
-              <p className={styles.blockEmpty}>Esta sazonalidade não está vinculada a nenhuma categoria.</p>
-            ) : (
-              <div className={styles.rowsBlock}>
-                {vinculadas.map((c) => (
-                  <div key={c.id} className={styles.duRow}>
-                    <span className={styles.duLabel}>{c.nome}</span>
-                    <span className={styles.duVal}>
-                      {c.modeloCobranca === 'Por quarto (tarifa fixa)' ? 'Tarifa fixa' : 'Por ocupação'}
-                      {c.dayUse?.ativo ? ' · Day Use' : ''}
-                    </span>
-                  </div>
-                ))}
+    return (
+      <div className={styles.detailPanel}>
+        <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+          <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
+            {formExplicito && <BackBtn onClick={cancelarForm} title={editar ? 'Voltar para a ficha' : 'Voltar para a lista'} />}
+            {isCat ? <Tag size={16} /> : <Calendar size={16} />}
+            <span className={styles.dCardTitle}>{titulo}</span>
+            {formExplicito && (
+              <div className={styles.dCardActions}>
+                <button type="button" className={styles.idClose} onClick={cancelarForm}
+                  title="Cancelar" aria-label="Cancelar">
+                  <X size={16} />
+                </button>
               </div>
             )}
+          </h3>
+
+          <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
+            <div className={[styles.fichaTopo, styles.fichaTopoForm].join(' ')}>
+              <FichaTabs abas={abas} atual={isCat ? catTab : seaTab} onChange={isCat ? setCatTab : setSeaTab} />
+            </div>
+
+            <div className={styles.formBody}>
+              {isCat ? catFormContent() : seaFormContent()}
+            </div>
+
+            <div className={styles.formFoot}>
+              <Button className={styles.btnSolid} onClick={cancelarForm}>
+                {formExplicito ? 'Cancelar' : 'Limpar'}
+              </Button>
+              {valido ? (
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                  onClick={isCat ? handleSaveCat : handleSaveSea} disabled={salvando}>
+                  {salvando && <Loader2 size={14} className={styles.spinInline} />}
+                  {editar ? 'Salvar alterações' : isCat ? 'Criar categoria' : 'Criar sazonalidade'}
+                </Button>
+              ) : (
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                  onClick={isCat ? advanceCatTab : advanceSeaTab}>
+                  Avançar
+                </Button>
+              )}
+            </div>
           </div>
         </section>
       </div>
@@ -1622,7 +1868,9 @@ export default function PricingManagement() {
     return alvo.filter(Boolean).join(' ').toLowerCase().includes(busca);
   });
 
-  // Totais do painel geral.
+  const nSaz = (c) => (c.sazonaisAtivas ?? []).length;
+
+  // Totais do painel geral (celular, sem nada aberto).
   const quartosVinculados = new Set(categorias.flatMap((c) => c.quartos ?? [])).size;
   const comDayUse = categorias.filter((c) => c.dayUse?.ativo).length;
 
@@ -1630,25 +1878,34 @@ export default function PricingManagement() {
     <div className={styles.page}>
       <Notification notification={notification} />
       <div className={styles.container}>
-        {/* Abaixo de 1024px, com uma ficha aberta, ela toma a tela e a lista sai. */}
-        <main className={[styles.split, detailItem ? styles.splitListHidden : ''].join(' ')}>
+        {/* Abaixo de 1024px, com ficha ou formulário aberto, ele toma a tela e a lista sai. */}
+        <main className={[styles.split, detailItem || formExplicito ? styles.splitListHidden : ''].join(' ')}>
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
           <aside className={styles.listPanel}>
-            <div className={styles.segmented}>
-              <button type="button"
-                className={[styles.segmentedBtn, !isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
-                onClick={() => changeAba('cat')}>
-                Categorias
-              </button>
-              <button type="button"
-                className={[styles.segmentedBtn, isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
-                onClick={() => changeAba('sea')}>
-                Sazonalidades
-              </button>
+            {/* abas Categorias / Sazonalidades e o cadastro da aba atual ao lado */}
+            <div className={styles.listTopo}>
+              <div className={styles.segmented}>
+                <button type="button"
+                  className={[styles.segmentedBtn, !isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
+                  onClick={() => changeAba('cat')}>
+                  Categorias
+                </button>
+                <button type="button"
+                  className={[styles.segmentedBtn, isSeaTab ? styles.segmentedBtnActive : ''].join(' ')}
+                  onClick={() => changeAba('sea')}>
+                  Sazonalidades
+                </button>
+              </div>
+              {!formAtivo && (
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                  onClick={isSeaTab ? openCreateSea : openCreateCat}>
+                  Cadastrar
+                </Button>
+              )}
             </div>
 
-            <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
+            <div className={[styles.searchWrap, styles.searchWrapFull, searchTerm ? styles.searchAtiva : ''].join(' ')}>
               <Search size={16} className={styles.searchIcon} />
               <Input
                 value={searchTerm}
@@ -1672,10 +1929,6 @@ export default function PricingManagement() {
                     ? `${items.length} sazonalidade${items.length !== 1 ? 's' : ''}`
                     : `${items.length} categoria${items.length !== 1 ? 's' : ''}`}
               </span>
-              <Button className={[styles.btnSolid, styles.btnSm, styles.btnPrimary].join(' ')}
-                onClick={isSeaTab ? openCreateSea : openCreateCat}>
-                {isSeaTab ? 'Nova sazonalidade' : 'Nova categoria'}
-              </Button>
             </div>
 
             <div className={styles.listScroll}>
@@ -1686,7 +1939,7 @@ export default function PricingManagement() {
                   <AlertCircle size={24} opacity={0.3} />
                   <span>{searchTerm ? 'Nenhum resultado encontrado.' : isSeaTab ? 'Nenhuma sazonalidade cadastrada.' : 'Nenhuma categoria cadastrada.'}</span>
                 </div>
-              ) : items.map((item, i) => {
+              ) : items.map((item) => {
                 const ativo = detailItem?.id === item.id && detailType === (isSeaTab ? 'sea' : 'cat');
                 const fixo  = item.modeloCobranca === 'Por quarto (tarifa fixa)';
                 return (
@@ -1696,24 +1949,17 @@ export default function PricingManagement() {
                     <span className={styles.listItemBody}>
                       <span className={styles.listItemName}>
                         <span className={styles.nome}>{item.nome}</span>
+                        {isSeaTab && expirada(item) && <Pill tom="tagRed">Expirado</Pill>}
                       </span>
                       <span className={styles.listItemSub}>
-                        {isSeaTab ? (
-                          <>
-                            <Pill tom="tagAmber">{MODO_LABEL[item.modoOperacao]}</Pill>
-                            {resumoSchedule(item)}
-                          </>
-                        ) : (
-                          <>
-                            <Pill tom={fixo ? 'tagSlate' : 'tagEmerald'}>{fixo ? 'Tarifa fixa' : 'Por ocupação'}</Pill>
-                            {item.dayUse?.ativo && <Pill tom="tagAmber">Day Use</Pill>}
-                            {(item.sazonaisAtivas ?? []).length > 0 && (
-                              <Pill tom="tagPrimary">
-                                {item.sazonaisAtivas.length} sazonal{item.sazonaisAtivas.length !== 1 ? 'idades' : 'idade'}
-                              </Pill>
-                            )}
-                          </>
-                        )}
+                        {(isSeaTab
+                          ? [MODO_LABEL[item.modoOperacao], resumoSchedule(item)]
+                          : [
+                              fixo ? 'Tarifa fixa' : 'Por ocupação',
+                              item.dayUse?.ativo && 'Day Use',
+                              nSaz(item) > 0 && `${nSaz(item)} sazonalidade${nSaz(item) !== 1 ? 's' : ''}`,
+                            ]
+                        ).filter(Boolean).join(' · ')}
                       </span>
                     </span>
                     <ChevronRight size={16} className={styles.listChevron} />
@@ -1723,9 +1969,11 @@ export default function PricingManagement() {
             </div>
           </aside>
 
-          {/* ══ DETALHE ═════════════════════════════════════════ */}
-          {!detailItem ? (
-            /* ── Painel geral (nada selecionado) ── */
+          {/* ══ DIREITA: formulário, ficha ou painel geral ══════ */}
+          {formAtivo ? renderForm()
+            : detailItem ? (detailType === 'cat' ? renderCatPanel(detailItem) : renderSeaPanel(detailItem))
+            : (
+            /* ── Painel geral (celular, nada aberto) ── */
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
                 <h3 className={styles.dCardHead}>
@@ -1756,245 +2004,10 @@ export default function PricingManagement() {
                   )}
                 </div>
               </section>
-
-              <div className={styles.detailHint}>
-                Escolha uma categoria ou sazonalidade na lista ao lado para ver as tarifas.
-              </div>
             </div>
-          ) : detailType === 'cat' ? renderCatPanel(detailItem) : renderSeaPanel(detailItem)}
+          )}
         </main>
       </div>
-
-      {/* ═══════════════════════════════════════════════════════
-          MODAL — Criar / Editar Categoria
-      ═══════════════════════════════════════════════════════ */}
-      <Modal
-        open={!!catModal}
-        onClose={() => setCatModal(null)}
-        size="md"
-        title={catModal === 'create' ? <><Tag size={15} /> Nova Categoria</> : <><Edit2 size={15} /> Editar Categoria</>}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setCatModal(null)}>Cancelar</Button>
-            {isCatValid(catForm)
-              ? (
-                <Button variant="primary" onClick={handleSaveCat} disabled={catSaving}>
-                  {catSaving && <Loader2 size={14} className={styles.spinInline} />}
-                  {catModal === 'create' ? 'Criar Categoria' : 'Salvar'}
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={advanceCatTab}>
-                  Avançar →
-                </Button>
-              )
-            }
-          </div>
-        }
-      >
-        <div className={styles.tabs}>
-          {CAT_FORM_LABELS.map((label, i) => (
-            <button key={i} type="button"
-              className={[styles.tab, catTab === CAT_FORM_TABS[i] ? styles.tabActive : ''].join(' ')}
-              onClick={() => setCatTab(CAT_FORM_TABS[i])}
-            >{label}</button>
-          ))}
-        </div>
-        <div className={styles.formTabBody}>
-          {catTab === 'precos' && (
-            <div className={styles.formBody}>
-              <FormField label="Nome da Categoria *">
-                <Input value={catForm.nome} onChange={(e) => setCatField('nome', e.target.value.toUpperCase())} placeholder="EX: STANDARD ATÉ 5 PESSOAS" />
-              </FormField>
-              <FormField label="Descrição">
-                <Input value={catForm.descricao} onChange={(e) => setCatField('descricao', e.target.value.toUpperCase())} placeholder="DESCRIÇÃO DA CATEGORIA" />
-              </FormField>
-              <div className={styles.formRow}>
-                <FormField label="Check-in">
-                  <TimePicker value={catForm.hora_checkin} onChange={(v) => setCatField('hora_checkin', v)} />
-                </FormField>
-                <FormField label="Check-out">
-                  <TimePicker value={catForm.hora_checkout} onChange={(v) => setCatField('hora_checkout', v)} />
-                </FormField>
-              </div>
-              <PricingFields form={catForm} setField={setCatField} setOcc={setCatOcc} />
-            </div>
-          )}
-          {catTab === 'dayuse' && (
-            <div className={styles.formBody}>
-              <DayUseFields du={catForm.dayUse} maxPessoas={catForm.maxPessoas} onChange={(du) => setCatField('dayUse', du)} />
-            </div>
-          )}
-          {catTab === 'criancas' && (
-            <div className={styles.formBody}>
-              <ChildPricingFields
-                criancas={catForm.criancas}
-                onChange={(c) => setCatField('criancas', c)}
-              />
-            </div>
-          )}
-          {catTab === 'vinculos' && (
-            <div className={styles.formBody}>
-              <div className={styles.sectionTitle}>Quartos vinculados</div>
-              <div className={styles.checkList}>
-                {quartos.map((q) => {
-                  const active = catForm.quartos.includes(q.id);
-                  const outraCat = data.categorias.find(
-                    (c) => c.id !== editingCat?.id && (c.quartos ?? []).includes(q.id)
-                  );
-                  const unavailable = !!outraCat && !active;
-                  return (
-                    <label key={q.id} className={[
-                      styles.checkItem,
-                      active ? styles.checkItemActive : '',
-                      unavailable ? styles.checkItemUnavailable : '',
-                    ].join(' ')}>
-                      <input type="checkbox" className={styles.checkItemCb} checked={active} disabled={unavailable} onChange={() => !unavailable && toggleCatQuarto(q.id)} />
-                      <span className={styles.checkItemLabel}>
-                        Quarto {q.numero ?? q.id}{(q.tipoOcupacao || q.descricao) ? ` - ${(q.tipoOcupacao || q.descricao).toUpperCase()}` : ''}
-                        {unavailable && <span className={styles.checkItemTag}>{outraCat.nome}</span>}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              <div className={styles.sectionTitle}>Sazonalidades ativas</div>
-              {sazonalidades.length === 0
-                ? <div style={{ fontSize: 13, color: 'var(--text-2)' }}>Nenhuma sazonalidade cadastrada.</div>
-                : (
-                  <div className={styles.checkList}>
-                    {sazonalidades.map((s) => {
-                      const active = catForm.sazonaisAtivas.includes(s.id);
-                      return (
-                        <label key={s.id} className={[styles.checkItem, active ? styles.checkItemActive : ''].join(' ')}>
-                          <input type="checkbox" className={styles.checkItemCb} checked={active} onChange={() => toggleCatSazonais(s.id)} />
-                          <span className={styles.checkItemLabel}>{s.nome}</span>
-                          <span className={styles.checkItemSub}>{MODO_LABEL[s.modoOperacao]}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                )}
-            </div>
-          )}
-        </div>
-      </Modal>
-
-      {/* ═══════════════════════════════════════════════════════
-          MODAL — Criar / Editar Sazonalidade
-      ═══════════════════════════════════════════════════════ */}
-      <Modal
-        open={!!seaModal}
-        onClose={() => setSeaModal(null)}
-        size="lg"
-        title={seaModal === 'create' ? <><Calendar size={15} /> Nova Sazonalidade</> : <><Edit2 size={15} /> Editar Sazonalidade</>}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button variant="secondary" onClick={() => setSeaModal(null)}>Cancelar</Button>
-            {isSeaValid(seaForm)
-              ? (
-                <Button variant="primary" onClick={handleSaveSea} disabled={seaSaving}>
-                  {seaSaving && <Loader2 size={14} className={styles.spinInline} />}
-                  {seaModal === 'create' ? 'Criar Sazonalidade' : 'Salvar'}
-                </Button>
-              ) : (
-                <Button variant="primary" onClick={advanceSeaTab}>
-                  Avançar →
-                </Button>
-              )
-            }
-          </div>
-        }
-      >
-        <div className={styles.tabs}>
-          {SEA_FORM_LABELS.map((label, i) => (
-            <button key={i} type="button"
-              className={[styles.tab, seaTab === SEA_FORM_TABS[i] ? styles.tabActive : ''].join(' ')}
-              onClick={() => setSeaTab(SEA_FORM_TABS[i])}
-            >{label}</button>
-          ))}
-        </div>
-        <div className={styles.formTabBody}>
-          {seaTab === 'agenda' && (
-            <div className={styles.formBody}>
-              <FormField label="Nome da Sazonalidade *">
-                <Input value={seaForm.nome} onChange={(e) => setSeaField('nome', e.target.value.toUpperCase())} placeholder="EX: ALTA TEMPORADA VERÃO" />
-              </FormField>
-
-              <div className={styles.sectionTitle}>Modo de Operação *</div>
-              <div className={styles.modeCards}>
-                {[
-                  { value: 'data-especifica', label: 'Data Específica', desc: 'Período fixo' },
-                  { value: 'semanal',         label: 'Semanal',         desc: 'Dias da semana' },
-                  { value: 'mensal',          label: 'Mensal',          desc: 'Dias do mês' },
-                  { value: 'anual',           label: 'Anual',           desc: 'Meses do ano' },
-                ].map((m) => (
-                  <button key={m.value} type="button"
-                    className={[styles.modeCard, seaForm.modoOperacao === m.value ? styles.modeCardActive : ''].join(' ')}
-                    onClick={() => setSeaField('modoOperacao', m.value)}
-                  >
-                    <span className={styles.modeCardLabel}>{m.label}</span>
-                    <span className={styles.modeCardDesc}>{m.desc}</span>
-                  </button>
-                ))}
-              </div>
-              <ScheduleFields form={seaForm} onChange={setSeaField} />
-            </div>
-          )}
-          {seaTab === 'precos' && (
-            <div className={styles.formBody}>
-              <PricingFields form={seaForm} setField={setSeaField} setOcc={setSeaOcc} />
-            </div>
-          )}
-          {seaTab === 'dayuse' && (
-            <div className={styles.formBody}>
-              <DayUseFields du={seaForm.dayUse} maxPessoas={seaForm.maxPessoas} onChange={(du) => setSeaField('dayUse', du)} />
-            </div>
-          )}
-          {seaTab === 'criancas' && (
-            <div className={styles.formBody}>
-              <ChildPricingFields
-                criancas={seaForm.criancas}
-                onChange={(c) => setSeaField('criancas', c)}
-              />
-            </div>
-          )}
-          {seaTab === 'categorias' && (
-            <div className={styles.formBody}>
-              <div className={styles.sectionTitle}>Vincular categorias</div>
-              <div className={styles.checkList}>
-                {categorias.map((cat) => {
-                  const active = seaForm.categoriasIds.includes(cat.id);
-                  const duLabel = cat.dayUse?.ativo
-                    ? (cat.dayUse.modo === 'ocupacao' ? 'Day Use · por ocupação' : 'Day Use · preço fixo')
-                    : 'Sem Day Use';
-                  const criLabel = cat.criancas?.ativo
-                    ? `Menores · ${CRIANCAS_MODO_LABEL[cat.criancas.modo] ?? cat.criancas.modo}`
-                    : 'Sem cobrança de menores';
-                  return (
-                    <label key={cat.id} className={[styles.checkboxRow, active ? styles.checkboxRowActive : ''].join(' ')}>
-                      <input type="checkbox" className={styles.checkbox} checked={active}
-                        onChange={() => toggleSeaCat(cat.id)} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <span className={styles.checkboxLabel}>{cat.nome}</span>
-                        <span className={styles.checkboxSub}>{cat.modeloCobranca} · {duLabel} · {criLabel}</span>
-                      </div>
-                      {active && (
-                        <button type="button" className={styles.seaRefBtn}
-                          onClick={(e) => { e.preventDefault(); preencherDeCat(cat); }}>
-                          Usar como referência
-                        </button>
-                      )}
-                    </label>
-                  );
-                })}
-                {categorias.length === 0 && (
-                  <span className={styles.detailEmpty}>Nenhuma categoria cadastrada</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </Modal>
 
       {/* ═══════════════════════════════════════════════════════
           MODAL — Confirmar exclusão
@@ -2016,11 +2029,29 @@ export default function PricingManagement() {
       >
         <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>
           Tem certeza que deseja excluir <strong>{deleteTarget?.nome}</strong>?
-          {deleteTarget?.type === 'sea' && (
-            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-2)' }}>
-              O vínculo desta sazonalidade será removido de todas as categorias.
-            </div>
-          )}
+          {deleteTarget?.type === 'cat' && (() => {
+            const cat = categorias.find((c) => c.id === deleteTarget.id);
+            const qs = (cat?.quartosObj ?? []).map((q) => quartos.find((x) => x.id === q.id)?.numero ?? q.id);
+            const ss = cat ? seasOf(cat).map((s) => s.nome) : [];
+            if (!qs.length && !ss.length) return null;
+            return (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)' }}>
+                Esta categoria possui vínculos que também serão removidos:
+                {qs.length > 0 && <div style={{ marginTop: 6 }}><strong>Quartos:</strong> {qs.join(', ')}</div>}
+                {ss.length > 0 && <div style={{ marginTop: 4 }}><strong>Sazonalidades:</strong> {ss.join(', ')}</div>}
+              </div>
+            );
+          })()}
+          {deleteTarget?.type === 'sea' && (() => {
+            const cs = categorias.filter((c) => (c.sazonaisAtivas ?? []).includes(deleteTarget.id)).map((c) => c.nome);
+            if (!cs.length) return null;
+            return (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-2)' }}>
+                Esta sazonalidade possui vínculos que também serão removidos:
+                <div style={{ marginTop: 6 }}><strong>Categorias:</strong> {cs.join(', ')}</div>
+              </div>
+            );
+          })()}
         </div>
       </Modal>
     </div>

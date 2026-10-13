@@ -13,39 +13,48 @@
 
 .timeDrop {
   position: fixed; z-index: 9999;
-  display: flex; align-items: center; gap: 6px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px;
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0,0,0,.18);
-  padding: 10px 12px;
+  border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  padding: 10px 14px; box-sizing: border-box; height: 230px;
 }
 
-.timeColWrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.timeColLabel {
-  font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--text-2);
+.rodas {
+  position: relative; display: flex; align-items: center; justify-content: center; gap: 2px;
+  perspective: 600px;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
 }
 
-.timeArrow {
-  width: 52px; height: 26px; display: flex; align-items: center; justify-content: center;
-  border: none; background: none; cursor: pointer; color: var(--text-2);
-  border-radius: 6px; transition: background .1s, color .1s;
+/* faixa cinza atrás do valor selecionado, como no iOS */
+.faixa {
+  position: absolute; left: 0; right: 0; border-radius: 8px;
+  background: color-mix(in oklch, var(--text) 9%, transparent);
+  pointer-events: none;
 }
-.timeArrow:hover { background: rgba(124,58,237,.08); color: var(--violet); }
 
-.timeCol {
-  width: 52px; height: 144px; overflow-y: auto; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--surface-2);
-  scroll-snap-type: y mandatory;
+.roda { position: relative; width: 56px; height: 100%; }
+.rodaScroll {
+  height: 100%; overflow-y: auto; scroll-snap-type: y mandatory;
+  scrollbar-width: none; overscroll-behavior: contain;
+  transform-style: preserve-3d;
 }
-.timeCol::-webkit-scrollbar { display: none; }
+.rodaScroll::-webkit-scrollbar { display: none; }
 
-.timeItem {
-  width: 100%; height: 36px; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; font-weight: 500; color: var(--text);
-  border: none; background: none; cursor: pointer;
-  scroll-snap-align: start; transition: background .1s;
+.rodaItem {
+  width: 100%; height: 34px; display: flex; align-items: center; justify-content: center;
+  border: none; background: none; cursor: pointer; padding: 0;
+  font-family: var(--font); font-size: 19px; font-weight: 400;
+  font-variant-numeric: tabular-nums; color: var(--text-2);
+  scroll-snap-align: center; backface-visibility: hidden;
 }
-.timeItem:hover      { background: rgba(124,58,237,.06); }
-.timeItemActive      { background: rgba(124,58,237,.12); color: var(--violet); font-weight: 700; }
+.rodaItemSel { color: var(--text); font-weight: 500; }
 
-.timeSep { font-size: 20px; font-weight: 700; color: var(--text-2); margin-top: 38px; }
+.timeSep { position: relative; font-size: 19px; font-weight: 500; color: var(--text); }
+
+.timeOk {
+  height: 30px; border: none; border-radius: 8px; cursor: pointer;
+  background: none; color: var(--violet); font-family: var(--font);
+  font-size: 14px; font-weight: 600;
+}
+.timeOk:hover { background: color-mix(in oklch, var(--violet) 10%, transparent); }
