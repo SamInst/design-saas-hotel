@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Search, Loader2, AlertCircle, Calendar, X,
-  Eye, EyeOff, Lock, Building,
-  Users, ChevronLeft, ChevronRight as ChevRight,
-  CreditCard, CheckCircle2, AlertTriangle, XCircle, Upload,
+  Search, Loader2, AlertCircle, X, Check,
+  Eye, EyeOff, Briefcase, Contact, UserPlus, Mail, MapPin, User, Lock,
+  ChevronLeft, ChevronRight as ChevRight,
+  CheckCircle2, AlertTriangle, XCircle, Upload,
 } from 'lucide-react';
 
 import { Button } from '../../components/ui/Button';
@@ -14,6 +14,9 @@ import { DatePicker } from '../../components/ui/DatePicker';
 import { funcionarioApi, cargoApi, cadastroApi, usuarioApi, enumApi } from '../../services/api';
 import iconWhatsapp from '../../assets/whatsapp.png';
 import iconGmail    from '../../assets/gmail.png';
+import imgUsuario   from '../../assets/avatar/usuario.png';
+import imgMasculino from '../../assets/avatar/masculino.png';
+import imgFeminino  from '../../assets/avatar/feminino.png';
 
 import styles from './EmployeeManagement.module.css';
 import { tr } from '../../i18n';
@@ -46,6 +49,27 @@ const fmtBRL = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency
 
 const unmask = v => (v ?? '').replace(/\D/g,'');
 
+// Datas digitadas, sem calendário — mesmo campo da tela de Cadastro.
+const maskDate = v => {
+  const n = v.replace(/\D/g,'').slice(0,8);
+  if (n.length <= 2) return n;
+  if (n.length <= 4) return `${n.slice(0,2)}/${n.slice(2)}`;
+  return `${n.slice(0,2)}/${n.slice(2,4)}/${n.slice(4)}`;
+};
+// "dd/mm/aaaa" → Date (00:00) ou null quando incompleta/inexistente/no futuro
+const parseDateBR = v => {
+  const m = (v ?? '').match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const [dd, mm, yyyy] = [+m[1], +m[2], +m[3]];
+  if (mm < 1 || mm > 12 || dd < 1 || yyyy < 1900) return null;
+  const d = new Date(yyyy, mm - 1, dd);
+  if (d.getDate() !== dd || d.getMonth() !== mm - 1) return null;
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  if (d > hoje) return null;
+  return d;
+};
+const fmtDateBR = d => (d instanceof Date && !isNaN(d) ? d.toLocaleDateString('pt-BR') : '');
+
 const parseDateDMY = str => {
   if (!str) return null;
   const [d, m, y] = str.split('/');
@@ -62,20 +86,6 @@ const formatDateDMY = d => {
   }
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(d)) return d;
   return '';
-};
-
-// ── Avatar helpers ────────────────────────────────────────────
-// Círculo sólido com as iniciais em branco, no ciclo de cores das faixas do
-// calendário. A cor vem da posição na lista, como na tela de Cadastro.
-const AVATAR_TONES = ['avTeal', 'avAmber', 'avCoral', 'avIndigo', 'avSky', 'avEmerald'];
-const avatarTone = (i) => styles[AVATAR_TONES[((i % AVATAR_TONES.length) + AVATAR_TONES.length) % AVATAR_TONES.length]];
-
-const getInitials = (name) => {
-  if (!name) return '?';
-  const words = (name ?? '').trim().split(/\s+/).filter(Boolean);
-  if (words.length === 0) return '?';
-  if (words.length === 1) return words[0][0].toUpperCase();
-  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 };
 
 // ── Validação CPF ─────────────────────────────────────────────
@@ -111,9 +121,6 @@ const blankFuncionario = () => ({
   senhaConfirma: '',
 });
 
-// Teto da busca única que alimenta os totais do painel geral.
-const TETO_STATS = 300;
-
 const dateFromApi = d => {
   if (!d) return '';
   if (d.includes('/')) return d; // already formatted
@@ -121,23 +128,50 @@ const dateFromApi = d => {
   return `${(p[2]??'').padStart(2,'0')}/${(p[1]??'').padStart(2,'0')}/${p[0]??''}`;
 };
 
-// ── Status Badge ──────────────────────────────────────────────
-function StatusBadge({ status }) {
-  const cls = status === 'ATIVO'    ? styles.badgeAtivo
-            : status === 'DEMITIDO' ? styles.badgeDemitido
-            : styles.badgeDefault;
-  return <span className={cls}>{status ?? '—'}</span>;
+// Pessoa vinda da API no formato do formulário (e de volta, via buildPessoaBody).
+const pessoaFromApi = p => ({
+  nome: p?.nome ?? '',
+  dataNascimento: parseDateDMY(dateFromApi(p?.data_nascimento ?? p?.dataNascimento)),
+  cpf: maskCPF(p?.cpf ?? ''),
+  rg: p?.rg ?? '',
+  email: p?.email ?? '',
+  telefone: maskPhone(p?.telefone ?? ''),
+  sexo: String(p?.sexo ?? ''),
+  pais: p?.pais ?? 'Brasil',
+  estado: p?.estado ?? '',
+  municipio: p?.municipio ?? '',
+  endereco: p?.endereco ?? '',
+  complemento: p?.complemento ?? '',
+  cep: maskCEP(p?.cep ?? ''),
+  bairro: p?.bairro ?? '',
+  numero: p?.numero ?? '',
+  status: p?.status ?? 'ATIVO',
+});
+
+// ── Avatar ────────────────────────────────────────────────────
+// Mesma foto por sexo da tela de Cadastro.
+function AvatarCircle({ sexo, size = 40 }) {
+  const img = Number(sexo) === 2 ? imgFeminino
+    : Number(sexo) === 1 ? imgMasculino
+    : imgUsuario;
+  return (
+    <img src={img} alt="" className={styles.avatar}
+      width={size} height={size} draggable={false} />
+  );
 }
 
-// ── Avatar Circle ─────────────────────────────────────────────
-function AvatarCircle({ name, size = 40, tone = 0 }) {
+// ── Ícone do filtro ───────────────────────────────────────────
+// SVG próprio (não vem do lucide); herda a cor do botão via currentColor.
+function FilterIcon({ size = 16 }) {
   return (
-    <span
-      className={[styles.avatar, avatarTone(tone)].join(' ')}
-      style={{ width: size, height: size, fontSize: size >= 56 ? 16 : 12 }}
+    <svg
+      width={size} height={size} viewBox="0 0 487 511.954"
+      fill="currentColor" fillRule="evenodd" clipRule="evenodd"
+      shapeRendering="geometricPrecision"
+      aria-hidden="true" focusable="false"
     >
-      {getInitials(name)}
-    </span>
+      <path fillRule="nonzero" d="M0 52.894h146.098a70.42 70.42 0 0118.388-32.26C177.18 7.874 194.783 0 214.13 0c19.37 0 36.95 7.874 49.645 20.569s20.569 30.275 20.569 49.644c0 19.348-7.874 36.95-20.569 49.645-12.76 12.673-30.319 20.569-49.645 20.569-19.282 0-36.884-7.896-49.579-20.569-8.79-8.812-15.29-19.936-18.453-32.326H0V52.894zm392.096 201.698a35.528 35.528 0 00-10.404-25.172 35.526 35.526 0 00-25.172-10.404 35.562 35.562 0 00-25.171 10.404c-6.413 6.369-10.404 15.334-10.404 25.172 0 9.837 3.991 18.802 10.382 25.193 6.391 6.391 15.356 10.382 25.193 10.382 9.837 0 18.802-3.991 25.193-10.382a35.728 35.728 0 0010.383-25.193zm14.069-49.645a70.26 70.26 0 0118.409 32.326h62.405v34.637h-62.405a70.366 70.366 0 01-18.409 32.326c-12.761 12.673-30.319 20.569-49.645 20.569-19.282 0-36.884-7.896-49.579-20.569-12.738-12.76-20.634-30.362-20.634-49.644 0-19.326 7.896-36.885 20.569-49.58 12.694-12.76 30.297-20.634 49.644-20.634 19.369 0 36.95 7.874 49.645 20.569zM260.11 271.91H0v-34.637h260.11v34.637zM67.007 424.421a70.414 70.414 0 0118.388-32.26c12.694-12.76 30.297-20.634 49.644-20.634 19.369 0 36.95 7.874 49.645 20.569 12.694 12.694 20.569 30.275 20.569 49.644 0 19.347-7.875 36.95-20.569 49.645-12.76 12.672-30.319 20.569-49.645 20.569-19.282 0-36.884-7.897-49.579-20.569-8.79-8.813-15.29-19.937-18.453-32.326H0v-34.638h67.007zm42.839-7.852c-6.391 6.369-10.382 15.334-10.382 25.171s3.991 18.802 10.382 25.193c6.391 6.391 15.356 10.383 25.193 10.383 9.838 0 18.803-3.992 25.193-10.383a35.728 35.728 0 0010.383-25.193 35.525 35.525 0 00-35.576-35.576 35.654 35.654 0 00-25.193 10.405zm121.603 7.852h255.508v34.638H231.449v-34.638zM188.937 45.042c-6.391 6.369-10.382 15.334-10.382 25.171 0 9.838 3.991 18.802 10.382 25.193 6.391 6.391 15.356 10.383 25.193 10.383 9.838 0 18.802-3.992 25.193-10.383a35.725 35.725 0 0010.383-25.193 35.524 35.524 0 00-35.576-35.575 35.653 35.653 0 00-25.193 10.404zm121.603 7.852H487v34.638H310.54V52.894z" />
+    </svg>
   );
 }
 
@@ -181,16 +215,36 @@ function SkeletonLista({ linhas = 7 }) {
   );
 }
 
-function SkeletonPainel() {
+// ── Campo de data com máscara ─────────────────────────────────
+function DateMaskInput({ value, onChange, className = '' }) {
+  const [text, setText] = useState(() => fmtDateBR(value));
+
+  // Sincroniza quando o valor vem de fora (abrir a edição, limpar o formulário…)
+  useEffect(() => {
+    const fromValue = fmtDateBR(value);
+    if (value ? fromValue !== text : parseDateBR(text)) setText(fromValue);
+  }, [value]); // eslint-disable-line
+
+  const handle = e => {
+    const masked = maskDate(e.target.value);
+    setText(masked);
+    onChange(parseDateBR(masked));
+  };
+
+  const invalida = text.length === 10 && !parseDateBR(text);
+
   return (
-    <div className={styles.statGrid} role="status" aria-label={tr('Carregando totais')}>
-      {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className={styles.statCard} aria-hidden="true">
-          <span className={sk(styles.skLabel)} />
-          <span className={sk(styles.skNumero)} />
-        </div>
-      ))}
-    </div>
+    <>
+      <Input
+        value={text}
+        onChange={handle}
+        placeholder={tr('dd/mm/aaaa')}
+        inputMode="numeric"
+        maxLength={10}
+        className={className}
+      />
+      {invalida && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>{tr('Data inválida')}</span>}
+    </>
   );
 }
 
@@ -239,51 +293,37 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
 
   return (
     <div className={styles.formBody}>
-      <div className={styles.sectionLabel}>{tr('Dados Pessoais')}</div>
-      {/* CPF | Nome | Data Nascimento */}
-      <div className={styles.cpfRow}>
-        <div className={styles.cpfBlock}>
-          <label className={[styles.cpfLabel, hasErr('cpf') && !cpfStatus ? styles.labelErr : ''].join(' ')}>
-            {tr('CPF *')}
-          </label>
-          <div className={styles.cpfWrap}>
-            <Input
-              value={p.cpf}
-              onChange={e => handleCPF(e.target.value)}
-              placeholder="000.000.000-00"
-              className={cpfStatus === 'ok' ? styles.inputOk : cpfStatus === 'exists' ? styles.inputWarn : cpfStatus === 'invalid' ? styles.inputErr : hasErr('cpf') && !cpfStatus ? styles.inputErr : ''}
-            />
-            {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
-          </div>
+      <div className={styles.sectionDivider}><User size={12} /> {tr('Dados Pessoais')}</div>
+
+      <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
+        <FormField label={tr('Nome completo *')}>
+          <Input value={p.nome} onChange={e => set('nome', e.target.value)} placeholder={tr('Nome completo')} />
+        </FormField>
+      </div>
+
+      <div className={styles.gridFix}>
+        <div className={[styles.cpfBlock, hasErr('cpf') && !cpfStatus ? styles.reqFieldErr : ''].join(' ')}>
+          <FormField label={tr('CPF *')}>
+            <div className={styles.cpfWrap}>
+              <Input
+                value={p.cpf}
+                onChange={e => handleCPF(e.target.value)}
+                placeholder="000.000.000-00"
+                className={cpfStatus === 'ok' ? styles.inputOk : cpfStatus === 'exists' ? styles.inputWarn : cpfStatus === 'invalid' ? styles.inputErr : hasErr('cpf') && !cpfStatus ? styles.inputErr : ''}
+              />
+              {cpfIcon && <span className={styles.cpfIcon}>{cpfIcon}</span>}
+            </div>
+          </FormField>
           {cpfStatus === 'invalid' && <span className={styles.cpfMsg} style={{ color:'#ef4444' }}>{tr('CPF inválido')}</span>}
           {cpfStatus === 'exists'  && <span className={styles.cpfMsg} style={{ color:'#f59e0b' }}>{tr('CPF já cadastrado')}</span>}
           {cpfStatus === 'ok'      && <span className={styles.cpfMsg} style={{ color:'#10b981' }}>{tr('CPF disponível')}</span>}
         </div>
 
-        <div className={[styles.reqField, hasErr('nome') ? styles.reqFieldErr : ''].join(' ')}>
-          <FormField label={tr('Nome completo *')}>
-            <Input value={p.nome} onChange={e => set('nome', e.target.value)} placeholder={tr('Nome completo')} />
-          </FormField>
-        </div>
-
         <div className={[styles.reqField, hasErr('dataNascimento') ? styles.reqFieldErr : ''].join(' ')}>
           <FormField label={tr('Data de Nascimento *')}>
-            <DatePicker
-              mode="single"
-              value={p.dataNascimento}
-              onChange={d => set('dataNascimento', d ?? null)}
-              maxDate={new Date()}
-              placeholder={tr('dd/mm/aaaa')}
-              error={hasErr('dataNascimento')}
-            />
+            <DateMaskInput value={p.dataNascimento} onChange={d => set('dataNascimento', d)} />
           </FormField>
         </div>
-      </div>
-
-      <div className={styles.grid3}>
-        <FormField label="RG">
-          <Input value={p.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
-        </FormField>
         <FormField label={tr('Sexo')}>
           <Select value={p.sexo} onChange={e => set('sexo', e.target.value)}>
             <option value="">{tr('Selecione')}</option>
@@ -299,51 +339,55 @@ function PessoaFormEmployee({ data, onChange, onFetchCEP, onCheckCPF, showErrors
         </div>
       </div>
 
-      <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
-        <FormField label={tr('Email *')}>
-          <Input type="email" value={p.email} onChange={e => set('email', e.target.value)} placeholder={tr('email@exemplo.com')} />
+      <div className={styles.rgEmailRow}>
+        <FormField label="RG">
+          <Input value={p.rg} onChange={e => set('rg', e.target.value)} placeholder="RG" />
         </FormField>
+        <div className={[styles.reqField, hasErr('email') ? styles.reqFieldErr : ''].join(' ')}>
+          <FormField label={tr('Email *')}>
+            <Input type="email" value={p.email} onChange={e => set('email', e.target.value)} placeholder={tr('email@exemplo.com')} />
+          </FormField>
+        </div>
       </div>
 
-      <div className={styles.sectionLabel}>{tr('Endereço')}</div>
+      <div className={styles.sectionDivider}><MapPin size={12} /> {tr('Endereço')}</div>
 
-      <div className={styles.grid3}>
+      <div className={styles.addrRow1}>
         <div className={[styles.reqField, hasErr('cep') ? styles.reqFieldErr : ''].join(' ')}>
-          <label className={[styles.fieldLabel, hasErr('cep') ? styles.labelErr : ''].join(' ')}>{tr('CEP *')}</label>
-          <div className={styles.inputWithSpinner}>
-            <Input value={p.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
-              className={hasErr('cep') ? styles.inputErr : ''} />
-            {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
-          </div>
+          <FormField label={tr('CEP *')}>
+            <div className={styles.inputWithSpinner}>
+              <Input value={p.cep} onChange={e => handleCEP(e.target.value)} placeholder="00000-000"
+                className={hasErr('cep') ? styles.inputErr : ''} />
+              {cepLoading && <Loader2 size={13} className={[styles.spinInline, styles.inputSpinner].join(' ')} />}
+            </div>
+          </FormField>
         </div>
-        <FormField label={tr('País')}>
-          <Input value={p.pais} onChange={e => set('pais', e.target.value)} placeholder={tr('Brasil')} />
+        <FormField label={tr('Endereço')}>
+          <Input value={p.endereco} onChange={e => set('endereco', e.target.value)} placeholder={tr('Rua / Av.')} />
+        </FormField>
+        <FormField label={tr('Número')}>
+          <Input value={p.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
+        </FormField>
+      </div>
+      <div className={styles.addrRow2}>
+        <FormField label={tr('Bairro')}>
+          <Input value={p.bairro} onChange={e => set('bairro', e.target.value)} />
+        </FormField>
+        <FormField label={tr('Município')}>
+          <Input value={p.municipio} onChange={e => set('municipio', e.target.value)} />
         </FormField>
         <FormField label={tr('Estado')}>
           <Input value={p.estado} onChange={e => set('estado', e.target.value)} placeholder="UF" />
         </FormField>
       </div>
-      <div className={styles.grid2}>
-        <FormField label={tr('Município')}>
-          <Input value={p.municipio} onChange={e => set('municipio', e.target.value)} />
+      <div className={styles.addrRow3}>
+        <FormField label={tr('País')}>
+          <Input value={p.pais} onChange={e => set('pais', e.target.value)} placeholder={tr('Brasil')} />
         </FormField>
-        <FormField label={tr('Bairro')}>
-          <Input value={p.bairro} onChange={e => set('bairro', e.target.value)} />
-        </FormField>
-      </div>
-      <div className={styles.grid3}>
-        <div className={styles.spanTwo}>
-          <FormField label={tr('Endereço')}>
-            <Input value={p.endereco} onChange={e => set('endereco', e.target.value)} placeholder={tr('Rua / Av.')} />
-          </FormField>
-        </div>
-        <FormField label={tr('Número')}>
-          <Input value={p.numero} onChange={e => set('numero', e.target.value)} placeholder="0" />
+        <FormField label={tr('Complemento')}>
+          <Input value={p.complemento} onChange={e => set('complemento', e.target.value)} placeholder={tr('Apto, Bloco...')} />
         </FormField>
       </div>
-      <FormField label={tr('Complemento')}>
-        <Input value={p.complemento} onChange={e => set('complemento', e.target.value)} placeholder={tr('Apto, Bloco...')} />
-      </FormField>
     </div>
   );
 }
@@ -363,14 +407,15 @@ export default function EmployeeManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const searchDebounce = useRef(null);
 
-  // modais
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [detailTone, setDetailTone] = useState(0);
+  // filtro de cargo da lista
+  const [cargoFiltro, setCargoFiltro] = useState(null);
+  const [cargoMenu, setCargoMenu] = useState(false);
+  const cargoMenuRef = useRef(null);
 
-  // painel geral, exibido enquanto nenhum funcionário está selecionado
-  const [stats, setStats] = useState(null);
-  const [statsLoading, setStatsLoading] = useState(true);
+  // formulários no painel da direita
+  const [showAddModal, setShowAddModal] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [abaFicha, setAbaFicha] = useState('dados');
   const [detailItem, setDetailItem] = useState(null);
   const [cargos, setCargos] = useState([]);
 
@@ -501,36 +546,12 @@ export default function EmployeeManagement() {
     status:          p.status ?? 'ATIVO',
   });
 
-  // Totais do painel geral. O /funcionario não tem contagem por status, então
-  // busca a lista inteira uma vez e conta aqui. Acima do teto a soma sairia
-  // errada (viria só a primeira página), e aí só o total é mostrado.
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
-      const res = await funcionarioApi.listar({ size: TETO_STATS, page: 0 });
-      const total = res?.totalElements ?? 0;
-      const lista = res?.content ?? [];
-      const completo = total <= TETO_STATS;
-      setStats({
-        total,
-        completo,
-        ativos:    completo ? lista.filter(f => f.pessoa?.status !== 'DEMITIDO').length : null,
-        demitidos: completo ? lista.filter(f => f.pessoa?.status === 'DEMITIDO').length : null,
-      });
-    } catch {
-      setStats(null);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchStats(); }, [fetchStats]);
-
-  const fetchData = useCallback(async (term = '', pg = 0) => {
+  const fetchData = useCallback(async (term = '', pg = 0, cargo = null) => {
     setLoading(true);
     try {
       const params = { size: 15, page: pg };
       if (term) params.termo = term;
+      if (cargo) params.cargoId = cargo.id;
 
       const res = await funcionarioApi.listar(params);
       setItems(res?.content ?? []);
@@ -548,15 +569,43 @@ export default function EmployeeManagement() {
     if (searchTerm.length >= 3) {
       searchDebounce.current = setTimeout(() => {
         setPage(0);
-        fetchData(searchTerm, 0);
+        fetchData(searchTerm, 0, cargoFiltro);
       }, 400);
     } else if (searchTerm.length === 0) {
-      fetchData('', 0);
+      setPage(0);
+      fetchData('', 0, cargoFiltro);
     }
     return () => clearTimeout(searchDebounce.current);
-  }, [searchTerm, fetchData]);
+  }, [searchTerm, cargoFiltro, fetchData]);
 
-  const goToPage = pg => { setPage(pg); fetchData(searchTerm, pg); };
+  // fecha o menu de cargo ao clicar fora
+  useEffect(() => {
+    if (!cargoMenu) return;
+    const onDown = e => { if (cargoMenuRef.current && !cargoMenuRef.current.contains(e.target)) setCargoMenu(false); };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [cargoMenu]);
+
+  const changeCargoFiltro = cargo => setCargoFiltro(cargo);
+
+  const goToPage = pg => { setPage(pg); fetchData(searchTerm, pg, cargoFiltro); };
+
+  const formAtivo = showAddModal ? 'novo' : showEdit ? 'edit' : null;
+  const isDemitido = detailItem?.pessoa?.status === 'DEMITIDO';
+
+  const openAddEmployee = () => {
+    setNewFunc(blankFuncionario());
+    setShowErrors(false);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setShowEdit(false);
+    setShowAddModal(true);
+  };
+
+  const cancelAddEmployee = () => {
+    setShowAddModal(false);
+    setShowErrors(false);
+  };
 
   const handleAddEmployee = () => {
     const p = newFunc.pessoa;
@@ -614,8 +663,7 @@ export default function EmployeeManagement() {
       setShowErrors(false);
       setShowPassword(false);
       setShowConfirmPassword(false);
-      fetchData(searchTerm, page);
-      fetchStats();
+      fetchData(searchTerm, page, cargoFiltro);
     } catch (e) {
       showNotif(e.message || tr('Erro ao cadastrar funcionário.'), 'error');
     } finally {
@@ -623,10 +671,11 @@ export default function EmployeeManagement() {
     }
   };
 
-  // `tone` mantém o avatar da ficha na mesma cor do item da lista.
-  const openDetail = async (item, tone = 0) => {
+  const openDetail = async (item) => {
     setDetailItem(item);
-    setDetailTone(tone);
+    setShowAddModal(false);
+    setShowEdit(false);
+    setAbaFicha('dados');
     setEditHistoryItem(null);
     setRecebidos([]);
 
@@ -664,24 +713,7 @@ export default function EmployeeManagement() {
     if (!detailItem) return;
     const item = detailItem;
     setEditFunc({
-      pessoa: {
-        nome: item.pessoa?.nome ?? '',
-        dataNascimento: parseDateDMY(item.pessoa?.data_nascimento ?? item.pessoa?.dataNascimento),
-        cpf: maskCPF(item.pessoa?.cpf ?? ''),
-        rg: item.pessoa?.rg ?? '',
-        email: item.pessoa?.email ?? '',
-        telefone: maskPhone(item.pessoa?.telefone ?? ''),
-        sexo: String(item.pessoa?.sexo ?? ''),
-        pais: item.pessoa?.pais ?? 'Brasil',
-        estado: item.pessoa?.estado ?? '',
-        municipio: item.pessoa?.municipio ?? '',
-        endereco: item.pessoa?.endereco ?? '',
-        complemento: item.pessoa?.complemento ?? '',
-        cep: maskCEP(item.pessoa?.cep ?? ''),
-        bairro: item.pessoa?.bairro ?? '',
-        numero: item.pessoa?.numero ?? '',
-        status: item.pessoa?.status ?? 'ATIVO',
-      },
+      pessoa: pessoaFromApi(item.pessoa),
       dataAdmissao: parseDateDMY(item.data_admissao ?? item.dataAdmissao),
       salario: maskBRL(String(Math.round(item.salario * 100))),
       cargoId: String(item.cargo?.id ?? ''),
@@ -693,7 +725,7 @@ export default function EmployeeManagement() {
       showPassword: false,
       showConfirmPassword: false,
     });
-    // a ficha continua aberta; o modal de edição sobe por cima
+    // o formulário toma o lugar da ficha; ao salvar ou voltar, a ficha reaparece
     setShowEdit(true);
   };
 
@@ -717,8 +749,7 @@ export default function EmployeeManagement() {
       await funcionarioApi.atualizar(funBody);
       showNotif(tr('Funcionário atualizado!'));
       setShowEdit(false);
-      fetchData(searchTerm, page);
-      fetchStats();
+      fetchData(searchTerm, page, cargoFiltro);
       refreshDetail();
     } catch (e) {
       showNotif(e.message || tr('Erro ao atualizar.'), 'error');
@@ -734,12 +765,11 @@ export default function EmployeeManagement() {
     setFireLoading(true);
     try {
       await usuarioApi.bloquear(detailItem.usuario.id, true);
-      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'DEMITIDO' };
+      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(pessoaFromApi(detailItem.pessoa)), status: 'DEMITIDO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
       showNotif(tr('Funcionário demitido e usuário bloqueado!'));
       setDetailItem(null);
-      fetchData(searchTerm, page);
-      fetchStats();
+      fetchData(searchTerm, page, cargoFiltro);
     } catch (e) {
       showNotif(e.message || tr('Erro ao desligar funcionário.'), 'error');
     } finally {
@@ -754,12 +784,11 @@ export default function EmployeeManagement() {
     setFireLoading(true);
     try {
       await usuarioApi.bloquear(detailItem.usuario.id, false);
-      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(detailItem.pessoa), status: 'CONTRATADO' };
+      const pessoaBody = { id: detailItem.pessoa.id, ...buildPessoaBody(pessoaFromApi(detailItem.pessoa)), status: 'CONTRATADO' };
       await cadastroApi.atualizarPessoa(pessoaBody);
       showNotif(tr('Funcionário reativado com sucesso!'));
       setDetailItem(null);
-      fetchData(searchTerm, page);
-      fetchStats();
+      fetchData(searchTerm, page, cargoFiltro);
     } catch (e) {
       showNotif(e.message || tr('Erro ao reativar funcionário.'), 'error');
     } finally {
@@ -940,28 +969,83 @@ export default function EmployeeManagement() {
   return (
     <div className={styles.page}>
       <div className={styles.container}>
-        {/* Abaixo de 1024px, com uma ficha aberta, ela toma a tela e a lista sai. */}
-        <main className={[styles.split, detailItem ? styles.splitListHidden : ''].join(' ')}>
+        {/* Abaixo de 1024px, com uma ficha ou formulário aberto, ele toma a tela e a lista sai. */}
+        <main className={[styles.split, (detailItem || formAtivo) ? styles.splitListHidden : ''].join(' ')}>
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
+          <div className={styles.listCol}>
           <aside className={styles.listPanel}>
-            <div className={[styles.searchWrap, styles.searchWrapFull].join(' ')}>
-              <Search size={16} className={styles.searchIcon} />
-              <Input
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder={tr('Buscar por nome, CPF, e-mail ou cargo...')}
-                className={styles.searchInput}
-                aria-label={tr('Buscar')}
-              />
-              {loading && searchTerm.length >= 3
-                ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
-                : searchTerm.length > 0 &&
-                  <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label={tr('Limpar busca')}>
-                    <X size={14} />
-                  </button>
-              }
+            <div className={styles.listTopo}>
+              <span className={styles.listTitulo}>{tr('Funcionários')}</span>
+              {!formAtivo && (
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={openAddEmployee}>
+                  {tr('Cadastrar')}
+                </Button>
+              )}
             </div>
+
+            {/* Busca + filtro de cargo */}
+            <div className={styles.searchRow}>
+              <div className={[styles.searchWrap, styles.searchWrapFull, searchTerm ? styles.searchAtiva : ''].join(' ')}>
+                <Search size={16} className={styles.searchIcon} />
+                <Input
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder={tr('Buscar por nome, CPF, e-mail ou cargo...')}
+                  className={styles.searchInput}
+                  aria-label={tr('Buscar')}
+                />
+                {loading && searchTerm.length >= 3
+                  ? <Loader2 size={14} className={[styles.spinInline, styles.searchSpinner].join(' ')} />
+                  : searchTerm.length > 0 &&
+                    <button className={styles.searchClear} onClick={() => setSearchTerm('')} aria-label={tr('Limpar busca')}>
+                      <X size={14} />
+                    </button>
+                }
+              </div>
+
+              <div className={styles.filterWrap} ref={cargoMenuRef}>
+                <button type="button"
+                  className={[styles.filterBtn, cargoFiltro ? styles.filterBtnOn : ''].join(' ')}
+                  onClick={() => setCargoMenu(v => !v)}
+                  aria-haspopup="menu" aria-expanded={cargoMenu}
+                  title={tr('Filtrar por cargo')}>
+                  <FilterIcon size={18} />
+                  {cargoFiltro && <span className={styles.filterDot} />}
+                </button>
+
+                {cargoMenu && (
+                  <div className={styles.filterMenu} role="menu">
+                    <span className={styles.filterMenuLabel}>{tr('Cargo')}</span>
+                    {[{ id: null, descricao: tr('Todos') }, ...cargos].map(c => {
+                      const on = (cargoFiltro?.id ?? null) === c.id;
+                      return (
+                        <button key={c.id ?? 'todos'} type="button" role="menuitem"
+                          className={[styles.filterMenuItem, on ? styles.filterMenuItemOn : ''].join(' ')}
+                          onClick={() => { changeCargoFiltro(c.id == null ? null : c); setCargoMenu(false); }}>
+                          <span>{c.descricao}</span>
+                          {on && <Check size={14} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* filtro de cargo aplicado, com o x que volta para "todos" */}
+            {cargoFiltro && (
+              <div className={styles.filtroChips}>
+                <span className={styles.filtroChip}>
+                  <span className={styles.filtroChipRot}>{tr('Cargo:')}</span> {cargoFiltro.descricao}
+                  <button type="button" className={styles.filtroChipX}
+                    onClick={() => changeCargoFiltro(null)}
+                    title={tr('Remover filtro')} aria-label={tr('Remover filtro {{label}}', { label: cargoFiltro.descricao })}>
+                    <X size={12} />
+                  </button>
+                </span>
+              </div>
+            )}
 
             <div className={styles.listMeta}>
               <span>
@@ -979,21 +1063,21 @@ export default function EmployeeManagement() {
                   <AlertCircle size={24} opacity={0.3} />
                   <span>{tr('Nenhum resultado encontrado.')}</span>
                 </div>
-              ) : items.map((item, i) => {
+              ) : items.map(item => {
                 const nome  = item.pessoa?.nome || '—';
                 const ativo = detailItem?.id === item.id;
                 return (
                   <button key={item.id} type="button"
                     className={[styles.listItem, ativo ? styles.listItemActive : ''].join(' ')}
-                    onClick={() => openDetail(item, i)}>
-                    <AvatarCircle name={nome} size={40} tone={i} />
+                    onClick={() => openDetail(item)}>
+                    <AvatarCircle sexo={item.pessoa?.sexo} size={40} />
                     <span className={styles.listItemBody}>
                       <span className={styles.listItemName}>
                         <span className={styles.nome}>{nome}</span>
-                        {item.pessoa?.status === 'DEMITIDO' && <span className={styles.badgeDemitido}>{tr('Demitido')}</span>}
+                        {item.pessoa?.status === 'DEMITIDO' && <span className={styles.badgeBloqueado}>{tr('Demitido')}</span>}
                       </span>
                       <span className={styles.listItemLoc}>
-                        <Building size={12} /> {item.cargo?.descricao || tr('Sem cargo')}
+                        <Briefcase size={12} /> {item.cargo?.descricao || tr('Sem cargo')}
                       </span>
                     </span>
                     <ChevRight size={16} className={styles.listChevron} />
@@ -1016,87 +1100,183 @@ export default function EmployeeManagement() {
               </div>
             )}
           </aside>
+          </div>
 
           {/* ══ DETALHE ═════════════════════════════════════════ */}
-          {!detailItem ? (
-            /* ── Painel geral (nenhum funcionário selecionado) ── */
+          {/* Os formulários ocupam o painel no lugar da ficha, como na tela de Cadastro. */}
+          <div className={styles.detailCol}>
+
+          {formAtivo === 'novo' ? (
             <div className={styles.detailPanel}>
               <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <Users size={16} />
-                  <span className={styles.dCardTitle}>{tr('Visão geral da equipe')}</span>
+                <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
+                  <button type="button" className={styles.backBtn} onClick={cancelAddEmployee}
+                    title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
+                    <ChevronLeft size={17} />
+                  </button>
+                  <UserPlus size={16} />
+                  <span className={styles.dCardTitle}>{tr('Novo Funcionário')}</span>
                   <div className={styles.dCardActions}>
-                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
-                      onClick={() => {
-                        setNewFunc(blankFuncionario());
-                        setShowErrors(false);
-                        setShowPassword(false);
-                        setShowConfirmPassword(false);
-                        setShowAddModal(true);
-                      }}>
-                      {tr('Adicionar funcionário')}
-                    </Button>
+                    <button type="button" className={styles.idClose} onClick={cancelAddEmployee}
+                      title={tr('Cancelar')} aria-label={tr('Cancelar')}>
+                      <X size={16} />
+                    </button>
                   </div>
                 </h3>
-
                 <div className={styles.dCardBody}>
-                  {statsLoading ? (
-                    <SkeletonPainel />
-                  ) : !stats ? (
-                    <div className={styles.empty}>
-                      <AlertCircle size={24} opacity={0.3} />
-                      <span>{tr('Não foi possível carregar os totais.')}</span>
+                  <div className={styles.formBody}>
+                    <PessoaFormEmployee data={newFunc} onChange={setNewFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} showErrors={showErrors} />
+
+                    <div className={styles.sectionDivider}><Briefcase size={12} /> {tr('Dados Profissionais')}</div>
+
+                    <div className={styles.gridFix}>
+                      <FormField label={tr('Data de Admissão *')}>
+                        <DateMaskInput value={newFunc.dataAdmissao} onChange={d => setNewFunc(prev => ({ ...prev, dataAdmissao: d }))} />
+                      </FormField>
+                      <FormField label={tr('Cargo *')}>
+                        <Select value={newFunc.cargoId} onChange={e => setNewFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
+                          <option value="">{tr('Selecione um cargo')}</option>
+                          {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                        </Select>
+                      </FormField>
+                      <FormField label={tr('Salário')}>
+                        <div className={styles.currencyWrapper}>
+                          <span className={styles.currencyPrefix}>{tr('R$')}</span>
+                          <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
+                        </div>
+                      </FormField>
                     </div>
-                  ) : (
-                    <div className={styles.statGrid}>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{tr('Funcionários')}</p>
-                        <p className={styles.statVal}>{stats.total}</p>
+
+                    <div className={styles.sectionDivider}><Lock size={12} /> {tr('Acesso ao Sistema')}</div>
+
+                    <div className={styles.gridFix}>
+                      <FormField label={tr('Usuário para Acesso')}>
+                        <Input value={newFunc.usuario.username} onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" />
+                      </FormField>
+                      <div>
+                        <label className={styles.fieldLabel}>{tr('Senha *')}</label>
+                        <div className={styles.inputWithSpinner}>
+                          <Input
+                            type={showPassword ? 'text' : 'password'}
+                            value={newFunc.usuario.senha}
+                            onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, senha: e.target.value } }))}
+                            placeholder={tr('Digite a senha')}
+                          />
+                          <button type="button" onClick={() => setShowPassword(!showPassword)} className={styles.eyeBtn}>
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
                       </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{tr('Ativos')}</p>
-                        <p className={[styles.statVal, styles.statValGreen].join(' ')}>
-                          {stats.completo ? stats.ativos : '—'}
-                        </p>
-                      </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{tr('Demitidos')}</p>
-                        <p className={[styles.statVal, styles.statValRed].join(' ')}>
-                          {stats.completo ? stats.demitidos : '—'}
-                        </p>
-                      </div>
-                      <div className={styles.statCard}>
-                        <p className={styles.statLabel}>{tr('Cargos')}</p>
-                        <p className={styles.statVal}>{cargos.length}</p>
+                      <div>
+                        <label className={styles.fieldLabel}>{tr('Confirmar Senha *')}</label>
+                        <div className={styles.inputWithSpinner}>
+                          <Input
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={newFunc.senhaConfirma}
+                            onChange={e => setNewFunc(prev => ({ ...prev, senhaConfirma: e.target.value }))}
+                            placeholder={tr('Confirme a senha')}
+                          />
+                          <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className={styles.eyeBtn}>
+                            {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
+
+                  <div className={styles.formFoot}>
+                    <Button className={styles.btnSolid} onClick={() => { setNewFunc(blankFuncionario()); setShowErrors(false); }}>{tr('Limpar')}</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleAddEmployee} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Cadastrar')}
+                    </Button>
+                  </div>
                 </div>
               </section>
-
-              <div className={styles.detailHint}>
-                {tr('Escolha um funcionário na lista ao lado para ver a ficha completa.')}
-              </div>
             </div>
-          ) : (
-            /* ── Ficha do funcionário ── */
+
+          ) : formAtivo === 'edit' ? (
+            <div className={styles.detailPanel}>
+              <section className={styles.dCard}>
+                <h3 className={[styles.dCardHead, styles.formHead].join(' ')}>
+                  <button type="button" className={styles.backBtn} onClick={() => setShowEdit(false)}
+                    title={tr('Voltar')} aria-label={tr('Voltar')}>
+                    <ChevronLeft size={17} />
+                  </button>
+                  <Contact size={16} />
+                  <span className={styles.dCardTitle}>{tr('Editar Funcionário')}</span>
+                  <div className={styles.dCardActions}>
+                    <button type="button" className={styles.idClose} onClick={() => setShowEdit(false)}
+                      title={tr('Cancelar')} aria-label={tr('Cancelar')}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                </h3>
+                <div className={styles.dCardBody}>
+                  <div className={styles.formBody}>
+                    <PessoaFormEmployee data={editFunc} onChange={setEditFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
+
+                    <div className={styles.sectionDivider}><Briefcase size={12} /> {tr('Dados Profissionais')}</div>
+
+                    <div className={styles.gridFix}>
+                      <FormField label={tr('Data de Admissão *')}>
+                        <DateMaskInput value={editFunc.dataAdmissao} onChange={d => setEditFunc(prev => ({ ...prev, dataAdmissao: d }))} />
+                      </FormField>
+                      <FormField label={tr('Cargo *')}>
+                        <Select value={editFunc.cargoId} onChange={e => setEditFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
+                          <option value="">{tr('Selecione um cargo')}</option>
+                          {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                        </Select>
+                      </FormField>
+                      <FormField label={tr('Salário')}>
+                        <div className={styles.currencyWrapper}>
+                          <span className={styles.currencyPrefix}>{tr('R$')}</span>
+                          <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
+                        </div>
+                      </FormField>
+                    </div>
+
+                    <div className={styles.sectionDivider}><Lock size={12} /> {tr('Acesso ao Sistema')}</div>
+
+                    <div className={styles.gridFix}>
+                      <FormField label={tr('Usuário para Acesso')}>
+                        <Input value={editFunc.usuario.username} placeholder="username" readOnly />
+                      </FormField>
+                    </div>
+                  </div>
+
+                  <div className={styles.formFoot}>
+                    <Button className={styles.btnSolid} onClick={() => setShowEdit(false)}>{tr('Cancelar')}</Button>
+                    <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                      onClick={handleSaveEditEmployee} disabled={isSubmitting}>
+                      {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+          ) : !detailItem ? null : (
             <div className={styles.detailPanel}>
 
-              {/* ── Dados do funcionário ── */}
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
+              {/* ── Ficha do funcionário: dados, acesso e histórico ── */}
+              <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+                <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
                   {/* só aparece quando a ficha ocupa a tela e a lista está fora */}
                   <button type="button" className={styles.backBtn} onClick={closeDetail}
                     title={tr('Voltar para a lista')} aria-label={tr('Voltar para a lista')}>
                     <ChevronLeft size={17} />
                   </button>
-                  <CreditCard size={16} />
-                  <span className={styles.dCardTitle}>{tr('Dados do funcionário')}</span>
+                  <Contact size={16} />
+                  <span className={styles.dCardTitle}>{tr('Ficha do funcionário')}</span>
                   <div className={styles.dCardActions}>
-                    <Button className={styles.btnSolid} onClick={openEditEmployee}>
+                    <span className={[styles.fichaStatus, isDemitido ? styles.fichaStatusBloq : ''].join(' ')}>
+                      {isDemitido ? tr('Demitido') : tr('Ativo')}
+                    </span>
+                    <Button className={styles.btnSolid} onClick={openEditEmployee} disabled={isDemitido}>
                       {tr('Editar')}
                     </Button>
-                    {detailItem.pessoa?.status === 'DEMITIDO' ? (
+                    {isDemitido ? (
                       <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                         onClick={handleReativarEmployee} disabled={fireLoading}>
                         {tr('Reativar')}
@@ -1114,56 +1294,45 @@ export default function EmployeeManagement() {
                   </div>
                 </h3>
 
-                <div className={styles.dCardBody}>
-                  <div className={styles.idHead}>
-                    <AvatarCircle name={detailItem.pessoa?.nome} size={56} tone={detailTone} />
-                    <div className={styles.idHeadMain}>
-                      <div className={styles.idName}>
-                        <h2 style={{ margin: 0, font: 'inherit' }}>{detailItem.pessoa?.nome ?? '—'}</h2>
-                        <StatusBadge status={detailItem.pessoa?.status} />
+                <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
+                  <div className={styles.fichaTopo}>
+                    <div className={styles.fichaId}>
+                      <AvatarCircle sexo={detailItem.pessoa?.sexo} size={72} />
+                      <div className={styles.idHeadMain}>
+                        <h2 className={styles.fichaNome}>{detailItem.pessoa?.nome ?? '—'}</h2>
+                        <p className={styles.fichaSub}>
+                          <span>{detailItem.cargo?.descricao || tr('Sem cargo')}</span>
+                          {detailItem.data_admissao && <>
+                            <span aria-hidden="true">·</span>
+                            <span>{tr('Admitido em {{data}}', { data: dateFromApi(detailItem.data_admissao) })}</span>
+                          </>}
+                        </p>
+                        <p className={styles.fichaSub}>{tr('Salário atual:')} {fmtBRL(detailItem.salario)}</p>
                       </div>
-                      <p className={styles.idSub}>
-                        {detailItem.cargo?.descricao || tr('Sem cargo')}
-                        {detailItem.data_admissao && tr(' · admitido em {{v0}}', { v0: dateFromApi(detailItem.data_admissao) })}
-                      </p>
-                      <p className={styles.idSub}>{tr('Salário atual:')} {fmtBRL(detailItem.salario)}</p>
+                    </div>
+
+                    <div className={styles.fichaTabs} role="tablist">
+                      {[
+                        ['dados', tr('Dados cadastrais')],
+                        ['acesso', tr('Acesso ao sistema')],
+                        ['historico', tr('Histórico de cargo e salário')],
+                      ].map(([k, label]) => (
+                        <button key={k} type="button" role="tab" aria-selected={abaFicha === k}
+                          className={[styles.fichaTab, abaFicha === k ? styles.fichaTabAtiva : ''].join(' ')}
+                          onClick={() => setAbaFicha(k)}>
+                          {label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  <div className={styles.fieldGrid}>
-                    <Field label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} mono />
-                    <Field label={tr('Data de nascimento')} value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
-                    <Field label={tr('E-mail')} value={detailItem.pessoa?.email ? (
-                      <ContatoBotao tipo="gmail" href={`mailto:${detailItem.pessoa.email}`} title={tr('Enviar e-mail')}>
-                        {detailItem.pessoa.email}
-                      </ContatoBotao>
-                    ) : ''} />
-                    <Field label={tr('Telefone')} value={detailItem.pessoa?.telefone ? (
-                      <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} title={tr('WhatsApp')}>
-                        {maskPhone(detailItem.pessoa.telefone)}
-                      </ContatoBotao>
-                    ) : ''} />
-                    <Field label={tr('Endereço')} value={[
-                      [detailItem.pessoa?.endereco, detailItem.pessoa?.numero].filter(Boolean).join(', '),
-                      detailItem.pessoa?.bairro,
-                    ].filter(Boolean).join(' — ')} />
-                    <Field label={tr('Cidade / UF')} value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' — ')} />
-                    <Field label="RG" value={detailItem.pessoa?.rg} mono />
-                    <Field label={tr('Sexo')} value={
-                      detailItem.pessoa?.sexo === 1 ? tr('Masculino')
-                      : detailItem.pessoa?.sexo === 2 ? tr('Feminino')
-                      : detailItem.pessoa?.sexo ? tr('Outro') : ''
-                    } />
-                    <Field label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} mono />
-                    <Field label={tr('País')} value={detailItem.pessoa?.pais} />
-                  </div>
-
-                  {/* ── Acesso ao sistema ── */}
-                  <div className={styles.subBlock}>
-                    <div className={styles.blockHead}>
-                      <Lock size={15} />
-                      <span>{tr('Acesso ao sistema')}</span>
-                      <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                  {abaFicha === 'acesso' ? (<>
+                    <div className={styles.fieldGrid}>
+                      <Field label={tr('Usuário')} value={detailItem.usuario?.username} />
+                      <Field label={tr('Situação do acesso')} value={detailItem.usuario?.bloqueado ? tr('Bloqueado') : tr('Liberado')} />
+                    </div>
+                    <div className={styles.formFoot}>
+                      <Button className={styles.btnSolid}
                         onClick={() => {
                           setCredentialsForm({ username: detailItem.usuario?.username ?? '', senha: '' });
                           setShowEditCredentials(true);
@@ -1171,292 +1340,175 @@ export default function EmployeeManagement() {
                         {tr('Atualizar credenciais')}
                       </Button>
                     </div>
-                    <div className={styles.fieldGrid}>
-                      <Field label={tr('Usuário')} value={detailItem.usuario?.username} />
-                      <Field label={tr('Situação do acesso')} value={detailItem.usuario?.bloqueado ? tr('Bloqueado') : tr('Liberado')} />
-                    </div>
-                  </div>
-                </div>
-              </section>
+                  </>) : abaFicha === 'historico' ? (
+                    historicoLoading ? (
+                      <div className={styles.empty}>
+                        <Loader2 size={18} className={styles.spinInline} /> {tr('Carregando histórico...')}
+                      </div>
+                    ) : historico.length === 0 ? (
+                      <p className={styles.blockEmpty}>{tr('Sem histórico de cargo e salário.')}</p>
+                    ) : (
+                      <div className={styles.histList}>
+                        {historico.map((h) => {
+                          const aberto = editHistoryItem?.id === h.id;
+                          return (
+                            <div key={h.id} className={styles.histItem}>
+                              <button type="button" className={styles.histToggle}
+                                aria-expanded={aberto}
+                                onClick={() => {
+                                  if (aberto) { setEditHistoryItem(null); setRecebidos([]); return; }
+                                  setEditHistoryItem(h);
+                                  setHistoryForm({
+                                    cargoId: String(h.cargo?.id ?? ''),
+                                    salario: maskBRL(String(Math.round(h.salario * 100))),
+                                  });
+                                  loadRecebidos(h.id);
+                                }}>
+                                <span>
+                                  <span className={styles.histCargo}>{h.cargo?.descricao || '—'}</span>
+                                  <span className={styles.histSalario}>{fmtBRL(h.salario)}</span>
+                                </span>
+                                <ChevRight size={16}
+                                  className={[styles.histChevron, aberto ? styles.histChevronOpen : ''].join(' ')} />
+                              </button>
 
-              {/* ── Histórico do funcionário ── */}
-              <section className={styles.dCard}>
-                <h3 className={styles.dCardHead}>
-                  <Calendar size={16} />
-                  <span className={styles.dCardTitle}>{tr('Histórico do funcionário')}</span>
-                </h3>
-
-                <div className={styles.dCardBody}>
-                  {historicoLoading ? (
-                    <div className={styles.empty}>
-                      <Loader2 size={18} className={styles.spinInline} /> {tr('Carregando histórico...')}
-                    </div>
-                  ) : historico.length === 0 ? (
-                    <p className={styles.blockEmpty}>{tr('Sem histórico de cargo e salário.')}</p>
-                  ) : (
-                    <div className={styles.histList}>
-                      {historico.map((h) => {
-                        const aberto = editHistoryItem?.id === h.id;
-                        return (
-                          <div key={h.id} className={styles.histItem}>
-                            <button type="button" className={styles.histToggle}
-                              aria-expanded={aberto}
-                              onClick={() => {
-                                if (aberto) { setEditHistoryItem(null); setRecebidos([]); return; }
-                                setEditHistoryItem(h);
-                                setHistoryForm({
-                                  cargoId: String(h.cargo?.id ?? ''),
-                                  salario: maskBRL(String(Math.round(h.salario * 100))),
-                                });
-                                loadRecebidos(h.id);
-                              }}>
-                              <span>
-                                <span className={styles.histCargo}>{h.cargo?.descricao || '—'}</span>
-                                <span className={styles.histSalario}>{fmtBRL(h.salario)}</span>
-                              </span>
-                              <ChevRight size={16}
-                                className={[styles.histChevron, aberto ? styles.histChevronOpen : ''].join(' ')} />
-                            </button>
-
-                            {aberto && (
-                              <div className={styles.histPanel}>
-                                <div className={styles.histPanelHead}>
-                                  <span>{tr('Recebimentos')}</span>
-                                  <div className={styles.histPanelActions}>
-                                    <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
-                                      onClick={() => {
-                                        setAddRecebidoForm({
-                                          historicoFuncionarioId: h.id,
-                                          valorRecebido: '',
-                                          dataHoraInicio: null,
-                                          dataHoraFim: null,
-                                          dataHoraPagamento: null,
-                                          tipoPagamentoId: '1',
-                                          descricao: '',
-                                        });
-                                        setRecebidoFile(null);
-                                        setShowAddRecebido(true);
-                                      }}>
-                                      {tr('Novo')}
-                                    </Button>
-                                    <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
-                                      onClick={() => {
-                                        setHistoryForm({
-                                          cargoId: String(h.cargo?.id ?? ''),
-                                          salario: maskBRL(String(Math.round(h.salario * 100))),
-                                        });
-                                        setShowEditHistory(true);
-                                      }}>
-                                      {tr('Editar')}
-                                    </Button>
+                              {aberto && (
+                                <div className={styles.histPanel}>
+                                  <div className={styles.histPanelHead}>
+                                    <span>{tr('Recebimentos')}</span>
+                                    <div className={styles.histPanelActions}>
+                                      <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                        onClick={() => {
+                                          setAddRecebidoForm({
+                                            historicoFuncionarioId: h.id,
+                                            valorRecebido: '',
+                                            dataHoraInicio: null,
+                                            dataHoraFim: null,
+                                            dataHoraPagamento: null,
+                                            tipoPagamentoId: '1',
+                                            descricao: '',
+                                          });
+                                          setRecebidoFile(null);
+                                          setShowAddRecebido(true);
+                                        }}>
+                                        {tr('Novo')}
+                                      </Button>
+                                      <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                        onClick={() => {
+                                          setHistoryForm({
+                                            cargoId: String(h.cargo?.id ?? ''),
+                                            salario: maskBRL(String(Math.round(h.salario * 100))),
+                                          });
+                                          setShowEditHistory(true);
+                                        }}>
+                                        {tr('Editar')}
+                                      </Button>
+                                    </div>
                                   </div>
-                                </div>
 
-                                {recebidosLoading ? (
-                                  <div className={styles.empty} style={{ padding: '16px 10px' }}>
-                                    <Loader2 size={16} className={styles.spinInline} /> {tr('Carregando...')}
-                                  </div>
-                                ) : recebidos.length === 0 ? (
-                                  <p className={styles.blockEmpty} style={{ paddingLeft: 8 }}>
-                                    {tr('Sem registros de recebimento.')}
-                                  </p>
-                                ) : (
-                                  <div className={styles.recebList}>
-                                    {recebidos.map((r) => (
-                                      <div key={r.id} className={styles.recebRow}>
-                                        <div style={{ minWidth: 0 }}>
-                                          <div className={styles.recebVal}>{fmtBRL(r.valorRecebido)}</div>
-                                          <div className={styles.recebMeta}>
-                                            {r.tipoPagamento?.descricao} · {dateFromApi(r.dataHoraPagamento)}
-                                            {r.descricao && ` · ${r.descricao.toUpperCase()}`}
+                                  {recebidosLoading ? (
+                                    <div className={styles.empty} style={{ padding: '16px 10px' }}>
+                                      <Loader2 size={16} className={styles.spinInline} /> {tr('Carregando...')}
+                                    </div>
+                                  ) : recebidos.length === 0 ? (
+                                    <p className={styles.blockEmpty} style={{ paddingLeft: 8 }}>
+                                      {tr('Sem registros de recebimento.')}
+                                    </p>
+                                  ) : (
+                                    <div className={styles.recebList}>
+                                      {recebidos.map((r) => (
+                                        <div key={r.id} className={styles.recebRow}>
+                                          <div style={{ minWidth: 0 }}>
+                                            <div className={styles.recebVal}>{fmtBRL(r.valorRecebido)}</div>
+                                            <div className={styles.recebMeta}>
+                                              {r.tipoPagamento?.descricao} · {dateFromApi(r.dataHoraPagamento)}
+                                              {r.descricao && ` · ${r.descricao.toUpperCase()}`}
+                                            </div>
+                                          </div>
+                                          <div className={styles.recebActions}>
+                                            {r.pathArquivoComprovante && (
+                                              <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                                onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}>
+                                                {tr('Comprovante')}
+                                              </Button>
+                                            )}
+                                            <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
+                                              onClick={() => {
+                                                setEditRecebidoItem(r);
+                                                setEditRecebidoForm({
+                                                  historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
+                                                  valorRecebido: maskBRL(String(Math.round(r.valorRecebido * 100))),
+                                                  dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
+                                                  dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
+                                                  dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
+                                                  tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
+                                                  descricao: r.descricao ?? '',
+                                                });
+                                                setEditRecebidoFile(null);
+                                                setShowEditRecebido(true);
+                                              }}>
+                                              {tr('Editar')}
+                                            </Button>
                                           </div>
                                         </div>
-                                        <div className={styles.recebActions}>
-                                          {r.pathArquivoComprovante && (
-                                            <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
-                                              onClick={() => handleDownloadArquivo(r.pathArquivoComprovante)}>
-                                              {tr('Comprovante')}
-                                            </Button>
-                                          )}
-                                          <Button className={[styles.btnSolid, styles.btnSm].join(' ')}
-                                            onClick={() => {
-                                              setEditRecebidoItem(r);
-                                              setEditRecebidoForm({
-                                                historicoFuncionarioId: r.historicoFuncionario?.id ?? '',
-                                                valorRecebido: maskBRL(String(Math.round(r.valorRecebido * 100))),
-                                                dataHoraInicio: r.dataHoraInicio ? new Date(r.dataHoraInicio) : null,
-                                                dataHoraFim: r.dataHoraFim ? new Date(r.dataHoraFim) : null,
-                                                dataHoraPagamento: r.dataHoraPagamento ? new Date(r.dataHoraPagamento) : null,
-                                                tipoPagamentoId: String(r.tipoPagamento?.id ?? '1'),
-                                                descricao: r.descricao ?? '',
-                                              });
-                                              setEditRecebidoFile(null);
-                                              setShowEditRecebido(true);
-                                            }}>
-                                            {tr('Editar')}
-                                          </Button>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
+                  ) : (<>
+                    <div className={styles.fieldGrid}>
+                      <Field label="CPF" value={maskCPF(detailItem.pessoa?.cpf ?? '')} mono />
+                      <Field label="RG" value={detailItem.pessoa?.rg} mono />
+                      <Field label={tr('Data de nascimento')} value={dateFromApi(detailItem.pessoa?.data_nascimento)} />
+                      <Field label={tr('Sexo')} value={
+                        detailItem.pessoa?.sexo === 1 ? tr('Masculino')
+                        : detailItem.pessoa?.sexo === 2 ? tr('Feminino')
+                        : detailItem.pessoa?.sexo ? tr('Outro') : ''
+                      } />
+                      <Field label={tr('País')} value={detailItem.pessoa?.pais} />
                     </div>
-                  )}
+
+                    <div className={styles.dadosGrupoSep}>
+                      <div className={styles.dadosHead}><Mail size={16} /><span>{tr('Contato')}</span></div>
+                      <div className={styles.fieldGrid}>
+                        <Field label={tr('E-mail')} value={detailItem.pessoa?.email ? (
+                          <ContatoBotao tipo="gmail" href={`mailto:${detailItem.pessoa.email}`} title={tr('Enviar e-mail')}>
+                            {detailItem.pessoa.email}
+                          </ContatoBotao>
+                        ) : ''} />
+                        <Field label={tr('Telefone')} value={detailItem.pessoa?.telefone ? (
+                          <ContatoBotao tipo="whatsapp" href={`https://wa.me/55${unmask(detailItem.pessoa.telefone)}`} title={tr('WhatsApp')}>
+                            {maskPhone(detailItem.pessoa.telefone)}
+                          </ContatoBotao>
+                        ) : ''} />
+                      </div>
+                    </div>
+
+                    <div className={styles.dadosGrupoSep}>
+                      <div className={styles.dadosHead}><MapPin size={16} /><span>{tr('Endereço')}</span></div>
+                      <div className={styles.fieldGrid}>
+                        <Field label={tr('Endereço')} value={[
+                          [detailItem.pessoa?.endereco, detailItem.pessoa?.numero].filter(Boolean).join(', '),
+                          detailItem.pessoa?.bairro,
+                        ].filter(Boolean).join(' — ')} />
+                        <Field label={tr('Cidade / UF')} value={[detailItem.pessoa?.municipio, detailItem.pessoa?.estado].filter(Boolean).join(' — ')} />
+                        <Field label="CEP" value={maskCEP(detailItem.pessoa?.cep ?? '')} mono />
+                      </div>
+                    </div>
+                  </>)}
                 </div>
               </section>
             </div>
           )}
+          </div>
         </main>
       </div>
-
-
-      {/* ══ MODAL: EDITAR FUNCIONÁRIO ═════════════════════════ */}
-      <Modal
-        open={showEdit}
-        onClose={() => setShowEdit(false)}
-        size="lg"
-        title={tr('Editar Funcionário')}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={() => setShowEdit(false)} className={styles.full}>{tr('Cancelar')}</Button>
-            <Button variant="primary" onClick={handleSaveEditEmployee} disabled={isSubmitting} className={styles.full}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Salvar')}
-            </Button>
-          </div>
-        }>
-        <div className={styles.formBody}>
-          <PessoaFormEmployee data={editFunc} onChange={setEditFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} />
-
-          <div className={styles.sectionLabel}>{tr('Dados Profissionais')}</div>
-
-          <div className={styles.grid2}>
-            <FormField label={tr('Data de Admissão *')}>
-              <DatePicker
-                mode="single"
-                value={editFunc.dataAdmissao}
-                onChange={d => setEditFunc(prev => ({ ...prev, dataAdmissao: d ?? null }))}
-                placeholder={tr('dd/mm/aaaa')}
-              />
-            </FormField>
-            <FormField label={tr('Cargo *')}>
-              <Select value={editFunc.cargoId} onChange={e => setEditFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
-                <option value="">{tr('Selecione um cargo')}</option>
-                {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
-              </Select>
-            </FormField>
-          </div>
-
-          <FormField label={tr('Salário')}>
-            <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>{tr('R$')}</span>
-              <Input value={editFunc.salario} onChange={e => setEditFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
-            </div>
-          </FormField>
-
-          <div className={styles.sectionLabel}>{tr('Acesso ao Sistema')}</div>
-
-          <div className={styles.grid2}>
-            <FormField label={tr('Usuário para Acesso')}>
-              <Input value={editFunc.usuario.username} onChange={e => setEditFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" readOnly />
-            </FormField>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ══ MODAL: ADICIONAR FUNCIONÁRIO ══════════════════════ */}
-      <Modal
-        open={showAddModal}
-        onClose={() => { setShowAddModal(false); setShowErrors(false); }}
-        size="lg"
-        title={tr('Novo Funcionário')}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={() => { setShowAddModal(false); setShowErrors(false); }}>{tr('Cancelar')}</Button>
-            <Button variant="primary" onClick={handleAddEmployee} disabled={isSubmitting}>
-              {isSubmitting ? <><Loader2 size={13} className={styles.spinInline} /> {tr('Salvando...')}</> : tr('Cadastrar')}
-            </Button>
-          </div>
-        }>
-        <div className={styles.formBody}>
-          <PessoaFormEmployee data={newFunc} onChange={setNewFunc} onFetchCEP={fetchCEP} onCheckCPF={checkCPF} showErrors={showErrors} />
-
-          <div className={styles.sectionLabel}>{tr('Dados Profissionais')}</div>
-
-          <div className={styles.grid2}>
-            <FormField label={tr('Data de Admissão *')}>
-              <DatePicker
-                mode="single"
-                value={newFunc.dataAdmissao}
-                onChange={d => setNewFunc(prev => ({ ...prev, dataAdmissao: d ?? null }))}
-                placeholder={tr('dd/mm/aaaa')}
-              />
-            </FormField>
-            <FormField label={tr('Cargo *')}>
-              <Select value={newFunc.cargoId} onChange={e => setNewFunc(prev => ({ ...prev, cargoId: e.target.value }))}>
-                <option value="">{tr('Selecione um cargo')}</option>
-                {cargos.map(c => <option key={c.id} value={c.id}>{c.descricao}</option>)}
-              </Select>
-            </FormField>
-          </div>
-
-          <FormField label={tr('Salário')}>
-            <div className={styles.currencyWrapper}>
-              <span className={styles.currencyPrefix}>{tr('R$')}</span>
-              <Input value={newFunc.salario} onChange={e => setNewFunc(prev => ({ ...prev, salario: maskBRL(e.target.value) }))} placeholder="" />
-            </div>
-          </FormField>
-
-          <div className={styles.sectionLabel}>{tr('Acesso ao Sistema')}</div>
-
-          <FormField label={tr('Usuário para Acesso')}>
-            <Input value={newFunc.usuario.username} onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, username: e.target.value } }))} placeholder="username" />
-          </FormField>
-
-          <div className={styles.grid2}>
-            <div>
-              <label className={styles.fieldLabel}>{tr('Senha *')}</label>
-              <div className={styles.inputWithSpinner}>
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  value={newFunc.usuario.senha}
-                  onChange={e => setNewFunc(prev => ({ ...prev, usuario: { ...prev.usuario, senha: e.target.value } }))}
-                  placeholder={tr('Digite a senha')}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className={styles.eyeBtn}
-                >
-                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className={styles.fieldLabel}>{tr('Confirmar Senha *')}</label>
-              <div className={styles.inputWithSpinner}>
-                <Input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={newFunc.senhaConfirma}
-                  onChange={e => setNewFunc(prev => ({ ...prev, senhaConfirma: e.target.value }))}
-                  placeholder={tr('Confirme a senha')}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className={styles.eyeBtn}
-                >
-                  {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
 
       {/* ══ MODAL: EDITAR CREDENCIAIS ═════════════════════════ */}
       <Modal

@@ -1,13 +1,12 @@
 /* ═════════════════════════════════════════════════════════════
-   Itens — mesma estética das telas de Cadastro, Funcionários,
-   Preços e Cargos: tokens do protótipo (Lovable/Hotalize) em
-   oklch, no escopo da página.
-   Escalas do Tailwind do protótipo: 1=4px … 6=24px;
+   Itens — mesmo layout da tela de Preços:
+   tokens do protótipo (Lovable/Hotalize) em oklch, no escopo da
+   página. Escalas do Tailwind do protótipo: 1=4px … 6=24px;
    text-xs=12px, text-sm=14px, text-lg=18px, text-xl=20px;
    radius 0.75rem → md 10px, lg 12px, xl 16px.
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.988 0.003 250);
+  --l-bg:            oklch(0.955 0.01 255);   /* mesmo fundo da tela de Cadastros */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
   --l-muted-fg:      oklch(0.52 0.03 258);
@@ -28,13 +27,13 @@
   --l-amber-fg:     oklch(0.49 0.11 72);
   --l-amber-border: oklch(0.86 0.09 80);
 
-  --l-rose-bg: oklch(0.95 0.04 20);
-  --l-rose-fg: oklch(0.5 0.17 25);
+  --l-slate-bg: oklch(0.955 0.008 255);
+  --l-slate-fg: oklch(0.45 0.03 258);
 
-  --l-radius: 0.75rem;
+  --l-radius: 0.5rem;
   --l-r-md: calc(var(--l-radius) - 2px);
   --l-r-lg: var(--l-radius);
-  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-r-xl: calc(var(--l-radius) + 2px);
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
@@ -69,8 +68,8 @@
   --l-amber-fg:     oklch(0.84 0.13 80);
   --l-amber-border: oklch(0.45 0.08 78);
 
-  --l-rose-bg: oklch(0.28 0.06 20);
-  --l-rose-fg: oklch(0.8 0.13 22);
+  --l-slate-bg: oklch(0.279 0.041 260.031);
+  --l-slate-fg: oklch(0.78 0.03 258);
 }
 
 .container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -83,8 +82,16 @@
   padding: 10px 24px 24px;
 }
 @media (min-width: 1024px) {
-  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
+  .split {
+    grid-template-columns: 400px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start; overflow: hidden;
+  }
 }
+
+/* Topo da lista: abas Categorias/Quartos e o "Cadastrar" ao lado */
+.listTopo { display: flex; align-items: stretch; gap: 8px; }
+.listTopo .segmented { flex: 1; min-width: 0; }
 
 /* ══ LISTA ═══════════════════════════════════════════════════ */
 .listPanel {
@@ -92,14 +99,14 @@
   border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
   background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
 }
-@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+@media (min-width: 1024px) { .listPanel { height: 100%; align-self: stretch; } }
 
 /* Categorias / Quartos */
 .segmented {
-  display: flex; gap: 4px; margin-bottom: 12px;
+  display: flex; gap: 4px;
   border-radius: var(--l-r-lg);
   border: 1px solid var(--l-border);
-  background: var(--l-bg);
+  background: transparent;
   padding: 4px;
 }
 .segmentedBtn {
@@ -115,23 +122,27 @@
 .segmentedBtnActive:hover { background: var(--l-primary); color: var(--l-primary-fg); }
 
 .searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
-.searchWrapFull { min-width: 0; flex: 1; }
-.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchWrapFull { min-width: 0; width: 100%; margin-top: 12px; }
+.searchIcon     { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
 .searchInput    { padding-left: 36px !important; }
 .searchWrapFull .searchInput {
   height: 40px; width: 100%;
   border-radius: var(--l-r-lg) !important;
   border: 1px solid var(--l-border) !important;
-  background: var(--l-bg) !important;
+  background: transparent !important;
   color: var(--l-fg) !important;
   padding-right: 12px !important;
   font-size: 14px !important;
   box-shadow: none !important;
 }
+/* foco azul (o --l-primary) só na borda, como em Cadastros — vale para a busca e o formulário */
+.page input:focus,
+.page select:focus,
+.page textarea:focus,
 .searchWrapFull .searchInput:focus {
   outline: none;
-  border-color: var(--l-ring) !important;
-  box-shadow: 0 0 0 2px var(--l-ring) !important;
+  border-color: var(--l-primary) !important;
+  box-shadow: none !important;
 }
 .searchClear {
   position: absolute; right: 10px;
@@ -141,6 +152,9 @@
   cursor: pointer; opacity: .6; transition: opacity .12s; flex-shrink: 0;
 }
 .searchClear:hover { opacity: 1; }
+/* busca preenchida: borda e lupa em destaque */
+.searchAtiva .searchInput { border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border)) !important; }
+.searchAtiva .searchIcon  { color: var(--l-primary); }
 
 .listMeta {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -171,6 +185,7 @@
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   margin-top: 5px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
 }
+.listItemSub svg { flex-shrink: 0; }
 .listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
 
 .nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -184,10 +199,12 @@
 }
 .tagPrimary { border-color: color-mix(in oklch, var(--l-primary) 35%, transparent); background: color-mix(in oklch, var(--l-primary) 12%, transparent); color: var(--l-primary); }
 .tagEmerald { border-color: color-mix(in oklch, var(--l-emerald-fg) 30%, transparent); background: var(--l-emerald-bg); color: var(--l-emerald-fg); }
-.tagRose    { border-color: color-mix(in oklch, var(--l-rose-fg) 30%, transparent); background: var(--l-rose-bg); color: var(--l-rose-fg); }
+.tagRed     { border-color: color-mix(in oklch, #dc2626 35%, transparent); background: color-mix(in oklch, #dc2626 12%, transparent); color: #dc2626; flex-shrink: 0; }
 
 /* ── Vazio / carregando ── */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; text-align: center; }
+.spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Esqueletos ── */
 .sk {
@@ -204,12 +221,88 @@
 @media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
 .skName   { width: 70%; height: 13px; }
 .skSub    { width: 45%; height: 10px; margin-top: 6px; }
-.skLabel  { width: 58%; height: 10px; }
-.skNumero { width: 46%; height: 22px; margin-top: 8px; }
 
 /* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
-.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 @media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+
+/* ── Ficha / formulário num cartão só: cabeçalho fixo, abas e conteúdo ──
+   Mesmo desenho da ficha do hóspede em Cadastros. */
+.dCard.fichaCard { padding: 0; flex-shrink: 0; }
+@media (max-width: 1023.98px) {
+  /* celular: quem rola é a página (.split); o cabeçalho com os botões gruda no alto */
+  .fichaHead {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (min-width: 1024px) {
+  .fichaCard {
+    flex: 0 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fichaHead { flex-shrink: 0; }
+  .fichaBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* nome e abas ficam presos no alto; só o conteúdo da aba rola */
+  .fichaCard .fichaBody { padding-top: 0; }
+  .fichaTopo {
+    position: sticky; top: 0; z-index: 4;
+    padding-top: 8px;
+    background: var(--l-card);
+  }
+}
+.fichaHead {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--l-border);
+  font-weight: 600;
+}
+.fichaHead > svg { color: var(--l-muted-fg); }
+.fichaHead .dCardTitle { font-weight: 600; }
+.fichaBody { margin-top: 0; padding: 8px 20px 20px; }
+
+.fichaId { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.fichaIcone {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 72px; height: 72px; border-radius: 50%;
+  background: var(--l-secondary); color: var(--l-muted-fg);
+  border: 1px solid var(--l-border);
+}
+.fichaIcone svg { stroke-width: 1.5; }
+.fichaNome {
+  margin: 0; font-size: 22px; line-height: 30px; font-weight: 700;
+  color: var(--l-fg); overflow-wrap: anywhere;
+}
+.fichaSub { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+
+.fichaTabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+  scrollbar-width: none;
+}
+.fichaTab {
+  position: relative; flex-shrink: 0;
+  padding: 0 0 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--l-muted-fg);
+  transition: color .15s;
+}
+.fichaTab:hover { color: var(--l-fg); }
+.fichaTabAtiva { color: var(--l-fg); }
+.fichaTabAtiva::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--l-fg);
+}
+.fichaTab:focus-visible { outline: 2px solid var(--l-ring); outline-offset: 2px; border-radius: 4px; }
+
+/* rodapé do formulário: Limpar/Cancelar e Avançar/Salvar, depois de tudo */
+.formFoot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  margin-top: 24px; padding-top: 16px;
+  border-top: 1px solid var(--l-border);
+}
 
 .dCard {
   border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
@@ -219,7 +312,7 @@
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
 }
-.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
 .dCardTitle { font-weight: 700; }
 .dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .dCardBody { margin-top: 16px; }
@@ -242,17 +335,18 @@
   cursor: pointer; transition: background-color .15s, color .15s;
 }
 .idClose:hover { background: var(--l-accent); color: var(--l-accent-fg); }
-
-.idHead {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
-  margin-bottom: 24px; padding-bottom: 20px;
-  border-bottom: 1px solid var(--l-border);
-}
 .idHeadMain { min-width: 0; flex: 1; }
-.idName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
-.idSub  { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+.idTags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.idTags .tag { border-radius: 2px; background: transparent; }
 
-/* Aviso de "nada aqui" dentro do corpo de um cartão */
+/* Campos rótulo/valor */
+.fieldGrid { display: grid; gap: 16px 24px; }
+@media (min-width: 640px)  { .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .fieldGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.fVal   { margin-top: 2px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow-wrap: break-word; }
+
+/* Blocos internos de um cartão */
 .blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
 
 /* ── Botões: cor sólida, sem brilho nem ícone ── */
@@ -264,24 +358,79 @@
 }
 .page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
 .page .btnSolid:active { transform: none; }
-.page .btnSm { padding: 5px 11px; font-size: 12px; }
 .page .btnPrimary { background: var(--l-primary); color: var(--l-primary-fg); }
 .page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
 
-/* ── Painel geral (nada selecionado) ── */
-.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-.statCard {
-  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
-  background: var(--l-bg); padding: 14px 16px;
+/* ── Responsivo ── */
+@media (max-width: 1023px) {
+  .splitListHidden .listPanel { display: none; }
+  .split { padding: 8px 16px 16px; gap: 16px; }
+  .detailPanel { order: 1; }
+  .listPanel   { order: 2; }
+  .listScroll { flex: none; max-height: 55vh; }
+  .backBtn { display: inline-flex; }
+  .idClose { display: none; }
+  .dCardActions:has(> .idClose:only-child) { display: none; }
 }
-.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
-.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
-.statValEmerald { color: var(--l-emerald-fg); }
-.statValRose    { color: var(--l-rose-fg); }
-.detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
 
+@media (max-width: 640px) {
+  .page  { margin: -12px -12px -24px; }
+  .fichaHead { padding: 12px 14px; }
+  .fichaBody { padding: 18px 14px 14px; }
+  .fichaIcone { width: 52px; height: 52px; }
+  .fichaNome { font-size: 19px; line-height: 26px; }
+  .split { padding: 6px 12px 12px; gap: 12px; }
+  .listPanel { padding: 12px; }
+  .dCard { padding: 14px; }
+  .dCardHead { flex-wrap: wrap; }
+  .dCardActions { margin-left: 0; flex: 1 1 100%; }
+  .dCardActions > * { flex: 1; }
+  .fichaCard .dCardActions { margin-left: auto; flex: 0 1 auto; }
+}
+
+@media (max-width: 420px) {
+  .listItem { padding: 10px; gap: 10px; }
+  .listItem .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════
+   FORMULÁRIOS — no painel da direita, com o visual dos campos de Cadastros
+   ═════════════════════════════════════════════════════════════ */
+
+.modalFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+
+/* ── Corpo ── */
+.formBody { display: flex; flex-direction: column; gap: 12px; }
+.formRow  { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 12px; }
+.formBody { container: priceForm / inline-size; }
+@container priceForm (max-width: 620px) {
+}
+@container priceForm (max-width: 360px) {
+}
+
+/* campos compactos e sem adornos, iguais aos do cadastro de hóspede */
+.formBody input:not([type="checkbox"]),
+.formBody select {
+  height: 34px; box-sizing: border-box;
+  padding: 7px 10px;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.formBody select { padding-right: 28px; background-position: right 9px center; }
+
+/* ── Linha de checkbox com título e explicação ── */
+.checkboxRow {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 11px 12px; border-radius: var(--l-r-lg);
+  border: 1px solid var(--l-border); background: var(--l-card);
+  cursor: pointer; transition: border-color .15s, background-color .15s;
+}
+.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--l-fg); display: block; }
+.checkboxSub   { font-size: 11.5px; color: var(--l-muted-fg); display: block; margin-top: 1px; }
 /* ── Itens da categoria, no painel ── */
-.itemSearch { max-width: 320px; margin-bottom: 4px; }
 
 .itemList { display: flex; flex-direction: column; }
 /* Primeira linha: nome à esquerda, preço à direita. As ações quebram para
@@ -312,7 +461,7 @@
 .itemCard {
   display: flex; flex-direction: column; min-width: 0;
   border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
-  background: var(--l-bg); padding: 14px 16px;
+  background: transparent; padding: 14px 16px;
 }
 .itemCardHead { display: flex; align-items: flex-start; gap: 8px; }
 .itemCardNome {
@@ -328,8 +477,13 @@
   margin-top: 6px; font-size: 12px; line-height: 16px;
   color: var(--l-muted-fg); overflow-wrap: anywhere;
 }
-/* margin-top auto cola o preço no rodapé: cartões da mesma linha alinham. */
-.itemCardPreco { margin-top: auto; padding-top: 12px; text-align: right; }
+/* margin-top auto cola o rodapé embaixo: cartões da mesma linha alinham.
+   Quartos à esquerda, preço à direita, na mesma linha de base. */
+.itemCardFoot {
+  margin-top: auto; padding-top: 12px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 12px;
+}
+.itemCardPreco { margin-left: auto; text-align: right; }
 
 /* ── Menu de ações do item ── */
 .itemMenuWrap { position: relative; flex-shrink: 0; }
@@ -377,76 +531,49 @@
   color: var(--l-muted-fg); white-space: nowrap;
 }
 
-
-/* Atalho para a categoria, na lista de estoque baixo */
-.linkCat {
-  border: none; background: transparent; padding: 0;
-  color: var(--l-primary); font: inherit; font-weight: 600;
-  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
-}
-.linkCat:hover { color: color-mix(in oklch, var(--l-primary) 80%, black); }
-
 /* ── Distribuição do item pelos quartos ── */
+/* Moldura e seta deixam claro que dá para clicar e abrir a caixa dos quartos. */
 .quartosToggle {
   display: inline-flex; align-items: center; gap: 5px;
-  border: none; background: transparent; padding: 0;
-  color: var(--l-muted-fg); font: inherit; cursor: pointer;
-  transition: color .15s;
+  border: 1px solid var(--l-border); border-radius: var(--l-r-md);
+  background: transparent; padding: 4px 8px;
+  font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg);
+  cursor: pointer; transition: color .15s, border-color .15s, background-color .15s;
 }
-.quartosToggle:hover { color: var(--l-fg); }
-.quartosToggle > svg:first-child { flex-shrink: 0; }
-.quartosChevron { transition: transform .18s; flex-shrink: 0; }
-.quartosChevronOpen { transform: rotate(90deg); color: var(--l-primary); }
+.quartosToggle:hover,
+.quartosToggleOn {
+  color: var(--l-primary);
+  border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border));
+  background: color-mix(in oklch, var(--l-primary) 6%, transparent);
+}
+.quartosToggle > svg { flex-shrink: 0; }
+.quartosChevron { transition: transform .18s; }
+.quartosChevronOpen { transform: rotate(180deg); }
 
-.quartosList {
-  margin-top: 10px; margin-left: 2px; padding-left: 10px;
-  border-left: 2px solid var(--l-border);
-  display: flex; flex-direction: column; gap: 4px;
-  max-width: 420px;
+/* Caixa flutuante com o item em cada quarto. Fica num portal no <body>, fora
+   do .page, então usa os tokens globais do app, como o menu de ações. */
+.quartosPop {
+  position: fixed; z-index: 45;
+  width: 300px; max-height: 320px; overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .18);
 }
+.quartosPopHead {
+  display: flex; flex-direction: column; gap: 2px;
+  padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.quartosPopNome { font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.quartosPopSub  { font-size: 11px; line-height: 15px; color: var(--text-2); }
+
+.quartosList { display: flex; flex-direction: column; gap: 6px; }
 .quartosRow {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-  font-size: 12px; line-height: 17px; color: var(--l-muted-fg);
+  font-size: 12px; line-height: 17px; color: var(--text-2);
 }
 .quartosNome { min-width: 0; overflow-wrap: anywhere; }
-.quartosQtd  { font-weight: 600; color: var(--l-fg); white-space: nowrap; }
-.quartosQtdBaixa { color: var(--l-rose-fg); }
-
-/* ── Responsivo ── */
-@media (max-width: 1023px) {
-  .splitListHidden .listPanel { display: none; }
-  .split { padding: 8px 16px 16px; gap: 16px; }
-  .detailPanel { order: 1; }
-  .listPanel   { order: 2; }
-  .listScroll { flex: none; max-height: 55vh; }
-  .backBtn { display: inline-flex; }
-}
-
-@media (max-width: 640px) {
-  .page  { margin: -12px -12px -24px; }
-  .split { padding: 6px 12px 12px; gap: 12px; }
-  .listPanel { padding: 12px; }
-  .dCard { padding: 14px; }
-  .idHead { gap: 12px; margin-bottom: 18px; padding-bottom: 16px; }
-  .idName { font-size: 18px; line-height: 24px; }
-  .dCardHead { flex-wrap: wrap; }
-  .dCardActions { margin-left: 0; flex: 1 1 100%; }
-  .dCardActions > * { flex: 1; }
-  .dCardActions > .idClose { flex: 0 0 auto; }
-  .statVal { font-size: 20px; line-height: 26px; }
-}
-
-@media (max-width: 420px) {
-  .listItem { padding: 10px; gap: 10px; }
-  .listItem .nome {
-    white-space: normal; overflow: visible; text-overflow: clip;
-    overflow-wrap: anywhere; line-height: 1.3;
-  }
-}
-
-/* ═════════════════════════════════════════════════════════════
-   MODAIS — estilo anterior mantido
-   ═════════════════════════════════════════════════════════════ */
+.quartosQtd  { font-weight: 600; color: var(--text); white-space: nowrap; }
+.quartosQtdBaixa { color: var(--danger); }
 /* ── Table ── */
 .tableWrap { overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -503,30 +630,18 @@
 }
 .actionBtn:hover { border-color: var(--violet); color: var(--violet); }
 
-/* ── Título do modal de histórico ── */
-.histModalTitle { display: inline-flex; align-items: center; gap: 8px; }
-
 /* ── Empty / loading (dentro dos modais) ── */
 .emptyInline {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 10px; padding: 40px 20px; color: var(--text-2); font-size: 13px; height: 100%;
 }
 .spin       { animation: spin .8s linear infinite; }
-.spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .histTabBody {
   min-height: 360px;
   display: flex; flex-direction: column;
 }
-
-/* ── Modal footer ── */
-.modalFooter { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
-
-/* ── Form ── */
-.formBody { display: flex; flex-direction: column; gap: 14px; }
-.formRow  { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 480px) { .formRow { grid-template-columns: 1fr; } }
 
 /* ── Item info box (repor) ── */
 .itemInfoBox {
@@ -537,16 +652,6 @@
 .itemInfoLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-2); }
 .itemInfoName  { font-size: 14px; font-weight: 700; color: var(--text); }
 .itemInfoSub   { font-size: 12px; color: var(--text-2); }
-
-/* ── Checkbox row ── */
-.checkboxRow {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: var(--text); cursor: pointer;
-  user-select: none;
-}
-.checkboxRow input { accent-color: var(--violet); width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
-.checkboxLabel { font-size: 13px; font-weight: 600; color: var(--text); display: block; }
-.checkboxSub   { font-size: 11px; color: var(--text-2); display: block; margin-top: 1px; }
 
 /* ── Consumo informativo ── */
 .consumoAlert {
@@ -613,7 +718,6 @@
 .quartoItensLow   { font-weight: 700; color: #ef4444; }
 .quartoItensNone  { color: var(--text-2); font-style: italic; }
 
-
 /* ── Mobile ≤ 480px (modais) ── */
 @media (max-width: 480px) {
   /* Pagamento chip: quebra em duas linhas (texto + botão Alterar) */
@@ -621,10 +725,78 @@
   .pagamentoChip span     { width: 100%; word-break: break-word; }
   .pagamentoEdit          { margin-left: auto; }
 
-  /* Footer do modal: botões lado a lado e ocupam largura toda */
-  .modalFooter            { flex-direction: row; }
-  .modalFooter > *        { flex: 1; }
-
   /* Item info sub: quebra naturalmente */
   .itemInfoSub            { line-height: 1.6; }
 }
+
+/* Busca de itens + "Novo item", acima dos cartões da categoria */
+.itemToolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.itemToolbar .itemSearch { flex: 1; min-width: 0; margin-top: 0; }
+
+/* "Histórico de Consumos" — atalho discreto ao lado da contagem */
+.listMetaLink {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--l-primary);
+}
+.listMetaLink:hover { text-decoration: underline; }
+
+/* Etiquetas de quantidade (cartões e itens do quarto): sem fundo e quase retas */
+.itemCardTags .tag,
+.itemRowSub .tag { background: transparent; border-radius: 2px; }
+
+/* ── Formulário de item e histórico, dentro da aba Itens ──
+   Tomam o lugar dos cartões; o cabeçalho da ficha continua em cima. */
+.inlineView { display: flex; flex-direction: column; gap: 14px; }
+.inlineHead { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inlineBack {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: none; background: none; padding: 4px 6px 4px 2px; border-radius: var(--l-r-md);
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--l-muted-fg);
+  cursor: pointer; transition: color .15s, background-color .15s;
+}
+.inlineBack:hover { color: var(--l-fg); background: var(--l-accent); }
+.inlineTitle {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
+  overflow-wrap: anywhere;
+}
+.inlineTitle > svg { color: var(--l-muted-fg); flex-shrink: 0; }
+/* edição de uma reposição, acima da tabela */
+.inlineEdit {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 14px 16px; border-radius: var(--l-r-lg);
+  border: 1px solid color-mix(in oklch, var(--l-primary) 35%, var(--l-border));
+}
+.inlineEdit .formFoot { margin-top: 0; }
+.rowEditando td { background: color-mix(in oklch, var(--l-primary) 6%, transparent); }
+
+/* ── Caixa flutuante de Consumir / Repor ──
+   Fica num portal no <body>, fora do .page, então usa os tokens globais do
+   app, como o menu de ações. A altura máxima vem do espaço livre na tela. */
+.acaoPop {
+  position: fixed; z-index: 46;
+  width: 340px; max-width: calc(100vw - 16px);
+  display: flex; flex-direction: column;
+  border-radius: 12px; border: 1px solid var(--border);
+  background: var(--surface); box-shadow: 0 12px 32px -8px rgb(0 0 0 / .25);
+}
+.acaoPopHead {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.acaoPopHead > svg { color: var(--text-2); flex-shrink: 0; }
+.acaoPopTitle { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; }
+.acaoPopClose {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  border: none; background: transparent; color: var(--text-2); cursor: pointer;
+}
+.acaoPopClose:hover { background: var(--surface-2); color: var(--text); }
+.acaoPopBody { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px; }
+.acaoPopFoot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 10px 14px; border-top: 1px solid var(--border);
+}
+/* pergunta do cancelamento, à esquerda dos botões no detalhe do consumo */
+.confirmPergunta { flex: 1; align-self: center; font-size: 12px; color: var(--l-muted-fg); }

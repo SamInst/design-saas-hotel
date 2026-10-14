@@ -1,14 +1,16 @@
 /* ═════════════════════════════════════════════════════════════
-   Funcionários — mesma estética da tela de Cadastro: tokens do
-   protótipo (Lovable/Hotalize) em oklch, no escopo da página.
-   Escalas do Tailwind do protótipo: 1=4px … 6=24px;
-   text-xs=12px, text-sm=14px, text-lg=18px, text-xl=20px;
-   radius 0.75rem → md 10px, lg 12px, xl 16px.
+   Funcionários — mesmo layout e design system da tela de Cadastro
+   Os tokens abaixo são os mesmos do src/styles.css de lá, em oklch,
+   e ficam no escopo da página para não afetar as outras telas.
+   Escalas seguem o Tailwind do protótipo: 1=4px … 6=24px;
+   text-xs=12px, text-sm=14px, text-base=16px, text-lg=18px, text-xl=20px;
+   radius 0.5rem → md 6px, lg 8px, xl 10px (menos arredondado que o protótipo).
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.988 0.003 250);
+  --l-bg:            oklch(0.955 0.01 255);   /* fundo cinza-azulado: destaca os cartões brancos */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
+  --l-muted:         oklch(0.965 0.008 255);
   --l-muted-fg:      oklch(0.52 0.03 258);
   --l-border:        oklch(0.925 0.008 255);
   --l-primary:       oklch(0.55 0.21 262);
@@ -20,6 +22,7 @@
   --l-destructive:   oklch(0.6 0.22 25);
   --l-ring:          oklch(0.65 0.15 260);
 
+  /* cores dos avatares — as mesmas faixas do calendário */
   --l-bar-teal:    oklch(0.64 0.12 178);
   --l-bar-amber:   oklch(0.76 0.155 72);
   --l-bar-coral:   oklch(0.63 0.2 26);
@@ -28,16 +31,20 @@
   --l-bar-emerald: oklch(0.66 0.14 162);
   --l-bar-fg:      oklch(0.99 0.003 250);
 
+  /* pílulas de categoria e status (amber-100/800, emerald-100/800) */
+  --l-amber-bg:   oklch(0.962 0.059 95.617);
+  --l-amber-fg:   oklch(0.473 0.137 46.201);
   --l-emerald-bg: oklch(0.95 0.052 163.051);
   --l-emerald-fg: oklch(0.432 0.095 166.913);
 
-  --l-radius: 0.75rem;
-  --l-r-md: calc(var(--l-radius) - 2px);
-  --l-r-lg: var(--l-radius);
-  --l-r-xl: calc(var(--l-radius) + 4px);
+  --l-radius: 0.5rem;                        /* 8px */
+  --l-r-md: calc(var(--l-radius) - 2px);     /* 6px */
+  --l-r-lg: var(--l-radius);                 /* 8px */
+  --l-r-xl: calc(var(--l-radius) + 2px);     /* 10px */
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
-  /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
+  /* O <main> do AppLayout tem padding 18px 22px; a margem negativa faz o fundo
+     desta página cobrir a área inteira, sem a faixa do fundo do app em volta. */
   margin: -18px -22px;
   height: auto;
   flex: 1;
@@ -48,12 +55,16 @@
   color: var(--l-fg);
 }
 
+/* Modo escuro do protótipo (bloco .dark do styles.css). */
 [data-theme='dark'] .page {
   --l-bg:           oklch(0.129 0.042 264.695);
   --l-card:         oklch(0.208 0.042 265.755);
   --l-fg:           oklch(0.984 0.003 247.858);
+  --l-muted:        oklch(0.279 0.041 260.031);
   --l-muted-fg:     oklch(0.704 0.04 256.788);
   --l-border:       oklch(1 0 0 / 10%);
+  --l-primary:      oklch(0.55 0.21 262);
+  --l-primary-fg:   oklch(0.985 0.005 250);
   --l-secondary:    oklch(0.279 0.041 260.031);
   --l-secondary-fg: oklch(0.984 0.003 247.858);
   --l-accent:       oklch(0.279 0.041 260.031);
@@ -64,47 +75,75 @@
 }
 
 .container { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* As listas desta tela são estruturais (ul/li), sem marcador. */
 .page ul { list-style: none; margin: 0; padding: 0; }
 
+/* Base no protótipo (grid gap-5 px-6 py-6 lg:grid-cols-[…]), sem o max-width
+   dele: aqui a tela ocupa a largura toda, sem faixas vazias nas laterais. */
 .split {
-  flex: 1; min-height: 0; width: 100%;
-  display: grid; gap: 20px;
+  flex: 1; min-height: 0;
+  width: 100%;
+  display: grid; gap: 12px;
   grid-template-columns: minmax(0, 1fr);
   overflow-y: auto;
+  /* recuo superior menor: o conteúdo começa logo abaixo do cabeçalho */
   padding: 10px 24px 24px;
 }
 @media (min-width: 1024px) {
-  .split { grid-template-columns: 400px minmax(0, 1fr); align-items: start; overflow: hidden; }
+  .split {
+    grid-template-columns: 400px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: start;
+    overflow: hidden;
+  }
 }
 
-/* ── Painel da lista ── */
+/* ── Painel da lista ──
+   aside: rounded-xl border border-border bg-card p-4 shadow-sm */
 .listPanel {
   display: flex; flex-direction: column; min-height: 0;
-  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
-  background: var(--l-card); padding: 16px; box-shadow: var(--l-shadow);
+  border-radius: var(--l-r-xl);
+  border: 1px solid var(--l-border);
+  background: var(--l-card);
+  padding: 16px;
+  box-shadow: var(--l-shadow);
 }
-@media (min-width: 1024px) { .listPanel { max-height: 100%; } }
+/* Coluna da esquerda: a lista preenche a altura toda no desktop. */
+.listCol { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+@media (min-width: 1024px) {
+  .listCol   { height: 100%; align-self: stretch; }
+  .listPanel { flex: 1 1 auto; min-height: 0; }
+}
 
+/* Busca — relative mt-3 / input h-10 rounded-lg border pl-9 pr-3 text-sm */
 .searchWrap     { position: relative; display: flex; align-items: center; min-width: 220px; }
-.searchWrapFull { min-width: 0; width: 100%; }
-.searchIcon     { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
+.searchWrapFull { min-width: 0; width: 100%; margin-top: 12px; }
+.searchIcon     { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg); pointer-events: none; flex-shrink: 0; }
 .searchInput    { padding-left: 36px !important; }
 .searchWrapFull .searchInput {
   height: 40px; width: 100%;
   border-radius: var(--l-r-lg) !important;
   border: 1px solid var(--l-border) !important;
-  background: var(--l-bg) !important;
+  background: transparent !important;
   color: var(--l-fg) !important;
   padding-right: 12px !important;
   font-size: 14px !important;
+  /* o componente Input traz uma sombra de repouso; aqui o campo fica plano */
   box-shadow: none !important;
 }
+/* O foco dos campos desta tela é azul (o --l-primary), não o violeta que o
+   componente Input traz por padrão. Vale para o formulário e para a busca.
+   Só a borda muda de cor: o halo do componente Input é desligado aqui. */
+.page input:focus,
+.page select:focus,
+.page textarea:focus,
 .searchWrapFull .searchInput:focus {
   outline: none;
-  border-color: var(--l-ring) !important;
-  box-shadow: 0 0 0 2px var(--l-ring) !important;
+  border-color: var(--l-primary) !important;
+  box-shadow: none !important;
 }
-.searchSpinner { position: absolute; right: 12px; color: var(--l-primary); }
+.searchSpinner  { position: absolute; right: 12px; color: var(--l-primary); }
 .searchClear {
   position: absolute; right: 10px;
   display: flex; align-items: center; justify-content: center;
@@ -114,15 +153,72 @@
 }
 .searchClear:hover { opacity: 1; }
 
+/* Busca + botão de filtro, lado a lado */
+.searchRow { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+.searchRow .searchWrapFull { margin-top: 0; flex: 1; }
+/* busca preenchida: borda e lupa em tom de destaque, para ver que ela está filtrando a lista */
+.searchAtiva .searchInput {
+  border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border)) !important;
+}
+.searchAtiva .searchIcon { color: var(--l-primary); }
+
+.filterWrap { position: relative; flex-shrink: 0; }
+/* Só o ícone: sem fundo, sem borda. */
+.filterBtn {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px;
+  border: none; background: transparent;
+  color: var(--l-muted-fg);
+  cursor: pointer; transition: color .15s;
+}
+.filterBtn:hover { color: var(--l-fg); }
+.filterBtnOn,
+.filterBtnOn:hover { color: var(--l-primary); }
+.filterDot {
+  position: absolute; top: 6px; right: 6px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--l-primary);
+}
+.filterMenu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+  min-width: 170px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
+  background: var(--l-card); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .18);
+}
+.filterMenuLabel {
+  padding: 4px 10px 6px;
+  font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--l-muted-fg);
+}
+.filterMenuItem {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; width: 100%;
+  border: none; border-radius: var(--l-r-md); background: transparent;
+  color: var(--l-fg); font-family: inherit; font-size: 13px; font-weight: 500;
+  text-align: left; cursor: pointer; transition: background-color .15s;
+}
+.filterMenuItem:hover { background: var(--l-accent); }
+.filterMenuItemOn { color: var(--l-primary); font-weight: 600; }
+
+/* Contagem — mt-3 text-xs text-muted-foreground */
 .listMeta {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  margin-top: 12px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+  margin-top: 12px;
+  /* mesmo recuo do item da lista (12px + 1px de borda): o total fica na linha
+     da lupa da busca e das fotos */
+  padding: 0 13px;
+  font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
 }
 
+/* Lista — ul mt-2 space-y-1.5 */
 .listScroll {
   flex: 1; min-height: 0; overflow-y: auto;
-  margin-top: 8px; display: flex; flex-direction: column; gap: 6px;
+  margin-top: 8px;
+  display: flex; flex-direction: column; gap: 6px;
 }
+/* li button: flex w-full items-center gap-3 rounded-lg border p-3 text-left */
 .listItem {
   display: flex; align-items: center; gap: 12px;
   width: 100%; padding: 12px;
@@ -137,8 +233,26 @@
   border-color: var(--l-primary);
   background: color-mix(in oklch, var(--l-primary) 5%, transparent);
 }
+
+/* Entrada de quem acabou de ser cadastrado: desliza e o realce verde
+   desaparece sozinho, para o olho achar a linha nova na lista. */
+@keyframes listItemEntra {
+  from {
+    opacity: 0; transform: translateY(-8px);
+    background: color-mix(in oklch, var(--l-emerald-fg) 20%, transparent);
+    border-color: color-mix(in oklch, var(--l-emerald-fg) 45%, transparent);
+  }
+  55% {
+    opacity: 1; transform: none;
+    background: color-mix(in oklch, var(--l-emerald-fg) 20%, transparent);
+    border-color: color-mix(in oklch, var(--l-emerald-fg) 45%, transparent);
+  }
+  to { opacity: 1; transform: none; background: transparent; border-color: transparent; }
+}
 .listItemBody { flex: 1; min-width: 0; }
 .listItemName { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.listItemName .nome { margin-right: auto; }
+/* mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground */
 .listItemLoc {
   display: flex; align-items: center; gap: 4px;
   margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
@@ -147,40 +261,54 @@
 .listItemLoc svg { flex-shrink: 0; }
 .listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
 
+/* ── Botões: cor sólida, sem brilho nem ícone ──
+   `.page` na frente para vencer as classes do componente Button. */
+.page .btnSolid {
+  gap: 0;
+  border-radius: var(--l-r-md);
+  border: 1px solid transparent;
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 600;
+  background: var(--l-secondary);
+  color: var(--l-secondary-fg);
+  box-shadow: none;
+  transition: background-color .15s, color .15s;
+}
+.page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
+.page .btnSolid:active { transform: none; }
+.page .btnSm { padding: 5px 11px; font-size: 12px; }
+
+.page .btnPrimary {
+  background: var(--l-primary); color: var(--l-primary-fg); border-color: transparent;
+}
+.page .btnPrimary:hover {
+  background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg);
+}
+.page .btnDanger {
+  background: var(--l-destructive); color: var(--l-primary-fg); border-color: transparent;
+}
+.page .btnDanger:hover {
+  background: color-mix(in oklch, var(--l-destructive) 88%, black); color: var(--l-primary-fg);
+}
+
 /* ── Avatares ── */
 .avatar {
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%; flex-shrink: 0;
-  font-weight: 700; color: var(--l-bar-fg);
+  display: block; flex-shrink: 0; object-fit: contain;
 }
-.avTeal    { background: var(--l-bar-teal);    }
-.avAmber   { background: var(--l-bar-amber);   }
-.avCoral   { background: var(--l-bar-coral);   }
-.avIndigo  { background: var(--l-bar-indigo);  }
-.avSky     { background: var(--l-bar-sky);     }
-.avEmerald { background: var(--l-bar-emerald); }
 
+/* ── Texto compartilhado ── */
 .nome { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── Pílulas de status ── */
-.badgeAtivo {
-  flex-shrink: 0; border-radius: 999px; padding: 2px 6px;
-  background: var(--l-emerald-bg); color: var(--l-emerald-fg);
-  font-size: 10px; font-weight: 700; white-space: nowrap;
-}
-.badgeDemitido {
+/* ── Pílulas ──
+   Bloqueado: rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold */
+.badgeBloqueado {
   flex-shrink: 0; border-radius: 999px; padding: 2px 6px;
   background: color-mix(in oklch, var(--l-destructive) 10%, transparent);
   color: var(--l-destructive);
   font-size: 10px; font-weight: 700; white-space: nowrap;
 }
-.badgeDefault {
-  flex-shrink: 0; border-radius: 999px; padding: 2px 6px;
-  background: var(--l-secondary); color: var(--l-secondary-fg);
-  font-size: 10px; font-weight: 700; white-space: nowrap;
-}
 
-/* ── Paginação ── */
+/* ── Paginação (pé da lista) ── */
 .pagination { display: flex; align-items: center; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--l-border); }
 .pageBtn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -193,57 +321,75 @@
 .pageBtn:disabled { opacity: .5; cursor: not-allowed; }
 .pageCurrent { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--l-fg); white-space: nowrap; }
 
+/* ── Esqueletos de carregamento ──
+   Bloco cinza com um brilho passando por cima, no formato do conteúdo real. */
+.sk {
+  position: relative; overflow: hidden;
+  display: block; flex-shrink: 0;
+  background: var(--l-secondary);
+  border-radius: 6px;
+}
+.sk::after {
+  content: ''; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklch, var(--l-card) 75%, transparent),
+    transparent
+  );
+  animation: skShine 1.3s ease-in-out infinite;
+}
+@keyframes skShine { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .sk::after { animation: none; opacity: .5; }
+}
+
+.skAvatar   { width: 40px; height: 40px; border-radius: 50%; }
+.skName     { width: 70%; height: 13px; }
+.skSub      { width: 45%; height: 10px; margin-top: 6px; }
+
 /* ── Empty / loading ── */
 .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 32px 16px; color: var(--l-muted-fg); font-size: 14px; }
 .spinInline { animation: spin .8s linear infinite; display: inline-block; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Esqueletos ── */
-.sk {
-  position: relative; overflow: hidden; display: block; flex-shrink: 0;
-  background: var(--l-secondary); border-radius: 6px;
+/* ═══ PAINEL DE DETALHE ═══════════════════════════════════════
+   div.space-y-4 com sections rounded-xl border bg-card p-5 shadow-sm */
+.detailPanel {
+  min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
 }
-.sk::after {
-  content: ''; position: absolute; inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--l-card) 75%, transparent), transparent);
-  animation: skShine 1.3s ease-in-out infinite;
+.detailCol {
+  min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
 }
-@keyframes skShine { to { transform: translateX(100%); } }
-@media (prefers-reduced-motion: reduce) { .sk::after { animation: none; opacity: .5; } }
-.skAvatar { width: 40px; height: 40px; border-radius: 50%; }
-.skName   { width: 70%; height: 13px; }
-.skSub    { width: 45%; height: 10px; margin-top: 6px; }
-.skLabel  { width: 58%; height: 10px; }
-.skNumero { width: 46%; height: 22px; margin-top: 8px; }
-
-/* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
-.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 16px; }
-@media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
+@media (min-width: 1024px) {
+  .detailCol { max-height: 100%; }
+  .detailPanel { flex: 1 1 auto; overflow-y: auto; padding-right: 2px; }
+}
 
 .dCard {
-  border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
-  background: var(--l-card); padding: 20px; box-shadow: var(--l-shadow);
+  border-radius: var(--l-r-xl);
+  border: 1px solid var(--l-border);
+  background: var(--l-card);
+  padding: 20px;
+  box-shadow: var(--l-shadow);
 }
+/* h3: flex items-center gap-2 text-sm font-bold + ícone size-4 text-primary */
 .dCardHead {
   display: flex; align-items: center; gap: 8px;
   font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
 }
-.dCardHead > svg { color: var(--l-primary); flex-shrink: 0; }
+.dCardHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
 .dCardTitle { font-weight: 700; }
 .dCardActions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .dCardBody { margin-top: 16px; }
 
-/* Voltar para a lista — à esquerda do título, só quando a ficha ocupa a tela */
-.backBtn {
-  display: none; align-items: center; justify-content: center;
-  width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
-  border: none; border-radius: var(--l-r-md);
-  background: transparent; color: var(--l-fg);
-  cursor: pointer; transition: background-color .15s;
-}
-.backBtn:hover { background: var(--l-accent); }
-
+/* Cabeçalho do cadastro
+   mb-6 flex flex-wrap items-center gap-4 border-b border-border pb-5 */
+.idHeadMain { min-width: 0; flex: 1; }
+/* Fechar a ficha — fica à direita de Editar/Bloquear, na mesma altura deles. */
 .idClose {
   display: inline-flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; flex-shrink: 0;
@@ -253,77 +399,341 @@
 }
 .idClose:hover { background: var(--l-accent); color: var(--l-accent-fg); }
 
-.idHead {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 16px;
-  margin-bottom: 24px; padding-bottom: 20px;
-  border-bottom: 1px solid var(--l-border);
-}
-.idHeadMain { min-width: 0; flex: 1; }
-.idName { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 20px; line-height: 28px; font-weight: 700; color: var(--l-fg); }
-.idSub  { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
-
-/* Campos rótulo/valor */
+/* Grid de campos — grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-3 */
 .fieldGrid { display: grid; gap: 16px 24px; }
 @media (min-width: 640px)  { .fieldGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 1280px) { .fieldGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* `fieldLabel` já existe nos formulários desta página (caixa alta, 10.5px);
+   os campos do painel de detalhe usam nomes próprios para não colidir. */
 .fLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
 .fVal   { margin-top: 2px; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); overflow-wrap: break-word; display: flex; align-items: center; gap: 6px; }
 .fMono  { font-family: var(--font-mono); font-weight: 400; letter-spacing: .01em; }
 
-/* Blocos internos separados por um fio */
-.subBlock { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--l-border); }
-.blockHead {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
-  font-size: 13px; font-weight: 700; color: var(--l-fg);
-}
-.blockHead > svg { color: var(--l-primary); flex-shrink: 0; }
-.blockHead > button:last-child { margin-left: auto; }
+/* ── Blocos dentro do cartão (Veículos, Empresa) ──
+   Mesma separação usada entre o nome e os dados: só uma linha. */
 .blockEmpty { font-size: 13px; color: var(--l-muted-fg); }
+/* Voltar para a lista — fica à esquerda do título do cartão e só existe
+   enquanto a ficha ocupa a tela inteira (abaixo de 1024px). */
+.backBtn {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  margin-left: -4px;
+  border: none; border-radius: var(--l-r-md);
+  background: transparent; color: var(--l-fg);
+  cursor: pointer; transition: background-color .15s;
+}
+.backBtn:hover { background: var(--l-accent); }
+/* Sem espaço para as duas colunas: ao escolher um registro a ficha toma a tela
+   e a lista sai (com "Voltar"). Sem seleção, lista e painel geral ficam
+   empilhados — é de onde saem os botões de cadastro. */
+@media (max-width: 1023px) {
+  .splitListHidden .listPanel { display: none; }
+  .listCol { order: 2; }
+  .split { padding: 8px 16px 16px; gap: 12px; }
+  /* Empilhado, o painel geral vem primeiro: é dele que saem os botões de
+     cadastro, que não podem ficar depois de uma lista inteira. */
+  .detailCol   { order: 1; }
+  .listPanel   { order: 2; }
+  /* O painel deixa de ter altura fixa aqui, então `flex: 1` zeraria a lista:
+     ela passa a crescer com o conteúdo, limitada a meia tela. */
+  .listScroll { flex: none; max-height: 55vh; }
+  .backBtn { display: inline-flex; }
+}
 
-/* Contato: o campo inteiro é o clique */
+@media (max-width: 640px) {
+  .page  { margin: -12px -12px -24px; }
+  .split { padding: 6px 12px 12px; gap: 12px; }
+  .listPanel { padding: 12px; }
+  .dCard { padding: 14px; }
+
+  /* Cabeçalho da ficha: avatar e fechar na primeira linha, nome embaixo. */
+  .idHeadMain { flex: 1 1 100%; order: 2; }
+
+  /* Ações do cartão descem para a linha de baixo e ocupam a largura toda. */
+  .dCardHead { flex-wrap: wrap; }
+  .dCardActions { margin-left: 0; flex: 1 1 100%; }
+  .dCardActions > * { flex: 1; }
+  .dCardActions > .idClose { flex: 0 0 auto; }
+}
+
+@media (max-width: 420px) {
+  .listItem { padding: 10px; gap: 10px; }
+  .pagination { flex-wrap: wrap; }
+  /* sem espaço para o nome numa linha só: quebra em vez de cortar com "..." */
+  .listItem .nome {
+    white-space: normal; overflow: visible; text-overflow: clip;
+    overflow-wrap: anywhere; line-height: 1.3;
+  }
+}
+/* ── Contato (e-mail / telefone) ──
+   O campo inteiro é o clique: ícone à esquerda e o valor em seguida. Sem fundo
+   em repouso; no hover só uma sombra leve. As margens negativas cancelam o
+   próprio padding, para o texto ficar alinhado com os outros campos. */
 .contatoBtn {
-  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
-  margin: -5px 0 -5px -8px; padding: 5px 8px;
+  display: inline-flex; align-items: center; gap: 8px;
+  max-width: 100%;
+  margin: -5px 0 -5px -8px;
+  padding: 5px 8px;
   border-radius: var(--l-r-md);
   background: transparent; color: inherit;
   font: inherit; text-decoration: none;
   transition: background-color .15s, box-shadow .15s;
 }
-.contatoBtn:hover { background: var(--l-card); box-shadow: 0 2px 8px -2px rgb(0 0 0 / .18); }
+.contatoBtn:hover {
+  background: var(--l-card);
+  box-shadow: 0 2px 8px -2px rgb(0 0 0 / .18);
+}
 .contatoBtn:active { box-shadow: 0 1px 3px -1px rgb(0 0 0 / .22); }
-.contatoBtn:focus-visible { outline: 2px solid var(--l-ring); outline-offset: 1px; }
+/* No escuro a sombra preta some sobre o card; a elevação vira um tom de fundo. */
 [data-theme='dark'] .contatoBtn:hover  { background: var(--l-accent); box-shadow: none; }
 [data-theme='dark'] .contatoBtn:active { background: var(--l-secondary); box-shadow: none; }
+.contatoBtn:focus-visible { outline: 2px solid var(--l-ring); outline-offset: 1px; }
 .contatoTexto { min-width: 0; overflow-wrap: anywhere; }
 .quickIcon { width: 16px; height: 16px; object-fit: contain; display: block; flex-shrink: 0; }
 
-/* ── Botões: cor sólida, sem brilho nem ícone ── */
-.page .btnSolid {
-  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
-  padding: 8px 14px; font-size: 13px; font-weight: 600;
-  background: var(--l-secondary); color: var(--l-secondary-fg);
-  box-shadow: none; transition: background-color .15s, color .15s;
-}
-.page .btnSolid:hover  { background: var(--l-accent); color: var(--l-accent-fg); box-shadow: none; transform: none; }
-.page .btnSolid:active { transform: none; }
-.page .btnSm { padding: 5px 11px; font-size: 12px; }
-.page .btnPrimary { background: var(--l-primary); color: var(--l-primary-fg); }
-.page .btnPrimary:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); color: var(--l-primary-fg); }
-.page .btnDanger { background: var(--l-destructive); color: var(--l-primary-fg); }
-.page .btnDanger:hover { background: color-mix(in oklch, var(--l-destructive) 88%, black); color: var(--l-primary-fg); }
+/* ── Modal footer ── */
+.modalFooter { display:flex; gap:8px; align-items:center; }
 
-/* ── Painel geral (nada selecionado) ── */
-.statGrid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 780px) { .statGrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-.statCard {
-  border-radius: var(--l-r-lg); border: 1px solid var(--l-border);
-  background: var(--l-bg); padding: 14px 16px;
+/* ── Uppercase inputs ── */
+.formBody input[type="text"],
+.formBody input[type="email"],
+.formBody input[type="tel"],
+.formBody input:not([type]) { text-transform: uppercase; }
+.formBody input::placeholder { text-transform: none; }
+
+/* ── Form layout ── */
+.formBody    { display:flex; flex-direction:column; gap:7px; }
+/* respiro entre dois blocos do formulário, sem fio no meio */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:7px 8px; }
+.gridFix  { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:7px 8px; align-items:start; }
+.addrRow1 { display:grid; grid-template-columns:120px 1fr 90px; gap:7px 8px; align-items:start; }
+.addrRow2 { display:grid; grid-template-columns:1fr 1fr 80px; gap:7px 8px; align-items:start; }
+.addrRow3 { display:grid; grid-template-columns:180px 1fr; gap:7px 8px; align-items:start; }
+.rgEmailRow { display:grid; grid-template-columns:150px 1fr; gap:7px 8px; align-items:start; }
+
+/* ── Campos compactos e sem adornos (só dentro dos formulários desta página) ── */
+.formBody input:not([type="checkbox"]),
+.formBody select {
+  padding:7px 10px;
+  border-radius:7px;
+  box-shadow:none;
 }
-.statLabel { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
-.statVal   { margin-top: 4px; font-size: 24px; line-height: 30px; font-weight: 700; color: var(--l-fg); }
-.statValGreen { color: var(--l-emerald-fg); }
-.statValRed   { color: var(--l-destructive); }
-.detailHint { padding: 4px 2px; font-size: 12px; line-height: 18px; color: var(--l-muted-fg); text-align: center; }
+.formBody select { padding-right:28px; background-position:right 9px center; }
+/* mesma altura para input, select e combobox, para as linhas alinharem */
+.formBody input:not([type="checkbox"]),
+.formBody select { box-sizing:border-box; height:34px; }
+
+/* Quando a coluna de campos fica estreita demais para caber o placeholder
+   ("000.000.000-00", "(00) 00000-0000", "dd/mm/aaaa"), empilha os campos
+   um abaixo do outro, todos com a mesma largura. */
+@container regFields (max-width: 400px) {
+}
+
+/* ── Required field highlight ── */
+
+.reqFieldErr label { color:var(--l-destructive) !important; }
+.reqFieldErr input,
+.reqFieldErr select { border-color:var(--l-destructive) !important; }
+
+/* ── CPF destacado ── */
+.cpfBlock { display:flex; flex-direction:column; gap:3px; }
+.cpfWrap  { position:relative; display:flex; align-items:center; }
+.cpfIcon  { position:absolute; right:10px; display:flex; align-items:center; pointer-events:none; }
+.cpfMsg   { font-size:11px; font-weight:500; }
+
+.inputOk   { border-color:#10b981 !important; }
+.inputWarn { border-color:#f59e0b !important; }
+.inputErr  { border-color:var(--l-destructive) !important; }
+.iconOk    { color:#10b981; }
+.iconWarn  { color:#f59e0b; }
+.iconErr   { color:var(--l-destructive); }
+
+/* ── CEP / CNPJ loading ── */
+.fieldLabel { font-size:10.5px; font-weight:600; color:var(--l-muted-fg); text-transform:uppercase; letter-spacing:.03em; display:block; margin-bottom:3px; }
+.inputWithSpinner { position:relative; display:flex; align-items:center; }
+.inputWithSpinner input { width:100%; padding-right:30px !important; }
+.inputSpinner { position:absolute; right:10px; color:var(--l-primary); pointer-events:none; }
+
+/* rodapé do formulário de cadastro: Limpar e Próximo, depois de tudo */
+.formFoot {
+  display:flex; align-items:center; justify-content:flex-end; gap:8px;
+  margin-top:20px;
+}
+
+/* ── Section divider (blue) ── */
+.sectionDivider {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--l-muted-fg);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  margin: 12px 0 2px;
+}
+.sectionDivider::after {
+  content: ''; flex: 1; height: 1px;
+  background: var(--l-border);
+}
+/* Sem altura fixa: quem rola é o .detailPanel, então o formulário usa a
+   altura que a tela tiver. O 55vh de antes vinha do modal e deixava o
+   formulário baixo mesmo em telas grandes. */
+
+@media (max-width:700px) {
+  /* em vez de empilhar tudo, os campos dividem a linha e vão quebrando
+     conforme a largura diminui */
+  .grid2 { grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); }
+  .gridFix { grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); }
+  .addrRow1, .addrRow2, .addrRow3, .rgEmailRow { display:flex; flex-wrap:wrap; }
+  .addrRow1 > *, .addrRow2 > *, .addrRow3 > *, .rgEmailRow > * { flex:1 1 110px; min-width:0; }
+  .addrRow1 > :nth-child(2),
+  .addrRow3 > :nth-child(2),
+  .rgEmailRow > :nth-child(2) { flex:3 1 200px; }
+  .addrRow2 > :nth-child(-n+2) { flex:2 1 150px; }
+}
+/* No celular a página toda rola, o cartão mantém a altura natural e só o
+   cabeçalho gruda no alto.
+   No desktop o cabeçalho (título, status e botões) fica fixo e só o corpo,
+   da primeira divisória para baixo, rola dentro do cartão. */
+.fichaCard { padding: 0; flex-shrink: 0; }
+@media (max-width: 1023.98px) {
+  /* celular: quem rola é a página (.split); o topo da ficha com os botões gruda no alto */
+  .fichaHead {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (min-width: 1024px) {
+  .fichaCard {
+    flex: 0 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .fichaHead { flex-shrink: 0; }
+  .fichaBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  /* foto, nome e abas ficam presos no alto; só o conteúdo da aba rola */
+  .fichaCard .fichaBody { padding-top: 0; }
+  .fichaTopo {
+    position: sticky; top: 0; z-index: 4;
+    padding-top: 24px;
+    background: var(--l-card);
+  }
+}
+.fichaHead {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--l-border);
+  font-weight: 600;
+}
+.fichaHead > svg { color: var(--l-muted-fg); }
+.fichaHead .dCardTitle { font-weight: 600; }
+.fichaBody { margin-top: 0; padding: 24px 20px 20px; }
+
+.fichaStatus {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; line-height: 16px; font-weight: 500;
+  color: var(--l-emerald-fg); white-space: nowrap;
+}
+.fichaStatus::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: currentColor;
+}
+.fichaStatusBloq { color: var(--l-destructive); }
+
+.fichaId { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+.fichaNome {
+  margin: 0; font-size: 22px; line-height: 30px; font-weight: 700;
+  color: var(--l-fg); overflow-wrap: anywhere;
+}
+.fichaSub {
+  margin-top: 4px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  font-size: 12px; line-height: 16px; color: var(--l-muted-fg);
+}
+
+.fichaTabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--l-border);
+  scrollbar-width: none;
+}
+.fichaTab {
+  position: relative; flex-shrink: 0;
+  padding: 0 0 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--l-muted-fg);
+  transition: color .15s;
+}
+.fichaTab:hover { color: var(--l-fg); }
+.fichaTabAtiva { color: var(--l-fg); }
+.fichaTabAtiva::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--l-fg);
+}
+.fichaTab:focus-visible { outline: 2px solid var(--l-ring, var(--l-primary)); outline-offset: 2px; border-radius: 4px; }
+
+/* Dados cadastrais: grupos (pessoais · contato · endereço) separados por um fio */
+.dadosGrupoSep { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--l-border); }
+.dadosHead {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 20px;
+  font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg);
+}
+.dadosHead > svg { color: var(--l-muted-fg); flex-shrink: 0; stroke-width: 1.75; }
+
+/* Filtro aplicado, logo abaixo da busca */
+.filtroChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.filtroChip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 4px 3px 10px; border-radius: var(--l-r-md);
+  background: var(--l-accent); color: var(--l-accent-fg);
+  font-size: 12px; line-height: 16px; font-weight: 600;
+}
+.filtroChipRot { font-weight: 500; color: var(--l-muted-fg); }
+.filtroChipX {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-left: 2px;
+  border: none; border-radius: 4px; background: transparent;
+  color: inherit; cursor: pointer;
+}
+.filtroChipX:hover { background: color-mix(in oklch, var(--l-fg) 10%, transparent); }
+
+/* Topo da lista: título e o botão de cadastrar ao lado */
+.listTopo { display: flex; align-items: stretch; gap: 8px; }
+
+/* Celular/tablet: quem rola é a página; o título dos formulários com o
+   "voltar" gruda no alto, como o topo da ficha */
+@media (max-width: 1023.98px) {
+  .formHead {
+    position: sticky; top: 0; z-index: 5;
+    margin: -20px -20px 0; padding: 16px 20px 12px;
+    background: var(--l-card);
+    border-radius: var(--l-r-xl) var(--l-r-xl) 0 0;
+  }
+}
+@media (max-width: 640px) {
+  .formHead { margin: -14px -14px 0; padding: 12px 14px 10px; }
+}
+
+/* Médio: o período desce para baixo do quarto, num quadro com check-in e check-out lado a lado */
+@container rvBox (max-width: 680px) {
+}
+
+/* Estreito: resumo financeiro desce para baixo do conteúdo */
+@container rvBox (max-width: 760px) {
+}
+
+/* Bem estreito (celular, zoom muito alto): datas menores, sem perder a leitura */
+@container rvBox (max-width: 420px) {
+}
+
+/* Histórico ↔ detalhe da hospedagem: troca com deslize lateral */
+@keyframes rvEntra { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
+@keyframes hVolta  { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+
+/* Título da lista, no lugar das abas Hóspedes/Empresas do Cadastro */
+.listTitulo {
+  flex: 1; min-width: 0; align-self: center;
+  font-size: 14px; line-height: 20px; font-weight: 700; color: var(--l-fg);
+}
 
 /* ── Histórico de cargo/salário (sanfona) ── */
 .histList { display: flex; flex-direction: column; }
@@ -335,8 +745,8 @@
   font-family: inherit; text-align: left; color: inherit; cursor: pointer;
 }
 .histItem:first-child .histToggle { padding-top: 0; }
-.histCargo   { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); }
-.histSalario { margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
+.histCargo   { display: block; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--l-fg); }
+.histSalario { display: block; margin-top: 2px; font-size: 12px; line-height: 16px; color: var(--l-muted-fg); }
 .histChevron { margin-left: auto; color: var(--l-muted-fg); flex-shrink: 0; transition: transform .2s; }
 .histChevronOpen { transform: rotate(90deg); color: var(--l-primary); }
 .histPanel { padding: 0 0 14px 8px; border-left: 2px solid var(--l-primary); margin-left: 6px; }
@@ -356,134 +766,19 @@
 .recebMeta { margin-top: 2px; font-size: 11px; line-height: 15px; color: var(--l-muted-fg); }
 .recebActions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
 
-/* ── Responsivo ── */
-@media (max-width: 1023px) {
-  .splitListHidden .listPanel { display: none; }
-  .split { padding: 8px 16px 16px; gap: 16px; }
-  .detailPanel { order: 1; }
-  .listPanel   { order: 2; }
-  .listScroll { flex: none; max-height: 55vh; }
-  .backBtn { display: inline-flex; }
-}
-
-@media (max-width: 640px) {
-  .page  { margin: -12px -12px -24px; }
-  .split { padding: 6px 12px 12px; gap: 12px; }
-  .listPanel { padding: 12px; }
-  .dCard { padding: 14px; }
-  .idHead { gap: 12px; margin-bottom: 18px; padding-bottom: 16px; }
-  .idHeadMain { flex: 1 1 100%; order: 2; }
-  .idName { font-size: 18px; line-height: 24px; }
-  .dCardHead { flex-wrap: wrap; }
-  .dCardActions { margin-left: 0; flex: 1 1 100%; }
-  .dCardActions > * { flex: 1; }
-  .dCardActions > .idClose { flex: 0 0 auto; }
-  .blockHead { flex-wrap: wrap; }
-  .statVal { font-size: 20px; line-height: 26px; }
-  .subBlock { margin-top: 18px; padding-top: 16px; }
-  .recebRow { flex-wrap: wrap; }
-  .recebActions { margin-left: 0; flex: 1 1 100%; }
-}
-
-@media (max-width: 420px) {
-  .statGrid { grid-template-columns: minmax(0, 1fr); }
-  .listItem { padding: 10px; gap: 10px; }
-  .pagination { flex-wrap: wrap; }
-  .listItem .nome {
-    white-space: normal; overflow: visible; text-overflow: clip;
-    overflow-wrap: anywhere; line-height: 1.3;
-  }
-}
-
-/* ── Título de seção dentro dos formulários (modais) ── */
-.sectionLabel {
-  display: flex; align-items: center; gap: 8px;
-  margin: 10px 0 2px;
-  font-size: 11px; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--l-muted-fg, var(--text-2));
-}
-.sectionLabel::before {
-  content: ''; width: 3px; height: 14px; flex-shrink: 0;
-  background: var(--l-primary, var(--violet)); border-radius: 2px;
-}
-.sectionLabel::after {
-  content: ''; flex: 1; height: 1px;
-  background: var(--l-border, var(--border));
-}
-
-/* ── Modal footer ── */
-.modalFooter { display:flex; gap:8px; align-items:center; }
-.full        { flex:1; justify-content:center; }
-
-/* ── Form layout ── */
-.formBody    { display:flex; flex-direction:column; gap:10px; overflow:visible; }
-.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-.spanTwo { grid-column:span 2; }
-
-/* ── Required field highlight ── */
-.reqField    { }
-.reqFieldErr label { color:#ef4444 !important; }
+/* ── Campos do formulário de funcionário ── */
+.reqFieldErr label { color: #ef4444 !important; }
 .reqFieldErr input,
-.reqFieldErr select { border-color:#ef4444 !important; }
-.labelErr { color:#ef4444 !important; }
-
-/* ── CPF destacado ── */
-.cpfRow   { display:grid; grid-template-columns:1fr 1.4fr 1fr; gap:10px; align-items:start; }
-.cpfBlock { display:flex; flex-direction:column; gap:3px; }
-.cpfLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; }
-.cpfWrap  { position:relative; display:flex; align-items:center; }
-.cpfIcon  { position:absolute; right:10px; display:flex; align-items:center; pointer-events:none; }
-.cpfMsg   { font-size:11px; font-weight:500; }
-.cpfInput { }
-.inputOk   { border-color:#10b981 !important; }
-.inputWarn { border-color:#f59e0b !important; }
-.inputErr  { border-color:#ef4444 !important; }
-.iconOk    { color:#10b981; }
-.iconWarn  { color:#f59e0b; }
-.iconErr   { color:#ef4444; }
-
-/* ── CEP / Salary loading ── */
-.fieldLabel { font-size:11px; font-weight:600; color:var(--text-2); text-transform:uppercase; letter-spacing:.04em; display:block; margin-bottom:5px; }
-.inputWithSpinner { position:relative; display:flex; align-items:center; }
-.inputWithSpinner input { width:100%; padding-right:30px !important; }
-.inputSpinner { position:absolute; right:10px; color:var(--violet); pointer-events:none; }
+.reqFieldErr select { border-color: #ef4444 !important; }
 .eyeBtn {
-  position:absolute; right:10px; display:flex; align-items:center; justify-content:center;
-  background:none; border:none; color:var(--text-2); cursor:pointer;
-  transition:color .12s; padding:0; width:20px; height:20px;
+  position: absolute; right: 10px; display: flex; align-items: center; justify-content: center;
+  background: none; border: none; color: var(--l-muted-fg); cursor: pointer;
+  transition: color .12s; padding: 0; width: 20px; height: 20px;
 }
-.eyeBtn:hover { color:var(--violet); }
-
-/* ── Responsive ── */
-@media (max-width:700px) {
-  .grid2, .grid3, .cpfRow { grid-template-columns:1fr; }
-  .spanTwo { grid-column:auto; }
-}
-
-/* ── Currency Input Wrapper ── */
-.currencyWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
+.eyeBtn:hover { color: var(--l-primary); }
+.currencyWrapper { position: relative; display: flex; align-items: center; }
 .currencyPrefix {
-  position: absolute;
-  left: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-  pointer-events: none;
-  z-index: 1;
+  position: absolute; left: 10px; z-index: 1; pointer-events: none;
+  font-size: 12px; font-weight: 600; color: var(--l-muted-fg);
 }
-
-.currencyWrapper input {
-  padding-left: 30px !important;
-}
-
-/* ── DatePicker Global Fix ── */
-:global(.rdp) {
-  z-index: 10000 !important;
-  position: fixed !important;
-}
+.currencyWrapper input { padding-left: 30px !important; }
