@@ -1,13 +1,18 @@
 import { tr, locale } from '../../i18n';
+import icoPix           from '../../assets/pagamento/pix.png';
+import icoCartao        from '../../assets/pagamento/cartao.png';
+import icoDinheiro      from '../../assets/pagamento/dinheiro.png';
+import icoTransferencia from '../../assets/pagamento/transferencia.png';
+import icoLink          from '../../assets/pagamento/link.png';
+import icoBoleto        from '../../assets/pagamento/boleto.png';
 // ─────────────────────────────────────────────────────────────
 //  financeiroReport.js
 //  Geração de relatórios PDF do Financeiro via impressão do navegador.
 //
-//  Estratégia: monta um documento HTML leve (texto vetorial + ícones SVG
-//  inline) dentro de um iframe oculto e dispara window.print(). O usuário
-//  escolhe "Salvar como PDF". Como não há captura de imagem (html2canvas),
-//  o arquivo gerado é pequeno, o texto continua selecionável e o layout
-//  reproduz a tela do Financeiro (KPIs, distribuição, grupos por dia).
+//  Estratégia: monta um documento HTML leve dentro de um iframe oculto e
+//  dispara window.print(). O usuário escolhe "Salvar como PDF". O texto
+//  continua selecionável e o layout segue a tela do Financeiro: cabeçalho
+//  escuro do dia, caixas de totais e o extrato com linha do tempo.
 // ─────────────────────────────────────────────────────────────
 
 const brl = (v) =>
@@ -21,17 +26,7 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
-// ── Paleta / acentos (idênticos ao FinancialDashboard) ───────────────────────
-const ACCENT = {
-  sky:     { fg: '#0284c7', bg: 'rgba(2,132,199,0.12)',   bar: '#0ea5e9' },
-  violet:  { fg: '#7c3aed', bg: 'rgba(124,58,237,0.12)',  bar: '#7c3aed' },
-  indigo:  { fg: '#6366f1', bg: 'rgba(99,102,241,0.12)',  bar: '#6366f1' },
-  emerald: { fg: '#059669', bg: 'rgba(5,150,105,0.12)',   bar: '#10b981' },
-  fuchsia: { fg: '#c026d3', bg: 'rgba(192,38,211,0.12)',  bar: '#d946ef' },
-  amber:   { fg: '#d97706', bg: 'rgba(217,119,6,0.12)',   bar: '#f59e0b' },
-  slate:   { fg: '#6b7280', bg: 'rgba(107,114,128,0.12)', bar: '#64748b' },
-};
-
+// ── Cores das formas de pagamento (idênticas ao FinancialDashboard) ─────────
 const accentOf = (d = '') => {
   const u = (d ?? '').toUpperCase();
   if (u.includes('PIX'))                              return 'sky';
@@ -43,19 +38,31 @@ const accentOf = (d = '') => {
   if (u.includes('PENDENTE'))                         return 'slate';
   return 'violet';
 };
-const corMetodo = (m) => ACCENT[accentOf(m)].bar;
+const ACCENT_HEX = {
+  sky: '#1b9a8c', violet: '#5b5bd6', indigo: '#3a7bc8', emerald: '#2f8a57',
+  fuchsia: '#9046c4', amber: '#c08a1e', slate: '#8a94a6',
+};
+const corMetodo = (m) => ACCENT_HEX[accentOf(m)];
+
+// Mesmos ícones do extrato na tela. Pendente fica com o relógio.
+const imgMetodo = (desc) => {
+  const d = (desc ?? '').toUpperCase();
+  if (d.includes('PENDENTE')) return null;
+  return d.includes('PIX') ? icoPix
+    : /CART|CR[EÉ]DITO|D[EÉ]BITO/.test(d) ? icoCartao
+    : /DINHEIRO|ESP[EÉ]CIE/.test(d) ? icoDinheiro
+    : /TRANSFER|TED|DOC|NUBANK/.test(d) ? icoTransferencia
+    : /LINK/.test(d) ? icoLink
+    : icoBoleto;
+};
 
 // ── Ícones (mesmos traços do lucide-react usado na tela) ─────────────────────
 const PATHS = {
   arrowUpRight:   '<line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>',
   arrowDownRight: '<line x1="7" y1="7" x2="17" y2="17"/><polyline points="17 7 17 17 7 17"/>',
-  minus:          '<line x1="5" y1="12" x2="19" y2="12"/>',
-  wallet:         '<path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/>',
+  trendingUp:     '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  trendingDown:   '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
   banknote:       '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/>',
-  calendar:       '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-  smartphone:     '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
-  creditCard:     '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>',
-  building:       '<path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><line x1="10" y1="6" x2="14" y2="6"/><line x1="10" y1="10" x2="14" y2="10"/><line x1="10" y1="14" x2="14" y2="14"/><line x1="10" y1="18" x2="14" y2="18"/>',
   clock:          '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   tag:            '<path d="M20.59 13.41 13.42 20.6a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
 };
@@ -64,19 +71,6 @@ const ico = (nome, size = 14, sw = 2) =>
   `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none"
      stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"
    >${PATHS[nome] ?? ''}</svg>`;
-
-// Mesmo mapeamento do <PayMethodIcon /> da tela.
-function icoMetodo(descricao = '', size = 14) {
-  const d = (descricao ?? '').toUpperCase();
-  if (d.includes('PIX'))                              return ico('smartphone', size);
-  if (d.includes('CREDITO') || d.includes('CRÉDITO')) return ico('creditCard', size);
-  if (d.includes('DEBITO')  || d.includes('DÉBITO'))  return ico('creditCard', size);
-  if (d.includes('DINHEIRO'))                         return ico('banknote', size);
-  if (d.includes('NUBANK'))                           return ico('smartphone', size);
-  if (d.includes('TRANSFER'))                         return ico('building', size);
-  if (d.includes('PENDENTE'))                         return ico('clock', size);
-  return ico('wallet', size);
-}
 
 // Valor final do lançamento, replicando a regra de desconto da tela.
 function valorLancamento(t) {
@@ -91,399 +85,302 @@ function valorLancamento(t) {
 // A busca da tela filtra os itens em `_items`; sem busca cai nos `relatorios`.
 const itensDoGrupo = (g) => g?._items ?? g?.relatorios ?? [];
 
+const horaDe = (s) => (s ?? '').split(' ')[1] ?? '—';
+const parseDia = (s) => { const [d, m, y] = (s ?? '').split('/').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+const diaSemana = (s) => parseDia(s).toLocaleDateString(locale(), { weekday: 'long' });
+
+// Saldo do caixa ao fim do dia: o saldo em dinheiro do último lançamento.
+function saldoFechamento(g) {
+  const lista = (g?.relatorios ?? itensDoGrupo(g)).filter(t => t.valor_historico_dinheiro != null);
+  if (!lista.length) return null;
+  const ultimo = lista.reduce((a, t) => (horaDe(t.data_hora_registro) > horaDe(a.data_hora_registro) ? t : a));
+  return ultimo.valor_historico_dinheiro;
+}
+
 // ── CSS: mesma linguagem visual do FinancialDashboard.module.css ─────────────
-// Só texto, bordas e SVG inline → PDF leve e com texto selecionável.
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
   * { box-sizing: border-box; }
-  @page { size: A4; margin: 11mm 10mm; }
+  @page { size: A4; margin: 12mm 11mm; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-    font-size: 11px; line-height: 1.4; color: #111827;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 10.5px; line-height: 1.45; color: #1c2333;
+    font-feature-settings: 'tnum';
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
   .ico { display: block; flex-shrink: 0; }
-  b, strong { font-weight: 700; }
 
   /* ── Cabeçalho do documento ── */
   .head {
     display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
-    border-bottom: 2px solid #7c3aed; padding-bottom: 9px; margin-bottom: 14px;
+    padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid #dde2ec;
   }
-  .brand {
-    font-size: 9px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
-    color: #7c3aed; margin-bottom: 3px;
-  }
-  .head h1 { font-size: 19px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
-  .head .sub { font-size: 11px; color: #6b7280; margin-top: 2px; }
-  .emit { text-align: right; font-size: 10px; color: #9ca3af; line-height: 1.5; flex-shrink: 0; }
-  .emit b { display: block; color: #6b7280; font-weight: 600; }
+  .brand { font-size: 10px; font-weight: 600; color: #6b7487; margin-bottom: 2px; }
+  .head h1 { font-size: 18px; line-height: 1.2; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .head .sub { font-size: 10.5px; color: #6b7487; margin-top: 3px; }
+  .emit { text-align: right; font-size: 9.5px; color: #6b7487; line-height: 1.5; flex-shrink: 0; }
+  .emit b { color: #1c2333; font-weight: 600; }
 
-  /* ── KPIs (espelha .kpi da tela) ── */
-  .kpiRow { display: flex; gap: 8px; margin-bottom: 12px; }
-  .kpi {
-    flex: 1; min-width: 0; position: relative; overflow: hidden;
-    border: 1px solid #e2e6ef; border-radius: 12px;
-    padding: 11px 11px 12px; background: #fff;
+  /* ── Cabeçalho escuro (dia ou período) ── */
+  .hero {
+    border-radius: 6px; background: #1f2a40; color: #f3f5fa;
+    padding: 14px 16px 0; overflow: hidden; margin-bottom: 10px;
+    break-inside: avoid; page-break-inside: avoid;
   }
-  .kpi .accentBar { position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-  .kpiTop { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; }
-  .kpiIcon {
-    width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
+  .heroTopo { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 14px; }
+  .heroRot { font-size: 10px; color: #a7b0c2; }
+  .heroRot::first-letter { text-transform: uppercase; }
+  .heroNome { margin: 2px 0 0; font-size: 17px; line-height: 1.2; font-weight: 650; letter-spacing: -.01em; }
+  .caixa {
+    display: flex; flex-direction: column; align-items: flex-start;
+    padding: 8px 14px; border-radius: 5px; background: #1d5e45; min-width: 150px;
   }
-  .kpiLabel {
-    font-size: 8px; font-weight: 700; letter-spacing: .07em;
-    text-transform: uppercase; color: #6b7280; line-height: 1.2;
+  .caixaRot { display: inline-flex; align-items: center; gap: 5px; font-size: 9.5px; color: #cbead9; }
+  .caixaVal { margin-top: 2px; font-size: 17px; line-height: 1.2; font-weight: 650; color: #fff; white-space: nowrap; }
+  .linhaTot { display: flex; margin: 0 -16px; border-top: 1px solid #36425c; }
+  .linhaTot div {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 10px; font-size: 10px;
   }
-  .kpiValue {
-    font-family: 'Fraunces', Georgia, serif; font-weight: 600;
-    font-size: 16px; line-height: 1; letter-spacing: -.02em; color: #111827;
-    font-variant-numeric: tabular-nums;
-  }
-  .kpiNeg { color: #e11d48; }
-  .kpiFoot { display: block; font-size: 8.5px; font-weight: 600; color: #9ca3af; margin-top: 5px; }
+  .linhaTot div + div { border-left: 1px solid #36425c; }
+  .linhaTot span { color: #a7b0c2; }
+  .linhaTot b { font-size: 11.5px; font-weight: 650; white-space: nowrap; }
+  .hIn { color: #7ee2ad; } .hOut { color: #f7a8a4; }
 
-  /* ── Distribuição por forma de pagamento ── */
-  .dist {
-    border: 1px solid #e2e6ef; border-radius: 12px;
-    padding: 11px 13px 12px; margin-bottom: 12px; background: #fff;
+  /* ── Cabeçalho do dia em uma linha ── */
+  .heroLinha {
+    display: flex; align-items: stretch; margin-bottom: 8px;
+    border-radius: 6px; background: #1f2a40; color: #f3f5fa; overflow: hidden;
+    break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid;
   }
-  .distHead {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 12px; margin-bottom: 9px;
+  .heroLinha > div {
+    flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 8px 10px; font-size: 9.5px; white-space: nowrap;
   }
-  .distTitle {
-    font-size: 9px; font-weight: 700; letter-spacing: .07em;
-    text-transform: uppercase; color: #6b7280;
-  }
-  .distPeriodo { font-size: 10px; font-weight: 600; color: #6b7280; flex-shrink: 0; }
-  .distBar {
-    display: flex; gap: 2px; height: 9px; border-radius: 999px;
-    overflow: hidden; background: #f6f8fc;
-  }
-  .distSeg { border-radius: 3px; min-width: 3px; }
-  .distLegend {
-    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px 20px; margin-top: 10px;
-  }
-  .distChip { display: flex; align-items: center; gap: 6px; font-size: 10px; min-width: 0; }
-  .distDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .distName {
-    color: #6b7280; flex: 1; min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  /* Contador de lançamentos: logo após o ponto colorido, sem fundo.
-     min-width fixo mantém os nomes das formas alinhados na coluna. */
-  .distCount {
-    min-width: 11px; text-align: right; flex-shrink: 0;
-    font-size: 9px; font-weight: 700; color: #6b7280;
-    font-variant-numeric: tabular-nums;
-  }
-  .distVal { color: #111827; font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .heroLinha > div + div { border-left: 1px solid #36425c; }
+  .heroLinha span { color: #a7b0c2; }
+  .heroLinha b { font-size: 11px; font-weight: 650; }
+  .heroLinha .hlData { flex: 0 0 auto; flex-direction: column; align-items: flex-start; gap: 0; padding-left: 12px; }
+  .hlData b { font-size: 13px; }
+  .hlData span::first-letter { text-transform: uppercase; }
+  .heroLinha .hlCaixa { flex: 0 0 auto; background: #1d5e45; color: #fff; }
+  .hlCaixa span { color: #cbead9; }
 
-  /* ── Cash hero (quando só há permissão do card de dinheiro) ── */
-  .cashHero {
-    display: flex; align-items: center; gap: 16px;
-    padding: 14px 18px; border-radius: 14px; margin-bottom: 12px;
-    background: linear-gradient(135deg, #064e3b 0%, #065f46 48%, #047857 100%);
-    color: #ecfdf5;
+  /* ── Caixas do período ── */
+  .boxes { display: flex; gap: 6px; padding-bottom: 14px; }
+  .box {
+    flex: 1; min-width: 0; padding: 8px 11px; border-radius: 5px;
+    display: flex; flex-direction: column; align-items: flex-start;
   }
-  .cashIcon {
-    width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);
-  }
-  .cashLabel {
-    font-size: 9px; font-weight: 700; letter-spacing: .12em;
-    text-transform: uppercase; color: rgba(236,253,245,0.72);
-  }
-  .cashSub { display: flex; gap: 16px; font-size: 10.5px; font-weight: 500; margin-top: 6px; }
-  .cashUp   { color: #a7f3d0; display: inline-flex; align-items: center; gap: 4px; }
-  .cashDown { color: #fda4af; display: inline-flex; align-items: center; gap: 4px; }
-  .cashValue {
-    margin-left: auto; flex-shrink: 0;
-    font-family: 'Fraunces', Georgia, serif; font-weight: 600;
-    font-size: 24px; line-height: 1; letter-spacing: -.02em;
-    font-variant-numeric: tabular-nums;
-  }
+  .box .caixaRot { color: #dfe5f2; }
+  .box .caixaVal { font-size: 15px; }
+  .bFat { background: #1f6470; } .bDesp { background: #8a2f2c; }
+  .bLucro { background: #34508f; } .bCaixa { background: #1d5e45; }
 
-  /* ── Barra de filtros aplicados ── */
-  .filtros { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
-  .filtrosTitle { font-size: 10px; font-weight: 700; color: #dc2626; }
-  .chip {
-    display: inline-flex; align-items: baseline; gap: 5px;
-    padding: 3px 9px; border-radius: 6px; font-size: 10px; line-height: 1.3;
-    background: rgba(220,38,38,0.08); border: 1px solid rgba(220,38,38,0.25);
+  /* ── Formas de pagamento ── */
+  .formas { margin: 14px 0 18px; break-inside: avoid; page-break-inside: avoid; }
+  .regua { display: flex; gap: 2px; height: 7px; border-radius: 2px; overflow: hidden; background: #eef1f6; }
+  .regua span { display: block; }
+  .secTit {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin: 12px 0 6px; font-size: 11.5px; font-weight: 600;
   }
-  .chip .k { color: #dc2626; font-weight: 600; }
-  .chip .v { color: #b91c1c; font-weight: 700; }
+  .secTit small { font-size: 10px; font-weight: 400; color: #6b7487; }
 
-  /* ── Grupo do dia (espelha .group da tela) ── */
-  .group {
-    border: 1px solid #e2e6ef; border-radius: 10px;
-    overflow: hidden; margin-bottom: 12px;
-  }
-  .groupHeader {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
-    background: #f6f8fc; border-bottom: 1px solid #e2e6ef; padding: 8px 11px;
-    break-after: avoid; page-break-after: avoid;
-  }
-  .groupLeft { display: flex; align-items: center; gap: 7px; }
-  .groupDate { font-size: 12px; font-weight: 700; color: #111827; }
-  .badge {
-    font-size: 9px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
-    background: rgba(124,58,237,0.10); border: 1px solid rgba(124,58,237,0.18); color: #7c3aed;
-  }
-  .groupRight { display: flex; flex-direction: column; gap: 2px; min-width: 190px; flex-shrink: 0; }
-  .groupStat { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-  .groupStatLabel { font-size: 9.5px; font-weight: 500; color: #6b7280; white-space: nowrap; }
-  .groupStat b { font-size: 10.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* ── Filtros aplicados ── */
+  .filtros { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 14px; font-size: 10px; color: #6b7487; }
+  .filtros b { color: #1c2333; font-weight: 600; }
 
-  /* ── Tabela de lançamentos ── */
+  /* ── Tabelas ── */
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   thead { display: table-header-group; }
   thead th {
-    font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em;
-    color: #6b7280; text-align: left; padding: 5px 11px;
-    background: #f6f8fc; border-bottom: 1px solid #e2e6ef;
+    font-size: 9.5px; font-weight: 500; color: #6b7487; text-align: center;
+    padding: 6px 8px; background: #f1f3f8; border-bottom: 1px solid #dde2ec;
   }
-  tbody td {
-    padding: 7px 11px; border-bottom: 1px solid #eef1f6;
-    vertical-align: top; color: #111827;
-  }
-  tbody tr:last-child td { border-bottom: none; }
+  thead th:first-child { border-radius: 4px 0 0 4px; }
+  thead th:last-child  { border-radius: 0 4px 4px 0; }
+  tbody td { padding: 7px 8px; border-bottom: 1px solid #eceff5; text-align: center; vertical-align: middle; }
   tbody tr { page-break-inside: avoid; break-inside: avoid; }
-  .cIco { width: 34px; }
-  .cVal { width: 108px; text-align: right; }
-  .cSaldo { width: 104px; text-align: right; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tl { text-align: left; }
+  .muted { color: #6b7487; }
+  .in { color: #1f7a4d; } .out { color: #b4372f; }
+  .val { white-space: nowrap; }
 
-  .methodIcon {
-    width: 22px; height: 22px; border-radius: 7px;
+  .forma { display: inline-flex; align-items: center; gap: 7px; }
+  .formaDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Extrato do dia: linha do tempo ── */
+  .dia { margin-bottom: 20px; }
+  .ledger .cTl { width: 30px; padding: 0; position: relative; }
+  .ledger td.cTl::before {
+    content: ''; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+    background: #dde2ec; transform: translateX(-.5px);
+  }
+  .ledger tbody tr:first-child td.cTl::before { top: 50%; }
+  .ledger tbody tr:last-child  td.cTl::before { bottom: 50%; }
+  .ledger tbody tr:only-child  td.cTl::before { display: none; }
+  .dot {
+    position: relative; z-index: 1; margin: 0 auto;
+    width: 18px; height: 18px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
+    background: #fff; border: 1.5px solid var(--m); color: var(--m);
   }
-  .desc { font-size: 11px; font-weight: 600; color: #111827; word-break: break-word; }
-  .subdesc {
-    font-size: 9px; color: #6b7280; margin-top: 2px;
-    display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
-  }
-  .editadoTag { color: #dc2626; font-weight: 700; margin-right: 4px; }
-  .pessoalTag {
-    font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
-    background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.20);
-  }
-  .valor {
-    display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px;
-    font-size: 11px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums;
-  }
-  .saldo {
-    display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px;
-    font-size: 10.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums;
-  }
-  .vazio { color: #9ca3af; text-align: center; padding: 14px; font-size: 10px; }
-
-  .pos { color: #059669; } .neg { color: #ef4444; }
-  .desconto { color: #d97706; }
-  .muted { color: #6b7280; }
-  .neutro { color: #374151; }
+  .dotOut { border-style: dashed; }
+  .dot img { width: 11px; height: 11px; object-fit: contain; }
+  .cHora { width: 44px; }
+  .cForma { width: 96px; }
+  .cValor { width: 92px; }
+  .cSaldo { width: 92px; }
+  .desc { display: block; color: #1c2333; word-break: break-word; }
+  .sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 1px; font-size: 9px; color: #6b7487; }
+  .flag { color: #a0611a; display: inline-flex; align-items: center; gap: 3px; }
+  .flagOut { color: #b4372f; }
+  .vazio { color: #6b7487; text-align: center; padding: 14px; font-size: 10px; }
 
   /* ── Rodapé ── */
   .foot {
-    margin-top: 16px; padding-top: 7px; border-top: 1px solid #e2e6ef;
+    margin-top: 16px; padding-top: 7px; border-top: 1px solid #dde2ec;
     display: flex; justify-content: space-between; gap: 12px;
-    font-size: 8.5px; color: #9ca3af;
+    font-size: 8.5px; color: #8a92a3;
   }
 `;
 
 // ── Blocos ───────────────────────────────────────────────────────────────────
 
-function kpiCard({ label, valor, accent, gradiente, icone, negativo = false, rodape = '' }) {
+const tot = (rot, icone, valor, cls) =>
+  `<div>${icone}<span>${escapeHtml(rot)}</span><b class="${cls ?? ''}">${valor}</b></div>`;
+
+// Cabeçalho do dia numa linha só: data, entrou, saiu, resultado e saldo do caixa.
+function heroDia(g, perm) {
+  const entrada = g.total_entrada_dia ?? 0;
+  const saida   = Math.abs(g.total_saida_dia ?? 0);
+  const lucro   = g.lucro_total_dia ?? 0;
+  const saldo   = perm.caixa ? saldoFechamento(g) : null;
+  const [d, m, y] = (g.data ?? '').split('/');
+  const dataCurta = y ? `${d}/${m}/${y.slice(-2)}` : (g.data ?? '—');
   return `
-    <div class="kpi">
-      <div class="accentBar" style="background:linear-gradient(90deg,${gradiente[0]},${gradiente[1]})"></div>
-      <div class="kpiTop">
-        <span class="kpiIcon" style="background:${accent.bg};color:${accent.fg}">${icone}</span>
-        <span class="kpiLabel">${escapeHtml(label)}</span>
-      </div>
-      <div class="kpiValue${negativo ? ' kpiNeg' : ''}">${valor}</div>
-      ${rodape ? `<span class="kpiFoot">${escapeHtml(rodape)}</span>` : ''}
+    <div class="heroLinha">
+      <div class="hlData"><b>${escapeHtml(dataCurta)}</b><span>${escapeHtml(diaSemana(g.data))}</span></div>
+      ${perm.totaisDia ? `
+        ${tot(tr('Entrou'), `<span class="hIn">${ico('arrowUpRight', 12)}</span>`, brl(entrada), 'hIn')}
+        ${tot(tr('Saiu'), `<span class="hOut">${ico('arrowDownRight', 12)}</span>`, brl(saida), 'hOut')}
+        ${tot(tr('Resultado'), lucro < 0 ? `<span class="hOut">${ico('trendingDown', 12)}</span>` : `<span class="hIn">${ico('trendingUp', 12)}</span>`, brl(lucro), lucro < 0 ? 'hOut' : '')}` : ''}
+      ${saldo != null ? `
+        <div class="hlCaixa">${ico('banknote', 12)}<span>${tr('Saldo do caixa')}</span><b class="${saldo < 0 ? 'hOut' : ''}">${brl(saldo)}</b></div>` : ''}
     </div>`;
 }
 
-function blocoKpis({ total, caixa, mostrarCaixa }) {
+function heroPeriodo({ periodo, total, saldo, perm }) {
   const lucro = total.lucro ?? 0;
-  const margem = total.receitas > 0
-    ? tr('Margem de {{pct}}%', { pct: Math.round((lucro / total.receitas) * 100) })
-    : '';
+  const box = (cls, rot, icone, valor, neg = false) => `
+    <div class="box ${cls}">
+      <span class="caixaRot">${icone} ${escapeHtml(rot)}</span>
+      <span class="caixaVal${neg ? ' hOut' : ''}">${valor}</span>
+    </div>`;
   return `
-    <section class="kpiRow">
-      ${kpiCard({
-        label: tr('Receita total'), valor: brl(total.receitas),
-        accent: { bg: 'rgba(16,185,129,0.12)', fg: '#10b981' },
-        gradiente: ['#10b981', '#34d399'], icone: ico('arrowUpRight', 13),
-      })}
-      ${kpiCard({
-        label: tr('Despesa total'), valor: brl(Math.abs(total.despesas ?? 0)),
-        accent: { bg: 'rgba(244,63,94,0.12)', fg: '#f43f5e' },
-        gradiente: ['#f43f5e', '#fb7185'], icone: ico('arrowDownRight', 13),
-      })}
-      ${kpiCard({
-        label: tr('Lucro'), valor: brl(lucro), negativo: lucro < 0,
-        accent: { bg: 'rgba(124,58,237,0.14)', fg: '#7c3aed' },
-        gradiente: ['#7c3aed', '#a78bfa'], icone: ico('wallet', 13),
-        rodape: margem,
-      })}
-      ${mostrarCaixa ? kpiCard({
-        label: tr('Saldo do caixa'), valor: brl(caixa.lucro ?? 0), negativo: (caixa.lucro ?? 0) < 0,
-        accent: { bg: 'rgba(5,150,105,0.13)', fg: '#059669' },
-        gradiente: ['#047857', '#34d399'], icone: ico('banknote', 13),
-        rodape: tr('Dinheiro em espécie'),
-      }) : ''}
-    </section>`;
-}
-
-// Banner verde exibido na tela quando o usuário só tem o card de dinheiro.
-function blocoCaixaHero(caixa) {
-  return `
-    <section class="cashHero">
-      <span class="cashIcon">${ico('banknote', 19)}</span>
-      <div>
-        <div class="cashLabel">${tr('Saldo em caixa · Dinheiro')}</div>
-        <div class="cashSub">
-          <span class="cashUp">${ico('arrowUpRight', 11)} Entradas ${brl(caixa.receitas)}</span>
-          <span class="cashDown">${ico('arrowDownRight', 11)} Saídas ${brl(Math.abs(caixa.despesas ?? 0))}</span>
+    <div class="hero">
+      <div class="heroTopo">
+        <div>
+          <div class="heroRot">${tr('Período')}</div>
+          <h2 class="heroNome">${escapeHtml(periodo)}</h2>
         </div>
       </div>
-      <div class="cashValue">${brl(caixa.lucro)}</div>
-    </section>`;
+      <div class="boxes">
+        ${perm.dashboard ? `
+          ${box('bFat', tr('Faturamento'), ico('arrowUpRight', 11), brl(total.receitas))}
+          ${box('bDesp', tr('Despesas'), ico('arrowDownRight', 11), brl(Math.abs(total.despesas ?? 0)))}
+          ${box('bLucro', tr('Lucro'), ico(lucro < 0 ? 'trendingDown' : 'trendingUp', 11), brl(lucro), lucro < 0)}` : ''}
+        ${saldo != null ? box('bCaixa', tr('Saldo do caixa'), ico('banknote', 11), brl(saldo), saldo < 0) : ''}
+      </div>
+    </div>`;
 }
 
-function blocoDistribuicao(entries, totalReceitas, periodo) {
+function blocoFormas(entries, totalReceitas, legenda) {
   if (!entries.length) return '';
   const segmentos = entries.map(([m, v]) => {
     const pct = totalReceitas > 0 ? (v.receitas / totalReceitas) * 100 : 0;
-    if (pct <= 0) return '';
-    return `<div class="distSeg" style="width:${pct}%;background:${corMetodo(m)}"></div>`;
+    return pct > 0 ? `<span style="width:${pct}%;background:${corMetodo(m)}"></span>` : '';
   }).join('');
-
-  const legenda = entries.map(([m, v]) => `
-    <div class="distChip">
-      <span class="distDot" style="background:${corMetodo(m)}"></span>
-      <span class="distCount">${v.amount ?? 0}</span>
-      <span class="muted">${icoMetodo(m, 11)}</span>
-      <span class="distName">${escapeHtml(m)}</span>
-      <b class="distVal">${brl(v.receitas)}</b>
-    </div>`).join('');
-
+  const linhas = entries.map(([m, v]) => {
+    const pct = totalReceitas > 0 ? (v.receitas / totalReceitas) * 100 : 0;
+    return `
+      <tr>
+        <td class="tl"><span class="forma"><span class="formaDot" style="background:${corMetodo(m)}"></span>${escapeHtml(m)}</span></td>
+        <td class="muted">${v.amount ?? 0}</td>
+        <td class="val">${brl(v.receitas)}</td>
+        <td class="muted">${Math.round(pct)}%</td>
+      </tr>`;
+  }).join('');
   return `
-    <section class="dist">
-      <div class="distHead">
-        <span class="distTitle">${tr('Receita por forma de pagamento')}</span>
-        ${periodo ? `<span class="distPeriodo">${escapeHtml(periodo)}</span>` : ''}
-      </div>
-      <div class="distBar">${segmentos}</div>
-      <div class="distLegend">${legenda}</div>
+    <section class="formas">
+      <div class="regua">${segmentos}</div>
+      <div class="secTit"><span>${tr('Faturamento por forma de pagamento')}</span>${legenda ? `<small>${escapeHtml(legenda)}</small>` : ''}</div>
+      <table>
+        <thead><tr>
+          <th class="tl">${tr('Forma')}</th><th>${tr('Lançamentos')}</th><th>${tr('Faturamento')}</th><th>${tr('Participação')}</th>
+        </tr></thead>
+        <tbody>${linhas}</tbody>
+      </table>
     </section>`;
 }
 
 function blocoFiltros(filtros) {
   if (!filtros.length) return '';
-  return `
-    <section class="filtros">
-      <span class="filtrosTitle">${tr('Filtros aplicados:')}</span>
-      ${filtros.map(f => `
-        <span class="chip">
-          <span class="k">${escapeHtml(f.label)}:</span>
-          <span class="v">${escapeHtml(f.value)}</span>
-        </span>`).join('')}
-    </section>`;
+  return `<div class="filtros">${filtros.map(f =>
+    `<span>${escapeHtml(f.label)}: <b>${escapeHtml(f.value)}</b></span>`).join('')}</div>`;
 }
 
-function linhaLancamento(t, { saldo: mostrarSaldo }) {
+function linhaLancamento(t, perm) {
   const { final, temDesconto, isExp } = valorLancamento(t);
-  const metodo = t.pagamento?.tipo_pagamento?.descricao;
-  const acc    = ACCENT[accentOf(metodo)];
-  const saldo  = t.valor_historico_dinheiro ?? 0;
-
-  const corValor = temDesconto ? 'desconto' : isExp ? 'neg' : '';
-  const estilo   = temDesconto || isExp ? '' : ` style="color:${acc.fg}"`;
-
-  const seta = saldo > 0
-    ? `<span class="pos">${ico('arrowUpRight', 10)}</span>`
-    : saldo < 0
-    ? `<span class="neg">${ico('arrowDownRight', 10)}</span>`
-    : `<span class="muted">${ico('minus', 10)}</span>`;
-
+  const metodo  = t.pagamento?.tipo_pagamento?.descricao;
+  const img     = imgMetodo(metodo);
+  const pagador = t.pagamento?.nome_pagador;
+  const saldo   = t.valor_historico_dinheiro ?? 0;
   return `
     <tr>
-      <td class="cIco">
-        <span class="methodIcon" style="background:${acc.bg};color:${acc.fg}">${icoMetodo(metodo, 12)}</span>
+      <td class="cTl">
+        <span class="dot${isExp ? ' dotOut' : ''}" style="--m:${corMetodo(metodo)}">
+          ${img ? `<img src="${img}" alt="">` : ico('clock', 10)}
+        </span>
       </td>
-      <td>
-        <div class="desc">
-          ${t.editado ? `<span class="editadoTag">(${tr('Editado')})</span>` : ''}${escapeHtml(t.relatorio ?? '—')}
-        </div>
-        <div class="subdesc">
-          <span>${escapeHtml(t.data_hora_registro ?? '—')} · ${escapeHtml(metodo ?? '—')}</span>
-          ${t.despesa_pessoal ? `<span class="pessoalTag">${tr('Despesa Interna')}</span>` : ''}
-        </div>
+      <td class="cHora muted">${escapeHtml(horaDe(t.data_hora_registro))}</td>
+      <td class="tl">
+        <span class="desc">${escapeHtml(t.relatorio ?? '—')}</span>
+        <span class="sub">
+          ${pagador ? `<span>${escapeHtml(pagador)}</span>` : ''}
+          ${t.despesa_pessoal ? `<span class="flag flagOut">${tr('Despesa interna')}</span>` : ''}
+          ${temDesconto ? `<span class="flag">${ico('tag', 9)} ${tr('Com desconto')}</span>` : ''}
+          ${t.editado ? `<span class="flag flagOut">${tr('Editado')}</span>` : ''}
+        </span>
       </td>
-      <td class="cVal">
-        <b class="valor ${corValor}"${estilo}>
-          ${isExp ? '−' : '+'}${brl(final)}${temDesconto ? ico('tag', 11) : ''}
-        </b>
-      </td>
-      ${mostrarSaldo ? `
-      <td class="cSaldo">
-        <span class="saldo">${brl(saldo)}${seta}</span>
-      </td>` : ''}
+      <td class="cForma muted">${escapeHtml(metodo ?? '—')}</td>
+      <td class="cValor val ${isExp ? 'out' : 'in'}">${isExp ? '−' : '+'}${brl(final)}</td>
+      ${perm.saldo ? `<td class="cSaldo val ${saldo < 0 ? 'out' : 'muted'}">${brl(saldo)}</td>` : ''}
     </tr>`;
 }
 
 function blocoDia(g, perm) {
   const itens = itensDoGrupo(g);
-  const lucro = g.lucro_total_dia ?? 0;
-  const nCols = perm.saldo ? 4 : 3;
-
+  const nCols = perm.saldo ? 6 : 5;
   const corpo = itens.length
     ? itens.map(t => linhaLancamento(t, perm)).join('')
     : `<tr><td class="vazio" colspan="${nCols}">${tr('Sem lançamentos.')}</td></tr>`;
-
   return `
-    <section class="group">
-      <div class="groupHeader">
-        <div class="groupLeft">
-          <span style="color:#7c3aed">${ico('calendar', 12)}</span>
-          <span class="groupDate">${escapeHtml(g.data ?? '—')}</span>
-          <span class="badge">${itens.length} ${itens.length === 1 ? tr('lançamento') : tr('lançamentos')}</span>
-        </div>
-        ${perm.totaisDia ? `
-        <div class="groupRight">
-          <div class="groupStat">
-            <span class="groupStatLabel">${tr('Receita total do dia:')}</span>
-            <b class="neutro">${brl(g.total_entrada_dia)}</b>
-          </div>
-          <div class="groupStat">
-            <span class="groupStatLabel">${tr('Total de despesas:')}</span>
-            <b class="neg">${brl(g.total_saida_dia)}</b>
-          </div>
-          <div class="groupStat">
-            <span class="groupStatLabel">${tr('Lucro do dia:')}</span>
-            <b class="${lucro >= 0 ? 'pos' : 'neg'}">${brl(lucro)}</b>
-          </div>
-        </div>` : ''}
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th class="cIco"></th>
-            <th>${tr('Descrição')}</th>
-            <th class="cVal">${tr('Valor')}</th>
-            ${perm.saldo ? `<th class="cSaldo">${tr('Saldo Dinheiro')}</th>` : ''}
-          </tr>
-        </thead>
+    <section class="dia">
+      ${heroDia(g, perm)}
+      <table class="ledger">
+        <thead><tr>
+          <th class="cTl"></th>
+          <th class="cHora">${tr('Hora')}</th>
+          <th class="tl">${tr('Lançamento')}</th>
+          <th class="cForma">${tr('Forma')}</th>
+          <th class="cValor">${tr('Valor')}</th>
+          ${perm.saldo ? `<th class="cSaldo">${tr('Saldo do caixa')}</th>` : ''}
+        </tr></thead>
         <tbody>${corpo}</tbody>
       </table>
     </section>`;
@@ -494,6 +391,7 @@ function blocoDia(g, perm) {
 function documento({ titulo, subtitulo, usuario, corpoHtml }) {
   const agora = new Date();
   return `<!doctype html><html lang="${locale()}"><head><meta charset="utf-8">
+    <base href="${escapeHtml(window.location.origin)}/">
     <title>${escapeHtml(titulo)}</title><style>${CSS}</style></head>
     <body>
       <header class="head">
@@ -503,14 +401,14 @@ function documento({ titulo, subtitulo, usuario, corpoHtml }) {
           ${subtitulo ? `<div class="sub">${escapeHtml(subtitulo)}</div>` : ''}
         </div>
         <div class="emit">
-          <b>${tr('Emitido em')}</b>${escapeHtml(agora.toLocaleString('pt-BR'))}
-          ${usuario ? `<b style="margin-top:3px">${tr('Por')}</b>${escapeHtml(usuario)}` : ''}
+          ${tr('Emitido em')} <b>${escapeHtml(agora.toLocaleString(locale()))}</b>
+          ${usuario ? `<br>${tr('Por')} <b>${escapeHtml(usuario)}</b>` : ''}
         </div>
       </header>
       ${corpoHtml}
       <footer class="foot">
         <span>maishospedagem · ${tr('Relatório financeiro')}</span>
-        <span>${escapeHtml(agora.toLocaleDateString('pt-BR'))}</span>
+        <span>${escapeHtml(agora.toLocaleDateString(locale()))}</span>
       </footer>
     </body></html>`;
 }
@@ -548,10 +446,13 @@ function imprimir(html, fallbackTitulo) {
     setTimeout(limpar, 60000);
   };
 
-  // Espera as fontes (DM Sans / Fraunces) para o layout não mudar depois do print;
-  // o timer garante a impressão mesmo se o carregamento demorar.
-  doc.fonts?.ready?.then(() => setTimeout(disparar, 60)).catch(() => {});
-  setTimeout(disparar, 1200);
+  // Espera a fonte e os ícones das formas de pagamento; o timer garante a
+  // impressão mesmo se o carregamento demorar.
+  const imagens = [...doc.images].map(img => (img.complete ? null : new Promise(r => { img.onload = img.onerror = r; })));
+  Promise.all([doc.fonts?.ready, ...imagens].filter(Boolean))
+    .then(() => setTimeout(disparar, 60))
+    .catch(() => {});
+  setTimeout(disparar, 1500);
 }
 
 // ── API pública ──────────────────────────────────────────────────────────────
@@ -581,7 +482,7 @@ function pagamentosDoDia(itens) {
   return [...mapa.entries()].sort((a, b) => b[1].receitas - a[1].receitas);
 }
 
-// Relatório de um único dia — reproduz o grupo do dia como aparece na tela.
+// Relatório de um único dia — extrato do dia como aparece na tela.
 export function relatorioDiaPdf(grupo, { permissoes, usuario } = {}) {
   if (!grupo) return;
   const perm  = permissoesPadrao(permissoes);
@@ -589,50 +490,48 @@ export function relatorioDiaPdf(grupo, { permissoes, usuario } = {}) {
 
   const entries  = pagamentosDoDia(itens);
   const receitas = entries.reduce((soma, [, v]) => soma + v.receitas, 0);
-  const distribuicao = perm.dashboard
-    ? blocoDistribuicao(entries, receitas, tr('Total de transações: {{n}} · {{data}}', { n: itens.length, data: grupo.data ?? '' }))
+  const formas = perm.dashboard
+    ? blocoFormas(entries, receitas, itens.length === 1 ? tr('1 lançamento') : tr('{{n}} lançamentos', { n: itens.length }))
     : '';
 
   const html = documento({
-    titulo: tr('Relatório Diário'),
+    titulo: tr('Relatório do dia'),
     subtitulo: grupo.data,
     usuario,
-    corpoHtml: distribuicao + blocoDia(grupo, perm),
+    corpoHtml: blocoDia(grupo, perm) + formas,
   });
   imprimir(html, tr('Relatório {{data}}', { data: grupo.data ?? '' }));
 }
 
-// Relatório da busca filtrada — KPIs + distribuição + filtros + todos os dias.
+// Relatório da busca filtrada — totais do período, formas e todos os dias.
 export function relatorioFiltroPdf({
   grupos = [], total, pagamentos = {}, filtros = [], periodo = '', permissoes, usuario,
 } = {}) {
   const perm = permissoesPadrao(permissoes);
-  const tot  = total ?? { receitas: 0, despesas: 0, lucro: 0 };
+  const totais  = total ?? { receitas: 0, despesas: 0, lucro: 0 };
   const entries = Object.entries(pagamentos).filter(([k]) => k !== 'TOTAL');
-  const caixa = entries.find(([m]) => m.toUpperCase().includes('DINHEIRO'))?.[1]
-    ?? { receitas: 0, despesas: 0, lucro: 0 };
 
   // aceita tanto a lista de filtros da tela quanto uma string simples
   const listaFiltros = Array.isArray(filtros)
     ? filtros
     : filtros ? [{ label: tr('Filtros'), value: filtros }] : [];
 
-  const cabecalho = perm.dashboard
-    ? blocoKpis({ total: tot, caixa, mostrarCaixa: perm.caixa }) +
-      blocoDistribuicao(entries, tot.receitas ?? 0, periodo)
-    : perm.caixa
-      ? blocoCaixaHero(caixa)
-      : '';
+  const periodoFiltro = listaFiltros.find(f => f.type === 'periodo')?.value;
+  const saldo = perm.caixa && grupos.length ? saldoFechamento(grupos[0]) : null;
+  const cabecalho = (perm.dashboard || saldo != null)
+    ? heroPeriodo({ periodo: periodoFiltro ?? tr('Todos os dias listados'), total: totais, saldo, perm })
+    : '';
+  const formas = perm.dashboard ? blocoFormas(entries, totais.receitas ?? 0, periodo) : '';
 
   const corpo = grupos.length
     ? grupos.map(g => blocoDia(g, perm)).join('')
     : `<p class="vazio" style="padding:24px">${tr('Nenhum lançamento no período filtrado.')}</p>`;
 
   const html = documento({
-    titulo: tr('Relatório Financeiro'),
-    subtitulo: listaFiltros.map(f => `${f.label}: ${f.value}`).join(' · ') || tr('Busca filtrada'),
+    titulo: tr('Relatório financeiro'),
+    subtitulo: '',
     usuario,
-    corpoHtml: cabecalho + blocoFiltros(listaFiltros) + corpo,
+    corpoHtml: cabecalho + blocoFiltros(listaFiltros) + formas + corpo,
   });
-  imprimir(html, tr('Relatório Financeiro'));
+  imprimir(html, tr('Relatório financeiro'));
 }

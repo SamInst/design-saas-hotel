@@ -1696,5 +1696,10 @@
   "Faturamento": "Revenue",
   "Faturamento por forma de pagamento": "Revenue by payment method",
   "Pago a": "Paid to",
-  "Último pagador": "Last payer"
+  "Último pagador": "Last payer",
+  "Participação no faturamento": "Revenue share",
+  "Resultado por forma de pagamento": "Results by payment method",
+  "Sem faturamento no período.": "No revenue in this period.",
+  "Sem lançamentos no período.": "No entries in this period.",
+  "{{n}} formas": "{{n}} methods"
 }

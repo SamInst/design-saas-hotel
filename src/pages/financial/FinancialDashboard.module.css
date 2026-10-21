@@ -144,6 +144,24 @@
 .page .searchAtiva .searchInput { border-color: color-mix(in oklch, var(--l-primary) 45%, var(--l-border)); }
 .searchAtiva .searchIcon { color: var(--l-primary); }
 
+/* Filtro flutuante, preso ao botão */
+.filtroWrap { position: relative; flex-shrink: 0; }
+.filtroPop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  width: 260px; padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+  border: 1px solid var(--l-border); border-radius: var(--l-r-lg);
+  background: var(--l-card); box-shadow: 0 8px 24px oklch(0.2 0.02 260 / .14);
+  animation: filtroIn .14s ease-out;
+}
+@keyframes filtroIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.filtroPop label, .filtroCampo > span { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--l-muted-fg); }
+.filtroCampo { display: flex; flex-direction: column; gap: 4px; }
+.page .filtroPop select, .page .filtroPop input { height: 32px; font-size: 13px; padding-top: 0; padding-bottom: 0; }
+.filtroAcoes { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.page .filtroAplicar { height: 30px; padding: 0 14px; font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .filtroPop { animation: none; } }
+
 .filterBtn {
   position: relative; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
@@ -201,15 +219,15 @@
 
 /* Um dia: numeral grande à esquerda, como a folha de um caderno de caixa */
 .dia {
-  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center;
-  width: 100%; padding: 10px 10px 10px 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  width: 100%; padding: 10px 10px 10px 12px;
   border-radius: var(--l-r-lg); border: 1px solid transparent;
   background: transparent; font-family: inherit; text-align: left; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s, border-color .15s;
 }
-.dia:hover { background: var(--l-accent); }
+.dia:hover { background: color-mix(in oklch, var(--l-accent) 45%, transparent); }
 .dia:focus-visible { outline: 2px solid var(--l-ring); outline-offset: -2px; }
-.diaAtivo, .diaAtivo:hover { background: var(--l-accent); }
+.diaAtivo, .diaAtivo:hover { background: transparent; border-color: color-mix(in oklch, var(--l-primary) 32%, transparent); }
 .listChevron { color: var(--l-muted-fg); flex-shrink: 0; }
 .diaAtivo .listChevron { color: var(--l-fg); }
 .diaNum {
@@ -220,7 +238,8 @@
 .diaBody { min-width: 0; display: flex; flex-direction: column; }
 .diaLinha { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .diaTitulo { font-size: 14px; line-height: 20px; font-weight: 600; }
-.diaTitulo::first-letter { text-transform: uppercase; }
+.diaTitulo { font-variant-numeric: tabular-nums; }
+.diaSemanaLista::first-letter { text-transform: uppercase; }
 .diaLucro { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .diaSub {
   display: flex; justify-content: space-between; gap: 10px;
@@ -361,7 +380,7 @@
 /* Extrato: a primeira coluna é a linha do tempo, com um ponto por lançamento */
 .ledger th.cTl { width: 40px; }
 .ledger th:nth-child(3), .ledger td.cDesc { text-align: left; }
-.ledger th.cHora, .ledger td.cHora { width: 56px; padding-right: 0; }
+.ledger th.cHora, .ledger td.cHora { width: 56px; padding-left: 0; }
 .ledger td.cTl {
   position: relative; width: 40px; padding: 0;
   border-bottom: none;
@@ -389,7 +408,7 @@
 .ledger td.cValor, .ledger td.cSaldo { font-variant-numeric: tabular-nums; }
 
 .lRow { cursor: pointer; transition: background-color .12s; }
-.lRow:hover td:not(.cTl) { background: var(--l-accent); }
+.lRow:hover td:not(.cTl) { background: color-mix(in oklch, var(--l-accent) 45%, transparent); }
 .lRow:focus-visible { outline: 2px solid var(--l-ring); outline-offset: -2px; }
 
 .lDesc { display: block; font-weight: 600; overflow-wrap: anywhere; }
@@ -404,6 +423,100 @@
 .flagEditado { font-style: italic; }
 
 /* Formas de pagamento */
+/* ── Gráficos do dashboard ── */
+.page {
+  --c-fat:   oklch(0.56 0.09 200);
+  --c-desp:  oklch(0.6 0.15 25);
+  --c-lucro: oklch(0.5 0.11 262);
+}
+[data-theme='dark'] .page {
+  --c-fat:   oklch(0.7 0.09 200);
+  --c-desp:  oklch(0.7 0.14 25);
+  --c-lucro: oklch(0.7 0.1 262);
+}
+.charts {
+  display: grid; margin-top: 14px;
+  border: 1px solid var(--l-border); border-radius: var(--l-r-xl); background: var(--l-card);
+}
+.chart + .chart { border-top: 1px solid var(--l-border); }
+@media (min-width: 1100px) {
+  .chart + .chart { border-top: none; border-left: 1px solid var(--l-border); }
+}
+.chart {
+  margin: 0; min-width: 0; padding: 14px 16px 16px;
+}
+.chartTit {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  margin-bottom: 12px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--l-fg);
+}
+.chartVazio { margin: 24px 0; text-align: center; font-size: 13px; color: var(--l-muted-fg); }
+
+/* rosca */
+.donutWrap { display: flex; align-items: center; justify-content: center; padding: 4px 0; }
+.donut { width: 252px; height: 184px; flex-shrink: 0; overflow: visible; }
+.donutTrilho { stroke: var(--l-secondary); }
+.donutArco { cursor: pointer; transition: stroke-width .15s, opacity .15s; }
+.donutApagado { opacity: .3; }
+.donutCallout { pointer-events: none; transition: opacity .15s; }
+.donutCallout text { font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.donutRot { font-size: 9px; fill: var(--l-muted-fg); }
+.donutVal { font-size: 17px; font-weight: 650; fill: var(--l-fg); font-variant-numeric: tabular-nums; }
+.donutSub { font-size: 9px; fill: var(--l-muted-fg); font-variant-numeric: tabular-nums; }
+.legenda { list-style: none; margin: 0; padding: 0; flex: 1 1 140px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.legItem {
+  display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: var(--l-r-md);
+  font-size: 12px; line-height: 16px; cursor: default; transition: opacity .15s;
+}
+.legItem:hover { background: color-mix(in oklch, var(--l-accent) 45%, transparent); }
+.legApagado { opacity: .45; }
+.legCor { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.legNome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--l-fg); }
+.legPct { color: var(--l-muted-fg); font-variant-numeric: tabular-nums; }
+
+/* barras agrupadas */
+.serLeg { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.serBtn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px;
+  border: none; border-radius: var(--l-r-md); background: transparent; cursor: pointer;
+  font: inherit; font-size: 12px; font-weight: 400; color: var(--l-muted-fg);
+}
+.serBtn:hover { background: color-mix(in oklch, var(--l-accent) 45%, transparent); color: var(--l-fg); }
+.serBtnOff { opacity: .45; text-decoration: line-through; }
+.serCor { width: 9px; height: 9px; border-radius: 50%; }
+.serFat   { background: var(--c-fat); }
+.serDesp  { background: var(--c-desp); }
+.serLucro { background: var(--c-lucro); }
+/* colunas agrupadas, eixo de valores à esquerda */
+.colunas { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; padding-bottom: 50px; }
+.colEixo { position: relative; height: 190px; margin-top: 18px; min-width: 52px; }
+.colEixo span {
+  position: absolute; right: 0; transform: translateY(50%);
+  font-size: 10.5px; line-height: 12px; color: var(--l-muted-fg); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.colPlot { position: relative; height: 190px; margin-top: 18px; display: flex; align-items: stretch; }
+.colGrade { position: absolute; left: 0; right: 0; height: 1px; background: color-mix(in oklch, var(--l-border) 70%, transparent); }
+.colZero { background: var(--l-border); }
+.colGrupo { position: relative; flex: 1 1 0; min-width: 0; display: flex; justify-content: center; transition: opacity .15s; }
+.colGrupo::before { content: ''; position: absolute; inset: -18px 0 -48px; z-index: 0; pointer-events: none; }
+.colGrupo:nth-child(even of .colGrupo)::before { background: color-mix(in oklch, var(--l-secondary) 70%, transparent); }
+.colGrupo:hover::before { background: color-mix(in oklch, var(--l-accent) 70%, transparent); }
+.colBarras, .colRot { z-index: 1; }
+.colApagado { opacity: .45; }
+.colBarras { position: relative; width: 100%; max-width: 66px; display: flex; justify-content: center; gap: 5px; }
+.colSlot { position: relative; flex: 0 1 16px; min-width: 6px; }
+.col { position: absolute; left: 0; right: 0; border-radius: 3px 3px 0 0; transition: height .3s ease, bottom .3s ease; }
+.colNeg { border-radius: 0 0 3px 3px; opacity: .85; }
+.colRot {
+  position: absolute; left: 0; right: 0; top: calc(100% + 7px);
+  font-size: 11px; line-height: 14px; text-align: center; color: var(--l-muted-fg);
+  overflow-wrap: anywhere; padding: 0 3px;
+}
+.colPct {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 2px); z-index: 1; text-align: center;
+  font-size: 11px; line-height: 14px; font-weight: 600; color: var(--l-fg); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) { .col, .donutArco { transition: none; } }
+
 .reguaTit {
   display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
   margin: 14px 0 8px;
@@ -449,7 +562,7 @@
   from { opacity: 0; transform: perspective(1400px) rotateY(-28deg) translateX(24px); }
   to   { opacity: 1; transform: none; }
 }
-.lRowAtivo td:not(.cTl) { background: var(--l-accent); }
+.lRowAtivo td:not(.cTl) { background: color-mix(in oklch, var(--l-accent) 75%, transparent); }
 .backBtnSempre {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; margin-left: -6px; border: none; border-radius: var(--l-r-md);
@@ -525,8 +638,8 @@
 .skNum   { width: 80%; height: 16px; margin-top: 3px; }
 .skCol   { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .skDia {
-  display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: center;
-  padding: 12px 10px 12px 8px;
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: center;
+  padding: 12px 10px 12px 12px;
 }
 .skDiaNum { width: 30px; height: 26px; justify-self: end; }
 .skHero   { height: 104px; margin-top: 16px; border-radius: var(--l-r-xl); }

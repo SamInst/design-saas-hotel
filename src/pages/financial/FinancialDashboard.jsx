@@ -15,6 +15,7 @@ import { PaymentModal }     from '../../components/ui/PaymentModal';
 import { relatorioApi, enumApi, quartoApi, funcionarioApi, arquivoApi } from '../../services/api';
 import { usePermissions } from '../../hooks/usePermissions';
 import { relatorioDiaPdf, relatorioFiltroPdf } from './financeiroReport';
+import { ComparativoBarras } from './FinanceCharts';
 
 import icoPix           from '../../assets/pagamento/pix.png';
 import icoCartao        from '../../assets/pagamento/cartao.png';
@@ -93,7 +94,6 @@ const methodColor = (m) => ACCENT_HEX[accentOf(m)] ?? '#7c3aed';
 const parseDia  = (s) => { const [d, m, y] = (s ?? '').split('/').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
 const diaSemana = (s) => parseDia(s).toLocaleDateString(locale(), { weekday: 'long' });
 const dataLonga = (s) => parseDia(s).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' });
-const mesAno    = (s) => parseDia(s).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
 const horaDe = (s) => (s ?? '').split(' ')[1] ?? '—';
 
 // Campo da ficha — mesmo desenho dos dados cadastrais em Cadastros.
@@ -199,6 +199,23 @@ export default function FinancialDashboard() {
   };
 
   useEffect(() => { fetchData(); }, []);
+  // Filtro flutuante: fecha ao clicar fora (o calendário do período abre
+  // fora da página, num portal, então cliques lá não contam).
+  const pageRef   = useRef(null);
+  const filtroRef = useRef(null);
+  useEffect(() => {
+    if (!showFilter) return;
+    const fora = (e) => {
+      if (filtroRef.current?.contains(e.target)) return;
+      if (!pageRef.current?.contains(e.target)) return;
+      setShowFilter(false);
+    };
+    const esc = (e) => { if (e.key === 'Escape') setShowFilter(false); };
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', esc); };
+  }, [showFilter]);
+
   const abriuDashboard = useRef(false);
   useEffect(() => {
     if (abriuDashboard.current || !canDashboard || !isDesktop) return;
@@ -571,16 +588,8 @@ export default function FinancialDashboard() {
                   </div>
                 </div>
               </div>
-              <div className={styles.reguaBar}>
-                {methodEntries.map(([m, v]) => {
-                  const pct = total.receitas > 0 ? (v.receitas / total.receitas) * 100 : 0;
-                  if (pct <= 0) return null;
-                  return (
-                    <span key={m} className={styles.reguaSeg}
-                      style={{ width: `${pct}%`, background: methodColor(m) }}
-                      title={`${m}: ${fmt(v.receitas)} (${Math.round(pct)}%)`} />
-                  );
-                })}
+              <div className={styles.charts}>
+                <ComparativoBarras entries={methodEntries} total={total.receitas} />
               </div>
               <div className={styles.reguaTit}>
                 <span>{tr('Faturamento por forma de pagamento')}</span>
@@ -592,6 +601,8 @@ export default function FinancialDashboard() {
                     <th>{tr('Forma')}</th>
                     <th>{tr('Lançamentos')}</th>
                     <th>{tr('Faturamento')}</th>
+                    <th>{tr('Despesas')}</th>
+                    <th>{tr('Lucro')}</th>
                     <th>{tr('Participação')}</th>
                   </tr></thead>
                   <tbody>
@@ -607,6 +618,8 @@ export default function FinancialDashboard() {
                           </td>
                           <td className={styles.tMuted}>{v.amount ?? 0}</td>
                           <td className={styles.tValor}>{fmt(v.receitas)}</td>
+                          <td className={[styles.tValor, styles.vOut].join(' ')}>{fmt(Math.abs(v.despesas ?? 0))}</td>
+                          <td className={[styles.tValor, (v.lucro ?? 0) < 0 ? styles.vOut : ''].join(' ')}>{fmt(v.lucro ?? 0)}</td>
                           <td className={styles.tMuted}>{Math.round(pct)}%</td>
                         </tr>
                       );
@@ -688,8 +701,8 @@ export default function FinancialDashboard() {
             <div className={styles.tScroll}>
               <table className={[styles.iTable, styles.ledger].join(' ')}>
                 <thead><tr>
-                  <th className={styles.cHora}>{tr('Hora')}</th>
                   <th className={styles.cTl} aria-label={tr('Forma')} />
+                  <th className={styles.cHora}>{tr('Hora')}</th>
                   <th>{tr('Lançamento')}</th>
                   <th className={styles.cForma}>{tr('Forma')}</th>
                   <th className={styles.cValor}>{tr('Valor')}</th>
@@ -707,7 +720,6 @@ export default function FinancialDashboard() {
                         tabIndex={0}
                         onClick={() => openDetail(t)}
                         onKeyDown={(e) => { if (e.key === 'Enter') openDetail(t); }}>
-                        <td className={[styles.cHora, styles.tMuted].join(' ')}>{hora}</td>
                         <td className={styles.cTl}>
                           <span className={[styles.tlDot, isExp ? styles.tlDotOut : ''].join(' ')}
                             style={{ '--m': methodColor(metDesc) }} title={metDesc ?? ''}>
@@ -716,6 +728,7 @@ export default function FinancialDashboard() {
                               : <Clock size={11} />}
                           </span>
                         </td>
+                        <td className={[styles.cHora, styles.tMuted].join(' ')}>{hora}</td>
                         <td className={styles.cDesc}>
                           <span className={styles.lDesc}>{t.relatorio ?? '—'}</span>
                           <span className={styles.lSub}>
@@ -935,7 +948,7 @@ export default function FinancialDashboard() {
 
   // ─────────────────────────────────────────────────────────
   return (
-    <div className={styles.page}>
+    <div className={styles.page} ref={pageRef}>
       <div className={styles.container}>
         <main className={[styles.split, (diaAberto || showFormas || showPaymentAdd || (showDetail && item)) ? styles.splitListHidden : ''].join(' ')}>
 
@@ -966,13 +979,58 @@ export default function FinancialDashboard() {
                 )}
               </div>
               {canFiltros && (
-                <button type="button"
-                  className={[styles.filterBtn, nFilters > 0 ? styles.filterBtnOn : ''].join(' ')}
-                  onClick={() => setShowFilter(true)}
-                  title={tr('Filtros')} aria-label={tr('Filtros')}>
-                  <FilterIcon size={18} />
-                  {nFilters > 0 && <span className={styles.filterDot} />}
-                </button>
+                <div className={styles.filtroWrap} ref={filtroRef}>
+                  <button type="button"
+                    className={[styles.filterBtn, (nFilters > 0 || showFilter) ? styles.filterBtnOn : ''].join(' ')}
+                    onClick={() => setShowFilter(v => !v)}
+                    title={tr('Filtros')} aria-label={tr('Filtros')} aria-expanded={showFilter}>
+                    <FilterIcon size={18} />
+                    {nFilters > 0 && <span className={styles.filterDot} />}
+                  </button>
+                  {showFilter && (
+                    <div className={styles.filtroPop} role="dialog" aria-label={tr('Filtros')}>
+                      <DatePicker
+                        mode="range" label={tr('Período')}
+                        startDate={fStart} endDate={fEnd}
+                        onRangeChange={({ start, end }) => { setFStart(start); setFEnd(end); }}
+                        placeholder={tr('Selecione o período...')}
+                      />
+                      <label className={styles.filtroCampo}>
+                        <span>{tr('Tipo de Valor')}</span>
+                        <Select value={fValores} onChange={e => setFValores(e.target.value)}>
+                          <option value="">{tr('Todos')}</option>
+                          <option value="ENTRADA">{tr('Entradas')}</option>
+                          <option value="SAIDA">{tr('Saídas')}</option>
+                        </Select>
+                      </label>
+                      <label className={styles.filtroCampo}>
+                        <span>{tr('Tipo de Pagamento')}</span>
+                        <Select value={fPagId} onChange={e => setFPagId(e.target.value)}>
+                          <option value="">{tr('Todos')}</option>
+                          {tiposPagamento.map(tp => <option key={tp.id} value={tp.id}>{tp.descricao}</option>)}
+                        </Select>
+                      </label>
+                      <label className={styles.filtroCampo}>
+                        <span>{tr('Quarto')}</span>
+                        <Select value={fQuarto} onChange={e => setFQuarto(e.target.value)}>
+                          <option value="">{tr('Todos')}</option>
+                          {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
+                        </Select>
+                      </label>
+                      <label className={styles.filtroCampo}>
+                        <span>{tr('Funcionário')}</span>
+                        <Select value={fFuncId} onChange={e => setFFuncId(e.target.value)}>
+                          <option value="">{tr('Todos')}</option>
+                          {funcionarios.map(f => <option key={f.id} value={f.id}>{f.pessoa?.nome}</option>)}
+                        </Select>
+                      </label>
+                      <div className={styles.filtroAcoes}>
+                        <button type="button" className={styles.linkBtn} onClick={clearFilter}>{tr('Limpar')}</button>
+                        <Button className={[styles.btnSolid, styles.filtroAplicar].join(' ')} onClick={applyFilter}>{tr('Aplicar')}</Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1020,7 +1078,6 @@ export default function FinancialDashboard() {
                 <div aria-busy="true">
                   {Array.from({ length: 7 }, (_, i) => (
                     <div key={i} className={styles.skDia}>
-                      <span className={[styles.sk, styles.skDiaNum].join(' ')} />
                       <span className={styles.skCol}>
                         <span className={[styles.sk, styles.skTxt].join(' ')} style={{ width: `${62 - (i % 3) * 10}%` }} />
                         <span className={[styles.sk, styles.skSub].join(' ')} />
@@ -1044,16 +1101,15 @@ export default function FinancialDashboard() {
                   <button key={g.data} type="button"
                     className={[styles.dia, ativo ? styles.diaAtivo : ''].join(' ')}
                     onClick={() => abrirDia(g.data)}>
-                    <span className={styles.diaNum}>{g.data.slice(0, 2)}</span>
                     <span className={styles.diaBody}>
                       <span className={styles.diaLinha}>
-                        <span className={styles.diaTitulo}>{diaSemana(g.data)}</span>
+                        <span className={styles.diaTitulo}>{g.data}</span>
                         {canValorTotalDia && (
                           <span className={[styles.diaLucro, lucro < 0 ? styles.vOut : ''].join(' ')}>{fmt(lucro)}</span>
                         )}
                       </span>
                       <span className={styles.diaSub}>
-                        <span>{mesAno(g.data)}</span>
+                        <span className={styles.diaSemanaLista}>{diaSemana(g.data)}</span>
                         <span>{g._items.length === 1 ? tr('1 lançamento') : tr('{{n}} lançamentos', { n: g._items.length })}</span>
                       </span>
                     </span>
@@ -1124,49 +1180,6 @@ export default function FinancialDashboard() {
             <CreditCard size={13} /> {tr('Definir Pagamento')}
           </button>
         )}
-      </Modal>
-
-      {/* ══ MODAL: FILTROS ══════════════════════════════════ */}
-      <Modal open={showFilter} onClose={() => setShowFilter(false)} title={tr('Filtros')}
-        footer={
-          <div className={styles.modalFooter}>
-            <Button onClick={clearFilter} className={styles.full}>{tr('Limpar')}</Button>
-            <Button variant="primary" onClick={applyFilter} className={styles.full}>{tr('Aplicar')}</Button>
-          </div>
-        }>
-        <DatePicker
-          mode="range" label={tr('Período')}
-          startDate={fStart} endDate={fEnd}
-          onRangeChange={({ start, end }) => { setFStart(start); setFEnd(end); }}
-          placeholder={tr('Selecione o período...')}
-        />
-        <FormField label={tr('Tipo de Valor')}>
-          <Select value={fValores} onChange={e => setFValores(e.target.value)}>
-            <option value="">{tr('Selecione')}</option>
-            <option value="ENTRADA">{tr('Entradas')}</option>
-            <option value="SAIDA">{tr('Saídas')}</option>
-          </Select>
-        </FormField>
-        <FormField label={tr('Tipo de Pagamento')}>
-          <Select value={fPagId} onChange={e => setFPagId(e.target.value)}>
-            <option value="">{tr('Selecione')}</option>
-            {tiposPagamento.map(tp => <option key={tp.id} value={tp.id}>{tp.descricao}</option>)}
-          </Select>
-        </FormField>
-        <FormField label={tr('Quarto')}>
-          <Select value={fQuarto} onChange={e => setFQuarto(e.target.value)}>
-            <option value="">{tr('Selecione')}</option>
-            {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
-          </Select>
-        </FormField>
-        <FormField label={tr('Funcionário')}>
-          <Select value={fFuncId} onChange={e => setFFuncId(e.target.value)}>
-            <option value="">{tr('Selecione')}</option>
-            {funcionarios.map(f => (
-              <option key={f.id} value={f.id}>{f.pessoa?.nome}</option>
-            ))}
-          </Select>
-        </FormField>
       </Modal>
 
       {/* ══ PAYMENT MODALS ══════════════════════════════════ */}
