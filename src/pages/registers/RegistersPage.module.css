@@ -7,7 +7,7 @@
    radius 0.5rem → md 6px, lg 8px, xl 10px (menos arredondado que o protótipo).
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.955 0.01 255);   /* fundo cinza-azulado: destaca os cartões brancos */
+  --l-bg:            oklch(0.925 0.012 255);   /* fundo cinza-azulado: destaca os cartões brancos */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
   --l-muted:         oklch(0.965 0.008 255);
@@ -40,7 +40,7 @@
   --l-radius: 0.5rem;                        /* 8px */
   --l-r-md: calc(var(--l-radius) - 2px);     /* 6px */
   --l-r-lg: var(--l-radius);                 /* 8px */
-  --l-r-xl: calc(var(--l-radius) + 2px);     /* 10px */
+  --l-r-xl: calc(var(--l-radius) - 4px);     /* 4px */
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* O <main> do AppLayout tem padding 18px 22px; a margem negativa faz o fundo
@@ -84,11 +84,10 @@
 .split {
   flex: 1; min-height: 0;
   width: 100%;
-  display: grid; gap: 12px;
+  display: grid; gap: 14px;
   grid-template-columns: minmax(0, 1fr);
   overflow-y: auto;
-  /* recuo superior menor: o conteúdo começa logo abaixo do cabeçalho */
-  padding: 10px 24px 24px;
+  padding: 14px;
 }
 @media (min-width: 1024px) {
   .split {
@@ -406,11 +405,11 @@
    div.space-y-4 com sections rounded-xl border bg-card p-5 shadow-sm */
 .detailPanel {
   min-height: 0;
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 .detailCol {
   min-height: 0;
-  display: flex; flex-direction: column; gap: 12px;
+  display: flex; flex-direction: column; gap: 14px;
 }
 .overviewFixed { flex-shrink: 0; }
 @media (min-width: 1024px) {
@@ -656,7 +655,7 @@
 @media (max-width: 1023px) {
   .splitListHidden .listPanel { display: none; }
   .listCol { order: 2; }
-  .split { padding: 8px 16px 16px; gap: 12px; }
+  .split { padding: 14px; gap: 14px; }
   /* Empilhado, o painel geral vem primeiro: é dele que saem os botões de
      cadastro, que não podem ficar depois de uma lista inteira. */
   .detailCol   { order: 1; }
@@ -670,7 +669,7 @@
 
 @media (max-width: 640px) {
   .page  { margin: -12px -12px -24px; }
-  .split { padding: 6px 12px 12px; gap: 12px; }
+  .split { padding: 14px; gap: 14px; }
   .listPanel { padding: 12px; }
   .dCard { padding: 14px; }
 

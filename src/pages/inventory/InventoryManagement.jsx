@@ -2,13 +2,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Package, Search, Edit2, Tag, Minus,
-  History, Loader2, RefreshCw, Calendar, Boxes, CreditCard,
-  X, ChevronLeft, ChevronRight, ChevronDown, BedDouble,
+  History, Loader2, RefreshCw, Calendar, Boxes,
+  X, ChevronLeft, ChevronRight, ChevronDown, BedDouble, LayoutGrid, List,
 } from 'lucide-react';
 import { Button }                   from '../../components/ui/Button';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { Notification }             from '../../components/ui/Notification';
-import { PaymentModal }             from '../../components/ui/PaymentModal';
 import { itemApi, categoriaApi, enumApi, quartoApi } from '../../services/api';
 import { usePermissions }           from '../../hooks/usePermissions';
 import styles from './InventoryManagement.module.css';
@@ -125,6 +124,14 @@ export default function InventoryManagement() {
   // ── Notification ────────────────────────────────────────────
   const [notification, setNotification] = useState(null);
 
+  const [modoItens, setModoItens] = useState(() => {
+    try { return localStorage.getItem('estoque.modoItens') === 'lista' ? 'lista' : 'blocos'; } catch { return 'blocos'; }
+  });
+  const trocarModoItens = (m) => {
+    setModoItens(m);
+    try { localStorage.setItem('estoque.modoItens', m); } catch { return; }
+  };
+
   // ── Item form modal ────────────────────────────────────────
   const [itemFormModal, setItemFormModal] = useState(null);
   const [selectedItem, setSelectedItem]   = useState(null);
@@ -145,18 +152,20 @@ export default function InventoryManagement() {
     valor_compra_unidade: '', valor_venda_unidade: '',
   });
   const [reporSaving, setReporSaving] = useState(false);
+  // repor um item do quarto até a quantidade padrão, tirando do estoque geral
+  const [reporQuarto, setReporQuarto]       = useState(null); // { qi, quarto }
+  const [reporQuartoQtd, setReporQuartoQtd] = useState('');
 
   // ── Consumir modal ─────────────────────────────────────────
   const [consumirModal, setConsumiModal]         = useState(false);
   const [consumirItem, setConsumiItem]           = useState(null);
   const [consumirQtd, setConsumiQtd]             = useState('');
   const [consumirSaving, setConsumiSaving]       = useState(false);
-  const [consumirPagamento, setConsumiPagamento]   = useState(null);
-  const [showConsumiPag, setShowConsumiPag]        = useState(false);
+  const [consumirPag, setConsumiPag]               = useState({ tipo: '', nome: '', descricao: '' });
   const [consumirDespesa, setConsumiDespesa]       = useState(false);
   const [consumirQuarto, setConsumiQuarto]           = useState('');
+  const [consumirOrigem, setConsumiOrigem]           = useState('estoque'); // 'estoque' | 'quarto'
   const [quartoItens, setQuartoItens]               = useState([]);
-  const [quartoItensLoading, setQuartoItensLoading] = useState(false);
 
   // ── Aba da lista: categorias ou quartos ────────────────────
   const [aba, setAba] = useState('cat'); // 'cat' | 'quarto'
@@ -208,6 +217,12 @@ export default function InventoryManagement() {
   const [cancelandoConsumo, setCancelandoConsumo] = useState(false);
   const [confirmCancelar, setConfirmCancelar]   = useState(false);
 
+  // ── Adicionar item ao quarto / repor o quarto todo ─────────
+  const [addQuartoItem, setAddQuartoItem] = useState(false);
+  const [addQIForm, setAddQIForm]         = useState({ itemId: '', padrao: '', atual: '' });
+  const [addQISaving, setAddQISaving]     = useState(false);
+  const [reporTudoSaving, setReporTudoSaving] = useState(false);
+
   // ── Helpers ─────────────────────────────────────────────────
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -230,7 +245,10 @@ export default function InventoryManagement() {
 
   useEffect(() => { loadSections(); }, [loadSections]);
   useEffect(() => { enumApi.tipoPagamento().then(setTiposPagamento).catch(() => {}); }, []);
-  useEffect(() => { quartoApi.listar({ size: 900 }).then(r => setQuartos(r?.content ?? [])).catch(() => {}); }, []);
+  const loadQuartos = useCallback(() => {
+    quartoApi.listar({ size: 900 }).then(r => setQuartos(r?.content ?? [])).catch(() => {});
+  }, []);
+  useEffect(() => { loadQuartos(); }, [loadQuartos]);
 
   // ── Search (frontend filter) ─────────────────────────────────
   const handleSearch = (e) => setSearch(e.target.value);
@@ -240,6 +258,7 @@ export default function InventoryManagement() {
     setItemForm({ descricao: '', categoriaId: cat?.id ?? '', servico: false });
     setSelectedItem(null);
     setHistoricoItem(null);
+    setConsumiModal(false);
     setItemFormModal('create');
   };
 
@@ -251,6 +270,7 @@ export default function InventoryManagement() {
     });
     setSelectedItem(item);
     setHistoricoItem(null);
+    setConsumiModal(false);
     setItemFormModal('edit');
   };
 
@@ -325,6 +345,7 @@ export default function InventoryManagement() {
   const openRepor = (item, e) => {
     e?.stopPropagation();
     setConsumiModal(false);
+    setReporQuarto(null);
     setReporItem(item);
     setReporForm({
       quantidade_unidades:  '',
@@ -364,18 +385,128 @@ export default function InventoryManagement() {
     }
   };
 
-  // ── Consumir ────────────────────────────────────────────────
-  const openConsumir = (item, e) => {
+  const reporQuartoMax = (qi) => {
+    const falta = Math.max(0, (qi.quantidade_padrao ?? 0) - (qi.quantidade_atual ?? 0));
+    const geral = itemQty(itemPorId.get(qi.item?.id));
+    return Math.max(0, Math.min(falta, geral));
+  };
+
+  const openReporQuarto = (qi, quarto, e) => {
     e?.stopPropagation();
     setReporModal(false);
+    setConsumiModal(false);
+    setReporQuarto({ qi, quarto });
+    const max = reporQuartoMax(qi);
+    setReporQuartoQtd(max > 0 ? String(max) : '');
+  };
+
+  const handleReporQuarto = async () => {
+    const { qi } = reporQuarto;
+    const qty = parseInt(reporQuartoQtd, 10) || 0;
+    const max = reporQuartoMax(qi);
+    if (qty <= 0 || qty > max) {
+      showNotification(max > 0
+        ? tr('Informe uma quantidade entre 1 e {{max}}.', { max })
+        : tr('Não há estoque geral para repor este item.'), 'error');
+      return;
+    }
+    setReporSaving(true);
+    try {
+      await quartoApi.reporItem({ id: qi.id, quantidade: qty });
+      showNotification(tr('Item reposto no quarto!'));
+      setReporQuarto(null);
+      loadQuartos();
+      loadSections();
+    } catch (e) {
+      showNotification(tr('Erro: ') + e.message, 'error');
+    } finally {
+      setReporSaving(false);
+    }
+  };
+
+  const openAddQuartoItem = () => {
+    setConsumiModal(false); setReporQuarto(null);
+    setAddQIForm({ itemId: '', padrao: '', atual: '' });
+    setAddQuartoItem(true);
+  };
+
+  const handleAddQuartoItem = async (q) => {
+    const itemId = Number(addQIForm.itemId);
+    const padrao = parseInt(addQIForm.padrao, 10);
+    const atual  = parseInt(addQIForm.atual, 10) || 0;
+    const geral  = itemQty(itemPorId.get(itemId));
+    if (!itemId) { showNotification(tr('Selecione o item.'), 'error'); return; }
+    if (!(padrao > 0)) { showNotification(tr('Informe a quantidade padrão.'), 'error'); return; }
+    if (atual < 0 || atual > geral) {
+      showNotification(tr('A quantidade no quarto deve ficar entre 0 e {{max}} (estoque geral).', { max: geral }), 'error');
+      return;
+    }
+    setAddQISaving(true);
+    try {
+      await quartoApi.adicionarItem(q.id, { item: { id: itemId }, quantidade_padrao: padrao, quantidade_atual: atual });
+      showNotification(tr('Item adicionado ao quarto!'));
+      setAddQuartoItem(false);
+      loadQuartos();
+      loadSections();
+    } catch (e) {
+      showNotification(tr('Erro: ') + e.message, 'error');
+    } finally {
+      setAddQISaving(false);
+    }
+  };
+
+  // Completa todos os itens abaixo do padrão, até onde o estoque geral permitir.
+  const handleReporTudo = async (q) => {
+    const pendentes = (q.quarto_itens ?? [])
+      .map((qi) => ({ qi, qtd: reporQuartoMax(qi) }))
+      .filter((p) => p.qtd > 0);
+    if (pendentes.length === 0) {
+      showNotification(tr('Não há estoque geral para repor os itens deste quarto.'), 'error');
+      return;
+    }
+    setReporTudoSaving(true);
+    let ok = 0;
+    try {
+      for (const { qi, qtd } of pendentes) {
+        await quartoApi.reporItem({ id: qi.id, quantidade: qtd });
+        ok++;
+      }
+      showNotification(tr('{{n}} item(ns) reposto(s) no quarto!', { n: ok }));
+    } catch (e) {
+      showNotification(tr('Erro: ') + e.message, 'error');
+    } finally {
+      setReporTudoSaving(false);
+      loadQuartos();
+      loadSections();
+    }
+  };
+
+  // ── Consumir ────────────────────────────────────────────────
+  // Da categoria consome do estoque geral; do quarto, do que está no quarto.
+  const openConsumir = (item, e, quarto = null) => {
+    e?.stopPropagation();
+    setReporModal(false);
+    setReporQuarto(null);
+    setItemFormModal(null);
+    setHistoricoItem(null);
+    setEditHistModal(false);
     setConsumiItem(item);
     setConsumiQtd('');
-    setConsumiPagamento(null);
+    setConsumiPag({ tipo: '', nome: '', descricao: '' });
     setConsumiDespesa(false);
-    setConsumiQuarto('');
-    setQuartoItens([]);
+    setConsumiOrigem(quarto ? 'quarto' : 'estoque');
+    setConsumiQuarto(quarto ? String(quarto.id) : '');
+    setQuartoItens(quarto?.quarto_itens ?? []);
     setConsumiModal(true);
   };
+
+  const openConsumirQuarto = (qi, quarto, e) => {
+    const item = itemPorId.get(qi.item?.id)
+      ?? { id: qi.item?.id, descricao: qi.item?.descricao, valor_venda_unidade: qi.preco ?? 0 };
+    openConsumir(item, e, quarto);
+  };
+
+  const consumoEsperado  = () => (Number(consumirQtd) || 0) * itemVenda(consumirItem);
 
   const handleConsumir = async () => {
     const qty = Number(consumirQtd);
@@ -394,23 +525,20 @@ export default function InventoryManagement() {
         return;
       }
     }
-    if (!consumirPagamento && !consumirDespesa) {
-      showNotification(tr('Defina o pagamento antes de confirmar.'), 'error');
+    const pago = consumoEsperado();
+    if (!consumirDespesa && (!consumirPag.tipo || !consumirPag.nome.trim())) {
+      showNotification(tr('Preencha tipo de pagamento e nome do pagador.'), 'error');
       return;
-    }
-    if (consumirPagamento && !consumirDespesa) {
-      const esperado = qty * itemVenda(consumirItem);
-      const pago     = consumirPagamento.valor ?? 0;
-      if (Math.abs(esperado - pago) > 0.01) {
-        showNotification(tr('O valor pago diverge do valor esperado. Corrija o pagamento ou marque como despesa pessoal.'), 'error');
-        return;
-      }
     }
     setConsumiSaving(true);
     try {
-      const pagamentoBody = consumirPagamento
-        ? (() => { const { _arquivo, _arquivoRemov, ...rest } = consumirPagamento; return { ...rest, funcionario: { id: loggedUser?.id } }; })()
-        : null;
+      const pagamentoBody = consumirDespesa ? null : {
+        tipo_pagamento: { id: Number(consumirPag.tipo) },
+        nome_pagador:   consumirPag.nome.trim(),
+        descricao:      consumirPag.descricao.trim() || undefined,
+        valor:          pago,
+        funcionario:    { id: loggedUser?.id },
+      };
       await itemApi.consumir({
         item:            { id: consumirItem.id },
         quantidade:      qty,
@@ -421,6 +549,7 @@ export default function InventoryManagement() {
       showNotification(tr('Item consumido com sucesso!'));
       setConsumiModal(false);
       loadSections();
+      if (consumirOrigem === 'quarto') loadQuartos();
     } catch (e) {
       showNotification(tr('Erro: ') + e.message, 'error');
     } finally {
@@ -486,6 +615,7 @@ export default function InventoryManagement() {
   const openHistorico = async (item, e) => {
     e?.stopPropagation();
     setItemFormModal(null);
+    setConsumiModal(false);
     setEditHistModal(false);
     setHistoricoItem(item);
     setHistoricoReposicao([]);
@@ -502,8 +632,8 @@ export default function InventoryManagement() {
 
   // ── Painel de detalhe ───────────────────────────────────────
   const closeDetail = () => {
-    setDetailCat(null); setDetailQuarto(null); setItemSearch('');
-    setItemFormModal(null); setHistoricoItem(null); setEditHistModal(false);
+    setDetailCat(null); setDetailQuarto(null); setItemSearch(''); setAddQuartoItem(false);
+    setItemFormModal(null); setHistoricoItem(null); setEditHistModal(false); setConsumiModal(false);
   };
   const closeHistorico = () => { setHistoricoItem(null); setEditHistModal(false); };
 
@@ -511,7 +641,7 @@ export default function InventoryManagement() {
   // Portal no <body>, como o menu de ações: o painel de detalhe rola e
   // recortaria a caixa. A posição sai do botão de ações do item e é
   // recalculada ao rolar, para a caixa acompanhar o cartão.
-  const ACAO_W = 340;
+  const ACAO_W = 280;
   const calcAcaoPos = () => {
     const el = acaoAnchorRef.current;
     if (!el) return null;
@@ -524,13 +654,13 @@ export default function InventoryManagement() {
       : { left, bottom: window.innerHeight - r.top + 6, maxHeight: above };
   };
   const ancorarAcao = () => { acaoAnchorRef.current = menuBtnRef.current; setAcaoPos(calcAcaoPos()); };
-  const fecharAcao  = () => { setReporModal(false); setConsumiModal(false); };
-  const acaoAberta  = reporModal || consumirModal;
+  const fecharAcao  = () => { setReporModal(false); setReporQuarto(null); };
+  const acaoAberta  = reporModal || !!reporQuarto;
 
   useEffect(() => {
     if (!acaoAberta) return;
     const reposicionar = () => setAcaoPos(calcAcaoPos());
-    const onKey = (e) => { if (e.key === 'Escape' && !showConsumiPag) fecharAcao(); };
+    const onKey = (e) => { if (e.key === 'Escape') fecharAcao(); };
     window.addEventListener('scroll', reposicionar, true);
     window.addEventListener('resize', reposicionar);
     document.addEventListener('keydown', onKey);
@@ -540,28 +670,19 @@ export default function InventoryManagement() {
       document.removeEventListener('keydown', onKey);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acaoAberta, showConsumiPag]);
+  }, [acaoAberta]);
 
   // Abrir uma ficha fecha o formulário que estiver no lugar dela.
   const openCat = (section) => {
     setItemFormModal(null); setCatFormModal(null); fecharConsumos();
-    setHistoricoItem(null); setEditHistModal(false);
+    setHistoricoItem(null); setEditHistModal(false); setConsumiModal(false);
     setDetailCat(section); setAbaFicha('itens');
   };
   const openQuarto = (q) => {
-    setItemFormModal(null); setCatFormModal(null); fecharConsumos();
+    setItemFormModal(null); setCatFormModal(null); fecharConsumos(); setConsumiModal(false);
+    setAddQuartoItem(false);
     setDetailQuarto(q);
   };
-
-  // Ao abrir a tela no desktop, já mostra os itens da primeira categoria.
-  const fichaInicial = useRef(false);
-  useEffect(() => {
-    if (fichaInicial.current || !isDesktop || !sections.length) return;
-    fichaInicial.current = true;
-    if (detailCat || detailQuarto) return;
-    setDetailCat(sections[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sections, isDesktop]);
 
   // Trocar de aba fecha a ficha aberta — ela é da outra lista.
   const changeAba = (nova) => {
@@ -716,6 +837,12 @@ export default function InventoryManagement() {
    * `/quarto` devolve `quarto_itens` desde a mudança no QuartoService — antes
    * isso só vinha de `/quarto/recepcao`.
    */
+  const itemPorId = useMemo(() => {
+    const mapa = new Map();
+    for (const sec of sections) for (const i of (sec.items ?? [])) mapa.set(i.id, i);
+    return mapa;
+  }, [sections]);
+
   const estoqueQuartos = useMemo(() => {
     const mapa = new Map();
     for (const q of quartos) {
@@ -770,77 +897,153 @@ export default function InventoryManagement() {
 
   const nUn = (n) => (n === 1 ? tr('{{n}} item', { n }) : tr('{{n}} itens', { n }));
 
+  const renderItemMenu = (item) => {
+    const qty     = itemQty(item);
+    const servico = itemServico(item);
+    const menu    = menuAberto === item.id;
+    return (
+      <div className={styles.itemMenuWrap} ref={menu ? menuBtnRef : null}>
+        <button type="button"
+          className={[styles.itemMenuBtn, menu ? styles.itemMenuBtnOn : ''].join(' ')}
+          onClick={(e) => abrirMenu(item.id, e)}
+          aria-haspopup="menu" aria-expanded={menu}
+          title={tr('Ações do item')} aria-label={tr('Ações do item')}>
+          <MenuIcon size={15} />
+        </button>
+
+        {menu && menuPos && createPortal(
+          <div className={styles.itemMenu} role="menu"
+            ref={menuPanelRef} style={menuPos}>
+            {canConsumirItem && (servico || qty > 0) && (
+              <button type="button" role="menuitem"
+                className={[styles.itemMenuItem, styles.itemMenuItemDanger].join(' ')}
+                onClick={(e) => { setMenuAberto(null); openConsumir(item, e); }}>
+                <Minus size={14} /> {tr('Consumir do estoque')}
+              </button>
+            )}
+            {canReporItem && (
+              <button type="button" role="menuitem" className={styles.itemMenuItem}
+                onClick={(e) => { ancorarAcao(); setMenuAberto(null); openRepor(item, e); }}>
+                <RefreshCw size={14} /> {servico ? tr('Alterar valor') : tr('Repor estoque')}
+              </button>
+            )}
+            {canHistReposicoes && (
+              <button type="button" role="menuitem" className={styles.itemMenuItem}
+                onClick={(e) => { setMenuAberto(null); openHistorico(item, e); }}>
+                <History size={14} /> {tr('Histórico')}
+              </button>
+            )}
+            {canAdicionarItem && (
+              <button type="button" role="menuitem" className={styles.itemMenuItem}
+                onClick={() => { setMenuAberto(null); openEditItem(item, detailCat.id); }}>
+                <Edit2 size={14} /> {tr('Editar')}
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
+      </div>
+    );
+  };
+
+  const renderQuartosToggle = (item) => {
+    const nosQ   = estoqueQuartos.get(item.id);
+    const aberto = quartosPop === item.id;
+    if (itemServico(item) || !nosQ) return null;
+    return (<>
+      <button type="button" className={[styles.quartosToggle, aberto ? styles.quartosToggleOn : ''].join(' ')}
+        ref={aberto ? quartosBtnRef : null}
+        onClick={(e) => abrirQuartos(item.id, e)}
+        aria-haspopup="dialog" aria-expanded={aberto}>
+        <BedDouble size={13} />
+        {nosQ.total} {tr('un em')} {nosQ.quartos.length} {nosQ.quartos.length === 1 ? tr('quarto') : tr('quartos')}
+        <ChevronDown size={13} className={[styles.quartosChevron, aberto ? styles.quartosChevronOpen : ''].join(' ')} />
+      </button>
+
+      {/* Quanto deste item está em cada quarto — vem do /quarto, que devolve quarto_itens. */}
+      {aberto && quartosPopPos && createPortal(
+        <div className={styles.quartosPop} role="dialog" aria-label={tr('Item nos quartos')}
+          ref={quartosPanelRef} style={quartosPopPos}>
+          <div className={styles.quartosPopHead}>
+            <span className={styles.quartosPopNome}>{itemDesc(item)}</span>
+            <span className={styles.quartosPopSub}>
+              {nosQ.total} {tr('un em')} {nosQ.quartos.length} {nosQ.quartos.length === 1 ? tr('quarto') : tr('quartos')}
+            </span>
+          </div>
+          <div className={styles.quartosList}>
+            {nosQ.quartos.map((q) => (
+              <div key={q.id} className={styles.quartosRow}>
+                <span className={styles.quartosNome}>{tr('Quarto')} {q.id}</span>
+                <span className={[
+                  styles.quartosQtd,
+                  q.atual < q.padrao ? styles.quartosQtdBaixa : '',
+                ].join(' ')}>
+                  {q.atual} {tr('de')} {q.padrao}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>);
+  };
+
+  const renderQtdTag = (item) => {
+    const qty = itemQty(item);
+    return itemServico(item) ? (
+      <span className={[styles.tag, styles.tagPrimary].join(' ')}>{tr('Serviço')}</span>
+    ) : (
+      <span className={[styles.tag, qty <= LIMITE_ESTOQUE_BAIXO ? styles.tagRed : styles.tagEmerald].join(' ')}>
+        {qty} {qty === 1 ? tr('unidade') : tr('unidades')}
+      </span>
+    );
+  };
+
   // ── Cartões dos itens da categoria aberta ──────────────────
   const renderItens = () => (
     itensDaCat.length === 0 ? (
       <p className={styles.blockEmpty}>
         {itemSearch ? tr('Nenhum item encontrado para "{{itemSearch}}".', { itemSearch }) : tr('Nenhum item cadastrado nesta categoria.')}
       </p>
+    ) : modoItens === 'lista' ? (
+      <div className={styles.iScroll}>
+        <table className={styles.iTable}>
+          <thead><tr>
+            <th>{tr('Item')}</th><th>{tr('Estoque')}</th><th>{tr('Fornecedor')}</th>
+            <th>{tr('Nos quartos')}</th><th className={styles.iDir}>{tr('Custo')}</th>
+            <th className={styles.iDir}>{tr('Venda')}</th><th aria-label={tr('Ações')} />
+          </tr></thead>
+          <tbody>
+            {itensDaCat.map((item) => {
+              const servico = itemServico(item);
+              return (
+                <tr key={item.id}>
+                  <td className={styles.iNome}>{itemDesc(item)}</td>
+                  <td className={styles.itemCardTags}>{renderQtdTag(item)}</td>
+                  <td className={styles.iMuted}>{(!servico && itemForn(item)) || '—'}</td>
+                  <td>{renderQuartosToggle(item) ?? <span className={styles.iMuted}>—</span>}</td>
+                  <td className={[styles.iDir, styles.iMuted].join(' ')}>{servico ? '—' : fmtBRL(itemCompra(item))}</td>
+                  <td className={[styles.iDir, styles.iVenda].join(' ')}>{fmtBRL(itemVenda(item))}</td>
+                  <td className={styles.iAcao}>{renderItemMenu(item)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     ) : (
       <div className={styles.itemGrid}>
         {itensDaCat.map((item) => {
-          const qty     = itemQty(item);
           const servico = itemServico(item);
-          const nosQ    = estoqueQuartos.get(item.id);
-          const aberto  = quartosPop === item.id;
-          const menu    = menuAberto === item.id;
           return (
             <div key={item.id} className={styles.itemCard}>
               <div className={styles.itemCardHead}>
                 <p className={styles.itemCardNome}>{itemDesc(item)}</p>
-
-                <div className={styles.itemMenuWrap} ref={menu ? menuBtnRef : null}>
-                  <button type="button"
-                    className={[styles.itemMenuBtn, menu ? styles.itemMenuBtnOn : ''].join(' ')}
-                    onClick={(e) => abrirMenu(item.id, e)}
-                    aria-haspopup="menu" aria-expanded={menu}
-                    title={tr('Ações do item')} aria-label={tr('Ações do item')}>
-                    <MenuIcon size={15} />
-                  </button>
-
-                  {menu && menuPos && createPortal(
-                    <div className={styles.itemMenu} role="menu"
-                      ref={menuPanelRef} style={menuPos}>
-                      {canConsumirItem && (servico || qty > 0) && (
-                        <button type="button" role="menuitem"
-                          className={[styles.itemMenuItem, styles.itemMenuItemDanger].join(' ')}
-                          onClick={(e) => { ancorarAcao(); setMenuAberto(null); openConsumir(item, e); }}>
-                          <Minus size={14} /> {tr('Consumir')}
-                        </button>
-                      )}
-                      {canReporItem && (
-                        <button type="button" role="menuitem" className={styles.itemMenuItem}
-                          onClick={(e) => { ancorarAcao(); setMenuAberto(null); openRepor(item, e); }}>
-                          <RefreshCw size={14} /> {servico ? tr('Alterar valor') : tr('Repor estoque')}
-                        </button>
-                      )}
-                      {canHistReposicoes && (
-                        <button type="button" role="menuitem" className={styles.itemMenuItem}
-                          onClick={(e) => { setMenuAberto(null); openHistorico(item, e); }}>
-                          <History size={14} /> {tr('Histórico')}
-                        </button>
-                      )}
-                      {canAdicionarItem && (
-                        <button type="button" role="menuitem" className={styles.itemMenuItem}
-                          onClick={() => { setMenuAberto(null); openEditItem(item, detailCat.id); }}>
-                          <Edit2 size={14} /> {tr('Editar')}
-                        </button>
-                      )}
-                    </div>,
-                    document.body,
-                  )}
-                </div>
+                {renderItemMenu(item)}
               </div>
 
-              <div className={styles.itemCardTags}>
-                {servico ? (
-                  <span className={[styles.tag, styles.tagPrimary].join(' ')}>{tr('Serviço')}</span>
-                ) : (
-                  <span className={[styles.tag, qty <= LIMITE_ESTOQUE_BAIXO ? styles.tagRed : styles.tagEmerald].join(' ')}>
-                    {qty} {qty === 1 ? tr('unidade') : tr('unidades')}
-                  </span>
-                )}
-              </div>
+              <div className={styles.itemCardTags}>{renderQtdTag(item)}</div>
 
               {!servico && itemForn(item) && (
                 <p className={styles.itemCardForn}>{itemForn(item)}</p>
@@ -848,16 +1051,7 @@ export default function InventoryManagement() {
 
               {/* Rodapé do cartão: quartos à esquerda, preço em destaque à direita. */}
               <div className={styles.itemCardFoot}>
-                {!servico && nosQ && (
-                  <button type="button" className={[styles.quartosToggle, aberto ? styles.quartosToggleOn : ''].join(' ')}
-                    ref={aberto ? quartosBtnRef : null}
-                    onClick={(e) => abrirQuartos(item.id, e)}
-                    aria-haspopup="dialog" aria-expanded={aberto}>
-                    <BedDouble size={13} />
-                    {nosQ.total} {tr('un em')} {nosQ.quartos.length} {nosQ.quartos.length === 1 ? tr('quarto') : tr('quartos')}
-                    <ChevronDown size={13} className={[styles.quartosChevron, aberto ? styles.quartosChevronOpen : ''].join(' ')} />
-                  </button>
-                )}
+                {renderQuartosToggle(item)}
                 <div className={styles.itemCardPreco}>
                   <p className={styles.itemRowVenda}>{fmtBRL(itemVenda(item))}</p>
                   {!servico && (
@@ -865,33 +1059,6 @@ export default function InventoryManagement() {
                   )}
                 </div>
               </div>
-
-              {/* Quanto deste item está em cada quarto — vem do /quarto, que devolve quarto_itens. */}
-              {aberto && nosQ && quartosPopPos && createPortal(
-                <div className={styles.quartosPop} role="dialog" aria-label={tr('Item nos quartos')}
-                  ref={quartosPanelRef} style={quartosPopPos}>
-                  <div className={styles.quartosPopHead}>
-                    <span className={styles.quartosPopNome}>{itemDesc(item)}</span>
-                    <span className={styles.quartosPopSub}>
-                      {nosQ.total} {tr('un em')} {nosQ.quartos.length} {nosQ.quartos.length === 1 ? tr('quarto') : tr('quartos')}
-                    </span>
-                  </div>
-                  <div className={styles.quartosList}>
-                    {nosQ.quartos.map((q) => (
-                      <div key={q.id} className={styles.quartosRow}>
-                        <span className={styles.quartosNome}>{tr('Quarto')} {q.id}</span>
-                        <span className={[
-                          styles.quartosQtd,
-                          q.atual < q.padrao ? styles.quartosQtdBaixa : '',
-                        ].join(' ')}>
-                          {q.atual} {tr('de')} {q.padrao}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>,
-                document.body,
-              )}
             </div>
           );
         })}
@@ -946,6 +1113,7 @@ export default function InventoryManagement() {
             </div>
 
             {abaFicha === 'itens' && itemFormModal ? renderItemForm()
+              : abaFicha === 'itens' && consumirModal && consumirOrigem === 'estoque' && consumirItem ? renderConsumir()
               : abaFicha === 'itens' && historicoItem ? renderHistorico()
               : abaFicha === 'dados' ? (
               <div className={styles.fieldGrid}>
@@ -974,6 +1142,16 @@ export default function InventoryManagement() {
                     </button>
                   )}
                 </div>
+                <div className={styles.viewToggle} role="group" aria-label={tr('Modo de visualização')}>
+                  {[['blocos', LayoutGrid, tr('Blocos')], ['lista', List, tr('Lista')]].map(([m, Icon, label]) => (
+                    <button key={m} type="button"
+                      className={[styles.viewToggleBtn, modoItens === m ? styles.viewToggleOn : ''].join(' ')}
+                      onClick={() => trocarModoItens(m)} aria-pressed={modoItens === m}
+                      title={label} aria-label={label}>
+                      <Icon size={16} />
+                    </button>
+                  ))}
+                </div>
                 {canAdicionarItem && (
                   <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                     onClick={() => openCreateItem(cat)}>
@@ -985,6 +1163,47 @@ export default function InventoryManagement() {
             </>)}
           </div>
         </section>
+      </div>
+    );
+  };
+
+  const renderQuartoItemMenu = (qi, q) => {
+    const chave = `q${qi.id}`;
+    const menu  = menuAberto === chave;
+    const atual = qi.quantidade_atual ?? 0;
+    const falta = (qi.quantidade_padrao ?? 0) - atual;
+    const podeConsumir = canConsumirItem && atual > 0;
+    const podeRepor    = canReporItem && falta > 0;
+    if (!podeConsumir && !podeRepor) return null;
+    return (
+      <div className={styles.itemMenuWrap} ref={menu ? menuBtnRef : null}>
+        <button type="button"
+          className={[styles.itemMenuBtn, menu ? styles.itemMenuBtnOn : ''].join(' ')}
+          onClick={(e) => abrirMenu(chave, e)}
+          aria-haspopup="menu" aria-expanded={menu}
+          title={tr('Ações do item')} aria-label={tr('Ações do item')}>
+          <MenuIcon size={15} />
+        </button>
+
+        {menu && menuPos && createPortal(
+          <div className={styles.itemMenu} role="menu"
+            ref={menuPanelRef} style={menuPos}>
+            {podeConsumir && (
+              <button type="button" role="menuitem"
+                className={[styles.itemMenuItem, styles.itemMenuItemDanger].join(' ')}
+                onClick={(e) => { setMenuAberto(null); openConsumirQuarto(qi, q, e); }}>
+                <Minus size={14} /> {tr('Consumir do quarto')}
+              </button>
+            )}
+            {podeRepor && (
+              <button type="button" role="menuitem" className={styles.itemMenuItem}
+                onClick={(e) => { ancorarAcao(); setMenuAberto(null); openReporQuarto(qi, q, e); }}>
+                <RefreshCw size={14} /> {tr('Repor do estoque')}
+              </button>
+            )}
+          </div>,
+          document.body,
+        )}
       </div>
     );
   };
@@ -1002,6 +1221,18 @@ export default function InventoryManagement() {
             <BedDouble size={16} />
             <span className={styles.dCardTitle}>{tr('Itens do quarto')}</span>
             <div className={styles.dCardActions}>
+              {canReporItem && !addQuartoItem && abaixo > 0 && (
+                <Button className={styles.btnSolid} onClick={() => handleReporTudo(q)} disabled={reporTudoSaving}>
+                  {reporTudoSaving ? <Loader2 size={14} className={styles.spinInline} /> : <RefreshCw size={14} />}
+                  {tr('Repor quarto')}
+                </Button>
+              )}
+              {canAdicionarItem && !addQuartoItem && (
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                  onClick={openAddQuartoItem}>
+                  {tr('Adicionar item')}
+                </Button>
+              )}
               <button type="button" className={styles.idClose} onClick={closeDetail}
                 title={tr('Fechar ficha')} aria-label={tr('Fechar ficha')}>
                 <X size={16} />
@@ -1025,35 +1256,98 @@ export default function InventoryManagement() {
               <FichaTabs abas={[['itens', tr('Itens')]]} atual="itens" onChange={() => {}} />
             </div>
 
-            {itens.length === 0 ? (
+            {addQuartoItem ? renderAddQuartoItem(q)
+              : consumirModal && consumirOrigem === 'quarto' && consumirItem ? renderConsumir()
+              : itens.length === 0 ? (
               <p className={styles.blockEmpty}>{tr('Nenhum item configurado para este quarto.')}</p>
             ) : (
-              <div className={styles.itemList}>
-                {itens.map((qi) => {
-                  const atual  = qi.quantidade_atual  ?? 0;
-                  const padrao = qi.quantidade_padrao ?? 0;
-                  const falta  = Math.max(0, padrao - atual);
-                  return (
-                    <div key={qi.id} className={styles.itemRow}>
-                      <div className={styles.itemRowMain}>
-                        <p className={styles.itemRowNome}>{qi.item?.descricao ?? '—'}</p>
-                        <div className={styles.itemRowSub}>
-                          <span className={[styles.tag, falta > 0 ? styles.tagRed : styles.tagEmerald].join(' ')}>
-                            {atual} {tr('de')} {padrao}
-                          </span>
-                          {falta > 0 && <span>{tr('faltam')} {falta} {tr('un')}</span>}
-                        </div>
-                      </div>
-                      <div className={styles.itemRowPreco}>
-                        <p className={styles.itemRowVenda}>{fmtBRL(qi.preco ?? 0)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className={styles.iScroll}>
+                <table className={styles.iTable}>
+                  <thead><tr>
+                    <th>{tr('Item')}</th><th>{tr('Quantidade')}</th><th>{tr('A repor')}</th>
+                    <th className={styles.iDir}>{tr('Preço')}</th><th aria-label={tr('Ações')} />
+                  </tr></thead>
+                  <tbody>
+                    {itens.map((qi) => {
+                      const atual  = qi.quantidade_atual  ?? 0;
+                      const padrao = qi.quantidade_padrao ?? 0;
+                      const falta  = Math.max(0, padrao - atual);
+                      return (
+                        <tr key={qi.id}>
+                          <td className={styles.iNome}>{qi.item?.descricao ?? '—'}</td>
+                          <td className={styles.itemCardTags}>
+                            <span className={[styles.tag, falta > 0 ? styles.tagRed : styles.tagEmerald].join(' ')}>
+                              {atual} {tr('de')} {padrao}
+                            </span>
+                          </td>
+                          <td className={styles.iMuted}>{falta > 0 ? `${falta} ${tr('un')}` : '—'}</td>
+                          <td className={[styles.iDir, styles.iVenda].join(' ')}>{fmtBRL(qi.preco ?? 0)}</td>
+                          <td className={styles.iAcao}>{renderQuartoItemMenu(qi, q)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
         </section>
+      </div>
+    );
+  };
+
+  // ── Adicionar item ao quarto, dentro da ficha do quarto ────
+  const renderAddQuartoItem = (q) => {
+    const jaNoQuarto = new Set((q.quarto_itens ?? []).map((qi) => qi.item?.id));
+    const cancelar   = () => setAddQuartoItem(false);
+    const geral      = addQIForm.itemId ? itemQty(itemPorId.get(Number(addQIForm.itemId))) : null;
+    const setCampo   = (campo, v) => setAddQIForm((f) => ({ ...f, [campo]: v }));
+    return (
+      <div className={styles.inlineView}>
+        <div className={styles.inlineHead}>
+          <button type="button" className={styles.inlineBack} onClick={cancelar}>
+            <ChevronLeft size={15} /> {tr('Voltar aos itens')}
+          </button>
+          <span className={styles.inlineTitle}>{tr('Adicionar item ao quarto')}</span>
+        </div>
+
+        <div className={styles.formBody}>
+          <FormField label={tr('Item *')}>
+            <Select value={addQIForm.itemId} onChange={(e) => setCampo('itemId', e.target.value)}>
+              <option value="">{tr('Selecione...')}</option>
+              {sections.map((sec) => {
+                const opcoes = (sec.items ?? []).filter((i) => !itemServico(i) && !jaNoQuarto.has(i.id));
+                return opcoes.length > 0 && (
+                  <optgroup key={sec.id} label={catNome(sec)}>
+                    {opcoes.map((i) => (
+                      <option key={i.id} value={i.id}>{itemDesc(i)} ({itemQty(i)} {tr('em estoque')})</option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </Select>
+          </FormField>
+          <div className={styles.formRow}>
+            <FormField label={tr('Quantidade padrão *')}>
+              <Input type="number" placeholder="0" min="1"
+                value={addQIForm.padrao} onChange={(e) => setCampo('padrao', e.target.value)} />
+            </FormField>
+            <FormField label={geral != null ? tr('Colocar agora (máx. {{max}})', { max: geral }) : tr('Colocar agora')}>
+              <Input type="number" placeholder="0" min="0" max={geral ?? undefined}
+                value={addQIForm.atual} onChange={(e) => setCampo('atual', e.target.value)} />
+            </FormField>
+          </div>
+          <p className={styles.blockEmpty}>{tr('O que for colocado agora sai do estoque geral.')}</p>
+        </div>
+
+        <div className={styles.formFoot}>
+          <Button className={styles.btnSolid} onClick={cancelar}>{tr('Cancelar')}</Button>
+          <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+            onClick={() => handleAddQuartoItem(q)} disabled={addQISaving}>
+            {addQISaving && <Loader2 size={14} className={styles.spinInline} />}
+            {tr('Adicionar')}
+          </Button>
+        </div>
       </div>
     );
   };
@@ -1118,6 +1412,142 @@ export default function InventoryManagement() {
     );
   };
 
+  // ── Consumir, dentro da aba Itens da ficha ─────────────────
+  const renderConsumir = () => {
+    const item     = consumirItem;
+    const qty      = Number(consumirQtd) || 0;
+    const esperado = consumoEsperado();
+    const nomeFunc = loggedUser?.pessoa?.nome?.toUpperCase();
+    const setPag   = (campo, v) => setConsumiPag((p) => ({ ...p, [campo]: v }));
+    return (
+      <div className={[styles.inlineView, styles.consumoView].join(' ')}>
+        <div className={styles.inlineHead}>
+          <button type="button" className={styles.inlineBack} onClick={() => setConsumiModal(false)}>
+            <ChevronLeft size={15} /> {tr('Voltar aos itens')}
+          </button>
+          <span className={styles.inlineTitle}>
+            <Minus size={15} />
+            {consumirOrigem === 'quarto'
+              ? tr('Consumir do quarto {{id}} —', { id: consumirQuarto })
+              : tr('Consumir do estoque —')} {itemDesc(item)}
+          </span>
+        </div>
+
+        <div className={styles.consumoGrid}>
+          <div className={styles.formBody}>
+            <p className={styles.consumoSecao}>{tr('Consumo')}</p>
+            <FormField label={tr('Quantidade a consumir *')}>
+              <Input
+                type="number" placeholder="0" min="1"
+                value={consumirQtd}
+                onChange={(e) => setConsumiQtd(e.target.value)}
+              />
+            </FormField>
+
+            {consumirQuarto && (() => {
+              const entrada = quartoItens.find(qi => qi.item?.id === item?.id);
+              if (!entrada) return (
+                <div className={styles.quartoItensBox}>
+                  <span className={styles.quartoItensNone}>{tr('Item não configurado para este quarto')}</span>
+                </div>
+              );
+              const { quantidade_atual, quantidade_padrao } = entrada;
+              const ok  = quantidade_atual >= quantidade_padrao;
+              const qtdExcede = qty > quantidade_atual;
+              return (
+                <div className={qtdExcede ? styles.quartoItensBoxErr : styles.quartoItensBox}>
+                  <div className={styles.quartoItensRow}>
+                    <span className={styles.quartoItensLabel}>{tr('No quarto agora')}</span>
+                    <span className={ok ? styles.quartoItensOk : styles.quartoItensLow}>
+                      {quantidade_atual} / {quantidade_padrao}
+                    </span>
+                  </div>
+                  {qtdExcede && (
+                    <span className={styles.quartoItensNone} style={{ color: '#ef4444', fontStyle: 'normal' }}>
+                      {tr('Quantidade maior que o disponível no quarto (')}{quantidade_atual} {tr('un.)')}
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
+
+            <label className={styles.checkInline}>
+              <input
+                type="checkbox"
+                checked={consumirDespesa}
+                onChange={(e) => setConsumiDespesa(e.target.checked)}
+              />
+              <span>{tr('Despesa pessoal')}</span>
+            </label>
+
+            {qty > 0 && (
+              <div className={styles.consumoAlert}>
+                <div className={styles.consumoAlertRow}>
+                  <span>{tr('Total')}</span>
+                  <strong>{fmtBRL(esperado)}</strong>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.formBody}>
+            <p className={styles.consumoSecao}>{tr('Pagamento')}</p>
+            {consumirDespesa ? (
+              <p className={styles.blockEmpty}>{tr('Despesa pessoal: sem cobrança.')}</p>
+            ) : (<>
+              <div className={styles.formRow}>
+                <FormField label={tr('Tipo de Pagamento *')}>
+                  <Select value={consumirPag.tipo} onChange={(e) => setPag('tipo', e.target.value)}>
+                    <option value="">{tr('Selecione...')}</option>
+                    {tiposPagamento.map((tp) => (
+                      <option key={tp.id} value={tp.id}>{tp.descricao}</option>
+                    ))}
+                  </Select>
+                </FormField>
+                <FormField label={tr('Valor')}>
+                  <Input value={fmtBRL(esperado)} readOnly tabIndex={-1} className={styles.inputFixo} />
+                </FormField>
+              </div>
+              <FormField label={tr('Nome do Pagador *')}>
+                <Input
+                  placeholder={tr('Nome completo')}
+                  value={consumirPag.nome}
+                  onChange={(e) => setPag('nome', e.target.value.toUpperCase())}
+                />
+              </FormField>
+              {nomeFunc && (
+                <label className={styles.checkInline}>
+                  <input
+                    type="checkbox"
+                    checked={consumirPag.nome === nomeFunc}
+                    onChange={(e) => setPag('nome', e.target.checked ? nomeFunc : '')}
+                  />
+                  <span>{tr('Nome do funcionário')}</span>
+                </label>
+              )}
+              <FormField label={tr('Descrição')}>
+                <Input
+                  placeholder={tr('Descrição do pagamento')}
+                  value={consumirPag.descricao}
+                  onChange={(e) => setPag('descricao', e.target.value.toUpperCase())}
+                />
+              </FormField>
+            </>)}
+          </div>
+        </div>
+
+        <div className={styles.formFoot}>
+          <Button className={styles.btnSolid} onClick={() => setConsumiModal(false)}>{tr('Cancelar')}</Button>
+          <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+            onClick={handleConsumir} disabled={consumirSaving}>
+            {consumirSaving && <Loader2 size={14} className={styles.spinInline} />}
+            {tr('Confirmar consumo')}
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   // ── Histórico de reposições, dentro da aba Itens da ficha ──
   const renderHistorico = () => (
     <div className={styles.inlineView}>
@@ -1176,43 +1606,38 @@ export default function InventoryManagement() {
           <span>{tr('Nenhuma reposição registrada')}</span>
         </div>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{tr('Data')}</th>
-                <th className={styles.thCenter}>{tr('Qtd')}</th>
-                <th className={styles.thRight}>{tr('Compra Un.')}</th>
-                <th className={styles.thRight}>{tr('Venda Un.')}</th>
-                <th className={styles.thRight}>{tr('Margem')}</th>
-                <th>{tr('Fornecedor')}</th>
-                <th>{tr('Responsável')}</th>
-                <th className={styles.thRight}>{tr('Ações')}</th>
-              </tr>
-            </thead>
+        <div className={styles.iScroll}>
+          <table className={styles.iTable}>
+            <thead><tr>
+              <th>{tr('Data')}</th><th>{tr('Qtd')}</th>
+              <th className={styles.iDir}>{tr('Compra Un.')}</th>
+              <th className={styles.iDir}>{tr('Venda Un.')}</th>
+              <th className={styles.iDir}>{tr('Margem')}</th>
+              <th>{tr('Fornecedor')}</th><th>{tr('Responsável')}</th>
+              <th aria-label={tr('Ações')} />
+            </tr></thead>
             <tbody>
               {historicoReposicao.map((entry, idx) => (
                 <tr key={entry.id ?? idx}
-                  className={[styles.rowHover, editHistModal && editHistEntry?.id === entry.id ? styles.rowEditando : ''].join(' ')}>
-                  <td><span className={styles.dateCell}><Calendar size={12} />{fmtDate(repData(entry))}</span></td>
-                  <td className={styles.tdCenter}>
-                    <span className={[styles.qtyBadge, styles.qtyBadgeOk].join(' ')}>+{repQty(entry)}</span>
+                  className={editHistModal && editHistEntry?.id === entry.id ? styles.rowEditando : ''}>
+                  <td>{fmtDate(repData(entry))}</td>
+                  <td className={styles.itemCardTags}>
+                    <span className={[styles.tag, styles.tagEmerald].join(' ')}>+{repQty(entry)}</span>
                   </td>
-                  <td className={styles.tdRight}>{fmtBRL(repCompra(entry))}</td>
-                  <td className={[styles.tdRight, styles.valVenda].join(' ')}>{fmtBRL(repVenda(entry))}</td>
-                  <td className={[styles.tdRight, styles.valTotal].join(' ')}>
+                  <td className={[styles.iDir, styles.iMuted].join(' ')}>{fmtBRL(repCompra(entry))}</td>
+                  <td className={[styles.iDir, styles.iVenda].join(' ')}>{fmtBRL(repVenda(entry))}</td>
+                  <td className={styles.iDir}>
                     {repCompra(entry) > 0 && repVenda(entry) > 0
                       ? ((repVenda(entry) - repCompra(entry)) / repCompra(entry) * 100).toFixed(1) + '%'
                       : '—'}
                   </td>
-                  <td>{repForn(entry)}</td>
-                  <td className={styles.tdSecondary}>{repFunc(entry)}</td>
-                  <td className={styles.tdRight}>
-                    <div className={styles.actionBtns}>
-                      <button type="button" className={styles.actionBtn} onClick={() => openEditHist(entry)}>
-                        <Edit2 size={11} /> {tr('Editar')}
-                      </button>
-                    </div>
+                  <td>{repForn(entry) || '—'}</td>
+                  <td className={styles.iMuted}>{repFunc(entry) || '—'}</td>
+                  <td className={styles.iAcao}>
+                    <button type="button" className={styles.itemMenuBtn} onClick={() => openEditHist(entry)}
+                      title={tr('Editar')} aria-label={tr('Editar')}>
+                      <Edit2 size={15} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1516,6 +1941,50 @@ export default function InventoryManagement() {
     );
   };
 
+  // Tabela de preços: o que aparece à direita enquanto nenhuma ficha está aberta.
+  const renderTabelaPrecos = () => (
+    <div className={styles.detailPanel}>
+      <section className={[styles.dCard, styles.fichaCard].join(' ')}>
+        <h3 className={[styles.dCardHead, styles.fichaHead].join(' ')}>
+          <Package size={16} />
+          <span className={styles.dCardTitle}>{tr('Tabela de preços')}</span>
+        </h3>
+        <div className={[styles.dCardBody, styles.fichaBody, styles.precoBody].join(' ')}>
+          {loading ? <SkeletonLista linhas={5} />
+            : sections.length === 0 ? <p className={styles.blockEmpty}>{tr('Nenhuma categoria cadastrada.')}</p>
+            : sections.map((section) => {
+              const items = section.items ?? [];
+              return (
+                <div key={section.id} className={styles.precoBloco}>
+                  <h4 className={styles.precoCat}>{catNome(section)}</h4>
+                  {items.length === 0 ? (
+                    <p className={styles.blockEmpty}>{tr('Nenhum item cadastrado nesta categoria.')}</p>
+                  ) : (
+                    <table className={[styles.iTable, styles.precoTable].join(' ')}>
+                      <thead><tr>
+                        <th>{tr('Descrição')}</th>
+                        <th className={styles.iDir}>{tr('Estoque')}</th>
+                        <th className={styles.iDir}>{tr('Venda')}</th>
+                      </tr></thead>
+                      <tbody>
+                        {items.map((item) => (
+                          <tr key={item.id}>
+                            <td className={styles.iNome}>{itemDesc(item)}</td>
+                            <td className={[styles.iDir, styles.iMuted].join(' ')}>{itemServico(item) ? '—' : itemQty(item)}</td>
+                            <td className={[styles.iDir, styles.iVenda].join(' ')}>{fmtBRL(itemVenda(item))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              );
+            })}
+        </div>
+      </section>
+    </div>
+  );
+
   return (
     <div className={styles.page}>
       <Notification notification={notification} />
@@ -1651,23 +2120,23 @@ export default function InventoryManagement() {
             : consumosModal ? renderConsumos()
             : isQuartos && detailQuarto ? renderQuartoPanel(detailQuarto)
             : detailCat ? renderCatPanel(detailCat)
+            : isDesktop ? renderTabelaPrecos()
             : null}
         </main>
       </div>
 
       {/* ═══════════════════════════════════════════════════════
-          CAIXA FLUTUANTE — Consumir / Repor estoque
+          CAIXA FLUTUANTE — Repor estoque
       ═══════════════════════════════════════════════════════ */}
       {acaoAberta && acaoPos && createPortal(
         <div className={styles.acaoPop} role="dialog" ref={acaoPanelRef}
           style={acaoPos}
-          aria-label={reporModal ? tr('Repor Estoque') : tr('Consumir Item')}>
+          aria-label={reporQuarto ? tr('Repor do estoque') : tr('Repor Estoque')}>
           <div className={styles.acaoPopHead}>
-            {reporModal ? <RefreshCw size={15} /> : <Minus size={15} />}
+            <RefreshCw size={15} />
             <span className={styles.acaoPopTitle}>
-              {reporModal
-                ? (reporItem && itemServico(reporItem) ? tr('Alterar valor') : tr('Repor Estoque'))
-                : tr('Consumir Item')}
+              {reporQuarto ? tr('Repor do estoque')
+                : reporItem && itemServico(reporItem) ? tr('Alterar valor') : tr('Repor Estoque')}
             </span>
             <button type="button" className={styles.acaoPopClose} onClick={fecharAcao}
               title={tr('Fechar')} aria-label={tr('Fechar')}>
@@ -1676,20 +2145,28 @@ export default function InventoryManagement() {
           </div>
 
           <div className={styles.acaoPopBody}>
-            {reporModal ? (<>
-            {reporItem && (
-              <div className={styles.formBody}>
-                <div className={styles.itemInfoBox}>
-                  <span className={styles.itemInfoLabel}>
-                    {itemServico(reporItem) ? tr('Serviço selecionado') : tr('Item selecionado')}
+            {reporQuarto ? (() => {
+              const { qi, quarto } = reporQuarto;
+              const max = reporQuartoMax(qi);
+              return (
+                <div className={styles.formBody}>
+                  <span className={styles.itemInfoName}>{qi.item?.descricao ?? '—'}</span>
+                  <span className={styles.itemInfoSub}>
+                    {tr('Quarto')} {quarto.id} · {qi.quantidade_atual ?? 0} {tr('de')} {qi.quantidade_padrao ?? 0}
+                    {' · '}{tr('estoque geral')} {itemQty(itemPorId.get(qi.item?.id))}
                   </span>
-                  <span className={styles.itemInfoName}>{itemDesc(reporItem)}</span>
-                  {!itemServico(reporItem) && (
-                    <span className={styles.itemInfoSub}>
-                      {tr('Qtd atual:')} <strong>{itemQty(reporItem)}</strong> {tr('unidades')}
-                    </span>
-                  )}
+                  <FormField label={tr('Quantidade (máx. {{max}}) *', { max })}>
+                    <Input
+                      type="number" placeholder="0" min="1" max={max}
+                      value={reporQuartoQtd}
+                      onChange={(e) => setReporQuartoQtd(e.target.value)}
+                    />
+                  </FormField>
                 </div>
+              );
+            })() : reporItem && (
+              <div className={styles.formBody}>
+                <span className={styles.itemInfoName}>{itemDesc(reporItem)}</span>
     
                 {/* Serviço não tem estoque: só o valor de venda faz sentido. */}
                 {!itemServico(reporItem) && (
@@ -1731,167 +2208,18 @@ export default function InventoryManagement() {
                 </div>
               </div>
             )}
-                </>) : (<>
-            {consumirItem && (() => {
-              const qty      = Number(consumirQtd) || 0;
-              const esperado = qty * itemVenda(consumirItem);
-              const pago     = consumirPagamento?.valor ?? null;
-              const diverge  = pago !== null && Math.abs(esperado - pago) > 0.01;
-              return (
-                <div className={styles.formBody}>
-                  <div className={styles.itemInfoBox}>
-                    <span className={styles.itemInfoLabel}>{tr('Item selecionado')}</span>
-                    <span className={styles.itemInfoName}>{itemDesc(consumirItem)}</span>
-                    <span className={styles.itemInfoSub}>
-                      {tr('Qtd atual:')} <strong>{itemQty(consumirItem)}</strong> {tr('unidades')}
-                      {' · '}{tr('Venda un.:')} <strong>{fmtBRL(itemVenda(consumirItem))}</strong>
-                    </span>
-                  </div>
-    
-                  <FormField label={tr('Quantidade a consumir *')}>
-                    <Input
-                      type="number" placeholder="0" min="1"
-                      value={consumirQtd}
-                      onChange={(e) => setConsumiQtd(e.target.value)}
-                    />
-                  </FormField>
-    
-                  <FormField label={tr('Quarto')}>
-                    <Select
-                      value={consumirQuarto}
-                      onChange={async (e) => {
-                        const id = e.target.value;
-                        setConsumiQuarto(id);
-                        setQuartoItens([]);
-                        if (!id) return;
-                        setQuartoItensLoading(true);
-                        try {
-                          const data = await quartoApi.itens(id);
-                          setQuartoItens(Array.isArray(data) ? data : []);
-                        } catch { setQuartoItens([]); }
-                        finally { setQuartoItensLoading(false); }
-                      }}
-                    >
-                      <option value="">{tr('Nenhum')}</option>
-                      {quartos.map((q) => (
-                        <option key={q.id} value={q.id}>{tr('Quarto')} {q.id} - {q.descricao}</option>
-                      ))}
-                    </Select>
-                  </FormField>
-    
-                  {consumirQuarto && (() => {
-                    if (quartoItensLoading) return (
-                      <div className={styles.quartoItensBox}>
-                        <Loader2 size={13} className={styles.spinInline} />
-                        <span>{tr('Carregando itens do quarto...')}</span>
-                      </div>
-                    );
-                    const entrada = quartoItens.find(qi => qi.item?.id === consumirItem?.id);
-                    if (!entrada) return (
-                      <div className={styles.quartoItensBox}>
-                        <span className={styles.quartoItensNone}>{tr('Item não configurado para este quarto')}</span>
-                      </div>
-                    );
-                    const { quantidade_atual, quantidade_padrao } = entrada;
-                    const ok  = quantidade_atual >= quantidade_padrao;
-                    const qtdExcede = (Number(consumirQtd) || 0) > quantidade_atual;
-                    return (
-                      <div className={qtdExcede ? styles.quartoItensBoxErr : styles.quartoItensBox}>
-                        <div className={styles.quartoItensRow}>
-                          <span className={styles.quartoItensLabel}>{tr('No quarto agora')}</span>
-                          <span className={ok ? styles.quartoItensOk : styles.quartoItensLow}>
-                            {quantidade_atual} / {quantidade_padrao}
-                          </span>
-                        </div>
-                        {qtdExcede && (
-                          <span className={styles.quartoItensNone} style={{ color: '#ef4444', fontStyle: 'normal' }}>
-                            {tr('Quantidade maior que o disponível no quarto (')}{quantidade_atual} {tr('un.)')}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
-    
-                  <label className={styles.checkboxRow}>
-                    <input
-                      type="checkbox"
-                      checked={consumirDespesa}
-                      onChange={(e) => setConsumiDespesa(e.target.checked)}
-                    />
-                    <span>{tr('Despesa pessoal')}</span>
-                  </label>
-    
-                  {consumirPagamento ? (
-                    <div className={styles.pagamentoChip}>
-                      <CreditCard size={13} />
-                      <span>
-                        {tiposPagamento.find(t => t.id === consumirPagamento.tipo_pagamento?.id)?.descricao
-                          ?? consumirPagamento.tipo_pagamento?.descricao ?? '—'}
-                        {' · '}{consumirPagamento.nome_pagador ?? '—'}
-                        {' · '}{fmtBRL(pago)}
-                      </span>
-                      <button className={styles.pagamentoEdit} onClick={() => setShowConsumiPag(true)}>
-                        {tr('Alterar')}
-                      </button>
-                    </div>
-                  ) : (
-                    <button className={styles.definePagamento} onClick={() => setShowConsumiPag(true)}>
-                      <CreditCard size={13} /> {tr('Definir Pagamento')}{consumirDespesa ? '' : ' *'}
-                    </button>
-                  )}
-    
-                  {qty > 0 && (
-                    <div className={diverge ? styles.consumoAlertDiverg : styles.consumoAlert}>
-                      <div className={styles.consumoAlertRow}>
-                        <span>{tr('Valor esperado')}</span>
-                        <strong>{fmtBRL(esperado)}</strong>
-                      </div>
-                      {pago !== null && (
-                        <div className={styles.consumoAlertRow}>
-                          <span>{tr('Valor informado')}</span>
-                          <strong className={diverge ? styles.valRose : styles.valVenda}>{fmtBRL(pago)}</strong>
-                        </div>
-                      )}
-                      {diverge && !consumirDespesa && (
-                        <p className={styles.consumoAlertMsg}>
-                          {tr('Os valores divergem. Corrija o pagamento ou marque como despesa pessoal.')}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-                </>)}
           </div>
 
           <div className={styles.acaoPopFoot}>
-            <Button variant="secondary" onClick={fecharAcao}>{tr('Cancelar')}</Button>
-            {reporModal ? (
-              <Button variant="primary" onClick={handleRepor} disabled={reporSaving}>
-                {reporSaving && <Loader2 size={14} className={styles.spinInline} />}
-                {tr('Confirmar Reposição')}
-              </Button>
-            ) : (
-              <Button variant="primary" onClick={handleConsumir} disabled={consumirSaving}>
-                {consumirSaving && <Loader2 size={14} className={styles.spinInline} />}
-                {tr('Confirmar')}
-              </Button>
-            )}
+            <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+              onClick={reporQuarto ? handleReporQuarto : handleRepor} disabled={reporSaving}>
+              {reporSaving && <Loader2 size={14} className={styles.spinInline} />}
+              {tr('Confirmar Reposição')}
+            </Button>
           </div>
         </div>,
         document.body,
       )}
-      <PaymentModal
-        open={showConsumiPag}
-        onClose={() => setShowConsumiPag(false)}
-        onConfirm={(pag) => { setConsumiPagamento(pag); setShowConsumiPag(false); }}
-        tiposPagamento={tiposPagamento}
-        initialPayment={consumirPagamento ?? undefined}
-        tipoRegistro="SAIDA"
-        loggedUser={loggedUser}
-        canAplicarDesconto={canAplicarDesconto}
-      />
 
     </div>
   );

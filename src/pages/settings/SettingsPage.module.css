@@ -1,5 +1,5 @@
 .page {
-  --l-bg:         oklch(0.955 0.01 255);
+  --l-bg:         oklch(0.925 0.012 255);
   --l-card:       oklch(1 0 0);
   --l-fg:         oklch(0.24 0.03 262);
   --l-muted-fg:   oklch(0.52 0.03 258);
@@ -35,10 +35,10 @@
   width: 100%;
   max-width: 760px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .header { display: flex; flex-direction: column; gap: 4px; }
@@ -48,7 +48,7 @@
 .card {
   background: var(--l-card);
   border: 1px solid var(--l-border);
-  border-radius: 10px;
+  border-radius: 4px;
   box-shadow: var(--l-shadow);
   padding: 20px;
   display: flex;

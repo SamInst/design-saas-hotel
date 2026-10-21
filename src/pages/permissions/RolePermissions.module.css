@@ -6,7 +6,7 @@
    radius 0.75rem → md 10px, lg 12px, xl 16px.
    ═════════════════════════════════════════════════════════════ */
 .page {
-  --l-bg:            oklch(0.955 0.01 255);   /* mesmo fundo da tela de Cadastros */
+  --l-bg:            oklch(0.925 0.012 255);   /* mesmo fundo da tela de Cadastros */
   --l-card:          oklch(1 0 0);
   --l-fg:            oklch(0.24 0.03 262);
   --l-muted-fg:      oklch(0.52 0.03 258);
@@ -33,7 +33,7 @@
   --l-radius: 0.5rem;
   --l-r-md: calc(var(--l-radius) - 2px);
   --l-r-lg: var(--l-radius);
-  --l-r-xl: calc(var(--l-radius) + 2px);
+  --l-r-xl: calc(var(--l-radius) - 4px);     /* 4px */
   --l-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 
   /* cancela o padding do <main> do AppLayout: fundo contínuo sob o cabeçalho */
@@ -76,10 +76,10 @@
 
 .split {
   flex: 1; min-height: 0; width: 100%;
-  display: grid; gap: 20px;
+  display: grid; gap: 14px;
   grid-template-columns: minmax(0, 1fr);
   overflow-y: auto;
-  padding: 10px 24px 24px;
+  padding: 14px;
 }
 @media (min-width: 1024px) {
   .split {
@@ -200,7 +200,7 @@
 .skSub    { width: 45%; height: 10px; margin-top: 6px; }
 
 /* ═══ PAINEL DE DETALHE ═══════════════════════════════════════ */
-.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.detailPanel { min-height: 0; display: flex; flex-direction: column; gap: 14px; }
 @media (min-width: 1024px) { .detailPanel { max-height: 100%; overflow-y: auto; padding-right: 2px; } }
 
 /* ── Ficha / formulário num cartão só: cabeçalho fixo, abas e conteúdo ──
@@ -215,7 +215,7 @@
   }
 }
 @media (min-width: 1024px) {
-  .fichaCard {
+  .dCard.fichaCard {
     flex: 0 1 auto; min-height: 0;
     display: flex; flex-direction: column;
     overflow: hidden;
@@ -343,7 +343,7 @@
 /* ── Responsivo ── */
 @media (max-width: 1023px) {
   .splitListHidden .listPanel { display: none; }
-  .split { padding: 8px 16px 16px; gap: 16px; }
+  .split { padding: 14px; gap: 14px; }
   .detailPanel { order: 1; }
   .listPanel   { order: 2; }
   .listScroll { flex: none; max-height: 55vh; }
@@ -358,7 +358,7 @@
   .fichaBody { padding: 18px 14px 14px; }
   .fichaIcone { width: 52px; height: 52px; }
   .fichaNome { font-size: 19px; line-height: 26px; }
-  .split { padding: 6px 12px 12px; gap: 12px; }
+  .split { padding: 14px; gap: 14px; }
   .listPanel { padding: 12px; }
   .dCard { padding: 14px; }
   .dCardHead { flex-wrap: wrap; }
