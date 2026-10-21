@@ -104,6 +104,16 @@ function DiscountModal({ open, onClose, onConfirm, valorBase = 0 }) {
   );
 }
 
+function InlineWrap({ open, children, footer }) {
+  if (!open) return null;
+  return (
+    <div className={styles.inline}>
+      <div className={styles.inlineBody}>{children}</div>
+      <div className={styles.inlineFooter}>{footer}</div>
+    </div>
+  );
+}
+
 // ── PaymentModal ──────────────────────────────────────────────
 /**
  * Modal universal de pagamento.
@@ -140,6 +150,7 @@ export function PaymentModal({
   grupoPago          = null,
   containerStyle     = undefined,
   backdropStyle      = undefined,
+  inline             = false,
 }) {
   const emGrupo = grupoTotal !== null && grupoPago !== null;
   const [tipoPagId,   setTipoPagId]   = useState('');
@@ -275,21 +286,151 @@ export function PaymentModal({
     onConfirm(payment);
   };
 
+  const footer = (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <Button onClick={onClose} style={{ flex: 1 }}>{tr('Cancelar')}</Button>
+      <Button variant="primary" onClick={handleConfirm}
+        disabled={localSubmitting || isSubmitting || !canConfirm}
+        style={{ flex: 1 }}>
+        {(localSubmitting || isSubmitting) ? <><Loader2 size={13} className={styles.spin} /> {tr('Salvando...')}</> : tr('Confirmar')}
+      </Button>
+    </div>
+  );
+
+  const comprovante = (
+    <FormField label={tr('Comprovante (opcional)')}>
+      {/* arquivo existente (edição) */}
+      {arquivoAtual && !arquivoRemov && !arquivo && (
+        <div className={styles.arquivoAtual}>
+          <span className={styles.arquivoNome}>
+            {arquivoAtual.split(/[\\/]/).pop()}
+          </span>
+          <button className={styles.arquivoBtn} title={tr('Ver')}
+            onClick={() => arquivoApi.abrir(arquivoAtual)}>
+            <Eye size={13} />
+          </button>
+          <button className={styles.arquivoBtnRemove} title={tr('Remover')}
+            onClick={() => setArquivoRemov(true)}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* novo arquivo selecionado */}
+      {arquivo && (
+        <div className={styles.arquivoAtual}>
+          <span className={styles.arquivoNome}>{arquivo.name}</span>
+          <button className={styles.arquivoBtnRemove} title={tr('Cancelar')}
+            onClick={() => { setArquivo(null); }}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* input para selecionar novo arquivo */}
+      {(!arquivoAtual || arquivoRemov || arquivo) && !arquivo && (
+        <label className={styles.fileLabel}>
+          <FileUp size={13} />
+          <span>{arquivoRemov ? tr('Selecionar novo arquivo...') : tr('Selecionar arquivo...')}</span>
+          <input type="file" style={{ display: 'none' }}
+            accept="image/*,application/pdf"
+            onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
+        </label>
+      )}
+    </FormField>
+  );
+
+  // Dentro de um painel (Financeiro): os mesmos campos agrupados em seções.
+  if (inline) {
+    if (!open) return null;
+    const outros = [
+      lastPayerName && lastPayerName.toUpperCase() !== titularNome?.toUpperCase() && [tr('Último pagador'), lastPayerName.toUpperCase()],
+      titularNome && [tr('Titular'), titularNome.toUpperCase()],
+      loggedUser?.pessoa?.nome && [tr('Funcionário'), loggedUser.pessoa.nome.toUpperCase()],
+    ].filter(Boolean);
+    return (
+      <div className={styles.inline}>
+        <section className={styles.secao}>
+          <h4 className={styles.secaoTit}>{tr('Valor')}</h4>
+          <div className={styles.secaoGrid}>
+            <FormField label={tr('Valor *')}>
+              <Input type="text" inputMode="numeric" placeholder={tr('R$ 0,00')} autoFocus
+                className={[styles.valorGrande, tipoRegistro === 'SAIDA' ? styles.valorOut : styles.valorIn].join(' ')}
+                value={valor} onChange={e => handleValorChange(e.target.value)} />
+            </FormField>
+            <FormField label={tr('Tipo de Pagamento *')}>
+              <Select value={tipoPagId} onChange={e => setTipoPagId(e.target.value)}>
+                <option value="">{tr('Selecione...')}</option>
+                {tiposPagamento.map(tp => (
+                  <option key={tp.id} value={tp.id}>{tp.descricao}</option>
+                ))}
+              </Select>
+            </FormField>
+          </div>
+        </section>
+
+        <section className={styles.secao}>
+          <h4 className={styles.secaoTit}>{tipoRegistro === 'SAIDA' ? tr('Pago a') : tr('Pagador')}</h4>
+          <FormField label={tr('Nome do Pagador *')}>
+            <Input placeholder={tr('Nome completo')}
+              value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
+          </FormField>
+          {outros.length > 0 && (
+            <div className={styles.atalhos}>
+              {outros.map(([rot, nome]) => (
+                <button key={rot} type="button"
+                  className={[styles.atalho, nomePagador === nome ? styles.atalhoOn : ''].join(' ')}
+                  onClick={() => setNomePagador(nomePagador === nome ? '' : nome)}>
+                  {rot}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className={styles.secao}>
+          <h4 className={styles.secaoTit}>{tr('Detalhes')}</h4>
+          <div className={styles.secaoGrid}>
+            <div className={styles.secaoLarga}>
+              <FormField label={tr('Descrição')}>
+                <Input placeholder={tr('Descrição do pagamento')}
+                  value={descricao} onChange={e => setDescricao(e.target.value.toUpperCase())} />
+              </FormField>
+            </div>
+            {quartos.length > 0 && (
+              <FormField label={tr('Quarto')}>
+                <Select value={quartoSel} onChange={e => setQuartoSel(e.target.value)}>
+                  <option value="">{tr('Nenhum')}</option>
+                  {quartos.map(q => (
+                    <option key={q.id} value={q.id}>{tr('Quarto {{id}} - {{descricao}}', { id: q.id, descricao: q.descricao })}</option>
+                  ))}
+                </Select>
+              </FormField>
+            )}
+            {despesaInternaEnabled && (
+              <label className={[styles.checkRow, styles.checkAlinhado].join(' ')}>
+                <input type="checkbox" checked={despesaInterna} onChange={e => setDespesaInterna(e.target.checked)} />
+                <span>{tr('Despesa interna do Hotel')}</span>
+              </label>
+            )}
+          </div>
+        </section>
+
+        <section className={styles.secao}>{comprovante}</section>
+
+        <div className={styles.inlineFooter}>{footer}</div>
+      </div>
+    );
+  }
+
+  const Wrap = inline ? InlineWrap : Modal;
+
   return (
     <>
-      <Modal open={open} onClose={onClose} title={tr('Pagamento')}
+      <Wrap open={open} onClose={onClose} title={tr('Pagamento')}
         containerStyle={containerStyle}
         backdropStyle={backdropStyle}
-        footer={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button onClick={onClose} style={{ flex: 1 }}>{tr('Cancelar')}</Button>
-            <Button variant="primary" onClick={handleConfirm}
-              disabled={localSubmitting || isSubmitting || !canConfirm}
-              style={{ flex: 1 }}>
-              {(localSubmitting || isSubmitting) ? <><Loader2 size={13} className={styles.spin} /> {tr('Salvando...')}</> : tr('Confirmar')}
-            </Button>
-          </div>
-        }>
+        footer={footer}>
 
         {emGrupo && (
           <div className={styles.resumoList}>
@@ -469,47 +610,8 @@ export function PaymentModal({
         ))}
 
         {/* Comprovante */}
-        {!despesaPessoal && <FormField label={tr('Comprovante (opcional)')}>
-          {/* arquivo existente (edição) */}
-          {arquivoAtual && !arquivoRemov && !arquivo && (
-            <div className={styles.arquivoAtual}>
-              <span className={styles.arquivoNome}>
-                {arquivoAtual.split(/[\\/]/).pop()}
-              </span>
-              <button className={styles.arquivoBtn} title={tr('Ver')}
-                onClick={() => arquivoApi.abrir(arquivoAtual)}>
-                <Eye size={13} />
-              </button>
-              <button className={styles.arquivoBtnRemove} title={tr('Remover')}
-                onClick={() => setArquivoRemov(true)}>
-                <Trash2 size={13} />
-              </button>
-            </div>
-          )}
-
-          {/* novo arquivo selecionado */}
-          {arquivo && (
-            <div className={styles.arquivoAtual}>
-              <span className={styles.arquivoNome}>{arquivo.name}</span>
-              <button className={styles.arquivoBtnRemove} title={tr('Cancelar')}
-                onClick={() => { setArquivo(null); }}>
-                <X size={13} />
-              </button>
-            </div>
-          )}
-
-          {/* input para selecionar novo arquivo */}
-          {(!arquivoAtual || arquivoRemov || arquivo) && !arquivo && (
-            <label className={styles.fileLabel}>
-              <FileUp size={13} />
-              <span>{arquivoRemov ? tr('Selecionar novo arquivo...') : tr('Selecionar arquivo...')}</span>
-              <input type="file" style={{ display: 'none' }}
-                accept="image/*,application/pdf"
-                onChange={e => setArquivo(e.target.files?.[0] ?? null)} />
-            </label>
-          )}
-        </FormField>}
-      </Modal>
+        {!despesaPessoal && comprovante}
+      </Wrap>
 
       <DiscountModal
         open={showDesc}
