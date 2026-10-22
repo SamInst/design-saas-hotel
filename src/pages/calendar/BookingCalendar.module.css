@@ -3726,3 +3726,190 @@
 @container direita (min-width: 900px) {
   .slotDireita:has(.rvGavetaAcao) .rvGaveta:not(.rvGavetaAcao) { display: flex; }
 }
+
+/* ── Gavetas de lista (grupo, orçamento, dia, quarto) ──────────────────────── */
+.slotDireita:has(.rvGavetaReserva) .rvGavetaLista { display: none; }
+.rvGavetaLista .finResumo { margin: 16px 18px; }
+.rvGavetaLista .rcSection { border-bottom: none; }
+.dtQuebra { white-space: normal !important; min-width: 160px; }
+.dtStatus {
+  display: inline-block; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500; color: var(--l-muted-fg); white-space: nowrap;
+}
+.dtStatus_confirmada { color: oklch(0.5 0.1 178); border-color: color-mix(in oklch, oklch(0.5 0.1 178) 35%, transparent); }
+.dtStatus_solicitada { color: oklch(0.58 0.13 70); border-color: color-mix(in oklch, oklch(0.58 0.13 70) 35%, transparent); }
+.dtStatus_hospedado  { color: var(--l-fg); border-color: color-mix(in oklch, var(--l-fg) 30%, transparent); }
+.dtStatus_cancelado, .dtStatus_ausente { color: oklch(0.55 0.19 25); border-color: color-mix(in oklch, oklch(0.55 0.19 25) 35%, transparent); }
+.orcListRowAtivo { background: transparent; box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--l-primary) 32%, transparent); border-radius: var(--l-r-lg); }
+
+/* ── Box esquerda: topo fixo ───────────────────────────────────────────────── */
+.sideTopo {
+  position: sticky; top: -16px; z-index: 5;
+  display: flex; flex-direction: column; gap: 12px;
+  margin: -16px -16px 0; padding: 16px 16px 12px;
+  background: var(--l-card); border-bottom: 1px solid var(--border);
+}
+
+/* ── Listas da esquerda (dia, quarto) ──────────────────────────────────────── */
+.lstRow {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px; border: 1px solid transparent; border-radius: var(--l-r-lg);
+  background: transparent; color: var(--l-fg); font: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s;
+}
+.lstRow:hover { background: color-mix(in oklch, var(--l-accent) 45%, transparent); }
+.lstRowFeito { opacity: .6; }
+.lstNum {
+  flex-shrink: 0; min-width: 34px; height: 34px; padding: 0 6px; border-radius: var(--l-r-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--l-hero); color: var(--l-hero-fg); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.lstTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lstTxt b { font-size: 13.5px; font-weight: 500; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lstTxt small { font-size: 11.5px; line-height: 16px; color: var(--l-muted-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lstDia { display: flex; align-items: baseline; gap: 8px; }
+.lstDiaData { font-size: 18px; font-weight: 600; color: var(--l-fg); font-variant-numeric: tabular-nums; }
+.lstDiaSemana { font-size: 13px; color: var(--l-muted-fg); }
+.lstStats {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-radius: var(--l-r-lg); background: var(--l-hero); color: var(--l-hero-fg); overflow: hidden;
+}
+.lstStat { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; }
+.lstStat + .lstStat { box-shadow: inset 1px 0 0 var(--l-hero-ln); }
+.lstStat b { font-size: 17px; font-weight: 700; line-height: 22px; font-variant-numeric: tabular-nums; }
+.lstStat span { font-size: 11px; color: var(--l-hero-mut); }
+
+.lstSecao { display: flex; flex-direction: column; gap: 2px; margin: 0 -6px; }
+.lstSecaoHead { display: flex; align-items: center; gap: 8px; padding: 4px 10px 6px; }
+.lstSecaoTit { font-size: 13px; font-weight: 600; color: var(--l-fg); }
+.lstSecaoSub { font-size: 12px; color: var(--l-muted-fg); }
+.lstQtd {
+  margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border);
+  font-size: 11.5px; font-weight: 600; text-align: center; color: var(--l-muted-fg);
+}
+.lstDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.lstDotSaida   { background: oklch(0.65 0.16 50); }
+.lstDotChegada { background: oklch(0.6 0.13 158); }
+.lstDotFica    { background: var(--l-muted-fg); }
+.page .lstBtnCheio { width: 100%; }
+
+.lstSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: var(--l-r-lg); background: var(--l-secondary); }
+.lstSegBtn {
+  height: 32px; border: none; border-radius: var(--l-r-md); background: transparent;
+  font: inherit; font-size: 12.5px; font-weight: 500; color: var(--l-muted-fg); cursor: pointer;
+}
+.lstSegBtn:hover { color: var(--l-fg); }
+.lstSegBtnOn { background: var(--l-card); color: var(--l-fg); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.lstMes { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lstMesBtn {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 1px solid var(--border); border-radius: var(--l-r-md); background: transparent; color: var(--l-muted-fg); cursor: pointer;
+}
+.lstMesBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--l-accent) 55%, transparent); color: var(--l-fg); }
+.lstMesBtn:disabled { opacity: .4; cursor: default; }
+.lstMesNome { font-size: 13.5px; font-weight: 600; color: var(--l-fg); }
+.lstResumo { margin: 0; font-size: 12.5px; color: var(--l-muted-fg); }
+.lstResumo b { color: var(--l-fg); }
+.sideTopo { top: 0; }
+/* topo fixo sem fio; o conteúdo rola por baixo e o cabeçalho do serviço aberto fica preso */
+.sideTopo { position: static; border-bottom: none; padding-bottom: 4px; }
+.sidePanel { overflow: hidden; }
+.sidePanel > .sideGrupo {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0 -16px -16px; padding: 0 16px 16px;
+}
+.slotEsq .janelaHead { position: sticky; top: 0; z-index: 4; background: var(--l-card); padding-top: 2px; }
+.page .sidePanel .btnTopo { width: auto; height: 32px; min-height: 32px; padding: 0 12px; white-space: nowrap; }
+.janelaHead .janelaTit { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* ── Nova reserva / novo orçamento: gaveta à direita ───────────────────────── */
+.rvGavetaCriar {
+  position: absolute; top: 0; right: 0; bottom: 0; z-index: 3;
+  width: min(720px, 100%);
+  display: flex; flex-direction: column; min-height: 0;
+  border: 1px solid var(--border); border-radius: var(--l-r-xl);
+  background: var(--l-card); box-shadow: -12px 0 32px rgb(15 23 42 / 0.14);
+  animation: gavetaEntra .22s cubic-bezier(.2,.8,.2,1);
+}
+@media (prefers-reduced-motion: reduce) { .rvGavetaCriar { animation: none; } }
+.rvGavetaCriar > .janelaHead { flex-shrink: 0; padding: 14px 18px; }
+.criarCorpo {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 14px; padding: 16px 20px;
+}
+.criarCorpo > * { flex-shrink: 0; }
+.criarRodape { flex-shrink: 0; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--l-card); }
+.criarRodape button { border-radius: var(--l-r-md); box-shadow: none; transform: none; font-weight: 600; min-height: 38px; }
+
+/* campos no padrão do cadastro de clientes */
+.rvGavetaCriar input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.rvGavetaCriar select {
+  box-sizing: border-box; height: 34px; min-height: 34px;
+  padding: 7px 10px; border-radius: 7px; box-shadow: none; font-size: 13px;
+}
+.rvGavetaCriar select { padding-right: 28px; background-position: right 9px center; }
+.rvGavetaCriar textarea { padding: 7px 10px; border-radius: 7px; box-shadow: none; font-size: 13px; }
+.rvGavetaCriar input:focus, .rvGavetaCriar select:focus, .rvGavetaCriar textarea:focus {
+  outline: none; border-color: var(--l-primary) !important; box-shadow: none !important;
+}
+.rvGavetaCriar label:not(:has(input)) { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; }
+.rvGavetaCriar input[type='checkbox'], .rvGavetaCriar input[type='radio'] { accent-color: var(--l-primary); }
+.rvGavetaCriar :is(.rvBtn, .rcBtn) { border-radius: var(--l-r-md); box-shadow: none; }
+.rvGavetaCriar .rcCard { border-color: var(--border); border-radius: var(--l-r-lg); }
+
+/* ── Criando a reserva ─────────────────────────────────────────────────────── */
+.criandoVeu {
+  position: absolute; inset: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: inherit;
+  background: color-mix(in oklch, var(--l-card) 72%, transparent);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  animation: criandoEntra .18s ease-out;
+}
+@keyframes criandoEntra { from { opacity: 0; } to { opacity: 1; } }
+.criandoCard {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: min(280px, 86%); padding: 24px 22px 20px; text-align: center;
+  border: 1px solid var(--border); border-radius: var(--l-r-lg);
+  background: var(--l-card); box-shadow: 0 12px 32px rgb(15 23 42 / 0.12);
+}
+.criandoCard b { font-size: 14px; font-weight: 600; color: var(--l-fg); }
+.criandoCard small { font-size: 12px; color: var(--l-muted-fg); }
+.criandoAnel {
+  width: 36px; height: 36px; margin-bottom: 6px; border-radius: 50%;
+  border: 3px solid color-mix(in oklch, var(--l-primary) 18%, transparent);
+  border-top-color: var(--l-primary);
+  animation: criandoGira .8s linear infinite;
+}
+@keyframes criandoGira { to { transform: rotate(360deg); } }
+.criandoBarra {
+  position: relative; width: 100%; height: 4px; margin-top: 10px; overflow: hidden;
+  border-radius: 999px; background: color-mix(in oklch, var(--l-primary) 14%, transparent);
+}
+.criandoBarra i {
+  position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; border-radius: inherit;
+  background: var(--l-primary); animation: criandoCorre 1.1s ease-in-out infinite;
+}
+@keyframes criandoCorre { to { left: 100%; } }
+
+/* ── Nova reserva destacada no calendário ──────────────────────────────────── */
+.barNova { z-index: 8; animation: barNovaEntra .45s cubic-bezier(.2,.8,.2,1), barNovaPulso 1.4s ease-out .45s 3; }
+@keyframes barNovaEntra { from { transform: scaleX(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes barNovaPulso {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--l-primary) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 12px color-mix(in oklch, var(--l-primary) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .criandoAnel, .criandoBarra i { animation-duration: 3s; }
+  .barNova { animation: none; outline: 2px solid var(--l-primary); outline-offset: 2px; }
+}
+/* faixas das reservas mais quadradas */
+.bar { border-radius: 6px; }
+.barHalf { border-radius: 0 6px 6px 0; }
+.resizeHandle { border-radius: 6px 0 0 6px; }
+.resizeHandleRight { border-radius: 0 6px 6px 0; }
+.barAvatar { border-radius: 5px; }
+.skBarra { border-radius: 6px; }
+.barStatusTag, .barStatusTagInline { border-radius: 4px; }

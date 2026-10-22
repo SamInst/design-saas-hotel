@@ -1721,5 +1721,20 @@
   "Pagamento registrado": "Payment recorded",
   "Registrar outro": "Record another",
   "Concluir": "Done",
-  "O pagamento entra na reserva ao clicar em Salvar.": "The payment is added to the booking when you click Save."
+  "O pagamento entra na reserva ao clicar em Salvar.": "The payment is added to the booking when you click Save.",
+  "Pagamento do grupo": "Group payment",
+  "Total do grupo": "Group total",
+  "Reservas do grupo": "Group bookings",
+  "Apartamentos": "Rooms",
+  "Total do orçamento": "Quote total",
+  "Hospedagens": "Stays",
+  "Nenhuma hospedagem neste orçamento.": "No stays in this quote.",
+  "Orçamento #": "Quote #",
+  "Nova reserva neste dia": "New booking on this day",
+  "reservas": "bookings",
+  "Nova": "New",
+  "Criando reserva…": "Creating booking…",
+  "Criando orçamento…": "Creating quote…",
+  "Criando solicitação…": "Creating request…",
+  "Reservando o quarto no calendário": "Booking the room on the calendar"
 }

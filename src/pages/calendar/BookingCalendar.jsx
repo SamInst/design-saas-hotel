@@ -476,10 +476,172 @@ function EsqueletoGrade({ leftW }) {
 
 // No desktop as janelas abrem na box da direita, por cima do calendário.
 const JanelaCtx = createContext(null);
-function Janela({ open, onClose, title, children, footer, bodyStyle, hideHeader, ...modal }) {
+// Box da direita, mesmo quando a lista vive na esquerda (grupos, orçamentos, dia, quarto).
+const JanelaDirCtx = createContext(null);
+
+// Conteúdo de um item da lista da esquerda, no desenho da view da reserva.
+function GavetaDir({ classe = '', children }) {
+  const dir = useContext(JanelaDirCtx);
+  if (!dir) return null;
+  return createPortal(
+    <div className={[styles.rvGaveta, styles.rvGavetaLista, classe].join(' ')}>
+      <div className={styles.rvPainelCorpo}>{children}</div>
+    </div>,
+    dir,
+  );
+}
+
+// Nova reserva / novo orçamento: gaveta à direita, como a view da reserva.
+function JanelaGaveta({ open, onClose, title, children, footer, bodyStyle, criando = false, criandoTxt = '', ...modal }) {
+  const dir = useContext(JanelaDirCtx);
+  if (!dir) return <Modal open={open} onClose={onClose} title={title} footer={footer} bodyStyle={bodyStyle} {...modal}>{children}</Modal>;
+  if (!open) return null;
+  return createPortal(
+    <div className={styles.rvGavetaCriar}>
+      <header className={styles.janelaHead}>
+        <button type="button" className={styles.janelaVoltar} onClick={onClose}
+          title={tr('Voltar')} aria-label={tr('Voltar')}>
+          <ChevronLeft size={17} />
+        </button>
+        <div className={styles.janelaTit}>{title}</div>
+      </header>
+      <div className={styles.criarCorpo}>{children}</div>
+      {footer && <div className={styles.criarRodape}>{footer}</div>}
+      {criando && (
+        <div className={styles.criandoVeu} role="status" aria-live="polite">
+          <div className={styles.criandoCard}>
+            <span className={styles.criandoAnel} />
+            <b>{criandoTxt || tr('Criando reserva…')}</b>
+            <small>{tr('Reservando o quarto no calendário')}</small>
+            <span className={styles.criandoBarra}><i /></span>
+          </div>
+        </div>
+      )}
+    </div>,
+    dir,
+  );
+}
+
+function CabecalhoGaveta({ titulo, chips = [], meta, onClose }) {
+  return (
+    <div className={styles.rcHead}>
+      <div className={styles.rcHeadLeft}>
+        <div className={styles.rcHeadTop}>
+          <span className={styles.rcTitle}>{titulo}</span>
+          {chips.filter(Boolean).map((c, i) => (
+            <span key={i} className={[styles.rcChip, c.red ? styles.rcChipRed : ''].join(' ')}>{c.txt ?? c}</span>
+          ))}
+        </div>
+        {meta && <span className={styles.rcHeadMeta}>{meta}</span>}
+      </div>
+      <div className={styles.rcHeadRight}>
+        <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label={tr('Fechar')}>
+          <X size={17} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FaixaPeriodo({ inicio, fim, celulas = [], opcoes = null }) {
+  return (
+    <div className={[styles.rcSection, styles.rvDestaque].join(' ')}>
+      <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
+        <div className={styles.ovDateCell}>
+          <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
+          <div className={styles.ovDateValue}>{inicio ? fmtDateBR(inicio) : '—'}</div>
+        </div>
+        <div className={styles.ovDateArrow}><ChevronRight size={16} /></div>
+        <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
+          <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
+          <div className={styles.ovDateValue}>{fim ? fmtDateBR(fim) : '—'}</div>
+        </div>
+        {celulas.map(([n, rot], i) => (
+          <div key={i} className={styles.ovNightsCell}>
+            <div className={styles.ovNightsNum}>{n}</div>
+            <div className={styles.ovNightsLabel}>{rot}</div>
+          </div>
+        ))}
+        {opcoes}
+      </div>
+    </div>
+  );
+}
+
+function MenuOpcoes({ itens }) {
+  const [aberto, setAberto] = useState(false);
+  const lista = itens.filter(Boolean);
+  if (lista.length === 0) return null;
+  return (
+    <div className={styles.rvOpcoesCell}>
+      <div className={styles.rvAcoesWrap}>
+        {aberto && (
+          <>
+            <div className={styles.rvAcoesBackdrop} onClick={() => setAberto(false)} />
+            <div className={styles.rvAcoesMenu}>
+              <div className={styles.rvAcoesTit}>{tr('Opções')}</div>
+              {lista.map((a, i) => (
+                <Fragment key={i}>
+                  {a.divider && <div className={styles.rvAcoesDiv} />}
+                  <button type="button" disabled={a.disabled} title={a.title}
+                    className={[styles.rvAcoesItem, a.primary ? styles.rvAcoesItemPrimary : '', a.danger ? styles.rvAcoesItemDanger : ''].join(' ')}
+                    onClick={(e) => { setAberto(false); a.onClick(e); }}>
+                    {a.icon} {a.label}
+                  </button>
+                </Fragment>
+              ))}
+            </div>
+          </>
+        )}
+        <button type="button" className={styles.rvAcoesBtn} onClick={() => setAberto((v) => !v)}>
+          {tr('Opções')} <ChevronDown size={15} className={aberto ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LinhaReserva({ r, onClick, mostrarQuarto = true }) {
+  const dias     = diffDays(r.dataInicio, r.dataFim);
+  const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
+  return (
+    <button type="button" className={[styles.lstRow, r.status === 'finalizado' ? styles.lstRowFeito : ''].join(' ')} onClick={onClick}>
+      {mostrarQuarto && <span className={styles.lstNum}>{fmtRoom(r.quarto)}</span>}
+      <span className={styles.lstTxt}>
+        <b>{r.titularNome}</b>
+        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</small>
+      </span>
+      <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
+      <ChevronRight size={15} className={styles.sideSeta} />
+    </button>
+  );
+}
+
+function SecaoTabela({ titulo, colunas, vazio, children, temLinhas }) {
+  return (
+    <div className={styles.rcSection}>
+      <div className={styles.rcSectionHead}>
+        <span className={styles.rcSectionLabel}>{titulo}</span>
+      </div>
+      <div className={styles.dtScroll}>
+        <table className={styles.dtTable}>
+          <thead><tr>
+            {colunas.map(([c, dir], i) => <th key={i} className={dir ? styles.dtDir : undefined}>{c}</th>)}
+          </tr></thead>
+          <tbody>
+            {temLinhas ? children : (
+              <tr><td colSpan={colunas.length} className={styles.dtVazio}>{vazio}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+function Janela({ open, onClose, title, acaoTopo = null, children, footer, bodyStyle, hideHeader, ...modal }) {
   const slot = useContext(JanelaCtx);
   if (!slot) {
-    return <Modal open={open} onClose={onClose} title={title} footer={footer} bodyStyle={bodyStyle} hideHeader={hideHeader} {...modal}>{children}</Modal>;
+    return <Modal open={open} onClose={onClose} title={acaoTopo ? <>{title}<span style={{ marginLeft: 'auto' }}>{acaoTopo}</span></> : title} footer={footer} bodyStyle={bodyStyle} hideHeader={hideHeader} {...modal}>{children}</Modal>;
   }
   if (!open) return null;
   return createPortal(
@@ -491,6 +653,7 @@ function Janela({ open, onClose, title, children, footer, bodyStyle, hideHeader,
             <ChevronLeft size={17} />
           </button>
           <div className={styles.janelaTit}>{title}</div>
+          {acaoTopo}
         </header>
       )}
       <div className={styles.janelaCorpo} style={bodyStyle}>{children}</div>
@@ -505,7 +668,7 @@ function PainelReserva({ inline, acao = false, pag = false, saindo = false, foot
   const slot = useContext(JanelaCtx);
   if (!inline || !slot) return <Modal {...modal} footer={footer}>{children}</Modal>;
   return createPortal(
-    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : '', pag ? styles.rvGavetaPag : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
+    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : styles.rvGavetaReserva, pag ? styles.rvGavetaPag : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
       {modal.title && !modal.hideHeader && (
         <header className={styles.janelaHead}>
           <button type="button" className={styles.janelaVoltar} onClick={modal.onClose}
@@ -2586,109 +2749,60 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
   const chegadas   = dayReservas.filter((r) => r.dataInicio === dateStr);
   const permanecem = dayReservas.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr);
 
-  const renderDayRow = (r, lineColor) => {
-    const dias     = diffDays(r.dataInicio, r.dataFim);
-    const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
-    return (
-      <div key={r.id} className={[styles.dayRoomRow, r.status === 'finalizado' ? styles.dayRoomDone : ''].join(' ')}
-        style={lineColor ? { borderLeftColor: lineColor } : undefined}
-        onClick={() => onSelectReserva(r)}>
-        <div className={[styles.dayRoomBadge, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
-        <div className={styles.searchDropInfo}>
-          <div className={styles.searchDropName}>{r.titularNome}</div>
-          <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-        </div>
-        <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
-      </div>
-    );
-  };
 
   const daySecoes = [
-    { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),           color: '#f97316', list: saidas },
-    { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'),  color: '#10b981', list: chegadas },
-    { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),   color: '#6b7280', list: permanecem },
+    { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),          tom: 'lstDotSaida',   list: saidas },
+    { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'), tom: 'lstDotChegada', list: chegadas },
+    { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),  tom: 'lstDotFica',    list: permanecem },
   ].filter((s) => s.list.length > 0);
 
   const dayObj  = new Date(dateStr + 'T00:00:00');
   const weekday = dayObj.toLocaleDateString(locale(), { weekday: 'long' });
   const cap     = weekday.charAt(0).toUpperCase() + weekday.slice(1);
   return (
-    <Janela open onClose={onClose} size="lg" hideHeader
+    <Janela open onClose={onClose} size="md"
       title={<><CalendarDays size={15} /> {tr('Reservas do dia')}</>}
       footer={
-        <div className={styles.footerRight}>
-          <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
-            <Plus size={13} /> {tr('Nova Reserva')}
-          </Button>
-        </div>
+        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary, styles.lstBtnCheio].join(' ')}
+          onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
+          {tr('Nova reserva neste dia')}
+        </Button>
       }
     >
-      {/* Cabeçalho do dia — mesmo desenho da faixa de período do modal de reserva,
-          com o dia escolhido no lugar do check-in/check-out. */}
-      <div className={styles.rcCard} style={{ marginBottom: 14 }}>
-        <div className={styles.rcSection}>
-          <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
-            <div className={styles.ovDateCell}>
-              <div className={styles.ovDateLabel}>{cap}</div>
-              <div className={styles.ovDateValue}>{fmtDateBR(dateStr)}</div>
-            </div>
-            {loading ? (
-              <span className={[styles.sk, styles.skNum].join(' ')} style={{ marginLeft: 'auto' }} />
-            ) : (
-              <>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{occupiedRooms.size}/{totalRooms}</div>
-                  <div className={styles.ovNightsLabel}>{tr('Ocupados')}</div>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{dayReservas.length}</div>
-                  <div className={styles.ovNightsLabel}>{dayReservas.length === 1 ? tr('Reserva') : tr('Reservas')}</div>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{totalPeople}</div>
-                  <div className={styles.ovNightsLabel}>{totalPeople === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
-                </div>
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{availableRooms.length}</div>
-                  <div className={styles.ovNightsLabel}>{availableRooms.length === 1 ? tr('Livre') : tr('Livres')}</div>
-                </div>
-              </>
-            )}
-            <button type="button" className={styles.rcCloseBtn} style={{ marginLeft: 12 }}
-              onClick={onClose} aria-label={tr('Fechar')}>
-              <X size={17} />
-            </button>
+      <div className={styles.lstDia}>
+        <span className={styles.lstDiaData}>{fmtDateBR(dateStr)}</span>
+        <span className={styles.lstDiaSemana}>{cap}</span>
+      </div>
+      <div className={styles.lstStats}>
+        {[
+          [`${occupiedRooms.size}/${totalRooms}`, tr('Ocupados')],
+          [dayReservas.length, dayReservas.length === 1 ? tr('Reserva') : tr('Reservas')],
+          [totalPeople, totalPeople === 1 ? tr('Pessoa') : tr('Pessoas')],
+          [availableRooms.length, availableRooms.length === 1 ? tr('Livre') : tr('Livres')],
+        ].map(([n, rot]) => (
+          <div key={rot} className={styles.lstStat}>
+            {loading ? <span className={[styles.sk, styles.skEscuro].join(' ')} style={{ width: 34, height: 18 }} /> : <b>{n}</b>}
+            <span>{rot}</span>
           </div>
-        </div>
+        ))}
       </div>
 
       {loading ? (
         <Esqueleto />
+      ) : dayReservas.length === 0 ? (
+        <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>
       ) : (
-        <>
-          {dayReservas.length === 0 ? (
-            <div className={styles.emptyState}>{tr('Nenhuma reserva para este dia.')}</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {daySecoes.map((sec) => (
-                <div key={sec.key}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: sec.color, flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{sec.label}</span>
-                    <span style={{ fontSize: 11, color: 'var(--text-2)' }}>· {sec.sub}</span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: sec.color, background: `color-mix(in srgb, ${sec.color} 13%, transparent)`, padding: '1px 9px', borderRadius: 999 }}>
-                      {sec.list.length}
-                    </span>
-                  </div>
-                  <div className={styles.dayRoomList}>
-                    {sec.list.map((r) => renderDayRow(r, sec.key === 'saidas' ? '#f97316' : undefined))}
-                  </div>
-                </div>
-              ))}
+        daySecoes.map((sec) => (
+          <div key={sec.key} className={styles.lstSecao}>
+            <div className={styles.lstSecaoHead}>
+              <span className={[styles.lstDot, styles[sec.tom]].join(' ')} />
+              <span className={styles.lstSecaoTit}>{sec.label}</span>
+              <span className={styles.lstSecaoSub}>{sec.sub}</span>
+              <span className={styles.lstQtd}>{sec.list.length}</span>
             </div>
-          )}
-        </>
+            {sec.list.map((r) => <LinhaReserva key={r.id} r={r} onClick={() => onSelectReserva(r)} />)}
+          </div>
+        ))
       )}
     </Janela>
   );
@@ -2699,6 +2813,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
  *  que continua aberta atrás: fechar aqui volta para a lista. */
 function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify }) {
   const naDireita = !!useContext(JanelaCtx);
+  const dir = useContext(JanelaDirCtx);
   const gid = grupo.grupo_id;
   const [lista,     setLista]     = useState([]);
   const [resumo,    setResumo]    = useState(null);
@@ -2776,6 +2891,121 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
 
   const titulo = grupo.descricao || (grupo.titulares || '').split(',')[0].trim() || `Grupo #${gid}`;
   const qtd    = grupo.count ?? grupo.quantidade ?? lista.length;
+
+  if (dir) {
+    const ativas   = lista.filter((r) => r.status !== 'cancelado');
+    const inicio   = ativas.reduce((m, r) => (!m || r.dataInicio < m ? r.dataInicio : m), null);
+    const fimGrupo = ativas.reduce((m, r) => (!m || r.dataFim > m ? r.dataFim : m), null);
+    const nPessoas = ativas.reduce((s, r) => s + (r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0))), 0);
+    return (
+      <>
+        <GavetaDir>
+          <div className={styles.rcCard}>
+            <CabecalhoGaveta titulo={titulo} chips={[`${qtd} ${tr('apartamento')}${qtd !== 1 ? 's' : ''}`]}
+              meta={`${tr('Grupo #')}${gid}`} onClose={onClose} />
+            <FaixaPeriodo inicio={inicio} fim={fimGrupo}
+              celulas={[[qtd, qtd === 1 ? tr('Apartamento') : tr('Apartamentos')], [nPessoas, nPessoas === 1 ? tr('Pessoa') : tr('Pessoas')]]}
+              opcoes={<MenuOpcoes itens={[
+                { label: tr('Pagamento do grupo'), icon: <DollarSign size={15} />, onClick: () => setPagAberto(true) },
+                { label: tr('Nova reserva'), icon: <Plus size={15} />, onClick: () => onNovaReservaGrupo(gid, periodoUnico),
+                  title: periodoUnico ? tr('Já abre em {{v0}} → {{v1}}', { v0: fmtDateBR(periodoUnico.dataInicio), v1: fmtDateBR(periodoUnico.dataFim) }) : undefined },
+                { label: tr('Responsável'), icon: <Pencil size={15} />, onClick: () => setNomeEdit(grupo.descricao ?? '') },
+              ]} />} />
+
+            {resumo && (
+              <aside className={styles.finResumo}>
+                <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
+                <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total do grupo')}</span><b>{fmtBRL(resumo.total)}</b></div>
+                {resumo.pendente > 0.005 ? (
+                  <>
+                    {resumo.pago > 0.005 && <div className={[styles.finLinha, styles.finPago].join(' ')}><span>{tr('Pago')}</span><b>{fmtBRL(resumo.pago)}</b></div>}
+                    <div className={[styles.finLinha, styles.finPend].join(' ')}><span>{tr('Saldo pendente')}</span><b>{fmtBRL(resumo.pendente)}</b></div>
+                  </>
+                ) : (
+                  <p className={styles.finQuitado}><Check size={15} /> {tr('Pago integralmente')}</p>
+                )}
+              </aside>
+            )}
+
+            {loading && lista.length === 0 ? (
+              <div className={styles.rcSection}><Esqueleto linhas={4} /></div>
+            ) : (
+              <SecaoTabela titulo={tr('Reservas do grupo')} temLinhas={lista.length > 0} vazio={tr('Nenhuma reserva neste grupo.')}
+                colunas={[[tr('Apto')], [tr('Titular')], [tr('Período')], [tr('Status')], [tr('Valor'), true]]}>
+                {lista.map((r) => (
+                  <tr key={r.id} className={[styles.dtLinkRow, r.status === 'cancelado' ? styles.dtCancelado : ''].join(' ')}
+                    tabIndex={0} role="button" onClick={() => onSelectReserva(r)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectReserva(r); } }}>
+                    <td><span className={styles.dtNum}>{fmtRoom(r.quarto)}</span></td>
+                    <td className={styles.dtTrunca}><span className={styles.dtCelTit}>{r.titularNome}</span></td>
+                    <td>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)}</td>
+                    <td><span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span></td>
+                    <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(r.valorTotal ?? 0)}</td>
+                  </tr>
+                ))}
+              </SecaoTabela>
+            )}
+
+            <SecaoTabela titulo={tr('Pagamentos do grupo')} temLinhas={pagamentosGrupo.length > 0} vazio={tr('Nenhum pagamento registrado.')}
+              colunas={[[tr('Forma')], [tr('Data')], [tr('Pagador')], [tr('Valor'), true]]}>
+              {pagamentosGrupo.map((p) => (
+                <tr key={p.id} className={p.cancelado ? styles.dtCancelado : ''}>
+                  <td>
+                    <span className={styles.dtForma}>
+                      <span className={[styles.finPgIcon, p.cancelado ? styles.finPgIconOff : ''].join(' ')}>{iconePagamento(p.formaPagamento)}</span>
+                      <span className={styles.dtCelTit}>{p.formaPagamento || p.descricao || tr('Pagamento')}</span>
+                    </span>
+                  </td>
+                  <td>{p.dataRegistro || '—'}</td>
+                  <td className={styles.dtTrunca}>{p.nomePagador || '—'}</td>
+                  <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(p.valor)}</td>
+                </tr>
+              ))}
+            </SecaoTabela>
+          </div>
+        </GavetaDir>
+
+        {pagAberto && createPortal(
+          <div className={[styles.rvGaveta, styles.rvGavetaAcao, styles.rvGavetaPag].join(' ')}>
+            <header className={styles.janelaHead}>
+              <button type="button" className={styles.janelaVoltar} onClick={() => setPagAberto(false)}
+                title={tr('Voltar')} aria-label={tr('Voltar')}>
+                <ChevronLeft size={17} />
+              </button>
+              <div className={styles.janelaTit}><DollarSign size={15} /> {tr('Pagamento do grupo')}</div>
+            </header>
+            <div className={styles.rvPainelCorpo}>
+              <PaymentModal inline compacto open onClose={() => setPagAberto(false)} onConfirm={registrarPagamento}
+                tiposPagamento={tiposPagamento} isSubmitting={salvando} canAplicarDesconto={false}
+                titularNome={lista[0]?.titularNome ?? null} valorTotal={resumo?.total ?? null} valorPago={resumo?.pago ?? null} />
+            </div>
+          </div>,
+          dir,
+        )}
+
+      {/* Responsável principal — grupo_reserva.descricao */}
+      <Modal open={nomeEdit != null} onClose={() => setNomeEdit(null)} size="sm"
+        title={tr('Responsável do grupo')}
+        footer={
+          <div className={styles.footerRight}>
+            <Button variant="secondary" onClick={() => setNomeEdit(null)}>{tr('Cancelar')}</Button>
+            <Button variant="primary" onClick={salvarNome}>{tr('Salvar')}</Button>
+          </div>
+        }
+      >
+        <FormField label={tr('Nome do responsável')}>
+          <Input placeholder={tr('Nome de quem responde pelo grupo')}
+            value={nomeEdit ?? ''}
+            onChange={(e) => setNomeEdit(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') salvarNome(); }} />
+        </FormField>
+        <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-2)' }}>
+          {tr('É por este nome que o grupo aparece na lista e ao vincular novas reservas.')}
+        </p>
+      </Modal>
+      </>
+    );
+  }
 
   return (
     <>
@@ -3047,32 +3277,24 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
 
   return (
     <Janela open onClose={onClose} size="md"
-      title={<><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)} — {cat?.nome || ''}</>}
-      footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
+      title={<><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)}{cat?.nome && <span className={styles.janelaChip}>{cat.nome}</span>}</>}
+      footer={null}
     >
-      {/* Filtro período */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+      <div className={styles.lstSeg} role="tablist">
         {FILTROS.map(([id, label]) => (
-          <button key={id} onClick={() => changeModo(id)}
-            style={{
-              padding: '5px 13px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              border: '1px solid ' + (modo === id ? 'var(--violet)' : 'var(--border)'),
-              background: modo === id ? 'var(--violet)' : 'var(--surface)',
-              color: modo === id ? '#fff' : 'var(--text-2)',
-            }}>
+          <button key={id} type="button" role="tab" aria-selected={modo === id}
+            className={[styles.lstSegBtn, modo === id ? styles.lstSegBtnOn : ''].join(' ')}
+            onClick={() => changeModo(id)}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* Navegação de mês/ano (só no modo 'mes') */}
       {modo === 'mes' && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 12 }}>
-          <button className={styles.navBtn} onClick={() => shiftMonth(-1)} title={tr('Mês anterior')}><ChevronLeft size={14} /></button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', minWidth: 130, textAlign: 'center' }}>
-            {ROOM_MES_NOMES[mes - 1]} {ano}
-          </span>
-          <button className={styles.navBtn} onClick={() => shiftMonth(1)} title={tr('Próximo mês')}><ChevronRight size={14} /></button>
+        <div className={styles.lstMes}>
+          <button type="button" className={styles.lstMesBtn} onClick={() => shiftMonth(-1)} title={tr('Mês anterior')} aria-label={tr('Mês anterior')}><ChevronLeft size={15} /></button>
+          <span className={styles.lstMesNome}>{ROOM_MES_NOMES[mes - 1]} {ano}</span>
+          <button type="button" className={styles.lstMesBtn} onClick={() => shiftMonth(1)} title={tr('Próximo mês')} aria-label={tr('Próximo mês')}><ChevronRight size={15} /></button>
         </div>
       )}
 
@@ -3080,62 +3302,24 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
         <Esqueleto />
       ) : (
         <>
-          <div className={[styles.dayMetrics, styles.dayMetricsRoom].join(' ')}>
-            <div className={[styles.metricCard, styles.metricViolet].join(' ')} style={{ '--i': 0 }}>
-              <div className={styles.metricHead}>
-                <span className={styles.metricIcon}><CalendarCheck2 size={14} /></span>
-                <span className={styles.metricLabel}>{tr('Reservas')}</span>
-              </div>
-              <div className={styles.metricValueRow}>
-                <span className={styles.metricValue}>{res.totalElements}</span>
-              </div>
-              <span className={styles.metricSub}>
-                {modo === 'mes' ? tr('em {{mes}}', { mes: ROOM_MES_NOMES[mes - 1] }) : modo === 'anteriores' ? tr('anteriores') : tr('próximas')}
-              </span>
-            </div>
-
-            <div className={[styles.metricCard, styles.metricIndigo].join(' ')} style={{ '--i': 1 }}>
-              <div className={styles.metricHead}>
-                <span className={styles.metricIcon}><BedDouble size={14} /></span>
-                <span className={styles.metricLabel}>{tr('Categoria')}</span>
-              </div>
-              <div className={styles.metricValueRow}>
-                <span className={styles.metricValueText}>{cat?.nome || '—'}</span>
-              </div>
-              <span className={styles.metricSub}>{tr('Apartamento')} {fmtRoom(room)}</span>
-            </div>
-          </div>
-
+          <p className={styles.lstResumo}>
+            <b>{res.totalElements}</b> {res.totalElements === 1 ? tr('reserva') : tr('reservas')}{' '}
+            {modo === 'mes' ? tr('em {{mes}}', { mes: ROOM_MES_NOMES[mes - 1] }) : modo === 'anteriores' ? tr('anteriores') : tr('próximas')}
+          </p>
           {res.content.length === 0 ? (
-            <div className={styles.emptyState}>
+            <p className={styles.sideVazio}>
               {modo === 'mes' ? tr('Nenhuma reserva neste mês.') : modo === 'anteriores' ? tr('Nenhuma reserva anterior.') : tr('Nenhuma reserva futura.')}
-            </div>
+            </p>
           ) : (
-            <div className={styles.dayRoomList}>
-              {res.content.map((r) => {
-                const dias     = diffDays(r.dataInicio, r.dataFim);
-                const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
-                return (
-                  <div key={r.id} className={styles.dayRoomRow}
-                    onClick={() => onSelectReserva(r)}>
-                    <div className={styles.searchDropInfo}>
-                      <div className={styles.searchDropName}>{r.titularNome}</div>
-                      <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                      <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-                    </div>
-                    <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
-                  </div>
-                );
-              })}
+            <div className={styles.lstSecao}>
+              {res.content.map((r) => <LinhaReserva key={r.id} r={r} mostrarQuarto={false} onClick={() => onSelectReserva(r)} />)}
             </div>
           )}
-
-          {/* Paginação */}
           {res.totalPages > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
-              <button className={styles.navBtn} disabled={page === 0} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={14} /></button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-2)' }}>{tr('Página')} {page + 1} {tr('de')} {res.totalPages}</span>
-              <button className={styles.navBtn} disabled={page >= res.totalPages - 1} onClick={() => setPage((p) => p + 1)}><ChevronRight size={14} /></button>
+            <div className={styles.lstMes}>
+              <button type="button" className={styles.lstMesBtn} disabled={page === 0} onClick={() => setPage((p) => p - 1)} aria-label={tr('Página anterior')}><ChevronLeft size={15} /></button>
+              <span className={styles.lstMesNome}>{tr('Página')} {page + 1} {tr('de')} {res.totalPages}</span>
+              <button type="button" className={styles.lstMesBtn} disabled={page >= res.totalPages - 1} onClick={() => setPage((p) => p + 1)} aria-label={tr('Próxima página')}><ChevronRight size={15} /></button>
             </div>
           )}
         </>
@@ -3490,6 +3674,8 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
   const [cancelSaving,  setCancelSaving]  = useState(false);
   const [openMenuId,    setOpenMenuId]    = useState(null);  // id do orçamento com menu aberto
   const [approveSaving, setApproveSaving] = useState(false);
+  const [orcAberto,     setOrcAberto]     = useState(null);
+  const dirOrc = useContext(JanelaDirCtx);
   const timerRef  = useRef(null);
   const menuRef   = useRef(null);
 
@@ -3629,33 +3815,14 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       />
     )}
 
-    <Janela open={!showCreate} onClose={onClose} size="md"
+    <Janela open={!showCreate || !!dirOrc} onClose={onClose} size="md"
       title={<><FileText size={15} /> {tr('Orçamentos')}{!loading && ` (${orcamentos.length})`}</>}
-      footer={
-        <div className={styles.footerRight}>
-          <Button variant="primary" onClick={() => setShowCreate(true)}>
-            <Plus size={14} /> {tr('Novo Orçamento')}
-          </Button>
-        </div>
+      acaoTopo={
+        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary, styles.btnTopo].join(' ')} onClick={() => setShowCreate(true)}>
+          <Plus size={14} /> {tr('Novo')}
+        </Button>
       }
     >
-      {/* Campo de busca por nome */}
-      <div className={styles.statusFilterSearch}>
-        <Search size={13} className={styles.statusFilterSearchIcon} />
-        <input
-          className={styles.statusFilterSearchInput}
-          placeholder={tr('Buscar por nome do solicitante...')}
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          autoFocus
-        />
-        {search && (
-          <button className={styles.clearSearch} onClick={() => { setSearch(''); fetchOrcamentos(''); }}>
-            <X size={12} />
-          </button>
-        )}
-      </div>
-
       {loading ? (
         <Esqueleto />
       ) : orcamentos.length === 0 ? (
@@ -3690,7 +3857,8 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
 
                 {/* ── Linha cabeçalho ── */}
                 <div className={styles.orcListRowWrap}>
-                  <button className={styles.orcListRow} onClick={() => toggleExpand(orc.id)}>
+                  <button className={[styles.orcListRow, dirOrc && orcAberto === orc.id ? styles.orcListRowAtivo : ''].join(' ')}
+                    onClick={() => (dirOrc ? setOrcAberto(orcAberto === orc.id ? null : orc.id) : toggleExpand(orc.id))}>
                     <div className={styles.orcListInfo}>
                       <span className={styles.orcListNameRow}>
                         <span className={styles.orcListName}>{orc.nome_solicitante}</span>
@@ -3705,7 +3873,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                         {grandTotal > 0 && <> · {fmtBRL(grandTotal)}</>}
                       </span>
                     </div>
-                    <ChevronDown size={14} style={{ flexShrink: 0, color: 'var(--text-2)', transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : '' }} />
+                    {dirOrc ? <ChevronRight size={15} style={{ flexShrink: 0, color: 'var(--text-2)' }} /> : <ChevronDown size={14} style={{ flexShrink: 0, color: 'var(--text-2)', transition: 'transform 0.18s', transform: isOpen ? 'rotate(180deg)' : '' }} />}
                   </button>
 
                   {/* FAB de ações — oculto quando cancelado */}
@@ -3832,6 +4000,77 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       )}
     </Janela>
 
+    {/* ── Orçamento aberto: conteúdo na direita ── */}
+    {dirOrc && (() => {
+      const orc = orcamentos.find((o) => o.id === orcAberto);
+      if (!orc) return null;
+      const hospedagens = orc.hospedagens ?? [];
+      const grandTotal  = hospedagens.reduce((s, h) => s + (h.valor_total ?? 0), 0);
+      const isCancelado = (orc.status != null
+        ? (orc.status + '').toUpperCase() === 'ORCAMENTO_CANCELADO'
+        : hospedagens.length > 0 && hospedagens.every((h) => mapStatus(h) === 'cancelado'));
+      const todayISO  = formatDate(new Date());
+      const isExpired = !isCancelado && hospedagens.some((h) => { const co = parseBrDate(h.data_hora_checkout); return co && co < todayISO; });
+      const inicios   = hospedagens.map((h) => parseBrDate(h.data_hora_checkin)).filter(Boolean).sort();
+      const fins      = hospedagens.map((h) => parseBrDate(h.data_hora_checkout)).filter(Boolean).sort();
+      const nPessoas  = hospedagens.reduce((s, h) => s + (h.pessoas_orcamento ?? []).length, 0);
+      const ev = { stopPropagation() {} };
+      return (
+        <GavetaDir>
+          <div className={[styles.rcCard, isCancelado ? styles.rvCancelado : ''].join(' ')}>
+            <CabecalhoGaveta titulo={orc.nome_solicitante || tr('Orçamento')}
+              chips={[isCancelado && { txt: tr('Cancelado'), red: true }, isExpired && { txt: tr('Vencido'), red: true }]}
+              meta={[`${tr('Orçamento #')}${orc.id}`, orc.data_hora_registro].filter(Boolean).join(' · ')}
+              onClose={() => setOrcAberto(null)} />
+            <FaixaPeriodo inicio={inicios[0]} fim={fins[fins.length - 1]}
+              celulas={[[hospedagens.length, hospedagens.length === 1 ? tr('Hospedagem') : tr('Hospedagens')], [nPessoas, nPessoas === 1 ? tr('Pessoa') : tr('Pessoas')]]}
+              opcoes={isCancelado ? null : <MenuOpcoes itens={[
+                { label: tr('Editar'), icon: <Pencil size={15} />, onClick: () => openEditOrc(ev, orc) },
+                { label: tr('Gerar PDF'), icon: <FileDown size={15} />, onClick: () => handleVoucher(ev, orc) },
+                { label: tr('Cancelar'), icon: <Trash2 size={14} />, danger: true, divider: true, onClick: () => openCancelOrc(ev, orc) },
+                { label: isExpired ? tr('Vencido — não aprovável') : tr('Aprovar Orçamento'), icon: <Check size={15} />, primary: true,
+                  disabled: approveSaving || isExpired,
+                  title: isExpired ? tr('Orçamento vencido: o check-out já passou e não pode ser aprovado.') : undefined,
+                  onClick: () => handleApprove(orc) },
+              ]} />} />
+
+            <aside className={styles.finResumo}>
+              <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
+              <div className={styles.finLinha}><span>{tr('Hospedagens')}</span><b>{hospedagens.length}</b></div>
+              <hr className={styles.finSep} />
+              <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total do orçamento')}</span><b>{fmtBRL(grandTotal)}</b></div>
+            </aside>
+
+            <SecaoTabela titulo={tr('Hospedagens')} temLinhas={hospedagens.length > 0} vazio={tr('Nenhuma hospedagem neste orçamento.')}
+              colunas={[[tr('Apto')], [tr('Período')], [tr('Hóspedes')], [tr('Valor'), true]]}>
+              {hospedagens.map((h) => {
+                const ci = parseBrDate(h.data_hora_checkin);
+                const co = parseBrDate(h.data_hora_checkout);
+                const quartoId = h.quarto_id ?? h.quarto?.id ?? null;
+                const pessoas  = h.pessoas_orcamento ?? [];
+                const motivo   = h.motivo_cancelamento?.motivo_cancelamento ?? null;
+                return (
+                  <tr key={h.id} className={[styles.dtLinkRow, mapStatus(h) === 'cancelado' ? styles.dtCancelado : ''].join(' ')}
+                    tabIndex={0} role="button" onClick={() => setEditHosp({ orc, hosp: h })}>
+                    <td><span className={styles.dtNum}>{quartoId ? fmtRoom(quartoId) : '—'}</span></td>
+                    <td>
+                      <span className={styles.dtCelTit}>{fmtDiaMes(ci)} → {fmtDiaMes(co)}</span>
+                      <span className={styles.dtCelSub}>{ci && co ? diariasTxt(diffDays(ci, co)) : ''}</span>
+                    </td>
+                    <td className={styles.dtQuebra}>
+                      {pessoas.length ? pessoas.map((p) => p.nome).join(', ') : '—'}
+                      {(h.observacao || motivo) && <span className={styles.dtCelSub}>{motivo || h.observacao}</span>}
+                    </td>
+                    <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(h.valor_total ?? 0)}</td>
+                  </tr>
+                );
+              })}
+            </SecaoTabela>
+          </div>
+        </GavetaDir>
+      );
+    })()}
+
     {/* ── Modal: editar nome do orçamento ── */}
     <Modal open={!!editOrc} onClose={() => { setEditOrc(null); setEditNome(''); }} size="sm"
       title={<><Pencil size={14} /> {tr('Editar Orçamento')}</>}
@@ -3956,37 +4195,16 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
 
       <Janela open={!showCreate} onClose={onClose} size="md"
         title={<><Bell size={15} /> {tr('Solicitações')}{!loading && ` (${solicitacoes.length})`}</>}
-        footer={
-          <div className={styles.footerRight}>
-            <Button variant="primary" onClick={() => setShowCreate(true)}>
-              <Plus size={14} /> {tr('Nova Solicitação')}
-            </Button>
-          </div>
-        }
       >
         {loading ? (
           <Esqueleto />
         ) : solicitacoes.length === 0 ? (
           <div className={styles.emptyState}>{tr('Nenhuma solicitação pendente.')}</div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {solicitacoes.map((r) => {
-              const nomeDisplay = r.pessoasOrcamento?.[0]?.nome ?? r.titularNome;
-              const dias        = diffDays(r.dataInicio, r.dataFim);
-              const nPessoas    = (r.pessoasOrcamento?.length ?? 0) || (r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0)));
-              return (
-                <div key={r.id} className={styles.searchDropItem} style={{ cursor: 'pointer' }} onClick={() => onSelectReserva(r)}>
-                  <div className={[styles.searchDropRoomCircle, styles[`dayRoomBadge_${r.status}`]].join(' ')}>
-                    {fmtRoom(r.quarto)}
-                  </div>
-                  <div className={styles.searchDropInfo}>
-                    <div className={styles.searchDropName}>{nomeDisplay}</div>
-                    <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                    <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className={styles.lstSecao}>
+            {solicitacoes.map((r) => (
+              <LinhaReserva key={r.id} r={{ ...r, titularNome: r.pessoasOrcamento?.[0]?.nome ?? r.titularNome }} onClick={() => onSelectReserva(r)} />
+            ))}
           </div>
         )}
       </Janela>
@@ -5084,7 +5302,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   };
 
   return (
-    <Janela open onClose={onClose} size="lg"
+    <JanelaGaveta open onClose={onClose} size="lg" criando={saving}
+      criandoTxt={forceOrcamento ? tr('Criando orçamento…') : isSolicitacao ? tr('Criando solicitação…') : tr('Criando reserva…')}
       bodyStyle={{ padding: '16px 22px' }}
       title={<><Plus size={15} /> {forcePernoite ? tr('Novo Pernoite') : isSolicitacao ? tr('Nova Solicitação') : forceOrcamento ? tr('Novo Orçamento') : tr('Nova Reserva')}</>}
       footer={
@@ -6109,7 +6328,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           />
         );
       })()}
-    </Janela>
+    </JanelaGaveta>
   );
 }
 
@@ -6148,6 +6367,9 @@ export default function BookingCalendar() {
   const [slotDir, setSlotDir] = useState(null);
   const [slotEsq, setSlotEsq] = useState(null);
   const [fechandoReserva, setFechandoReserva] = useState(false);
+  const gridScrollRef = useRef(null);
+  const [novasIds, setNovasIds] = useState(() => new Set());
+  const [focoNova, setFocoNova] = useState(null);
   const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -6552,6 +6774,16 @@ export default function BookingCalendar() {
     window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h);
   }, []);
 
+  useEffect(() => {
+    if (!focoNova || loading) return;
+    const id = requestAnimationFrame(() => {
+      const box = gridScrollRef.current;
+      const el  = box?.querySelector(`[data-room="${focoNova.quarto}"]`);
+      if (box && el) box.scrollTo({ top: Math.max(0, el.offsetTop - HDR_H - 96), left: 0, behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [focoNova, loading]);
+
   const handleSaveNew = async (bodyOrFlag) => {
     // Nova reserva pode criar ou entrar num grupo — a lista de grupos recarrega.
     setGruposRefreshKey((k) => k + 1);
@@ -6578,6 +6810,16 @@ export default function BookingCalendar() {
         .filter((r) => r.dataInicio);
       if (novas.length > 0) {
         setReservas((rs) => [...rs, ...novas]);
+        // leva o calendário até a nova reserva e a destaca por alguns segundos
+        const prim = [...novas].sort((a, b) => a.dataInicio.localeCompare(b.dataInicio))[0];
+        const cat  = categorias.find((c) => c.quartos.includes(prim.quarto));
+        if (cat) setCollapsedCats((prev) => ({ ...prev, [cat.id]: false }));
+        const d = new Date(prim.dataInicio + 'T00:00:00');
+        d.setDate(d.getDate() - 1);
+        setViewDate(d);
+        setNovasIds(new Set(novas.map((n) => n.id)));
+        setFocoNova({ quarto: prim.quarto, t: Date.now() });
+        setTimeout(() => setNovasIds(new Set()), 5000);
       } else {
         await loadReservas();
       }
@@ -6838,8 +7080,8 @@ export default function BookingCalendar() {
     const insetL       = startInView ? BAR_INSET : 0;
     const insetR       = endInView   ? BAR_INSET : 0;
     const temMeia      = !isGhost && orig.meiaDiaria && endInView;
-    const rLeft        = startInView ? 999 : 0;
-    const rRight       = endInView && !temMeia ? 999 : 0;
+    const rLeft        = startInView ? 6 : 0;
+    const rRight       = endInView && !temMeia ? 6 : 0;
     const borderRadius = `${rLeft}px ${rRight}px ${rRight}px ${rLeft}px`;
     const dias         = diffDays(orig.dataInicio, orig.dataFim);
     const totalPeople  = 1 + (orig.quantidadeAcompanhantes || 0);
@@ -6863,7 +7105,7 @@ export default function BookingCalendar() {
 
     return (
       <div key={key}
-        className={[styles.bar, styles[`bar_${orig.status}`], isGhost ? styles.barGhost : '', isDragging ? styles.barDragging : ''].join(' ')}
+        className={[styles.bar, styles[`bar_${orig.status}`], isGhost ? styles.barGhost : '', isDragging ? styles.barDragging : '', novasIds.has(orig.id) ? styles.barNova : ''].join(' ')}
         style={{
           left: left + insetL, width: width - insetL - insetR, borderRadius,
           opacity: barOpacity,
@@ -7036,12 +7278,14 @@ export default function BookingCalendar() {
   );
 
   return (
+    <JanelaDirCtx.Provider value={isDesktop ? slotDir : null}>
     <JanelaCtx.Provider value={isDesktop ? slotDir : null}>
     <div className={styles.page}>
       <Notification notification={notif} />
       <div className={styles.split}>
         {isDesktop && (
           <aside className={styles.sidePanel}>
+                <div className={styles.sideTopo}>
                 <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                   onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
                   {tr('Nova reserva')}
@@ -7068,6 +7312,7 @@ export default function BookingCalendar() {
                       </div>
                     )}
                   </div>
+                </div>
                 </div>
                 {buscando ? (
                   <div className={styles.sideGrupo}>
@@ -7178,7 +7423,7 @@ export default function BookingCalendar() {
               </button>
             </>
           )}
-        <div className={styles.gridScroll}>
+        <div className={styles.gridScroll} ref={gridScrollRef}>
           {loading ? (
             <EsqueletoGrade leftW={leftW} />
           ) : (
@@ -7224,7 +7469,7 @@ export default function BookingCalendar() {
                     </div>
 
                     {!isCollapsed && cat.quartos.map((room) => (
-                      <div key={room} className={styles.roomRow} style={{ width: gridTotalW, height: ROOM_H }}>
+                      <div key={room} data-room={room} className={styles.roomRow} style={{ width: gridTotalW, height: ROOM_H }}>
                         <button className={styles.roomLabel} style={{ width: leftW, height: ROOM_H }}
                           onClick={() => setRoomModal({ room })}
                           title={tr('Histórico quarto {{v0}}{{v1}}', { v0: fmtRoom(room), v1: roomDescMap[room] ? ` – ${roomDescMap[room]}` : '' })}>
@@ -7273,12 +7518,16 @@ export default function BookingCalendar() {
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap}
           initialGrupo={createInit.grupo ?? null} />
       )}
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {dayModal && (
         <DayModal dateStr={dayModal.dateStr} refreshKey={dayRefreshKey} onClose={() => setDayModal(null)} categorias={categorias}
           onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {roomModal && <RoomModal room={roomModal.room} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
+      </JanelaCtx.Provider>
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
+        {roomModal && <RoomModal room={roomModal.room} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { if (!isDesktop) setRoomModal(null); setSelectedReserva(r); }} />}
+      </JanelaCtx.Provider>
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showGrupos && (
         <GruposModal
@@ -7286,7 +7535,7 @@ export default function BookingCalendar() {
           tiposPagamento={tiposPagamento}
           onClose={() => setShowGrupos(false)}
           onNotify={notify}
-          onSelectReserva={(r) => { setShowGrupos(false); setSelectedReserva(r); }}
+          onSelectReserva={(r) => setSelectedReserva(r)}
           onNovaReservaGrupo={(grupoId, periodo) => {
             setShowGrupos(false);
             setCreateInit({
@@ -7621,5 +7870,6 @@ export default function BookingCalendar() {
       </div>}
     </div>
     </JanelaCtx.Provider>
+    </JanelaDirCtx.Provider>
   );
 }
