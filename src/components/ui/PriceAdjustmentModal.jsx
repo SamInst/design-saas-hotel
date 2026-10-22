@@ -128,7 +128,7 @@ const modeHint = (key) => {
  * @param initial      estado inicial (use novoPrecoToState para reconstruir de um snapshot).
  * @param onApply      (result, raw) => void  — result de computeAdjustedTotal.
  */
-export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = tr('Gerenciar Preços') }) {
+export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = tr('Gerenciar Preços'), as: Wrap = Modal }) {
   // Modos disponíveis. allowDiaria=false (ex.: ajuste de grupo) remove o "Por diária".
   const modeKeys = allowDiaria ? ['diaria', 'desconto', 'porcentagem'] : ['desconto', 'porcentagem'];
   const [sign, setSign] = useState(initial?.sign ?? 'desconto');
@@ -151,7 +151,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
     mode === 'porcentagem' ? tr('Porcentagem (%)') : mode === 'diaria' ? tr('Novo valor da diária (R$)') : tr('Valor (R$)');
 
   return (
-    <Modal
+    <Wrap
       open={open}
       onClose={onClose}
       title={title}
@@ -282,6 +282,6 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
           </div>
         </div>
       </div>
-    </Modal>
+    </Wrap>
   );
 }

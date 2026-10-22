@@ -151,6 +151,7 @@ export function PaymentModal({
   containerStyle     = undefined,
   backdropStyle      = undefined,
   inline             = false,
+  compacto           = false,
 }) {
   const emGrupo = grupoTotal !== null && grupoPago !== null;
   const [tipoPagId,   setTipoPagId]   = useState('');
@@ -349,7 +350,7 @@ export function PaymentModal({
       loggedUser?.pessoa?.nome && [tr('Funcionário'), loggedUser.pessoa.nome.toUpperCase()],
     ].filter(Boolean);
     return (
-      <div className={styles.inline}>
+      <div className={[styles.inline, compacto ? styles.compacto : ''].join(' ')}>
         <section className={styles.secao}>
           <h4 className={styles.secaoTit}>{tr('Valor')}</h4>
           <div className={styles.secaoGrid}>
@@ -370,14 +371,28 @@ export function PaymentModal({
         </section>
 
         <section className={styles.secao}>
-          <h4 className={styles.secaoTit}>{tipoRegistro === 'SAIDA' ? tr('Pago a') : tr('Pagador')}</h4>
-          <FormField label={tr('Nome do Pagador *')}>
-            <Input placeholder={tr('Nome completo')}
-              value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
-          </FormField>
-          {outros.length > 0 && (
+          {!compacto && <h4 className={styles.secaoTit}>{tipoRegistro === 'SAIDA' ? tr('Pago a') : tr('Pagador')}</h4>}
+          {compacto && titularNome ? (
+            <div className={styles.nomeLinha}>
+              <FormField label={tr('Nome do Pagador *')}>
+                <Input placeholder={tr('Nome completo')}
+                  value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
+              </FormField>
+              <label className={styles.nomeTitular}>
+                <input type="checkbox" checked={nomePagador === titularNome.toUpperCase()}
+                  onChange={e => setNomePagador(e.target.checked ? titularNome.toUpperCase() : '')} />
+                {tr('Titular')}
+              </label>
+            </div>
+          ) : (
+            <FormField label={tr('Nome do Pagador *')}>
+              <Input placeholder={tr('Nome completo')}
+                value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
+            </FormField>
+          )}
+          {(compacto ? outros.filter(([rot]) => rot !== tr('Titular')) : outros).length > 0 && (
             <div className={styles.atalhos}>
-              {outros.map(([rot, nome]) => (
+              {(compacto ? outros.filter(([rot]) => rot !== tr('Titular')) : outros).map(([rot, nome]) => (
                 <button key={rot} type="button"
                   className={[styles.atalho, nomePagador === nome ? styles.atalhoOn : ''].join(' ')}
                   onClick={() => setNomePagador(nomePagador === nome ? '' : nome)}>
@@ -389,7 +404,7 @@ export function PaymentModal({
         </section>
 
         <section className={styles.secao}>
-          <h4 className={styles.secaoTit}>{tr('Detalhes')}</h4>
+          {!compacto && <h4 className={styles.secaoTit}>{tr('Detalhes')}</h4>}
           <div className={styles.secaoGrid}>
             <div className={styles.secaoLarga}>
               <FormField label={tr('Descrição')}>

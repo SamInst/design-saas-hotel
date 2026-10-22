@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment, createContext, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
@@ -19,6 +19,12 @@ import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userSto
 import { useCalendarSocket } from '../../hooks/useCalendarSocket';
 import whatsappIcon from '../../assets/whatsapp.png';
 import emailIcon    from '../../assets/gmail.png';
+import icoPix           from '../../assets/pagamento/pix.png';
+import icoCartao        from '../../assets/pagamento/cartao.png';
+import icoDinheiro      from '../../assets/pagamento/dinheiro.png';
+import icoTransferencia from '../../assets/pagamento/transferencia.png';
+import icoLink          from '../../assets/pagamento/link.png';
+import icoBoleto        from '../../assets/pagamento/boleto.png';
 import styles from './BookingCalendar.module.css';
 import { tr, locale } from '../../i18n';
 
@@ -193,9 +199,9 @@ const DAY_CELL_W   = 168;
 const ROOM_H       = 72;
 const CAT_H        = 30;
 const HDR_H        = 64;
-const LEFT_W       = 210;
-const LEFT_W_NARROW = 140;
-const LEFT_W_MOBILE = 96;  // celular: só "Apt. 11" e a lotação
+const LEFT_W       = 86;
+const LEFT_W_NARROW = 86;
+const LEFT_W_MOBILE = 80;  // celular: só "Apt. 11" e a lotação
 const BAR_INSET    = 3; // folga lateral da faixa flutuante
 const VISIBLE_DAYS = 31;
 const HALF         = DAY_CELL_W / 2;
@@ -306,6 +312,20 @@ const periodoDiaria = (descricao) => {
  *  primeira ocorrência.
  *  valorDe: opcional, sobrescreve o valor exibido (modo "Por diária" do ajuste).
  *  _valorAnterior na diária: valor antes da edição em curso, exibido riscado. */
+/** "2026-10-21" → "21/10" */
+const fmtDiaMes = (s) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : '—');
+
+const iconePagamento = (desc) => {
+  const d = (desc ?? '').toUpperCase();
+  const src = d.includes('PIX') ? icoPix
+    : /CART|CR[EÉ]DITO|D[EÉ]BITO/.test(d) ? icoCartao
+    : /DINHEIRO|ESP[EÉ]CIE/.test(d) ? icoDinheiro
+    : /TRANSFER|TED|DOC/.test(d) ? icoTransferencia
+    : /LINK/.test(d) ? icoLink
+    : icoBoleto;
+  return <img src={src} alt="" draggable={false} />;
+};
+
 const groupDiarias = (detalhes, valorDe) => {
   const grupos = [];
   const porChave = new Map();
@@ -405,13 +425,112 @@ function ConfirmModal({ title, message, onConfirm, onCancel }) {
   );
 }
 
+// Carregamento em esqueleto: a forma do conteúdo aparece antes dos dados.
+function Esqueleto({ linhas = 5, avatar = true }) {
+  return (
+    <div className={styles.skLista} aria-busy="true" aria-label={tr('Carregando...')}>
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className={styles.skLinha}>
+          {avatar && <span className={[styles.sk, styles.skAvatar].join(' ')} />}
+          <span className={styles.skTextos}>
+            <span className={styles.sk} style={{ width: `${64 - (i % 3) * 12}%` }} />
+            <span className={[styles.sk, styles.skFino].join(' ')} style={{ width: `${42 - (i % 2) * 12}%` }} />
+          </span>
+          {avatar && <span className={[styles.sk, styles.skTag].join(' ')} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EsqueletoGrade({ leftW }) {
+  return (
+    <div className={styles.skGrade} style={{ '--lw': `${leftW}px` }} aria-busy="true" aria-label={tr('Carregando...')}>
+      <div className={styles.skGradeTopo}>
+        <span className={styles.skGradeCanto} />
+        <span className={styles.skGradeDias}>
+          {Array.from({ length: 8 }, (_, i) => (
+            <span key={i} className={styles.skGradeDia}>
+              <span className={styles.sk} style={{ width: '58%' }} />
+              <span className={[styles.sk, styles.skFino].join(' ')} style={{ width: '30%' }} />
+            </span>
+          ))}
+        </span>
+      </div>
+      {Array.from({ length: 10 }, (_, i) => (
+        <div key={i} className={[styles.skGradeLinha, i % 4 === 0 ? styles.skGradeCat : ''].join(' ')}>
+          <span className={styles.skGradeQuarto}>
+            <span className={[styles.sk, styles.skEscuro].join(' ')} style={{ width: i % 4 === 0 ? '80%' : '62%' }} />
+          </span>
+          <span className={styles.skGradeCelulas}>
+            {i % 4 !== 0 && (
+              <span className={[styles.sk, styles.skBarra].join(' ')}
+                style={{ left: `${(i * 23) % 55}%`, width: `${16 + (i * 37) % 26}%` }} />
+            )}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// No desktop as janelas abrem na box da direita, por cima do calendário.
+const JanelaCtx = createContext(null);
+function Janela({ open, onClose, title, children, footer, bodyStyle, hideHeader, ...modal }) {
+  const slot = useContext(JanelaCtx);
+  if (!slot) {
+    return <Modal open={open} onClose={onClose} title={title} footer={footer} bodyStyle={bodyStyle} hideHeader={hideHeader} {...modal}>{children}</Modal>;
+  }
+  if (!open) return null;
+  return createPortal(
+    <section className={styles.janela}>
+      {(!hideHeader || title) && (
+        <header className={styles.janelaHead}>
+          <button type="button" className={styles.janelaVoltar} onClick={onClose}
+            title={tr('Voltar ao calendário')} aria-label={tr('Voltar ao calendário')}>
+            <ChevronLeft size={17} />
+          </button>
+          <div className={styles.janelaTit}>{title}</div>
+        </header>
+      )}
+      <div className={styles.janelaCorpo} style={bodyStyle}>{children}</div>
+      {footer && <footer className={styles.janelaRodape}>{footer}</footer>}
+    </section>,
+    slot,
+  );
+}
+
+// No desktop o detalhe da reserva abre numa gaveta à direita, por cima do calendário.
+function PainelReserva({ inline, acao = false, pag = false, saindo = false, footer, children, ...modal }) {
+  const slot = useContext(JanelaCtx);
+  if (!inline || !slot) return <Modal {...modal} footer={footer}>{children}</Modal>;
+  return createPortal(
+    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : '', pag ? styles.rvGavetaPag : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
+      {modal.title && !modal.hideHeader && (
+        <header className={styles.janelaHead}>
+          <button type="button" className={styles.janelaVoltar} onClick={modal.onClose}
+            title={tr('Voltar')} aria-label={tr('Voltar')}>
+            <ChevronLeft size={17} />
+          </button>
+          <div className={styles.janelaTit}>{modal.title}</div>
+        </header>
+      )}
+      <div className={styles.rvPainelCorpo}>{children}</div>
+      {footer && <div className={styles.rvPainelRodape}>{footer}</div>}
+    </div>,
+    slot,
+  );
+}
+
+const PainelAcaoReserva = (props) => <PainelReserva inline acao {...props} />;
+
 // ─── Reserva Detail Modal ─────────────────────────────────────────────────────
 // `overnight` — quando informado, o modal opera em modo "pernoite" (Recepção):
 //   muda apenas os botões do menu Ações e usa as diárias/dados fornecidos no objeto.
 //   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
 //     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
 //     onVoucher, onCancelar }
-export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null }) {
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null, inline = false, saindo = false }) {
   const isOvernight = !!overnight;
   // Botão "Finalizar Limpeza" — compartilhado entre pernoite (overnight) e reserva.
   // Em pernoite vem de overnight.hasLimpeza; em reserva vem da prop `limpeza`.
@@ -431,6 +550,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // ── Pending ops + dirty tracking ───────────────────────────────────────────
   // Each op: { type: 'addPessoa'|'removePessoa'|'addPagamento'|'cancelPagamento', ...data }
   const [pendingOps,   setPendingOps]   = useState([]);
+  const [pagRegistrado, setPagRegistrado] = useState(null);
   const [hasChanges,   setHasChanges]   = useState(false);
   const [showDiscard,  setShowDiscard]  = useState(false);
   const [saving,       setSaving]       = useState(false);
@@ -768,7 +888,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const handleAddPagamento = (payment) => {
     const tp = tiposPagamento.find((t) => t.id === payment.tipo_pagamento?.id);
     const localId = `local-${Date.now()}`;
-    setPagamentos((prev) => [...prev, {
+    const novo = {
       id:             localId,
       formaPagamento: tp?.descricao ?? '',
       nomePagador:    payment.nome_pagador ?? '',
@@ -778,10 +898,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       // Mesmo formato de data_hora_registro do backend, para a linha já mostrar
       // data e hora antes de salvar. O GET depois substitui pelo valor real.
       dataRegistro:   new Date().toLocaleString('pt-BR'),
-    }]);
+    };
+    setPagamentos((prev) => [...prev, novo]);
     addOp({ type: 'addPagamento', localId, payment });
-    setShowPayModal(false);
+    // No painel o registro fica à vista na própria box do pagamento.
+    if (inline) setPagRegistrado(novo);
+    else setShowPayModal(false);
   };
+  const fecharPag = () => { setShowPayModal(false); setPagRegistrado(null); };
 
   const handleConfirmCancelPagamento = () => {
     if (!cancelMotivo.trim()) return;
@@ -1089,7 +1213,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   };
 
   // ── Edit mode render ───────────────────────────────────────────────────────
-  if (editing) {
+  // No painel a edição abre ao lado da view, que continua visível à esquerda.
+  const renderEdicao = () => {
     // ── Valores (diárias + totais) — mesma lista da view e do passo "Resumo &
     //    Pagamento", compartilhada pelas abas Pessoas e Pagamentos.
     //    O /calcular-preco devolve o preço de tabela, então o ajuste manual salvo
@@ -1196,7 +1321,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
     return (
       <>
-      <Modal open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
+      <PainelReserva inline={inline} acao saindo={saindo} open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
         containerStyle={editActiveTab === 'dados' ? { maxWidth: 'min(640px, 96vw)' } : undefined}
         hideHeader
         bodyStyle={{ padding: 0, gap: 0 }}
@@ -1509,13 +1634,40 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           );
         })()}
         </div>
-      </Modal>
+      </PainelReserva>
 
       <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
         footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
       ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>{tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}</p></Modal>
 
-      <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
+      {inline ? (showPayModal && (
+        <PainelReserva inline acao pag open onClose={fecharPag}
+          title={<><DollarSign size={15} /> {pagRegistrado ? tr('Pagamento registrado') : tr('Registrar pagamento')}</>}
+          footer={pagRegistrado ? (
+            <>
+              <Button className={styles.btnSolid} onClick={() => setPagRegistrado(null)}>{tr('Registrar outro')}</Button>
+              <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={fecharPag}>{tr('Concluir')}</Button>
+            </>
+          ) : null}>
+          {pagRegistrado ? (
+            <div className={styles.pagRecibo}>
+              <span className={styles.pagReciboOk}><Check size={22} /></span>
+              <p className={styles.pagReciboValor}>{fmtBRL(pagRegistrado.valor)}</p>
+              <div className={styles.pagReciboLista}>
+                <div><span>{tr('Forma')}</span><b className={styles.pagReciboForma}><span className={styles.finPgIcon}>{iconePagamento(pagRegistrado.formaPagamento)}</span>{pagRegistrado.formaPagamento || '—'}</b></div>
+                <div><span>{tr('Pagador')}</span><b>{pagRegistrado.nomePagador || '—'}</b></div>
+                {pagRegistrado.descricao && <div><span>{tr('Descrição')}</span><b>{pagRegistrado.descricao}</b></div>}
+                <div><span>{tr('Data')}</span><b>{pagRegistrado.dataRegistro}</b></div>
+              </div>
+              <p className={styles.pagReciboAviso}>{tr('O pagamento entra na reserva ao clicar em Salvar.')}</p>
+            </div>
+          ) : (
+            <PaymentModal inline compacto open onClose={fecharPag} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
+          )}
+        </PainelReserva>
+      )) : (
+        <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
+      )}
 
       <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title={tr('Cancelar Pagamento')}
         footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>{tr('Voltar')}</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>{tr('Confirmar')}</Button></div>}
@@ -1561,7 +1713,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
       </>
     );
-  }
+  };
+  if (editing && !inline) return renderEdicao();
 
   // ── View mode render ───────────────────────────────────────────────────────
   const todayStr = formatDate(new Date());
@@ -1631,10 +1784,68 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const pagamentoDeGrupo = pagamentos.some((p) => !p.cancelado && p.grupoId != null);
   const pagoIntegral = !pagamentoDeGrupo && cardTotal > 0 && totalPago >= cardTotal - 0.005;
 
+  // Reserva em aberto: as opções (Hospedar, Voucher, edição…) ficam no período, ao lado das pessoas.
+  const temOpcoes = !isOvernight && !['orcamento', 'solicitada', 'hospedado', 'finalizado', 'cancelado', 'ausente'].includes(reserva.status);
+  // Hospedado/finalizado: sobra só o Voucher, que ocupa o mesmo lugar das opções.
+  const soVoucher = !isOvernight && ['hospedado', 'finalizado', 'ausente'].includes(reserva.status);
+  const opcoesEl = temOpcoes ? (
+      <div className={styles.rvAcoesWrap}>
+        {acoesOpen && (
+          <>
+            <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
+            <div className={styles.rvAcoesMenu}>
+              <div className={styles.rvAcoesTit}>{tr('Opções')}</div>
+              <button className={styles.rvAcoesItem} disabled={voucherLoading}
+                onClick={() => { setAcoesOpen(false); handleVoucherClick(); }}>
+                {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <FileDown size={15}/>} {voucherLoading ? tr('Gerando...') : tr('Voucher')}
+              </button>
+              <div className={styles.rvAcoesDiv} />
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
+                <Pencil size={15}/> {tr('Editar')}
+              </button>
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
+                <Users size={15}/> {tr('Gerenciar Pessoas')}
+              </button>
+              <button className={styles.rvAcoesItem}
+                disabled={pagamentoDeGrupo}
+                title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
+                onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
+                <DollarSign size={15}/> {tr('Gerenciar Pagamentos')}
+              </button>
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
+                <Tag size={15}/> {tr('Gerenciar Preços')}
+              </button>
+              {reserva.status === 'confirmada' && (
+                <button className={styles.rvAcoesItem}
+                  onClick={() => { setAcoesOpen(false); setConfirmAusente(true); }}>
+                  <UserX size={15}/> {tr('Reserva Ausente')}
+                </button>
+              )}
+              <div className={styles.rvAcoesDiv} />
+              <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
+                onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setConfirmCancel(true); }}>
+                <Trash2 size={14}/> {tr('Cancelar')}
+              </button>
+              <button className={[styles.rvAcoesItem, styles.rvAcoesItemPrimary].join(' ')}
+                disabled={!canCheckin || voucherLoading}
+                title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
+                onClick={() => { setAcoesOpen(false); setConfirmPernoite(true); }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                {tr('Hospedar')}
+              </button>
+            </div>
+          </>
+        )}
+        <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={() => setAcoesOpen((v) => !v)}>
+          {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : null}{tr('Opções')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+        </button>
+      </div>
+  ) : null;
+
   return (
     <>
       {/* Card único no mesmo desenho do passo "Resumo & Pagamento" da criação. */}
-      <Modal open onClose={handleClose} size="lg" hideHeader closeOnBackdrop
+      <PainelReserva inline={inline} saindo={saindo} open onClose={handleClose} size="lg" hideHeader closeOnBackdrop
         bodyStyle={{ padding: '14px 16px 16px', gap: 12 }}
         containerStyle={{ maxWidth: overnight ? 'min(518px, 96vw)' : 'min(628px, 96vw)' }}
       >
@@ -1663,7 +1874,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           </div>
 
           {/* ── Período — acima dos hóspedes, em linha cheia ── */}
-          <div className={styles.rcSection}>
+          <div className={[styles.rcSection, styles.rvDestaque].join(' ')}>
             <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
               <div className={styles.ovDateCell}>
                 <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
@@ -1690,9 +1901,19 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={styles.ovNightsLabel}>{guestList.length === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
                 </div>
               )}
+              {opcoesEl && <div className={styles.rvOpcoesCell}>{opcoesEl}</div>}
+              {soVoucher && (
+                <div className={styles.rvOpcoesCell}>
+                  <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={handleVoucherClick}>
+                    {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <FileDown size={15}/>} {voucherLoading ? tr('Gerando...') : tr('Voucher')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
+          <div className={styles.rvCorpo}>
+          <div className={styles.rvCorpoMain}>
           {/* ── Hóspedes ── */}
           <div className={styles.rcSection}>
             <div className={styles.rcSectionHead}>
@@ -1708,7 +1929,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   const showEmail = hi === 0 && !!h.email;
                   return (
                     <div key={h.id ?? h.nome} className={styles.hospedeRow}>
-                      <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className={styles.hospedeName}>
                           {h.nome}
@@ -1745,140 +1965,183 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             )}
           </div>
 
-          {/* ── Valores — pagamentos, diárias e totais na mesma lista do passo
-                 "Resumo & Pagamento" da criação ── */}
-          {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0 || groupInfo) && (
-            <div className={styles.rcSection}>
-              {!pagamentoDeGrupo && pagamentos.length > 0 && (
-                <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
-                </div>
-              )}
-              {!pagamentoDeGrupo && pagamentos.map((p) => (
-                <div key={p.id}
-                  className={[styles.step3PagRow, styles.pagCardClickable, p.cancelado ? styles.rvPayItemCancelado : ''].join(' ')}
-                  onClick={() => setViewPagamento(p)}>
-                  <div className={styles.step3PagRowTop}>
-                    <span className={styles.step3PagDesc}>{p.descricao || p.formaPagamento || tr('Pagamento')}</span>
-                    <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
-                  </div>
-                  {(p.dataRegistro || p.formaPagamento) && (
-                    <div className={styles.step3PagMeta}>{[p.dataRegistro, p.formaPagamento].filter(Boolean).join(' · ')}</div>
-                  )}
-                  {p.nomePagador && <div className={styles.step3PagMeta}>{p.nomePagador}</div>}
-                  {p.funcionario && <div className={styles.step3PagMeta}>{tr('registrado por')} {p.funcionario}</div>}
-                  {p.cancelado && <span className={styles.pagCardCanceladoBadge}>{tr('Cancelado')}</span>}
-                </div>
-              ))}
-
-              {/* ── Diárias — uma linha por diária ── */}
-              {effectiveDetalhes.length > 0 && (() => {
-                const adj        = priceAdj;
-                const novoValor  = diariaAdjValor;
-                const aggDiff    = cardTotal - baseTotal;
-                const funcAjuste = reserva.novoPreco?.funcionario?.nome;
-                const grupos = groupDiarias(effectiveDetalhes, isDiariaAdj ? () => novoValor : null);
-                return (
+          </div>
+          {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0 || groupInfo) && (() => {
+            const ajuste    = baseTotal > 0 ? cardTotal - baseTotal : 0;
+            return (
+              <aside className={styles.finResumo}>
+                <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
+                <div className={styles.finLinha}><span>{tr('Diárias')}</span><b>{fmtBRL(baseTotal > 0 ? baseTotal : cardTotal)}</b></div>
+                {Math.abs(ajuste) >= 0.005 && (
+                  <div className={styles.finLinha}><span>{tr('Ajuste de preço')}</span><b>{ajuste > 0 ? '+' : ''}{fmtBRL(ajuste)}</b></div>
+                )}
+                <hr className={styles.finSep} />
+                <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total da reserva')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                {!pagamentoDeGrupo && (pagoIntegral ? (
+                  <p className={styles.finQuitado}><Check size={15} /> {tr('Pago integralmente')}</p>
+                ) : (
                   <>
-                    {grupos.map((g, gi) => (
-                      <div key={g.key} className={[styles.rcDiariaRow, pagoIntegral ? styles.rcDiariaPago : ''].join(' ')}>
-                        <span>
-                          {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
-                          {diariaSubs(g) && <span className={styles.rcDiariaSub}> · {diariaSubs(g)}</span>}
-                          {isDiariaAdj && g.valor - g.valorOriginal !== 0 && (
-                            <span className={styles.rcDiariaSub} style={{ color: g.valor < g.valorOriginal ? 'var(--emerald)' : '#f97316' }}>
-                              {' · '}{g.valor < g.valorOriginal ? tr('Desconto ') : tr('Adicional ')}{fmtBRL(Math.abs(g.valor - g.valorOriginal))}
-                            </span>
-                          )}
-                        </span>
-                        <span className={styles.rcDiariaVal}>
-                          {/* Selo uma vez só, na última diária, para não repetir em cada linha. */}
-                          {pagoIntegral && gi === grupos.length - 1 && (
-                            <span className={styles.rcDiariaTag}>{tr('(pago 100%)')}</span>
-                          )}
-                          {isDiariaAdj && <span className={styles.rcDiariaOld}>{fmtBRL(g.valorOriginal)}</span>}
-                          {g.qtd > 1 && <span className={styles.rcDiariaMult}>{g.qtd}{tr('x')} </span>}
-                          {fmtBRL(g.valor)}
-                        </span>
+                    {totalPago > 0.005 && (
+                      <div className={[styles.finLinha, styles.finPago].join(' ')}><span>{tr('Pago')}</span><b>{fmtBRL(totalPago)}</b></div>
+                    )}
+                    {temPendente && (
+                      <div className={[styles.finLinha, styles.finPend].join(' ')}><span>{tr('Saldo pendente')}</span><b>{fmtBRL(displayPendente)}</b></div>
+                    )}
+                    <p className={styles.finSituacao}><Clock size={14} /> {totalPago > 0.005 ? tr('Pagamento parcial') : tr('Aguardando pagamento')}</p>
+                  </>
+                ))}
+
+          {groupInfo && (() => {
+            const grpQuitado = groupInfo.total > 0 && groupInfo.pago >= groupInfo.total - 0.005;
+            const aptsLabel  = `${groupInfo.count} apt${groupInfo.count !== 1 ? 's' : ''}`;
+            return (
+              <div className={[styles.rcResumoList, styles.rcResumoGrupo].join(' ')}>
+                {grpQuitado ? (
+                  <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                    <span>{tr('Total pago · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.pago)}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.rcResumoRow}>
+                      <span>{tr('Total · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.total)}</span>
+                    </div>
+                    {groupInfo.pago > 0.005 && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
+                        <span>{tr('Pago · grupo')}</span><span>{fmtBRL(groupInfo.pago)}</span>
                       </div>
-                    ))}
-                    {adj && !isDiariaAdj && Math.abs(aggDiff) >= 0.005 && (
-                      <div className={styles.rcDiariaRow}>
-                        <span className={styles.rcDiariaSub}>
-                          {describeAdjustment(adj)}{funcAjuste ? tr(' · por {{funcAjuste}}', { funcAjuste }) : ''}
-                        </span>
-                        <span className={styles.rcDiariaVal} style={{ color: aggDiff < 0 ? 'var(--emerald)' : '#f97316' }}>
-                          {aggDiff > 0 ? '+' : ''}{fmtBRL(aggDiff)}
-                        </span>
+                    )}
+                    {groupInfo.pendente > 0.005 && (
+                      <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
+                        <span>{tr('Pendente · grupo')}</span><span>{fmtBRL(groupInfo.pendente)}</span>
                       </div>
                     )}
                   </>
-                );
-              })()}
+                )}
+              </div>
+            );
+          })()}
 
-              {/* ── Totais — mesma regra do passo "Resumo & Pagamento": o Total some
-                     quando a única diária já repete o valor. ── */}
-              {(() => {
-                const showQuitado = !pagamentoDeGrupo && pagoIntegral && !totalRedundante;
-                const showTotal   = !pagoIntegral && !totalRedundante;
-                const showPend    = !pagamentoDeGrupo && !pagoIntegral && temPendente;
-                if (!showQuitado && !showTotal && !showPend) return null;
-                return (
-                  <div className={styles.rcResumoList}>
-                    {showQuitado && (
-                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>{tr('Total pago')}</span><span>{fmtBRL(totalPago)}</span>
-                      </div>
-                    )}
-                    {showTotal && (
-                      <div className={styles.rcResumoRow}>
-                        <span>{tr('Total')}</span><span>{fmtBRL(cardTotal)}</span>
-                      </div>
-                    )}
-                    {showPend && (
-                      <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                        <span>{tr('Pendente')}</span><span>{fmtBRL(displayPendente)}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
+              </aside>
+            );
+          })()}
+          </div>
+          {/* ── Diárias — tabela no desenho do histórico de hospedagem ── */}
+          {effectiveDetalhes.length > 0 && (() => {
+            const aggDiff    = cardTotal - baseTotal;
+            const funcAjuste = reserva.novoPreco?.funcionario?.nome;
+            return (
+              <div className={styles.rcSection}>
+                <div className={styles.rcSectionHead}>
+                  <span className={styles.rcSectionLabel}>{tr('Diárias')}</span>
+                </div>
+                <div className={styles.dtScroll}>
+                  <table className={styles.dtTable}>
+                    <thead><tr>
+                      <th>{tr('Nº')}</th><th>{tr('Período')}</th><th>{tr('Ocupação')}</th><th className={styles.dtDir}>{tr('Valor')}</th>
+                    </tr></thead>
+                    <tbody>
+                      {effectiveDetalhes.map((d, i) => {
+                        const ini   = addDaysStr(reserva.dataInicio, i);
+                        const orig  = d.valor_final ?? 0;
+                        const valor = isDiariaAdj ? diariaAdjValor : orig;
+                        return (
+                          <tr key={i}>
+                            <td><span className={styles.dtNum}>{String(i + 1).padStart(2, '0')}</span></td>
+                            <td>{periodoDiaria(d.descricao) ? periodoDiaria(d.descricao).replace(/(\d{2}\/\d{2})\/\d{4}/g, '$1').replace(/\s*->\s*/, ' → ') : `${fmtDiaMes(ini)} → ${fmtDiaMes(addDaysStr(ini, 1))}`}</td>
+                            <td>
+                              {normalizaAdultos(descricaoHospedes(d.descricao)) || '—'}
+                              {d.meia_diaria && <span className={styles.dtTag}>{tr('Meia diária')}</span>}
+                              {d.sazonalidade?.descricao && <span className={styles.dtTag}>{d.sazonalidade.descricao}</span>}
+                            </td>
+                            <td className={[styles.dtDir, styles.dtForte].join(' ')}>
+                              {isDiariaAdj && Math.abs(valor - orig) >= 0.005 && <span className={styles.rcDiariaOld}>{fmtBRL(orig)}</span>}
+                              {fmtBRL(valor)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {priceAdj && !isDiariaAdj && Math.abs(aggDiff) >= 0.005 && (
+                        <tr>
+                          <td colSpan={3}>{describeAdjustment(priceAdj)}{funcAjuste ? tr(' · por {{funcAjuste}}', { funcAjuste }) : ''}</td>
+                          <td className={[styles.dtDir, aggDiff < 0 ? styles.dtMenos : styles.dtMais].join(' ')}>
+                            {aggDiff > 0 ? '+' : ''}{fmtBRL(aggDiff)}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
-              {/* ── Valores do grupo — mesma lista, logo abaixo dos totais do
-                     apartamento. Segue a regra dos totais individuais: quitado
-                     vira uma linha verde só; senão Total + Pago (se houve) +
-                     Pendente (se sobrou). ── */}
-              {groupInfo && (() => {
-                const grpQuitado = groupInfo.total > 0 && groupInfo.pago >= groupInfo.total - 0.005;
-                const aptsLabel  = `${groupInfo.count} apt${groupInfo.count !== 1 ? 's' : ''}`;
-                return (
-                  <div className={[styles.rcResumoList, styles.rcResumoGrupo].join(' ')}>
-                    {grpQuitado ? (
-                      <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                        <span>{tr('Total pago · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.pago)}</span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className={styles.rcResumoRow}>
-                          <span>{tr('Total · grupo (')}{aptsLabel})</span><span>{fmtBRL(groupInfo.total)}</span>
-                        </div>
-                        {groupInfo.pago > 0.005 && (
-                          <div className={[styles.rcResumoRow, styles.rcResumoGreen].join(' ')}>
-                            <span>{tr('Pago · grupo')}</span><span>{fmtBRL(groupInfo.pago)}</span>
-                          </div>
-                        )}
-                        {groupInfo.pendente > 0.005 && (
-                          <div className={[styles.rcResumoRow, styles.rcResumoDanger].join(' ')}>
-                            <span>{tr('Pendente · grupo')}</span><span>{fmtBRL(groupInfo.pendente)}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
+          {/* ── Pagamentos ── */}
+          {!pagamentoDeGrupo && (
+            <div className={styles.rcSection}>
+              <div className={styles.rcSectionHead}>
+                <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
+              </div>
+              <div className={styles.dtScroll}>
+                <table className={styles.dtTable}>
+                  <thead><tr>
+                    <th>{tr('Forma')}</th><th>{tr('Data')}</th><th>{tr('Pagador')}</th><th className={styles.dtDir}>{tr('Valor')}</th>
+                  </tr></thead>
+                  <tbody>
+                    {pagamentos.length === 0 ? (
+                      <tr><td colSpan={4} className={styles.dtVazio}>{tr('Nenhum pagamento registrado.')}</td></tr>
+                    ) : pagamentos.map((p) => (
+                      <tr key={p.id} className={[styles.dtLinkRow, p.cancelado ? styles.dtCancelado : ''].join(' ')}
+                        tabIndex={0} role="button" title={tr('Ver detalhes do pagamento')}
+                        onClick={() => setViewPagamento(p)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setViewPagamento(p); } }}>
+                        <td>
+                          <span className={styles.dtForma}>
+                            <span className={[styles.finPgIcon, p.cancelado ? styles.finPgIconOff : ''].join(' ')}>{iconePagamento(p.formaPagamento)}</span>
+                            <span>
+                              <span className={styles.dtCelTit}>{p.formaPagamento || p.descricao || tr('Pagamento')}</span>
+                              {p.cancelado && <span className={styles.dtCelSub}>{tr('Cancelado')}</span>}
+                            </span>
+                          </span>
+                        </td>
+                        <td>{p.dataRegistro || '—'}</td>
+                        <td className={styles.dtTrunca}>{p.nomePagador || '—'}</td>
+                        <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(p.valor)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
+
+          {/* ── Consumo ── */}
+          <div className={styles.rcSection}>
+            <div className={styles.rcSectionHead}>
+              <span className={styles.rcSectionLabel}>{tr('Consumo')}</span>
+            </div>
+            <div className={styles.dtScroll}>
+              <table className={styles.dtTable}>
+                <thead><tr>
+                  <th>{tr('Item')}</th><th>{tr('Qtd.')}</th><th>{tr('Data')}</th><th className={styles.dtDir}>{tr('Total')}</th>
+                </tr></thead>
+                <tbody>
+                  {(reserva.consumos ?? []).length === 0 ? (
+                    <tr><td colSpan={4} className={styles.dtVazio}>{tr('Nenhum consumo registrado.')}</td></tr>
+                  ) : reserva.consumos.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <span className={styles.dtCelTit}>{c.descricao}</span>
+                        <span className={styles.dtCelSub}>{fmtBRL(c.valorUnitario)} {tr('cada')}{c.despesaPessoal ? ` · ${tr('despesa pessoal')}` : ''}</span>
+                      </td>
+                      <td>{String(c.quantidade).padStart(2, '0')}</td>
+                      <td>{(c.data || '').slice(0, 10) || '—'}</td>
+                      <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(c.valorTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
           {/* ── Cancelamento / Observação ── */}
           {reserva.status === 'cancelado' && reserva.motivoCancelamento ? (
@@ -1909,7 +2172,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
         {/* ── Ações — fora do card, no rodapé do modal. Cancelada não tem ação
                própria: sem voucher e sem limpeza a faixa nem aparece. ── */}
-        {!(reserva.status === 'cancelado' && !limpezaBtnInfo && !isOvernight) && (
+        {!(reserva.status === 'cancelado' && !limpezaBtnInfo && !isOvernight) && !((temOpcoes || soVoucher) && !limpezaBtnInfo) && (
         <div className={[styles.rcActions, styles.rcActionsCenter].join(' ')}>
           {limpezaBtnInfo && (
             <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
@@ -1939,6 +2202,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <>
                     <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
                     <div className={styles.rvAcoesMenu}>
+                      <div className={styles.rvAcoesTit}>{tr('Opções')}</div>
                       {acoesItems.map((a, i) => (
                         <Fragment key={i}>
                           {a.divider && <div className={styles.rvAcoesDiv} />}
@@ -1953,7 +2217,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   </>
                 )}
                 <button className={styles.rvAcoesBtn} onClick={() => setAcoesOpen((v) => !v)}>
-                  {tr('Outras Ações')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+                  {tr('Opções')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
                 </button>
               </div>
             );
@@ -1972,57 +2236,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               </button>
             </>
           ) : reserva.status !== 'hospedado' && reserva.status !== 'finalizado' && reserva.status !== 'cancelado' && reserva.status !== 'ausente' ? (
-            <>
-            {/* Outras Ações, Voucher e Hospedar ficam à vista; o resto vai no menu. */}
-            <div className={styles.rvAcoesWrap}>
-              {acoesOpen && (
-                <>
-                  <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
-                  <div className={styles.rvAcoesMenu}>
-                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                      <Pencil size={15}/> {tr('Editar')}
-                    </button>
-                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
-                      <Users size={15}/> {tr('Gerenciar Pessoas')}
-                    </button>
-                    <button className={styles.rvAcoesItem}
-                      disabled={pagamentoDeGrupo}
-                      title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
-                      onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
-                      <DollarSign size={15}/> {tr('Gerenciar Pagamentos')}
-                    </button>
-                    <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
-                      <Tag size={15}/> {tr('Gerenciar Preços')}
-                    </button>
-                    {reserva.status === 'confirmada' && (
-                      <button className={styles.rvAcoesItem}
-                        onClick={() => { setAcoesOpen(false); setConfirmAusente(true); }}>
-                        <UserX size={15}/> {tr('Reserva Ausente')}
-                      </button>
-                    )}
-                    <div className={styles.rvAcoesDiv} />
-                    <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
-                      onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setConfirmCancel(true); }}>
-                      <Trash2 size={14}/> {tr('Cancelar')}
-                    </button>
-                  </div>
-                </>
-              )}
-              <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={() => setAcoesOpen((v) => !v)}>
-                {tr('Outras Ações')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
-              </button>
-            </div>
-            <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} disabled={voucherLoading} onClick={handleVoucherClick}>
-              {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> {tr('Gerando...')}</> : <><FileDown size={14}/> {tr('Voucher')}</>}
-            </button>
-            <button className={[styles.rvBtn, styles.rvBtnGreen].join(' ')}
-              disabled={!canCheckin || voucherLoading}
-              title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
-              onClick={() => setConfirmPernoite(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-              {tr('Hospedar')}
-            </button>
-            </>
+            null
           ) : reserva.status === 'cancelado' ? null : (
             <button className={[styles.rvBtn, styles.rvBtnGold].join(' ')} disabled={voucherLoading} onClick={handleVoucherClick}>
               {voucherLoading ? <><Loader2 size={14} className={styles.spin}/> {tr('Gerando...')}</> : <><FileDown size={14}/> {tr('Voucher')}</>}
@@ -2030,7 +2244,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           )}
         </div>
         )}
-      </Modal>
+      </PainelReserva>
 
       <Modal open={showVoucherScope} onClose={() => setShowVoucherScope(false)} size="sm"
         title={<><FileDown size={14} /> {tr('Gerar Voucher')}</>}
@@ -2160,7 +2374,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         </div>
       </Modal>
 
-      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm"
+      <Modal open={!editing && !!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm"
         title={tr('Remover pessoa')}
         footer={
           <div style={{ display: 'flex', gap: 8 }}>
@@ -2177,7 +2391,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       <PaymentModal
-        open={showPayModal}
+        open={!editing && showPayModal}
         onClose={() => setShowPayModal(false)}
         onConfirm={handleAddPagamento}
         tiposPagamento={tiposPagamento}
@@ -2189,7 +2403,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         valorPago={totalPago}
       />
 
-      <Modal open={!!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
+      <Modal open={!editing && !!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
         title={tr('Detalhes do Pagamento')}
         footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>{tr('Fechar')}</Button></div>}
       >
@@ -2267,7 +2481,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         )}
       </Modal>
 
-      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
+      <Modal open={!editing && !!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
         title={tr('Cancelar Pagamento')}
         footer={
           <div className={styles.footerRight}>
@@ -2293,7 +2507,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       </Modal>
 
       {/* ── Discard confirmation ── */}
-      <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm"
+      <Modal open={!editing && showDiscard} onClose={() => setShowDiscard(false)} size="sm"
         title={tr('Descartar alterações?')}
         footer={
           <div className={styles.footerRight}>
@@ -2317,6 +2531,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           return (
             <PriceAdjustmentModal
               open
+              as={inline ? PainelAcaoReserva : undefined}
               onClose={() => setShowAdjPreco(false)}
               baseTotal={baseTotal}
               baseDiarias={baseDiarias}
@@ -2327,13 +2542,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             />
           );
         })() : (
-          <Modal open onClose={() => setShowAdjPreco(false)} size="sm" title={tr('Gerenciar Preços')}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
-              <Loader2 size={16} className={styles.spin} /> {tr('Calculando preço...')}
+          <PainelReserva inline={inline} acao open onClose={() => setShowAdjPreco(false)} size="sm" title={tr('Gerenciar Preços')}>
+            <div style={{ padding: 8 }}>
+              <Esqueleto linhas={3} avatar={false} />
             </div>
-          </Modal>
+          </PainelReserva>
         )
       )}
+      {editing && inline && renderEdicao()}
     </>
   );
 }
@@ -2398,7 +2614,8 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
   const weekday = dayObj.toLocaleDateString(locale(), { weekday: 'long' });
   const cap     = weekday.charAt(0).toUpperCase() + weekday.slice(1);
   return (
-    <Modal open onClose={onClose} size="lg" hideHeader
+    <Janela open onClose={onClose} size="lg" hideHeader
+      title={<><CalendarDays size={15} /> {tr('Reservas do dia')}</>}
       footer={
         <div className={styles.footerRight}>
           <Button variant="primary" onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
@@ -2417,9 +2634,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
               <div className={styles.ovDateValue}>{fmtDateBR(dateStr)}</div>
             </div>
             {loading ? (
-              <span className={styles.rcHeadMeta} style={{ marginLeft: 'auto' }}>
-                <Loader2 size={14} className={styles.spin} />
-              </span>
+              <span className={[styles.sk, styles.skNum].join(' ')} style={{ marginLeft: 'auto' }} />
             ) : (
               <>
                 <div className={styles.ovNightsCell}>
@@ -2449,7 +2664,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
       </div>
 
       {loading ? (
-        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
+        <Esqueleto />
       ) : (
         <>
           {dayReservas.length === 0 ? (
@@ -2475,7 +2690,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
           )}
         </>
       )}
-    </Modal>
+    </Janela>
   );
 }
 
@@ -2483,6 +2698,7 @@ function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSe
 /** Conteúdo de um grupo — reservas, totais e ações. Abre por cima da listagem,
  *  que continua aberta atrás: fechar aqui volta para a lista. */
 function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify }) {
+  const naDireita = !!useContext(JanelaCtx);
   const gid = grupo.grupo_id;
   const [lista,     setLista]     = useState([]);
   const [resumo,    setResumo]    = useState(null);
@@ -2563,11 +2779,12 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
 
   return (
     <>
-      <Modal open onClose={onClose} size="lg" hideHeader
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('← Voltar')}</Button></div>}
+      <Janela open onClose={onClose} size="lg" hideHeader
+        title={<><Users size={15} /> {titulo}<span className={styles.janelaChip}>{qtd} {tr('apartamento')}{qtd !== 1 ? 's' : ''}</span></>}
+        footer={naDireita ? null : <div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('← Voltar')}</Button></div>}
       >
         <div className={styles.rcCard} style={{ marginBottom: 14 }}>
-          <div className={styles.rcHead}>
+          {!naDireita && <div className={styles.rcHead}>
             <div className={styles.rcHeadLeft}>
               <div className={styles.rcHeadTop}>
                 <span className={styles.rcTitle}>{titulo}</span>
@@ -2578,7 +2795,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
             <button type="button" className={styles.rcCloseBtn} onClick={onClose} aria-label={tr('Fechar')}>
               <X size={17} />
             </button>
-          </div>
+          </div>}
 
           <div className={styles.rcActions}>
             <button type="button" className={[styles.rcBtn, styles.rcBtnPay].join(' ')}
@@ -2599,7 +2816,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
 
           <div className={styles.rcSection}>
             {loading && lista.length === 0 ? (
-              <div className={styles.rcSectionLabel}>{tr('Carregando reservas…')}</div>
+              <Esqueleto linhas={3} />
             ) : lista.length === 0 ? (
               <div className={styles.pagEmpty}>{tr('Nenhuma reserva neste grupo.')}</div>
             ) : (
@@ -2672,7 +2889,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
             )}
           </div>
         </div>
-      </Modal>
+      </Janela>
 
       {/* Responsável principal — grupo_reserva.descricao */}
       <Modal open={nomeEdit != null} onClose={() => setNomeEdit(null)} size="sm"
@@ -2715,6 +2932,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
  *  a última reserva finalizada). Abrir um grupo empilha o modal de conteúdo por
  *  cima — esta listagem continua aberta atrás. */
 function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify }) {
+  const naDireita = !!useContext(JanelaCtx);
   const [grupos,  setGrupos]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [detalhe, setDetalhe] = useState(null);
@@ -2734,10 +2952,11 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
 
   return (
     <>
-      <Modal open onClose={onClose} size="lg" hideHeader
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
+      <Janela open onClose={onClose} size="lg" hideHeader
+        title={<><Users size={15} /> {tr('Reservas em grupo')}{!loading && grupos.length > 0 && <span className={styles.janelaChip}>{grupos.length} {tr('em aberto')}</span>}</>}
+        footer={naDireita ? null : <div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
       >
-        <div className={styles.rcCard} style={{ marginBottom: 14 }}>
+        {!naDireita && <div className={styles.rcCard} style={{ marginBottom: 14 }}>
           <div className={styles.rcHead}>
             <div className={styles.rcHeadLeft}>
               <div className={styles.rcHeadTop}>
@@ -2751,12 +2970,10 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
               <X size={17} />
             </button>
           </div>
-        </div>
+        </div>}
 
         {loading ? (
-          <div className={styles.emptyState}>
-            <Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}
-          </div>
+          <Esqueleto />
         ) : grupos.length === 0 ? (
           <div className={styles.emptyState}>{tr('Nenhum grupo em aberto.')}</div>
         ) : (
@@ -2776,7 +2993,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
             })}
           </div>
         )}
-      </Modal>
+      </Janela>
 
       {detalhe && (
         <GrupoDetalheModal
@@ -2829,7 +3046,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
   const FILTROS = [['mes', tr('Por mês')], ['anteriores', tr('Anteriores')], ['proximas', tr('Próximas')]];
 
   return (
-    <Modal open onClose={onClose} size="md"
+    <Janela open onClose={onClose} size="md"
       title={<><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)} — {cat?.nome || ''}</>}
       footer={<div className={styles.footerRight}><Button variant="secondary" onClick={onClose}>{tr('Fechar')}</Button></div>}
     >
@@ -2860,7 +3077,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
       )}
 
       {loading ? (
-        <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
+        <Esqueleto />
       ) : (
         <>
           <div className={[styles.dayMetrics, styles.dayMetricsRoom].join(' ')}>
@@ -2923,7 +3140,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
           )}
         </>
       )}
-    </Modal>
+    </Janela>
   );
 }
 
@@ -2987,12 +3204,12 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
   const handleSearch = (v) => { setSearch(v); setPage(1); };
 
   return (
-    <Modal open onClose={onClose} size="md"
+    <Janela open onClose={onClose} size="md"
       bodyStyle={{ flexShrink: 0, flexGrow: 0, flexBasis: 'clamp(200px, 48vh, 360px)' }}
       title={<><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
       footer={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? tr('carregando...') : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? <span className={styles.sk} style={{ width: 80, display: 'inline-block' }} /> : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
           {!loading && pages > 1 && (
             <div style={{ display: 'flex', gap: 4 }}>
               <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
@@ -3020,7 +3237,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
       </div>
 
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Buscando reservas...')}</div>
+        <Esqueleto linhas={6} />
       ) : total === 0 ? (
         <div className={styles.emptyState}>{search ? tr('Nenhum resultado para "{{search}}".', { search }) : tr('Nenhuma reserva com status "{{label}}".', { label })}</div>
       ) : (
@@ -3041,7 +3258,7 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
           })}
         </div>
       )}
-    </Modal>
+    </Janela>
   );
 }
 
@@ -3117,7 +3334,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
   const dataRegistro  = orc?.data_hora_registro ?? '';
 
   return (
-    <Modal open onClose={onClose} size="md"
+    <Janela open onClose={onClose} size="md"
       title={<><FileText size={15} /> {tr('Orçamento')} {solicitante ? `— ${solicitante}` : ''}</>}
       footer={
         <div className={styles.footerSpread}>
@@ -3129,7 +3346,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
       }
     >
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Carregando...')}</div>
+        <Esqueleto linhas={5} avatar={false} />
       ) : !orc ? (
         <div className={styles.emptyState}>{tr('Não foi possível carregar o orçamento.')}</div>
       ) : (
@@ -3253,7 +3470,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
           )}
         </div>
       )}
-    </Modal>
+    </Janela>
   );
 }
 
@@ -3412,7 +3629,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       />
     )}
 
-    <Modal open={!showCreate} onClose={onClose} size="md"
+    <Janela open={!showCreate} onClose={onClose} size="md"
       title={<><FileText size={15} /> {tr('Orçamentos')}{!loading && ` (${orcamentos.length})`}</>}
       footer={
         <div className={styles.footerRight}>
@@ -3440,7 +3657,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       </div>
 
       {loading ? (
-        <div className={styles.loadingRow}><Loader2 size={16} className={styles.spin} /> {tr('Buscando...')}</div>
+        <Esqueleto />
       ) : orcamentos.length === 0 ? (
         <div className={styles.emptyState}>
           {search ? tr('Nenhum orçamento encontrado para "{{search}}".', { search }) : tr('Nenhum orçamento cadastrado.')}
@@ -3613,7 +3830,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
           })}
         </div>
       )}
-    </Modal>
+    </Janela>
 
     {/* ── Modal: editar nome do orçamento ── */}
     <Modal open={!!editOrc} onClose={() => { setEditOrc(null); setEditNome(''); }} size="sm"
@@ -3737,7 +3954,7 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
         />
       )}
 
-      <Modal open={!showCreate} onClose={onClose} size="md"
+      <Janela open={!showCreate} onClose={onClose} size="md"
         title={<><Bell size={15} /> {tr('Solicitações')}{!loading && ` (${solicitacoes.length})`}</>}
         footer={
           <div className={styles.footerRight}>
@@ -3748,7 +3965,7 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
         }
       >
         {loading ? (
-          <div className={styles.emptyState}><Loader2 size={16} className={styles.spin} style={{ marginRight: 6 }} />{tr('Carregando...')}</div>
+          <Esqueleto />
         ) : solicitacoes.length === 0 ? (
           <div className={styles.emptyState}>{tr('Nenhuma solicitação pendente.')}</div>
         ) : (
@@ -3772,7 +3989,7 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
             })}
           </div>
         )}
-      </Modal>
+      </Janela>
     </>
   );
 }
@@ -3892,7 +4109,7 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
       >
         {loading ? (
           <span className={styles.comboPlaceholder} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Loader2 size={13} className={styles.spin} /> {tr('Verificando disponibilidade...')}
+            <span className={styles.sk} style={{ width: 160 }} />
           </span>
         ) : value.length > 0 ? (
           <div className={styles.comboChipsInline}>
@@ -4867,7 +5084,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   };
 
   return (
-    <Modal open onClose={onClose} size="lg"
+    <Janela open onClose={onClose} size="lg"
       bodyStyle={{ padding: '16px 22px' }}
       title={<><Plus size={15} /> {forcePernoite ? tr('Novo Pernoite') : isSolicitacao ? tr('Nova Solicitação') : forceOrcamento ? tr('Novo Orçamento') : tr('Nova Reserva')}</>}
       footer={
@@ -5553,7 +5770,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         </span>
                         <span className={styles.rcDiariaVal}>
                           {calcLoading && !precosCalc[rKey]
-                            ? <Loader2 size={13} className={styles.spin} />
+                            ? <span className={styles.sk} style={{ width: 72, display: 'inline-block' }} />
                             : fmtBRL(precosCalc[rKey]?.valor_total ?? 0)}
                         </span>
                       </div>
@@ -5569,7 +5786,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     {showTotal && (
                       <div className={styles.rcResumoRow}>
                         <span>{tr('Total')}</span>
-                        <span>{calcLoading ? <Loader2 size={14} className={styles.spin} /> : fmtBRL(grandTotal)}</span>
+                        <span>{calcLoading ? <span className={styles.sk} style={{ width: 90, height: 16, display: 'inline-block' }} /> : fmtBRL(grandTotal)}</span>
                       </div>
                     )}
                     {showPend && (
@@ -5892,7 +6109,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           />
         );
       })()}
-    </Modal>
+    </Janela>
   );
 }
 
@@ -5928,6 +6145,16 @@ export default function BookingCalendar() {
   const [showPagQuartoPicker,  setShowPagQuartoPicker]  = useState(false);
   const [pagQuartoAlvo,        setPagQuartoAlvo]        = useState(null); // reserva escolhida (por quarto)
   const [winWide,              setWinWide]              = useState(typeof window !== 'undefined' ? window.innerWidth >= 1080 : true);
+  const [slotDir, setSlotDir] = useState(null);
+  const [slotEsq, setSlotEsq] = useState(null);
+  const [fechandoReserva, setFechandoReserva] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const h = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', h);
+    return () => mq.removeEventListener('change', h);
+  }, []);
   const [winMobile,            setWinMobile]            = useState(typeof window !== 'undefined' ? window.innerWidth <= 600 : false);
   const [groupPanel,           setGroupPanel]           = useState(null);
   const [groupMembersCache,    setGroupMembersCache]    = useState({}); // { [grupoId]: reservas normalizadas (todos os meses) }
@@ -6192,7 +6419,10 @@ export default function BookingCalendar() {
     return Object.values(groups).sort((a, b) => a.key.localeCompare(b.key));
   })();
 
-  const navigateToReserva = (r) => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); setSelectedReserva(r); };
+  const navigateToReserva = (r) => {
+    if (!isDesktop) { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); }
+    setSelectedReserva(r);
+  };
 
   const solicitadasCount = solicitacoes.length;
   const allRooms         = categorias.flatMap((c) => c.quartos);
@@ -6232,6 +6462,7 @@ export default function BookingCalendar() {
   const handleCellClick = (room, dateStr) => {
     if (pagamentoModoAtivo) return;
     if (dragState) return;
+    if (dateStr < todayStr) return;
     if (selRoom === room && selStart !== null) {
       if (dateStr === selStart) { setSelRoom(null); setSelStart(null); setSelHover(null); return; }
       const start = dateStr < selStart ? dateStr : selStart;
@@ -6744,9 +6975,132 @@ export default function BookingCalendar() {
   const leftW      = winMobile ? LEFT_W_MOBILE : winWide ? LEFT_W : LEFT_W_NARROW;
   const gridTotalW = leftW + VISIBLE_DAYS * DAY_CELL_W;
 
+  const buscaItens = (
+    <>
+              {searchResults.map((r) => {
+                const dias     = diffDays(r.dataInicio, r.dataFim);
+                const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
+                return (
+                  <div key={r.id} className={styles.searchDropItem} onClick={() => navigateToReserva(r)}>
+                    <div className={styles.searchDropRoomCircle}>{fmtRoom(r.quarto)}</div>
+                    <div className={styles.searchDropInfo}>
+                      <div className={styles.searchDropName}>{r.titularNome}</div>
+                      <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                      <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
+                    </div>
+                    <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
+                  </div>
+                );
+              })}
+              {remoteSearchLoading && (
+                <Esqueleto linhas={2} />
+              )}
+              {!remoteSearchLoading && remoteSearchByMonth.map((group) => (
+                <div key={group.key}>
+                  <div className={styles.searchDropSeparator}>{group.label}</div>
+                  {group.items.map((r) => {
+                    const dias     = diffDays(r.dataInicio, r.dataFim);
+                    const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
+                    return (
+                      <div key={r.id} className={styles.searchDropItem} onClick={() => navigateToReserva(r)}>
+                        <div className={styles.searchDropRoomCircle}>{fmtRoom(r.quarto)}</div>
+                        <div className={styles.searchDropInfo}>
+                          <div className={styles.searchDropName}>{r.titularNome}</div>
+                          <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
+                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
+                        </div>
+                        <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+    </>
+  );
+  const buscando = searchTerm.trim().length >= 2;
+
+  const buscaEl = (
+        <div className={styles.searchWrap} ref={searchRef}>
+          <Search size={13} className={styles.searchIcon} />
+          <input className={styles.searchInput} value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setShowSearchDropdown(true); }}
+            onFocus={() => searchTerm.length >= 2 && setShowSearchDropdown(true)}
+            placeholder={tr('Buscar hóspede...')} />
+          {searchTerm && (
+            <button className={styles.clearSearch} onClick={() => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); }}><X size={12} /></button>
+          )}
+          {!isDesktop && showSearchDropdown && (searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) && (
+            <div className={styles.searchDropdown}>{buscaItens}</div>
+          )}
+        </div>
+  );
+
   return (
+    <JanelaCtx.Provider value={isDesktop ? slotDir : null}>
     <div className={styles.page}>
       <Notification notification={notif} />
+      <div className={styles.split}>
+        {isDesktop && (
+          <aside className={styles.sidePanel}>
+                <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
+                  onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
+                  {tr('Nova reserva')}
+                </Button>
+                <div className={styles.sideBusca}>
+                  {buscaEl}
+                  <div className={styles.sideFiltroWrap} ref={statusFilterRef}>
+                    <button type="button"
+                      className={[styles.sideFiltroBtn, showStatusFilter ? styles.sideFiltroBtnOn : ''].join(' ')}
+                      onClick={() => setShowStatusFilter((v) => !v)}
+                      title={tr('Filtrar por status')} aria-label={tr('Filtrar por status')} aria-expanded={showStatusFilter}>
+                      <SlidersHorizontal size={16} />
+                    </button>
+                    {showStatusFilter && (
+                      <div className={styles.sideFiltroPop}>
+                        <span className={styles.sideFiltroTit}>{tr('Reservas por status')}</span>
+                        {STATUS_FILTER_OPTIONS.map(([key, label]) => (
+                          <button key={key} type="button" className={styles.sideFiltroItem}
+                            onClick={() => { setStatusModalFilter({ key, label }); setShowStatusFilter(false); }}>
+                            <span className={[styles.statusDot, styles[`status_${key}`]].join(' ')} />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {buscando ? (
+                  <div className={styles.sideGrupo}>
+                    <span className={styles.sideGrupoTit}>{tr('Resultados da busca')}</span>
+                    {(searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) ? (
+                      <div className={styles.sideResultados}>{buscaItens}</div>
+                    ) : (
+                      <p className={styles.sideVazio}>{tr('Nenhum hóspede encontrado.')}</p>
+                    )}
+                  </div>
+                ) : (
+                <div className={styles.sideGrupo}>
+                  <span className={styles.sideGrupoTit}>{tr('Serviços')}</span>
+                  <div ref={setSlotEsq} className={styles.slotEsq} />
+                  <div className={styles.sideItens}>
+                  {[
+                    { k: 'grupos', ic: <Users size={16} />,    rot: tr('Grupos'),       sub: tr('Reservas em grupo e pagamentos'),  on: () => setShowGrupos(true) },
+                    { k: 'orc',    ic: <FileText size={16} />, rot: tr('Orçamentos'),   sub: tr('Propostas enviadas aos hóspedes'), on: () => setShowOrcamentos(true) },
+                    { k: 'sol',    ic: <Bell size={16} />,     rot: tr('Solicitações'), sub: tr('Pedidos aguardando aprovação'),    on: () => setShowSolicitacoes(true), n: solicitadasCount },
+                  ].map((s) => (
+                    <button key={s.k} type="button" className={styles.sideItem} onClick={s.on}>
+                      <span className={styles.sideIco}>{s.ic}</span>
+                      <span className={styles.sideTxt}><b>{s.rot}</b><small>{s.sub}</small></span>
+                      {s.n > 0 && <span className={styles.sideBadge}>{s.n}</span>}
+                      <ChevronRight size={15} className={styles.sideSeta} />
+                    </button>
+                  ))}
+                  </div>
+                </div>
+                )}
+          </aside>
+        )}
+      <div className={styles.direita}>
       <div className={styles.card}>
 
         {/* Header */}
@@ -6785,63 +7139,13 @@ export default function BookingCalendar() {
               )}
             </div>
             <button className={styles.todayBtn} onClick={goToToday}>{tr('Hoje')}</button>
-            <button className={[styles.todayBtn, styles.groupsBtn].join(' ')} onClick={() => setShowGrupos(true)}>
-              <Users size={14} /> {tr('Grupos')}
-            </button>
+            {!isDesktop && (
+              <button className={[styles.todayBtn, styles.groupsBtn].join(' ')} onClick={() => setShowGrupos(true)}>
+                <Users size={14} /> {tr('Grupos')}
+              </button>
+            )}
 
-            {/* Search combobox */}
-            <div className={styles.searchWrap} ref={searchRef}>
-              <Search size={13} className={styles.searchIcon} />
-              <input className={styles.searchInput} value={searchTerm}
-                onChange={(e) => { setSearchTerm(e.target.value); setShowSearchDropdown(true); }}
-                onFocus={() => searchTerm.length >= 2 && setShowSearchDropdown(true)}
-                placeholder={tr('Buscar hóspede...')} />
-              {searchTerm && (
-                <button className={styles.clearSearch} onClick={() => { setSearchTerm(''); setShowSearchDropdown(false); setRemoteSearchResults([]); }}><X size={12} /></button>
-              )}
-              {showSearchDropdown && (searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) && (
-                <div className={styles.searchDropdown}>
-                  {searchResults.map((r) => {
-                    const dias     = diffDays(r.dataInicio, r.dataFim);
-                    const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
-                    return (
-                      <div key={r.id} className={styles.searchDropItem} onClick={() => navigateToReserva(r)}>
-                        <div className={styles.searchDropRoomCircle}>{fmtRoom(r.quarto)}</div>
-                        <div className={styles.searchDropInfo}>
-                          <div className={styles.searchDropName}>{r.titularNome}</div>
-                          <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                          <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-                        </div>
-                        <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
-                      </div>
-                    );
-                  })}
-                  {remoteSearchLoading && (
-                    <div className={styles.searchDropLoading}><Loader2 size={12} className={styles.spin} /> {tr('buscando outros meses...')}</div>
-                  )}
-                  {!remoteSearchLoading && remoteSearchByMonth.map((group) => (
-                    <div key={group.key}>
-                      <div className={styles.searchDropSeparator}>{group.label}</div>
-                      {group.items.map((r) => {
-                        const dias     = diffDays(r.dataInicio, r.dataFim);
-                        const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
-                        return (
-                          <div key={r.id} className={styles.searchDropItem} onClick={() => navigateToReserva(r)}>
-                            <div className={styles.searchDropRoomCircle}>{fmtRoom(r.quarto)}</div>
-                            <div className={styles.searchDropInfo}>
-                              <div className={styles.searchDropName}>{r.titularNome}</div>
-                              <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                              <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-                            </div>
-                            <span className={[styles.statusBadgeSm, styles[`status_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status]}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {!isDesktop && buscaEl}
 
           </div>
         </div>
@@ -6876,7 +7180,7 @@ export default function BookingCalendar() {
           )}
         <div className={styles.gridScroll}>
           {loading ? (
-            <div className={styles.loadingRow}><Loader2 size={20} className={styles.spin} /> {tr('Carregando...')}</div>
+            <EsqueletoGrade leftW={leftW} />
           ) : (
             <>
               <div className={styles.dayHeaderRow} style={{ width: gridTotalW }}>
@@ -6926,7 +7230,6 @@ export default function BookingCalendar() {
                           title={tr('Histórico quarto {{v0}}{{v1}}', { v0: fmtRoom(room), v1: roomDescMap[room] ? ` – ${roomDescMap[room]}` : '' })}>
                           <span className={styles.roomTitle}>
                             <span className={styles.roomNum}>{tr('Apt.')} {fmtRoom(room)}</span>
-                            {roomDescMap[room] && <span className={styles.roomDesc}> – {roomDescMap[room]}</span>}
                           </span>
                           {roomPaxMap[room] != null && (
                             <span className={styles.roomPax}><Users size={14} /> {roomPaxMap[room]}</span>
@@ -6940,7 +7243,7 @@ export default function BookingCalendar() {
                             const isSel     = isCellSelected(room, dStr);
                             return (
                               <div key={idx}
-                                className={[styles.cell, isWeekend ? styles.cellWeekend : '', isToday ? styles.cellToday : '', isSel ? styles.cellSelected : '', styles.cellClickable].join(' ')}
+                                className={[styles.cell, isWeekend ? styles.cellWeekend : '', isToday ? styles.cellToday : '', isSel ? styles.cellSelected : '', dStr < todayStr ? styles.cellPassado : styles.cellClickable].join(' ')}
                                 style={{ width: DAY_CELL_W, height: ROOM_H, flexShrink: 0 }}
                                 onClick={() => handleCellClick(room, dStr)}
                               />
@@ -6958,25 +7261,13 @@ export default function BookingCalendar() {
         </div>
         </div>
 
-        {/* Legend */}
-        <div className={styles.legend}>
-          {[
-            { cls: 'legendDot_confirmada', label: tr('Confirmada') },
-            { cls: 'legendDot_solicitada', label: tr('Solicitada') },
-            { cls: 'legendDot_hospedado',  label: tr('Hospedado')  },
-            { cls: 'legendDot_finalizado', label: tr('Finalizado') },
-            { cls: 'legendDot_cancelado',  label: tr('Cancelado')  },
-          ].map((l) => (
-            <div key={l.label} className={styles.legendItem}>
-              <div className={[styles.legendDot, styles[l.cls]].join(' ')} />
-              <span>{l.label}</span>
-            </div>
-          ))}
-          <span className={styles.legendHint}>{tr('Clique dia/quarto · 2 células para criar · Arraste/borda para mover')}</span>
-        </div>
       </div>
 
+      <div ref={setSlotDir} className={styles.slotDireita} />
+      </div>
+      </div>
       {/* Modals */}
+      {selectedReserva && isDesktop && <ReservaModal inline saindo={fechandoReserva} key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setFechandoReserva(true); setTimeout(() => { setSelectedReserva(null); setDragEditValues(null); setFechandoReserva(false); }, 200); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap}
@@ -6988,6 +7279,7 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       {roomModal && <RoomModal room={roomModal.room} onClose={() => setRoomModal(null)} categorias={categorias} onSelectReserva={(r) => { setRoomModal(null); setSelectedReserva(r); }} />}
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showGrupos && (
         <GruposModal
           refreshKey={gruposRefreshKey}
@@ -7008,6 +7300,7 @@ export default function BookingCalendar() {
           }}
         />
       )}
+      </JanelaCtx.Provider>
       {statusModalFilter && (
         <StatusFilterModal
           status={statusModalFilter.key}
@@ -7016,6 +7309,7 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)}
         />
       )}
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showOrcamentos && (
         <OrcamentosModal
           onClose={() => setShowOrcamentos(false)}
@@ -7026,11 +7320,14 @@ export default function BookingCalendar() {
           onSave={handleSaveNew}
         />
       )}
+      </JanelaCtx.Provider>
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showSolicitacoes && (
         <SolicitacoesModal onClose={() => setShowSolicitacoes(false)}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
-      {selectedReserva && <ReservaModal key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
+      </JanelaCtx.Provider>
+      {selectedReserva && !isDesktop && <ReservaModal key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
 
       {/* ── Multi-payment selection panel ── */}
       {pagamentoModoAtivo && (
@@ -7264,7 +7561,7 @@ export default function BookingCalendar() {
       })()}
 
       {/* ── Floating action panel ── */}
-      {!selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !showGrupos && !dayModal && !showMonthPicker && !roomModal && !pagamentoModoAtivo && <div className={styles.floatPanel}>
+      {!isDesktop && !selectedReserva && !showCreateModal && !showOrcamentos && !showSolicitacoes && !showGrupos && !dayModal && !showMonthPicker && !roomModal && !pagamentoModoAtivo && <div className={styles.floatPanel}>
         <button className={[styles.floatBtn, styles.floatBtnPrimary].join(' ')} onClick={() => { setCreateInit({ room: null, start: null, end: null, available: null }); setShowCreateModal(true); }}>
           <Plus size={15} />
           <span>{tr('Nova Reserva')}</span>
@@ -7323,5 +7620,6 @@ export default function BookingCalendar() {
         </div>
       </div>}
     </div>
+    </JanelaCtx.Provider>
   );
 }
