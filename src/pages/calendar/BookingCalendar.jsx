@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown, AlertTriangle,
+  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Minus,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -314,6 +314,18 @@ const periodoDiaria = (descricao) => {
  *  _valorAnterior na diária: valor antes da edição em curso, exibido riscado. */
 /** "2026-10-21" → "21/10" */
 const fmtDiaMes = (s) => (s ? `${s.slice(8, 10)}/${s.slice(5, 7)}` : '—');
+
+/** "11/10/2026 15:09:04" → data em cima, hora embaixo. */
+function DataHora({ valor }) {
+  if (!valor) return '—';
+  const [data, hora] = String(valor).split(' ');
+  return (
+    <span className={styles.dtDataHora}>
+      {data}
+      {hora && <small>{hora.slice(0, 5)}</small>}
+    </span>
+  );
+}
 
 const iconePagamento = (desc) => {
   const d = (desc ?? '').toUpperCase();
@@ -664,11 +676,11 @@ function Janela({ open, onClose, title, acaoTopo = null, children, footer, bodyS
 }
 
 // No desktop o detalhe da reserva abre numa gaveta à direita, por cima do calendário.
-function PainelReserva({ inline, acao = false, pag = false, saindo = false, footer, children, ...modal }) {
+function PainelReserva({ inline, acao = false, pag = false, largo = false, saindo = false, footer, children, ...modal }) {
   const slot = useContext(JanelaCtx);
   if (!inline || !slot) return <Modal {...modal} footer={footer}>{children}</Modal>;
   return createPortal(
-    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : styles.rvGavetaReserva, pag ? styles.rvGavetaPag : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
+    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : styles.rvGavetaReserva, pag ? styles.rvGavetaPag : '', largo ? styles.rvGavetaLarga : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
       {modal.title && !modal.hideHeader && (
         <header className={styles.janelaHead}>
           <button type="button" className={styles.janelaVoltar} onClick={modal.onClose}
@@ -1286,6 +1298,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
   const maxCheckout = useMemo(() => maxCheckoutFor(editCheckin), [maxCheckoutFor, editCheckin]);
 
+  const mudaCheckin = (d) => {
+    setEditCheckin(d);
+    const max = maxCheckoutFor(d);
+    if (editCheckout && d && (editCheckout <= d || (max && editCheckout > max))) {
+      setEditCheckout(null);
+    }
+  };
+
   // Dias cuja tarde já está ocupada não podem receber um check-in.
   const checkinBloqueados = useMemo(() => {
     const set = new Set();
@@ -1310,22 +1330,56 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     return () => { cancelled = true; };
   }, [editing]);
 
+  // Meia diária (saída tardia) na edição: começa como está gravada na reserva.
+  const horaMeiaOrig = reserva.meiaDiaria ? (reserva.saidaPrevista?.split(' ')[1]?.slice(0, 5) ?? '') : '';
+  const [editMeia,     setEditMeia]     = useState(!!reserva.meiaDiaria);
+  const [editHoraMeia, setEditHoraMeia] = useState(horaMeiaOrig);
+  const editCatCheckout = categorias.find((c) => (c.quartos || []).map(String).includes(String(editQuarto[0])))?.checkout || '12:00';
+  // A tarde do dia do check-out precisa estar livre para o hóspede ficar até mais tarde.
+  const meiaBloqueada = !!editCheckout && !!occupancy.get(formatDate(editCheckout))?.pm;
+  const temMeiaEdit   = editMeia && !!editHoraMeia && editHoraMeia > editCatCheckout && !meiaBloqueada;
+  const meiaMudou     = temMeiaEdit !== !!reserva.meiaDiaria || (temMeiaEdit && editHoraMeia !== horaMeiaOrig);
+
   useEffect(() => {
     if (!editing || !editQuarto[0] || !editCheckin || !editCheckout) return;
     let cancelled = false;
     setEditCalcLoading(true);
     setEditCalc(null);
     const brDate = (d) => toBrDate(formatDate(d));
-    reservaApi.calcularPreco([{
+    const itens = [{
       fk_quarto:    parseInt(editQuarto[0]),
       data_entrada: brDate(editCheckin),
       data_saida:   brDate(editCheckout),
       ...buildGuestCalcParams(pessoas),
-    }]).then((res) => { if (!cancelled) setEditCalc(Array.isArray(res) ? res[0] : res); })
+    }];
+    // Mesma regra da criação: a meia diária é metade da noite do dia do check-out.
+    if (temMeiaEdit) {
+      const dia = new Date(editCheckout); dia.setDate(dia.getDate() + 1);
+      itens.push({ ...itens[0], data_entrada: brDate(editCheckout), data_saida: brDate(dia) });
+    }
+    reservaApi.calcularPreco(itens).then((res) => {
+      if (cancelled) return;
+      const lista = Array.isArray(res) ? res : [res];
+      const calc  = lista[0];
+      const meia  = temMeiaEdit ? lista[1] : null;
+      const meiaValor = meia ? Math.round(((meia.valor_total ?? 0) / 2) * 100) / 100 : 0;
+      if (!calc || meiaValor <= 0) { setEditCalc(calc); return; }
+      const noite = meia.detalhes?.[0] ?? {};
+      setEditCalc({
+        ...calc,
+        valor_total: (calc.valor_total ?? 0) + meiaValor,
+        detalhes: [...(calc.detalhes ?? []), {
+          ...noite,
+          valor_final: meiaValor,
+          valor_criancas: noite.valor_criancas != null ? noite.valor_criancas / 2 : null,
+          meia_diaria: true,
+        }],
+      });
+    })
       .catch(() => {})
       .finally(() => { if (!cancelled) setEditCalcLoading(false); });
     return () => { cancelled = true; };
-  }, [editing, editQuarto[0], editCheckin, editCheckout, pessoas]); // eslint-disable-line
+  }, [editing, editQuarto[0], editCheckin, editCheckout, pessoas, temMeiaEdit, editHoraMeia]); // eslint-disable-line
 
   // ── Edit save (quarto/datas/obs) ──────────────────────────────────────────
   const [editSaving,    setEditSaving]    = useState(false);
@@ -1345,6 +1399,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         data_hora_checkin:  `${toBrDate(formatDate(editCheckin))} ${eci}`,
         data_hora_checkout: `${toBrDate(formatDate(editCheckout))} ${eco}`,
         observacao:         editObs.trim(),
+        hora_saida_meia_diaria: temMeiaEdit ? editHoraMeia : null,
         ...(valorTotal != null ? { valor_total: valorTotal } : {}),
       });
       setEditing(false);
@@ -1360,13 +1415,13 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     (editCheckin  ? formatDate(editCheckin)  : '') !== reserva.dataInicio ||
     (editCheckout ? formatDate(editCheckout) : '') !== reserva.dataFim;
 
-  const hasChangedData = hasChangedDatesOrRoom || editObs !== (reserva.observacao ?? '');
+  const hasChangedData = hasChangedDatesOrRoom || meiaMudou || editObs !== (reserva.observacao ?? '');
 
   // Sem arraste: o primeiro cálculo da edição vira o "antes", desde que quarto,
   // datas e pessoas ainda sejam os da reserva.
   useEffect(() => {
     if (!editing || dragValues || origCalc || !editCalc) return;
-    if (hasChangedDatesOrRoom || hasChanges) return;
+    if (hasChangedDatesOrRoom || meiaMudou || hasChanges) return;
     setOrigCalc(editCalc);
   }, [editing, editCalc, origCalc, hasChangedDatesOrRoom, hasChanges]); // eslint-disable-line
 
@@ -1378,18 +1433,33 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // ── Edit mode render ───────────────────────────────────────────────────────
   // No painel a edição abre ao lado da view, que continua visível à esquerda.
   const renderEdicao = () => {
+    // Botões de um dia a mais / a menos, nos mesmos limites dos calendários.
+    const somaDia = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+    const hoje0   = new Date(); hoje0.setHours(0, 0, 0, 0);
+    const ciAntes = editCheckin ? somaDia(editCheckin, -1) : null;
+    const podeCheckinAntes   = !!ciAntes && ciAntes >= hoje0 && !checkinBloqueados.has(formatDate(ciAntes))
+      && !occupancy.get(formatDate(editCheckin))?.am;
+    const podeCheckinDepois  = !!editCheckin && (!editCheckout || somaDia(editCheckin, 1) < editCheckout);
+    const podeCheckoutAntes  = !!editCheckout && (!editCheckin || somaDia(editCheckout, -1) > editCheckin);
+    const podeCheckoutDepois = !!editCheckout && (!maxCheckout || somaDia(editCheckout, 1) <= maxCheckout);
+
     // ── Valores (diárias + totais) — mesma lista da view e do passo "Resumo &
     //    Pagamento", compartilhada pelas abas Pessoas e Pagamentos.
     //    O /calcular-preco devolve o preço de tabela, então o ajuste manual salvo
     //    ("Gerenciar Preços") é reaplicado por cima.
-    const valDetalhes    = editCalc?.detalhes ?? [];
+    // Sem mudar quarto/datas, valem as diárias gravadas — as mesmas da tabela da view.
+    const valGravadas    = (editActiveTab === 'pagamentos' && !hasChangedDatesOrRoom && !meiaMudou)
+      ? detalhesDasDiarias(reserva.diarias, pessoas, reserva.dataInicio)
+      : [];
+    const valPersistidas = valGravadas.length > 0;
+    const valDetalhes    = valPersistidas ? valGravadas : (editCalc?.detalhes ?? []);
     const valAdj         = reserva.novoPreco ? novoPrecoToState(reserva.novoPreco) : null;
     const valBaseDiarias = valDetalhes.map((d) => ({ valor: d.valor_final ?? 0 }));
     const valBaseTotal   = valBaseDiarias.reduce((acc, d) => acc + d.valor, 0);
-    const valAdjResult   = valAdj
+    const valAdjResult   = (valAdj && !(valAdj.mode === 'diaria' && valPersistidas))
       ? computeAdjustedTotal({ baseTotal: valBaseTotal, baseDiarias: valBaseDiarias, ...valAdj })
       : null;
-    const valIsDiariaAdj = valAdj?.mode === 'diaria';
+    const valIsDiariaAdj = valAdj?.mode === 'diaria' && !valPersistidas;
     const valDiariaValor = valIsDiariaAdj ? (valAdjResult?.diarias?.[0]?.valor ?? 0) : null;
     const valTotal       = valDetalhes.length > 0
       ? (valAdjResult ? valAdjResult.valorTotal : valBaseTotal)
@@ -1406,7 +1476,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     // entrar no modo de edição, então não acompanha o que está sendo alterado.
     // O casamento é pela noite (data da descrição), para seguir correto quando a
     // edição muda o período; sem descrição (pernoite), cai na posição.
-    const valOrigDetalhes = origCalc?.detalhes ?? [];
+    const valOrigDetalhes = valPersistidas ? [] : (origCalc?.detalhes ?? []);
     const valOrigPorNoite = new Map();
     valOrigDetalhes.forEach((d, i) => {
       valOrigPorNoite.set(periodoDiaria(d.descricao) || `#${i}`, d.valor_final ?? 0);
@@ -1425,7 +1495,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       const showPend    = !valQuitado && valPendente > 0.005;
       return (
         <>
-          {editCalcLoading && valGrupos.length === 0 && (
+          {!valPersistidas && editCalcLoading && valGrupos.length === 0 && (
             <div className={styles.rcSectionLabel}>{tr('Calculando…')}</div>
           )}
           {valGrupos.map((g, gi) => (
@@ -1484,7 +1554,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
     return (
       <>
-      <PainelReserva inline={inline} acao saindo={saindo} open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
+      <PainelReserva inline={inline} acao largo={editActiveTab === 'dados'} saindo={saindo} open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
         containerStyle={editActiveTab === 'dados' ? { maxWidth: 'min(640px, 96vw)' } : undefined}
         hideHeader
         bodyStyle={{ padding: 0, gap: 0 }}
@@ -1538,35 +1608,66 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     o período escolhido e a ocupação do quarto. */}
                 <div className={styles.editDatesGrid}>
                   <FormField label={tr('Check-in')}>
-                    <div className={styles.dateCompact}>
-                      {/* Abre para cima: o calendário fica ao lado (telas largas)
-                          ou logo abaixo (estreitas) e não deve ser coberto. */}
-                      <DatePicker mode="single" value={editCheckin}
-                        onChange={(d) => {
-                          setEditCheckin(d);
-                          const max = maxCheckoutFor(d);
-                          if (editCheckout && d && (editCheckout <= d || (max && editCheckout > max))) {
-                            setEditCheckout(null);
-                          }
-                        }}
-                        minDate={new Date()}
-                        disabledDates={checkinBloqueados}
-                        placement="top"
-                        placeholder={tr('Data de check-in')} />
+                    <div className={styles.dataPasso}>
+                      <button type="button" className={styles.dataPassoBtn}
+                        disabled={!podeCheckinAntes} onClick={() => mudaCheckin(somaDia(editCheckin, -1))}
+                        title={tr('Um dia antes')} aria-label={tr('Um dia antes')}><Minus size={14} /></button>
+                      <div className={styles.dateCompact}>
+                        <DatePicker mode="single" value={editCheckin}
+                          onChange={mudaCheckin}
+                          minDate={new Date()}
+                          disabledDates={checkinBloqueados}
+                          placeholder={tr('Data de check-in')} />
+                      </div>
+                      <button type="button" className={styles.dataPassoBtn}
+                        disabled={!podeCheckinDepois} onClick={() => mudaCheckin(somaDia(editCheckin, 1))}
+                        title={tr('Um dia depois')} aria-label={tr('Um dia depois')}><Plus size={14} /></button>
                     </div>
                   </FormField>
                   <FormField label={tr('Check-out')}>
-                    <div className={styles.dateCompact}>
-                      {/* align="end" + placement="top": abre para cima e para a
-                          esquerda, sem avançar sobre o calendário. */}
-                      <DatePicker mode="single" value={editCheckout}
-                        onChange={setEditCheckout}
-                        minDate={editCheckin ?? undefined}
-                        maxDate={maxCheckout ?? undefined}
-                        align="end" placement="top"
-                        placeholder={tr('Data de check-out')} />
+                    <div className={styles.dataPasso}>
+                      <button type="button" className={styles.dataPassoBtn}
+                        disabled={!podeCheckoutAntes} onClick={() => setEditCheckout(somaDia(editCheckout, -1))}
+                        title={tr('Um dia antes')} aria-label={tr('Um dia antes')}><Minus size={14} /></button>
+                      <div className={styles.dateCompact}>
+                        <DatePicker mode="single" value={editCheckout}
+                          onChange={setEditCheckout}
+                          minDate={editCheckin ?? undefined}
+                          maxDate={maxCheckout ?? undefined}
+                          placeholder={tr('Data de check-out')} />
+                      </div>
+                      <button type="button" className={styles.dataPassoBtn}
+                        disabled={!podeCheckoutDepois} onClick={() => setEditCheckout(somaDia(editCheckout, 1))}
+                        title={tr('Um dia depois')} aria-label={tr('Um dia depois')}><Plus size={14} /></button>
                     </div>
                   </FormField>
+                  {editCheckout && (
+                    <div className={styles.meiaDiariaBox}>
+                      <label className={styles.empresaModeToggle}>
+                        <input type="checkbox" checked={editMeia} disabled={meiaBloqueada && !editMeia}
+                          onChange={(e) => {
+                            setEditMeia(e.target.checked);
+                            if (!e.target.checked) setEditHoraMeia('');
+                          }} />
+                        <span>{tr('Meia diária')}</span>
+                      </label>
+                      {editMeia && (
+                        <div className={styles.meiaDiariaRow}>
+                          <span className={styles.meiaDiariaLabel}>{tr('Hora de saída')}</span>
+                          <div className={styles.meiaDiariaInput}>
+                            <TimeInput value={editHoraMeia} onChange={setEditHoraMeia} />
+                          </div>
+                          <span className={temMeiaEdit ? styles.meiaDiariaAviso : styles.meiaDiariaHint}>
+                            {meiaBloqueada
+                              ? tr('O quarto tem entrada na tarde de {{v0}}', { v0: fmtDateBR(formatDate(editCheckout)) })
+                              : temMeiaEdit
+                                ? tr('Meio valor da diária de {{v0}}', { v0: fmtDateBR(formatDate(editCheckout)) })
+                                : tr('Informe uma hora após o checkout da categoria ({{checkoutCatHora}})', { checkoutCatHora: editCatCheckout })}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className={[styles.editFieldCap, styles.editObsGrow].join(' ')}>
@@ -2130,28 +2231,40 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
           </div>
           {(pagamentos.length > 0 || effectiveDetalhes.length > 0 || cardTotal > 0 || groupInfo) && (() => {
+            // Mesmo desenho da aba Pagamentos: lançamentos, diárias agrupadas, total e pendente.
             const ajuste    = baseTotal > 0 ? cardTotal - baseTotal : 0;
+            const grupos    = groupDiarias(effectiveDetalhes, isDiariaAdj ? () => diariaAdjValor : null);
+            const pendente  = Math.max(0, cardTotal - totalPago);
+            const pagosLista = pagamentoDeGrupo ? [] : pagamentos.filter((p) => !p.cancelado);
             return (
               <aside className={styles.finResumo}>
                 <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
-                <div className={styles.finLinha}><span>{tr('Diárias')}</span><b>{fmtBRL(baseTotal > 0 ? baseTotal : cardTotal)}</b></div>
-                {Math.abs(ajuste) >= 0.005 && (
-                  <div className={styles.finLinha}><span>{tr('Ajuste de preço')}</span><b>{ajuste > 0 ? '+' : ''}{fmtBRL(ajuste)}</b></div>
+                {grupos.map((g) => (
+                  <div key={g.key} className={styles.finLinha}>
+                    <span>
+                      {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
+                      {diariaSubs(g) && <small className={styles.finSub}> · {diariaSubs(g)}</small>}
+                    </span>
+                    <b>{g.qtd > 1 && <small className={styles.finSub}>{g.qtd}{tr('x')} </small>}{fmtBRL(g.valor)}</b>
+                  </div>
+                ))}
+                {grupos.length === 0 && (
+                  <div className={styles.finLinha}><span>{tr('Diárias')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                )}
+                {priceAdj && !isDiariaAdj && Math.abs(ajuste) >= 0.005 && (
+                  <div className={styles.finLinha}><span>{describeAdjustment(priceAdj)}</span><b>{ajuste > 0 ? '+' : ''}{fmtBRL(ajuste)}</b></div>
                 )}
                 <hr className={styles.finSep} />
-                <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total da reserva')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                {pagosLista.map((p) => (
+                  <div key={p.id} className={[styles.finLinha, styles.finPago].join(' ')}>
+                    <span>{p.descricao || p.formaPagamento || tr('Pagamento')}</span><b>{fmtBRL(p.valor)}</b>
+                  </div>
+                ))}
                 {!pagamentoDeGrupo && (pagoIntegral ? (
                   <p className={styles.finQuitado}><Check size={15} /> {tr('Pago integralmente')}</p>
-                ) : (
-                  <>
-                    {totalPago > 0.005 && (
-                      <div className={[styles.finLinha, styles.finPago].join(' ')}><span>{tr('Pago')}</span><b>{fmtBRL(totalPago)}</b></div>
-                    )}
-                    {temPendente && (
-                      <div className={[styles.finLinha, styles.finPend].join(' ')}><span>{tr('Saldo pendente')}</span><b>{fmtBRL(displayPendente)}</b></div>
-                    )}
-                    <p className={styles.finSituacao}><Clock size={14} /> {totalPago > 0.005 ? tr('Pagamento parcial') : tr('Aguardando pagamento')}</p>
-                  </>
+                ) : pendente > 0.005 && (
+                  <div className={[styles.finLinha, styles.finPend].join(' ')}><span>{tr('Pendente')}</span><b>{fmtBRL(pendente)}</b></div>
                 ))}
 
           {groupInfo && (() => {
@@ -2266,7 +2379,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                             </span>
                           </span>
                         </td>
-                        <td>{p.dataRegistro || '—'}</td>
+                        <td><DataHora valor={p.dataRegistro} /></td>
                         <td className={styles.dtTrunca}>{p.nomePagador || '—'}</td>
                         <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(p.valor)}</td>
                       </tr>
@@ -2276,35 +2389,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               </div>
             </div>
           )}
-
-          {/* ── Consumo ── */}
-          <div className={styles.rcSection}>
-            <div className={styles.rcSectionHead}>
-              <span className={styles.rcSectionLabel}>{tr('Consumo')}</span>
-            </div>
-            <div className={styles.dtScroll}>
-              <table className={styles.dtTable}>
-                <thead><tr>
-                  <th>{tr('Item')}</th><th>{tr('Qtd.')}</th><th>{tr('Data')}</th><th className={styles.dtDir}>{tr('Total')}</th>
-                </tr></thead>
-                <tbody>
-                  {(reserva.consumos ?? []).length === 0 ? (
-                    <tr><td colSpan={4} className={styles.dtVazio}>{tr('Nenhum consumo registrado.')}</td></tr>
-                  ) : reserva.consumos.map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <span className={styles.dtCelTit}>{c.descricao}</span>
-                        <span className={styles.dtCelSub}>{fmtBRL(c.valorUnitario)} {tr('cada')}{c.despesaPessoal ? ` · ${tr('despesa pessoal')}` : ''}</span>
-                      </td>
-                      <td>{String(c.quantidade).padStart(2, '0')}</td>
-                      <td>{(c.data || '').slice(0, 10) || '—'}</td>
-                      <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(c.valorTotal)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
 
           {/* ── Cancelamento / Observação ── */}
           {reserva.status === 'cancelado' && reserva.motivoCancelamento ? (
@@ -2566,6 +2650,42 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         valorPago={totalPago}
       />
 
+      {inline ? (!editing && viewPagamento && (
+        <PainelReserva inline acao pag open onClose={() => setViewPagamento(null)}
+          title={<><DollarSign size={15} /> {tr('Detalhes do Pagamento')}</>}>
+          <div className={styles.pagRecibo}>
+            <span className={[styles.pagDetIcone, viewPagamento.cancelado ? styles.finPgIconOff : ''].join(' ')}>{iconePagamento(viewPagamento.formaPagamento)}</span>
+            <p className={[styles.pagReciboValor, viewPagamento.cancelado ? styles.pagDetRiscado : ''].join(' ')}>{fmtBRL(viewPagamento.valor)}</p>
+            <span className={[styles.dtStatus, viewPagamento.cancelado ? styles.dtStatus_cancelado : styles.pagDetAtivo].join(' ')}>
+              {viewPagamento.cancelado ? tr('Cancelado') : tr('Ativo')}
+            </span>
+
+            <h5 className={styles.pagDetSecao}>{tr('Pagamento')}</h5>
+            <div className={styles.pagReciboLista}>
+              <div><span>{tr('Forma')}</span><b>{viewPagamento.formaPagamento || '—'}</b></div>
+              <div><span>{tr('Pagador')}</span><b>{viewPagamento.nomePagador || '—'}</b></div>
+              {viewPagamento.descricao && <div><span>{tr('Descrição')}</span><b>{viewPagamento.descricao}</b></div>}
+            </div>
+
+            <h5 className={styles.pagDetSecao}>{tr('Registro')}</h5>
+            <div className={styles.pagReciboLista}>
+              <div><span>{tr('Registrado por')}</span><b>{viewPagamento.funcionario || '—'}</b></div>
+              <div><span>{tr('Data')}</span><b>{viewPagamento.dataRegistro || '—'}</b></div>
+            </div>
+
+            {viewPagamento.cancelado && (
+              <>
+                <h5 className={[styles.pagDetSecao, styles.pagDetSecaoCancel].join(' ')}>{tr('Cancelamento')}</h5>
+                <div className={styles.pagReciboLista}>
+                  <div><span>{tr('Cancelado por')}</span><b>{viewPagamento.funcMotivo || '—'}</b></div>
+                  <div><span>{tr('Data')}</span><b>{viewPagamento.dataMotivo || '—'}</b></div>
+                  {viewPagamento.motivoCancelamento && <div><span>{tr('Motivo')}</span><b>{viewPagamento.motivoCancelamento}</b></div>}
+                </div>
+              </>
+            )}
+          </div>
+        </PainelReserva>
+      )) : (
       <Modal open={!editing && !!viewPagamento} onClose={() => setViewPagamento(null)} size="sm"
         title={tr('Detalhes do Pagamento')}
         footer={<div className={styles.footerRight}><Button onClick={() => setViewPagamento(null)}>{tr('Fechar')}</Button></div>}
@@ -2643,6 +2763,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           </div>
         )}
       </Modal>
+      )}
 
       <Modal open={!editing && !!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
         title={tr('Cancelar Pagamento')}
@@ -2956,7 +3077,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                       <span className={styles.dtCelTit}>{p.formaPagamento || p.descricao || tr('Pagamento')}</span>
                     </span>
                   </td>
-                  <td>{p.dataRegistro || '—'}</td>
+                  <td><DataHora valor={p.dataRegistro} /></td>
                   <td className={styles.dtTrunca}>{p.nomePagador || '—'}</td>
                   <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(p.valor)}</td>
                 </tr>

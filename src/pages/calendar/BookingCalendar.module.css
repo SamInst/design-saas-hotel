@@ -3551,6 +3551,9 @@
 .finTotal, .finTotal b { color: var(--l-fg, var(--text)); font-weight: 700; font-size: 13.5px; }
 .finPago b { color: oklch(0.5 0.12 158); }
 .finPend b { color: #b45309; }
+.finLinha > span { min-width: 0; color: var(--l-fg, var(--text)); }
+.finSub { font-size: 11.5px; font-weight: 400; color: var(--l-muted-fg, var(--text-2)); }
+.finPend, .finPend b { color: #b91c1c; font-weight: 600; }
 .finSep { width: 100%; height: 1px; margin: 2px 0; border: none; background: var(--border); }
 .finSituacao { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--l-muted-fg, var(--text-2)); }
 .finQuitado { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: oklch(0.5 0.12 158); }
@@ -3713,15 +3716,16 @@
 .rvGaveta .rvCorpo { grid-template-columns: minmax(0, 1fr); }
 .rvGaveta .finResumo { margin: 0 18px 16px; }
 .rvGaveta:not(.rvGavetaAcao) { width: min(560px, 100%); }
-.rvGavetaAcao { width: clamp(360px, calc(100% - 572px), 560px); }
-.rvGavetaAcao.rvGavetaPag { width: clamp(340px, calc(100% - 572px), 400px); }
+.rvGavetaReserva:not(.rvGavetaAcao) { width: min(500px, 100%); }
+.rvGavetaAcao { width: clamp(360px, calc(100% - 512px), 560px); }
+.rvGavetaAcao.rvGavetaPag { width: clamp(340px, calc(100% - 512px), 400px); }
 .slotDireita:has(.rvGavetaAcao) .rvGaveta:not(.rvGavetaAcao) {
-  right: calc(clamp(360px, calc(100% - 572px), 560px) + 12px);
-  width: min(560px, calc(100% - 372px));
+  right: calc(clamp(360px, calc(100% - 512px), 560px) + 12px);
+  width: min(500px, calc(100% - 372px));
 }
 .slotDireita:has(.rvGavetaPag) .rvGaveta:not(.rvGavetaAcao) {
-  right: calc(clamp(340px, calc(100% - 572px), 400px) + 12px);
-  width: min(560px, calc(100% - 352px));
+  right: calc(clamp(340px, calc(100% - 512px), 400px) + 12px);
+  width: min(500px, calc(100% - 352px));
 }
 @container direita (min-width: 900px) {
   .slotDireita:has(.rvGavetaAcao) .rvGaveta:not(.rvGavetaAcao) { display: flex; }
@@ -3913,3 +3917,66 @@
 .barAvatar { border-radius: 5px; }
 .skBarra { border-radius: 6px; }
 .barStatusTag, .barStatusTagInline { border-radius: 4px; }
+.dtDataHora { display: flex; flex-direction: column; line-height: 1.25; white-space: nowrap; }
+.dtDataHora small { font-size: 11px; color: var(--l-muted-fg, var(--text-2)); }
+.pagDetIcone { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--l-r-md); border: 1px solid var(--border); background: var(--l-bg); }
+.pagDetIcone img { width: 22px; height: 22px; }
+.pagDetRiscado { text-decoration: line-through; color: var(--l-muted-fg); }
+.pagDetAtivo { color: oklch(0.5 0.12 158); border-color: color-mix(in oklch, oklch(0.5 0.12 158) 35%, transparent); }
+.pagDetSecao { align-self: stretch; margin: 12px 0 0; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--l-muted-fg); }
+.pagDetSecao + .pagReciboLista { margin-top: 4px; }
+.pagDetSecaoCancel { color: #b91c1c; }
+.rvGavetaPag:has(.pagDetIcone) { bottom: auto; max-height: 100%; }
+.rvGavetaPag:has(.pagDetIcone) .rvPainelCorpo { flex: 0 1 auto; padding-bottom: 18px; }
+.rvGavetaPag:has(.pagDetIcone) .pagReciboLista:last-child > div:last-child { border-bottom: none; }
+.rvGaveta .rvDestaque .ovDateValue { font-size: 13px; }
+.rvGaveta .rvDestaque .ovNightsNum { font-size: 14px; }
+.rvGaveta .rvDestaque .ovDateLabel, .rvGaveta .rvDestaque .ovNightsLabel { font-size: 9px; }
+/* Edição na gaveta: tudo em uma coluna */
+.rvGavetaAcao .detailTabContent { height: auto; max-height: none; overflow: visible; padding: 0; }
+.rvGavetaAcao .editDados { display: flex; flex-direction: column; gap: 14px; padding: 0 18px 18px; }
+.rvGavetaAcao .editFieldCap { max-width: none; }
+.rvGavetaAcao .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rvGavetaAcao .editDatesGrid .dateCompact > div > div > input { flex: 1 1 auto; width: auto; min-width: 0; }
+.rvGavetaAcao .editObsGrow, .rvGavetaAcao .editObsGrow > div { display: block; }
+.rvGavetaAcao .editObsGrow textarea { width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box; }
+.rvGavetaAcao .editDadosCal > div:first-child { width: 100%; box-sizing: border-box; }
+.rvGavetaAcao .editCalLegend { grid-column: auto; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+
+/* ── Editar reserva: gaveta larga, a view fecha e o calendário vai para a direita ── */
+.slotDireita:has(.rvGavetaLarga) .rvGaveta:not(.rvGavetaAcao) { display: none !important; }
+.rvGavetaAcao.rvGavetaLarga { width: min(574px, 100%); }
+.rvGavetaLarga .editDadosRoot {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 250px);
+  grid-template-rows: auto auto 1fr; gap: 14px 16px; padding: 0 16px 16px;
+}
+.rvGavetaLarga .editDadosRoot > .rcCard { grid-column: 1; grid-row: 1; border: none; }
+.rvGavetaLarga .editDadosRoot > .rcCard .rcSection { padding-left: 0; padding-right: 0; }
+.rvGavetaLarga .editDados { display: contents; }
+.rvGavetaLarga .editDadosForm { grid-column: 1; grid-row: 2 / 4; }
+.rvGavetaLarga .editDadosCal { grid-column: 2; grid-row: 1 / 3; padding-top: 14px; }
+.rvGavetaLarga .editCalLegend { grid-column: 2; grid-row: 3; align-self: start; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+@container direita (max-width: 560px) {
+  .rvGavetaLarga .editDadosRoot { display: flex; flex-direction: column; }
+  .rvGavetaLarga .editDados { display: flex; padding: 0; }
+}
+.rvGavetaAcao .editDatesGrid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.rvGavetaAcao .motivoTextarea { background: transparent; }
+
+/* um dia a mais / a menos ao lado da data */
+.dataPasso { display: flex; align-items: center; gap: 6px; }
+.dataPasso > .dateCompact { flex: 1; min-width: 0; }
+.dataPassoBtn {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 7px;
+  background: var(--l-card); color: var(--l-fg);
+  transition: border-color .15s, color .15s;
+}
+.dataPassoBtn:hover:not(:disabled) { border-color: var(--l-primary); color: var(--l-primary); }
+.dataPassoBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+.dataPassoBtn:disabled { opacity: .4; cursor: not-allowed; }
+.rvGavetaAcao .meiaDiariaBox { margin-top: -4px; }
+.rvGavetaAcao .meiaDiariaRow { flex-wrap: wrap; }
+.rvGavetaLarga .editDadosCal > div:first-child { zoom: .88; }
+.rvGavetaLarga .editCalLegendItem { font-size: 10.5px; }
