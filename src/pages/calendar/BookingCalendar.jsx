@@ -2052,64 +2052,79 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const temOpcoes = !isOvernight && !['orcamento', 'solicitada', 'hospedado', 'finalizado', 'cancelado', 'ausente'].includes(reserva.status);
   // Hospedado/finalizado: sobra só o Voucher, que ocupa o mesmo lugar das opções.
   const soVoucher = !isOvernight && ['hospedado', 'finalizado', 'ausente'].includes(reserva.status);
-  const opcoesEl = temOpcoes ? (
-      <div className={styles.rvAcoesWrap}>
+  // Botões fixos no rodapé da view: pagamento, hospedar e o menu com as demais opções.
+  const rodapeEl = temOpcoes ? (
+    <div className={styles.rvRodape}>
+      <button type="button" className={styles.rvRodapeBtn} disabled={pagamentoDeGrupo}
+        title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
+        onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
+        <Plus size={15} /> {tr('Pagamento')}
+      </button>
+      <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeHospedar].join(' ')}
+        disabled={!canCheckin || voucherLoading}
+        title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
+        onClick={() => { setAcoesOpen(false); setConfirmPernoite(true); }}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> {tr('Hospedar')}
+      </button>
+      <div className={styles.rvRodapeMais}>
         {acoesOpen && (
           <>
             <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
-            <div className={styles.rvAcoesMenu}>
-              <div className={styles.rvAcoesTit}>{tr('Opções')}</div>
+            <div className={styles.rvRodapeMenu} role="menu">
               <button className={styles.rvAcoesItem} disabled={voucherLoading}
                 onClick={() => { setAcoesOpen(false); handleVoucherClick(); }}>
-                {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <FileDown size={15}/>} {voucherLoading ? tr('Gerando...') : tr('Voucher')}
+                <FileDown size={15}/> {tr('Voucher')}
+              </button>
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
+                <Pencil size={15}/> {tr('Editar reserva')}
               </button>
               <div className={styles.rvAcoesDiv} />
-              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                <Pencil size={15}/> {tr('Editar')}
-              </button>
               <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
-                <Users size={15}/> {tr('Gerenciar Pessoas')}
+                <Users size={15}/> {tr('Gerenciar pessoas')}
               </button>
               <button className={styles.rvAcoesItem}
                 disabled={pagamentoDeGrupo}
                 title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
                 onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
-                <DollarSign size={15}/> {tr('Gerenciar Pagamentos')}
+                <DollarSign size={15}/> {tr('Gerenciar pagamentos')}
               </button>
               <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
-                <Tag size={15}/> {tr('Gerenciar Preços')}
+                <Tag size={15}/> {tr('Gerenciar preços')}
               </button>
+              <div className={styles.rvAcoesDiv} />
               {reserva.status === 'confirmada' && (
                 <button className={styles.rvAcoesItem}
                   onClick={() => { setAcoesOpen(false); setConfirmAusente(true); }}>
-                  <UserX size={15}/> {tr('Reserva Ausente')}
+                  <UserX size={15}/> {tr('Marcar como ausente')}
                 </button>
               )}
-              <div className={styles.rvAcoesDiv} />
               <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
                 onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setConfirmCancel(true); }}>
-                <Trash2 size={14}/> {tr('Cancelar')}
-              </button>
-              <button className={[styles.rvAcoesItem, styles.rvAcoesItemPrimary].join(' ')}
-                disabled={!canCheckin || voucherLoading}
-                title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
-                onClick={() => { setAcoesOpen(false); setConfirmPernoite(true); }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                {tr('Hospedar')}
+                <Trash2 size={14}/> {tr('Cancelar reserva')}
               </button>
             </div>
           </>
         )}
-        <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={() => setAcoesOpen((v) => !v)}>
-          {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : null}{tr('Opções')} <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />
+        <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeSeta].join(' ')}
+          onClick={() => setAcoesOpen((v) => !v)} aria-haspopup="menu" aria-expanded={acoesOpen}
+          title={tr('Opções')} aria-label={tr('Opções')}>
+          {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <ChevronDown size={16} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />}
         </button>
       </div>
+    </div>
+  ) : soVoucher ? (
+    <div className={styles.rvRodape}>
+      <button type="button" className={styles.rvRodapeBtn} disabled={voucherLoading} onClick={handleVoucherClick}>
+        {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <FileDown size={15}/>} {voucherLoading ? tr('Gerando...') : tr('Voucher')}
+      </button>
+    </div>
   ) : null;
 
   return (
     <>
       {/* Card único no mesmo desenho do passo "Resumo & Pagamento" da criação. */}
       <PainelReserva inline={inline} saindo={saindo} open onClose={handleClose} size="lg" hideHeader closeOnBackdrop
+        footer={rodapeEl}
         bodyStyle={{ padding: '14px 16px 16px', gap: 12 }}
         containerStyle={{ maxWidth: overnight ? 'min(518px, 96vw)' : 'min(628px, 96vw)' }}
       >
@@ -2163,14 +2178,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.ovNightsCell}>
                   <div className={styles.ovNightsNum}>{guestList.length}</div>
                   <div className={styles.ovNightsLabel}>{guestList.length === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
-                </div>
-              )}
-              {opcoesEl && <div className={styles.rvOpcoesCell}>{opcoesEl}</div>}
-              {soVoucher && (
-                <div className={styles.rvOpcoesCell}>
-                  <button className={styles.rvAcoesBtn} disabled={voucherLoading} onClick={handleVoucherClick}>
-                    {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <FileDown size={15}/>} {voucherLoading ? tr('Gerando...') : tr('Voucher')}
-                  </button>
                 </div>
               )}
             </div>

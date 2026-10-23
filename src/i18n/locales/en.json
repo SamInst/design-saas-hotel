@@ -1739,5 +1739,11 @@
   "Reservando o quarto no calendário": "Booking the room on the calendar",
   "Um dia antes": "One day earlier",
   "Um dia depois": "One day later",
-  "O quarto tem entrada na tarde de {{v0}}": "The room has a check-in on the afternoon of {{v0}}"
+  "O quarto tem entrada na tarde de {{v0}}": "The room has a check-in on the afternoon of {{v0}}",
+  "Editar reserva": "Edit booking",
+  "Gerenciar pessoas": "Manage guests",
+  "Gerenciar pagamentos": "Manage payments",
+  "Gerenciar preços": "Manage prices",
+  "Marcar como ausente": "Mark as no-show",
+  "Cancelar reserva": "Cancel booking"
 }

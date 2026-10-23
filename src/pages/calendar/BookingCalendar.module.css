@@ -58,7 +58,7 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
-@media (min-width: 1024px) { .split { grid-template-columns: 420px minmax(0, 1fr); } }
+@media (min-width: 1024px) { .split { grid-template-columns: 336px minmax(0, 1fr); } }
 
 .sidePanel {
   min-height: 0; overflow-y: auto;
@@ -3929,9 +3929,6 @@
 .rvGavetaPag:has(.pagDetIcone) { bottom: auto; max-height: 100%; }
 .rvGavetaPag:has(.pagDetIcone) .rvPainelCorpo { flex: 0 1 auto; padding-bottom: 18px; }
 .rvGavetaPag:has(.pagDetIcone) .pagReciboLista:last-child > div:last-child { border-bottom: none; }
-.rvGaveta .rvDestaque .ovDateValue { font-size: 13px; }
-.rvGaveta .rvDestaque .ovNightsNum { font-size: 14px; }
-.rvGaveta .rvDestaque .ovDateLabel, .rvGaveta .rvDestaque .ovNightsLabel { font-size: 9px; }
 /* Edição na gaveta: tudo em uma coluna */
 .rvGavetaAcao .detailTabContent { height: auto; max-height: none; overflow: visible; padding: 0; }
 .rvGavetaAcao .editDados { display: flex; flex-direction: column; gap: 14px; padding: 0 18px 18px; }
@@ -3980,3 +3977,42 @@
 .rvGavetaAcao .meiaDiariaRow { flex-wrap: wrap; }
 .rvGavetaLarga .editDadosCal > div:first-child { zoom: .88; }
 .rvGavetaLarga .editCalLegendItem { font-size: 10.5px; }
+.rvGavetaAcao.rvGavetaPag:has(.pagDetIcone) { width: min(300px, 100%); }
+.slotDireita:has(.pagDetIcone) .rvGaveta:not(.rvGavetaAcao) {
+  right: 312px;
+  width: min(500px, calc(100% - 312px));
+}
+.sideFiltroBtn, .sideFiltroBtnOn { border-color: transparent; }
+.sideFiltroBtn:hover { background: transparent; }
+.sideFiltroBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+
+/* ── Rodapé fixo da view da reserva ────────────────────────────────────────── */
+.rvGavetaReserva .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
+.rvRodape { flex: 1; display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.rvRodapeBtn {
+  flex: 1 1 0; min-width: 0; height: 40px; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: var(--l-r-md);
+  background: var(--l-card); color: var(--l-fg);
+  font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.rvRodapeBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--l-accent) 45%, var(--l-card)); }
+.rvRodapeBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+.rvRodapeBtn:disabled { opacity: .5; cursor: not-allowed; }
+.rvRodapeHospedar { flex-grow: 1.6; border-color: transparent; background: oklch(0.55 0.12 165); color: #fff; }
+.rvRodapeHospedar:hover:not(:disabled) { background: oklch(0.5 0.12 165); }
+.rvRodapeMais { position: relative; flex-shrink: 0; display: flex; }
+.rvRodapeSeta { flex: 0 0 40px; width: 40px; padding: 0; }
+.rvRodapeMenu {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 30;
+  width: 232px; padding: 6px;
+  display: flex; flex-direction: column; gap: 1px;
+  border: 1px solid var(--border); border-radius: var(--l-r-lg);
+  background: var(--l-card); box-shadow: 0 12px 32px rgb(15 23 42 / 0.16);
+  animation: rodapeMenuEntra .14s ease-out;
+}
+@keyframes rodapeMenuEntra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rvRodapeMenu { animation: none; } }
+.rvRodapeMenu .rvAcoesItem { padding: 8px 10px; gap: 10px; font-size: 13px; font-weight: 500; border-radius: var(--l-r-md); }
+.rvRodapeMenu .rvAcoesDiv { margin: 4px 2px; }
