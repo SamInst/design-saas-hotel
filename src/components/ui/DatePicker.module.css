@@ -54,7 +54,7 @@
 .headBtn {
   flex:1; font-size:13px; font-weight:700; color:var(--text);
   background:none; border:none; cursor:pointer; padding:2px 8px;
-  border-radius:6px; transition:background .12s, color .12s;
+  border-radius:3px; transition:background .12s, color .12s;
   text-align:center;
 }
 .headBtn:hover { background:rgba(124,58,237,.10); color:var(--violet); }

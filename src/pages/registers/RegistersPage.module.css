@@ -123,7 +123,7 @@
    cartão; quem marca a aba ativa é a pílula do .segmentedBtnActive. */
 .segmented {
   display: flex; gap: 4px;
-  border-radius: var(--l-r-lg);
+  border-radius: 3px;
   border: 1px solid var(--l-border);
   background: transparent;
   padding: 4px;
@@ -131,7 +131,7 @@
 /* flex-1 rounded-md px-3 py-1.5 text-xs font-semibold */
 .segmentedBtn {
   flex: 1; cursor: pointer;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   padding: 6px 12px;
   background: transparent; color: var(--l-muted-fg);
   font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
@@ -247,7 +247,7 @@
 .listItem {
   display: flex; align-items: center; gap: 12px;
   width: 100%; padding: 12px;
-  border-radius: var(--l-r-lg);
+  border-radius: 3px;
   border: 1px solid transparent; background: transparent;
   font-family: inherit; text-align: left; cursor: pointer;
   transition: background-color .15s, border-color .15s;
@@ -292,7 +292,7 @@
    `.page` na frente para vencer as classes do componente Button. */
 .page .btnSolid {
   gap: 0;
-  border-radius: var(--l-r-md);
+  border-radius: 3px;
   border: 1px solid transparent;
   padding: 8px 14px;
   font-size: 13px; font-weight: 600;
@@ -352,7 +352,7 @@
 .pageBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px;
-  border-radius: var(--l-r-md); border: 1px solid var(--l-border);
+  border-radius: 3px; border: 1px solid var(--l-border);
   background: var(--l-card); color: var(--l-muted-fg);
   cursor: pointer; transition: background-color .15s, color .15s;
 }
@@ -640,7 +640,7 @@
   align-items: center; justify-content: center;
   width: 28px; height: 28px; flex-shrink: 0;
   margin-left: -4px;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   background: transparent; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s;
 }
@@ -723,16 +723,15 @@
   max-width: 100%;
   margin: -5px 0 -5px -8px;
   padding: 5px 8px;
-  border-radius: var(--l-r-md);
+  border-radius: 3px;
   background: transparent; color: inherit;
   font: inherit; text-decoration: none;
   transition: background-color .15s, box-shadow .15s;
 }
 .contatoBtn:hover {
   background: var(--l-card);
-  box-shadow: 0 2px 8px -2px rgb(0 0 0 / .18);
 }
-.contatoBtn:active { box-shadow: 0 1px 3px -1px rgb(0 0 0 / .22); }
+.contatoBtn:active { }
 /* No escuro a sombra preta some sobre o card; a elevação vira um tom de fundo. */
 [data-theme='dark'] .contatoBtn:hover  { background: var(--l-accent); box-shadow: none; }
 [data-theme='dark'] .contatoBtn:active { background: var(--l-secondary); box-shadow: none; }
@@ -759,7 +758,7 @@
 /* ── Btn remove ── */
 .btnRemove {
   display:inline-flex; align-items:center; justify-content:center;
-  width:28px; height:28px; border-radius:var(--l-r-md);
+  width:28px; height:28px; border-radius:3px;
   border:1px solid var(--l-border); background:transparent;
   color:var(--l-muted-fg); cursor:pointer; transition:all .15s;
   flex-shrink:0; margin-left:auto;
@@ -982,7 +981,7 @@
 .btnEdit { width:26px; height:26px; margin-left:0; }
 .btnEdit {
   display:inline-flex; align-items:center; justify-content:center;
-  border-radius:var(--l-r-md); border:1px solid var(--l-border); background:transparent;
+  border-radius:3px; border:1px solid var(--l-border); background:transparent;
   color:var(--l-muted-fg); cursor:pointer; transition:all .15s; flex-shrink:0;
 }
 .btnEdit:hover {
@@ -1000,7 +999,7 @@
 .editorFoot { display:flex; align-items:center; gap:8px; margin-top:8px; }
 .editorFoot .optAdd { margin-top:0; }
 .btnGhost {
-  padding:7px 13px; border-radius:8px;
+  padding:7px 13px; border-radius:3px;
   border:1px solid var(--l-border); background:transparent;
   color:var(--l-muted-fg);
   font-family:inherit; font-size:12px; font-weight:600;
@@ -1644,7 +1643,7 @@
 .rvSituacao { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--l-muted-fg); }
 .rvBtnResumo {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  border-radius: var(--l-r-md); font-family: inherit; font-size: 12.5px; font-weight: 500;
+  border-radius: 3px; font-family: inherit; font-size: 12.5px; font-weight: 500;
   color: var(--l-fg); cursor: pointer; transition: background-color .15s;
 }
 .rvBtnResumo { padding: 9px 12px; border: 1px solid var(--l-border); background: var(--l-card); }

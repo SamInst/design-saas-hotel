@@ -221,7 +221,7 @@
 .listItem {
   display: flex; align-items: center; gap: 12px;
   width: 100%; padding: 12px;
-  border-radius: var(--l-r-lg);
+  border-radius: 3px;
   border: 1px solid transparent; background: transparent;
   font-family: inherit; text-align: left; cursor: pointer;
   transition: background-color .15s, border-color .15s;
@@ -264,7 +264,7 @@
    `.page` na frente para vencer as classes do componente Button. */
 .page .btnSolid {
   gap: 0;
-  border-radius: var(--l-r-md);
+  border-radius: 3px;
   border: 1px solid transparent;
   padding: 8px 14px;
   font-size: 13px; font-weight: 600;
@@ -312,7 +312,7 @@
 .pageBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px;
-  border-radius: var(--l-r-md); border: 1px solid var(--l-border);
+  border-radius: 3px; border: 1px solid var(--l-border);
   background: var(--l-card); color: var(--l-muted-fg);
   cursor: pointer; transition: background-color .15s, color .15s;
 }
@@ -419,7 +419,7 @@
   align-items: center; justify-content: center;
   width: 28px; height: 28px; flex-shrink: 0;
   margin-left: -4px;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   background: transparent; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s;
 }
@@ -475,16 +475,15 @@
   max-width: 100%;
   margin: -5px 0 -5px -8px;
   padding: 5px 8px;
-  border-radius: var(--l-r-md);
+  border-radius: 3px;
   background: transparent; color: inherit;
   font: inherit; text-decoration: none;
   transition: background-color .15s, box-shadow .15s;
 }
 .contatoBtn:hover {
   background: var(--l-card);
-  box-shadow: 0 2px 8px -2px rgb(0 0 0 / .18);
 }
-.contatoBtn:active { box-shadow: 0 1px 3px -1px rgb(0 0 0 / .22); }
+.contatoBtn:active { }
 /* No escuro a sombra preta some sobre o card; a elevação vira um tom de fundo. */
 [data-theme='dark'] .contatoBtn:hover  { background: var(--l-accent); box-shadow: none; }
 [data-theme='dark'] .contatoBtn:active { background: var(--l-secondary); box-shadow: none; }

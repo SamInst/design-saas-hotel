@@ -165,8 +165,8 @@
   background: transparent; color: var(--text-2); cursor: pointer;
   transition: background 0.12s, color 0.12s;
 }
-.navBtn:first-child { border-radius: var(--l-r-lg) 0 0 var(--l-r-lg); }
-.navBtn:last-child  { border-radius: 0 var(--l-r-lg) var(--l-r-lg) 0; }
+.navBtn:first-child { border-radius: 3px 0 0 3px; }
+.navBtn:last-child  { border-radius: 0 3px 3px 0; }
 .navBtn:hover { background: color-mix(in oklch, var(--l-accent) 70%, transparent); color: var(--text); }
 .monthLabel {
   font-size: 14px; font-weight: 600; color: var(--text); text-transform: capitalize;
@@ -176,7 +176,7 @@
 }
 .monthLabel:hover { color: var(--violet); }
 .todayBtn {
-  height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--l-r-md);
+  height: 40px; padding: 0 14px; border: 1px solid transparent; border-radius: 3px;
   background: var(--l-secondary); color: var(--l-secondary-fg);
   font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
   transition: background 0.15s, color 0.15s; flex-shrink: 0;
@@ -307,7 +307,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; padding: 0; z-index: 30;
   background: var(--l-card); border: 1px solid var(--border); border-radius: 50%;
-  color: var(--text-2); cursor: pointer; box-shadow: 0 1px 4px rgb(0 0 0 / 0.12);
+  color: var(--text-2); cursor: pointer;
   transition: background 0.12s, color 0.12s, border-color 0.12s;
 }
 .dayNavBtn:hover { background: var(--l-primary); color: var(--l-primary-fg); border-color: var(--l-primary); }
@@ -627,10 +627,10 @@
 .pessoaDetailVal { font-size: 12px; color: var(--text); }
 
 /* ── Remove / action icon button ───────────────────────────────────────────── */
-.removeIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
+.removeIconBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
 .removeIconBtn:hover { background: #fef2f2; border-color: #fecaca; color: #ef4444; }
 
-.makeTitularBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
+.makeTitularBtn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.1s, color 0.1s, border-color 0.1s; }
 .makeTitularBtn:hover { background: #fffbeb; border-color: #fde68a; color: #d97706; }
 
 /* ── Inline add-pessoa search ──────────────────────────────────────────────── */
@@ -642,7 +642,7 @@
 /* ── Add link button ───────────────────────────────────────────────────────── */
 
 /* ── Motivo cancelamento ───────────────────────────────────────────────────── */
-.motivoTextarea { width: 100%; resize: vertical; padding: 8px 10px; font-size: 13px; font-family: var(--font); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); outline: none; box-sizing: border-box; transition: border-color 0.15s; }
+.motivoTextarea { width: 100%; resize: vertical; padding: 8px 10px; font-size: 13px; font-family: var(--font); color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; outline: none; box-sizing: border-box; transition: border-color 0.15s; }
 .motivoTextarea:focus { border-color: var(--violet); }
 .motivoTextarea::placeholder { color: var(--text-2); }
 
@@ -837,7 +837,7 @@
 .roomHistoryHospedes { display: flex; align-items: center; gap: 4px; }
 .orcDownloadBtn {
   display: flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid #ef4444;
+  width: 32px; height: 32px; border-radius: 3px; border: 1px solid #ef4444;
   background: color-mix(in srgb, #ef4444 12%, transparent); color: #ef4444; cursor: pointer; flex-shrink: 0;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
@@ -949,7 +949,7 @@
 
 /* Legacy action btn classes — kept for safety */
 .orcListActions { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 0; flex-shrink: 0; }
-.orcActionBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.orcActionBtn { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 3px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; flex-shrink: 0; transition: background 0.12s, color 0.12s, border-color 0.12s; }
 .orcActionBtn:hover { background: var(--surface-2); color: var(--violet); border-color: var(--violet); }
 .orcActionBtnDanger:hover { background: color-mix(in srgb, #ef4444 10%, var(--surface)); color: #ef4444; border-color: #ef4444; }
 
@@ -1134,7 +1134,7 @@
 /* Sem Cadastro Hospedes Picker */
 .semCadastroAddRow { display: flex; align-items: center; gap: 8px; }
 .addOrcGuestBtn {
-  flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: var(--radius);
+  flex-shrink: 0; height: 36px; padding: 0 12px; border-radius: 3px;
   border: 1px solid var(--violet); background: var(--surface); color: var(--violet);
   display: flex; align-items: center; gap: 5px; cursor: pointer; white-space: nowrap;
   font-size: 12px; font-weight: 600;
@@ -1170,7 +1170,7 @@
 .periodoItemRoomNum { font-size: 12px; font-weight: 700; color: var(--text-2); min-width: 32px; }
 .periodoEditBtn {
   background: none; border: none; cursor: pointer; color: var(--text-2);
-  display: flex; align-items: center; padding: 2px; border-radius: 4px;
+  display: flex; align-items: center; padding: 2px; border-radius: 3px;
   transition: color 0.12s;
 }
 .periodoEditBtn:hover { color: var(--violet); }
@@ -1210,9 +1210,9 @@
 .companionName { font-size: 13px; font-weight: 500; color: var(--text); }
 .companionMeta { font-size: 11px; color: var(--text-2); }
 .companionActions { display: flex; justify-content: flex-end; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); }
-.companionBtnSecondary { padding: 5px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; font-family: inherit; }
+.companionBtnSecondary { padding: 5px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 12px; cursor: pointer; font-family: inherit; }
 .companionBtnSecondary:hover { background: var(--surface-2); }
-.companionBtnPrimary { padding: 5px 12px; border: none; border-radius: 6px; background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.companionBtnPrimary { padding: 5px 12px; border: none; border-radius: 3px; background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
 .companionBtnPrimary:hover { opacity: 0.88; }
 .titularChip { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--violet); padding: 1px 6px; border-radius: 4px; background: color-mix(in srgb, var(--violet) 10%, transparent); flex-shrink: 0; }
 .companionCountChip { font-size: 10px; font-weight: 600; color: var(--text-2); padding: 1px 5px; border-radius: 4px; background: var(--surface-2); flex-shrink: 0; }
@@ -1282,7 +1282,7 @@
 
 /* ── Room buttons ──────────────────────────────────────────────────────────── */
 .roomBtnRow { display: flex; flex-wrap: wrap; gap: 5px; }
-.roomBtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; min-width: 46px; transition: all 0.13s; }
+.roomBtn { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; min-width: 46px; transition: all 0.13s; }
 .roomBtn:hover:not(:disabled) { border-color: var(--violet); color: var(--violet); }
 .roomBtnSel    { background: var(--violet); border-color: var(--violet); color: #fff; }
 .roomBtnSel:hover { background: var(--violet); }
@@ -1396,7 +1396,7 @@
 .step3PayHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .step3AddPagBtn {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 6px;
+  padding: 3px 10px; border-radius: 3px;
   border: 1px solid #f97316; background: color-mix(in srgb, #f97316 10%, transparent);
   color: #f97316; font-size: 11px; font-weight: 600; cursor: pointer;
   font-family: inherit; transition: background 0.12s;
@@ -1969,7 +1969,7 @@
   display: flex; align-items: center; gap: 8px;
   width: 100%; padding: 8px 12px;
   border: none; background: none;
-  border-radius: 10px;
+  border-radius: 3px;
   color: var(--text-2); font-size: 12px; font-weight: 500;
   cursor: pointer; text-align: left;
   transition: background 0.12s, color 0.12s;
@@ -2007,14 +2007,14 @@
 .selectionCountSub { font-size: 12px; color: var(--text-2); font-weight: 400; }
 .selectionBtnPrimary {
   display: flex; align-items: center; gap: 6px;
-  padding: 7px 14px; border: none; border-radius: 9px;
+  padding: 7px 14px; border: none; border-radius: 3px;
   background: var(--violet); color: #fff; font-size: 12px; font-weight: 600; cursor: pointer;
 }
 .selectionBtnPrimary:not(:disabled):hover { background: color-mix(in srgb, var(--violet) 85%, #000); }
 .selectionBtnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
 .selectionBtnCancel {
   display: flex; align-items: center; gap: 5px;
-  padding: 7px 11px; border: none; border-radius: 9px;
+  padding: 7px 11px; border: none; border-radius: 3px;
   background: none; color: var(--text-2); font-size: 12px; font-weight: 500; cursor: pointer;
 }
 .selectionBtnCancel:hover { background: var(--surface-2); color: var(--text); }
@@ -2052,7 +2052,7 @@
 .pageBtn {
   display: flex; align-items: center; justify-content: center;
   min-width: 28px; height: 28px; padding: 0 6px;
-  border: 1px solid var(--border); border-radius: 6px;
+  border: 1px solid var(--border); border-radius: 3px;
   background: var(--surface); color: var(--text-2);
   font-size: 12px; font-weight: 600; font-family: inherit;
   cursor: pointer; transition: background 0.12s, color 0.12s;
@@ -2161,7 +2161,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 3px;
   border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.08);
   color: rgba(255,255,255,0.65);
@@ -2382,18 +2382,37 @@
 .rvGuestMeta { font-size: 11px; color: var(--text-2); margin-top: 1px; }
 
 .rvGuestContacts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.rvContactBtn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 30px; height: 30px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--surface);
-  cursor: pointer; transition: all 0.12s; text-decoration: none;
-}
-.rvContactBtnWa   { color: #16a34a; }
-.rvContactBtnWa:hover   { background: rgba(22,163,74,0.12); border-color: rgba(22,163,74,0.4); }
 /* Ícone em PNG (WhatsApp) dentro do botão de contato */
-.rvContactIcon { width: 17px; height: 17px; object-fit: contain; display: block; }
-.rvContactBtnMail { color: #2563eb; }
-.rvContactBtnMail:hover { background: rgba(37,99,235,0.12); border-color: rgba(37,99,235,0.4); }
+.rvContactIcon { width: 14px; height: 14px; object-fit: contain; display: block; flex-shrink: 0; }
+.rvContato { display: flex; align-items: center; gap: 6px; color: var(--l-fg, var(--text)); text-decoration: none; }
+.rvContato + .rvContato { margin-top: 2px; color: var(--l-muted-fg, var(--text-2)); }
+a.rvContato:hover span { text-decoration: underline; }
+/* Titular em destaque, com os contatos; acompanhantes vão para a tabela abaixo */
+.rvTitular {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap;
+  padding: 12px 14px; margin-bottom: 8px;
+  border: 1px solid var(--border); border-radius: 3px;
+}
+.rvTitularChip {
+  padding: 1px 6px; border: 1px solid currentColor; border-radius: 2px;
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: oklch(0.5 0.12 158);
+}
+.rvTitularInfo { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.rvTitularNome { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13.5px; font-weight: 400; color: var(--l-fg, var(--text)); }
+.rvTitularMeta { font-size: 12px; color: var(--l-muted-fg, var(--text-2)); font-variant-numeric: tabular-nums; }
+.rvTitularContatos { display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; min-width: 0; }
+.rvTitularContatos .rvContato > span { overflow-wrap: anywhere; }
+.rvObsEdit { display: flex; flex-direction: column; gap: 8px; }
+.rvObsEdit .motivoTextarea { background: none; }
+/* Botão simples no cabeçalho de cada tópico da view */
+.rvSecBtn {
+  padding: 2px 4px; border: none; background: none; border-radius: 3px;
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--l-primary, #2563eb);
+  cursor: pointer; white-space: nowrap;
+}
+.rvSecBtn:hover { text-decoration: underline; }
+.rvSecBtn:focus-visible { outline: 2px solid var(--l-primary, #2563eb); outline-offset: 1px; }
 
 /* Empty state */
 .rvEmptyState {
@@ -2682,7 +2701,7 @@
   justify-content: center;
   gap: 6px;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 3px;
   border: 1px solid transparent;
   font-size: 13px;
   font-weight: 600;
@@ -2697,7 +2716,7 @@
 .rvAcoesWrap { position: relative; margin-left: auto; }
 .rvAcoesBtn {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 9px 20px; border-radius: 9px; border: none;
+  padding: 9px 20px; border-radius: 3px; border: none;
   font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer;
   color: #fff; background: #0f172a;
   transition: background 0.12s;
@@ -2930,7 +2949,7 @@
 .rcCloseBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; padding: 0;
-  border: none; background: none; border-radius: 6px;
+  border: none; background: none; border-radius: 3px;
   color: var(--text-2); cursor: pointer;
   transition: color 0.12s ease;
 }
@@ -2984,7 +3003,7 @@
 .rcBtn {
   flex: 1; min-width: 150px;
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 12px; border-radius: 8px;
+  padding: 8px 12px; border-radius: 3px;
   border: 1px solid var(--border); background: var(--surface);
   color: var(--text); font-size: 13px; font-weight: 500; font-family: inherit;
   cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s;
@@ -3085,7 +3104,7 @@
 .rcToggleBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; padding: 0;
-  border: none; background: none; border-radius: 6px;
+  border: none; background: none; border-radius: 3px;
   color: var(--text-2); cursor: pointer;
   transition: color 0.12s ease;
 }
@@ -3271,7 +3290,7 @@
 
 /* Botões no padrão de Cadastros */
 .page .btnSolid {
-  height: 40px; gap: 6px; border-radius: var(--l-r-md); border: 1px solid transparent;
+  height: 40px; gap: 6px; border-radius: 3px; border: 1px solid transparent;
   padding: 0 14px; font-size: 13px; font-weight: 600;
   background: var(--l-secondary); color: var(--l-secondary-fg);
   box-shadow: none; transition: background-color .15s, color .15s;
@@ -3298,7 +3317,7 @@
 .sideFiltroWrap { position: relative; flex-shrink: 0; }
 .sideFiltroBtn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 40px; height: 40px; border: 1px solid var(--border); border-radius: var(--l-r-lg);
+  width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 3px;
   background: transparent; color: var(--l-muted-fg); cursor: pointer;
   transition: background-color .15s, color .15s, border-color .15s;
 }
@@ -3406,7 +3425,7 @@
 .rvGaveta :is(.rvBtn, .rcBtn, .rvAcoesBtn),
 .janela :is(.rvBtn, .rcBtn, .rvAcoesBtn) {
   min-height: 40px; padding: 0 14px; gap: 6px;
-  border: 1px solid transparent; border-radius: var(--l-r-md);
+  border: 1px solid transparent; border-radius: 3px;
   background: var(--l-secondary); color: var(--l-secondary-fg);
   font-size: 13px; font-weight: 600; box-shadow: none;
   transition: background-color .15s, color .15s;
@@ -3522,6 +3541,7 @@
 .dtTable tbody tr + tr td { border-top: 1px solid var(--border); }
 .dtDir { text-align: right !important; }
 .dtForte { color: var(--l-fg, var(--text)) !important; font-weight: 700; }
+.dtValor { color: var(--l-fg, var(--text)) !important; }
 .dtMenos { color: oklch(0.5 0.12 158) !important; font-weight: 600; }
 .dtMais  { color: oklch(0.6 0.15 55) !important; font-weight: 600; }
 .dtNum {
@@ -3539,13 +3559,31 @@
 .finResumo {
   display: flex; flex-direction: column; gap: 10px;
   margin: 12px 16px; padding: 18px 20px 20px;
-  background: var(--l-bg, var(--surface-2)); border: 1px solid var(--border); border-radius: var(--l-r-xl, 8px);
+  background: var(--l-bg, var(--surface-2)); border: 1px solid var(--border); border-radius: 3px;
   color: var(--l-fg, var(--text));
 }
 .rvGaveta .finResumo { margin: 14px 18px 14px 0; }
 @container direita (max-width: 760px) { .rvGaveta .finResumo { margin: 0 18px 14px; } }
 .finResumo p, .finResumo h4, .finResumo h5 { margin: 0; }
-.finTit { font-size: 13px; line-height: 18px; font-weight: 600; margin-bottom: 4px !important; }
+.finTit { font-size: 13px; line-height: 18px; font-weight: 600; margin-bottom: 4px !important; margin-left: -20px !important; margin-right: -20px !important; padding: 0 20px 10px; border-bottom: 1px solid var(--l-card, #fff); }
+/* Resumo da view: cabeçalho com ícone, linhas com detalhe embaixo, barra de pago e pendente em destaque */
+.finResumoView { background: none; gap: 12px; padding: 0 20px 18px; overflow: hidden; }
+.finCab { margin: 0 -20px 2px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: oklch(0.27 0.02 260); }
+.finCab .finTit { color: #fff; }
+.finResumoView .finLinha b, .finResumoView .finTotal b, .finResumoView .finPendGrande > b { font-weight: 400; }
+.finResumoView .finTit { margin: 0 !important; padding: 0; border: none; }
+.finResumoView .finLinha { align-items: flex-start; font-size: 13px; }
+.finLinhaTxt { display: flex; flex-direction: column; gap: 1px; }
+.finProg { display: flex; flex-direction: column; gap: 6px; }
+.finProgBarra { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.finProgBarra > span { display: block; height: 100%; border-radius: inherit; background: oklch(0.5 0.12 158); }
+.finProgLeg { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--l-muted-fg, var(--text-2)); }
+.finPendGrande {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-top: 12px; border-top: 1px solid var(--border);
+}
+.finPendGrande > span { font-size: 13px; font-weight: 600; color: var(--l-muted-fg, var(--text-2)); }
+.finPendGrande > b { font-size: 16px; font-weight: 700; color: #b91c1c; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .finLinha { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--l-muted-fg, var(--text-2)); }
 .finLinha b { font-weight: 600; color: var(--l-fg, var(--text)); white-space: nowrap; }
 .finTotal, .finTotal b { color: var(--l-fg, var(--text)); font-weight: 700; font-size: 13.5px; }
@@ -3591,7 +3629,7 @@
 .rvOpcoesCell { display: flex; align-items: center; margin-left: auto; padding-left: 14px; }
 .rvOpcoesCell .rvAcoesWrap { margin-left: 0; }
 .rvOpcoesCell .rvAcoesMenu { top: calc(100% + 8px); bottom: auto; right: 0; left: auto; }
-.rvOpcoesCell .rvAcoesBtn { min-height: 40px; padding: 0 16px; border-radius: var(--l-r-md, 8px); }
+.rvOpcoesCell .rvAcoesBtn { min-height: 40px; padding: 0 16px; border-radius: 3px; }
 .rvGaveta .rvDestaque, .rvGaveta .rcPeriodRow, .rvGaveta .rvOpcoesCell, .rvGaveta .rvOpcoesCell .rvAcoesWrap { position: static; }
 .rvGaveta .rvOpcoesCell .rvAcoesBtn { background: var(--l-primary); color: var(--l-primary-fg); border: none; }
 .rvGaveta .rvOpcoesCell .rvAcoesBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--l-primary) 88%, black); }
@@ -3607,7 +3645,7 @@
 .rvGaveta .rvOpcoesCell .rvAcoesDiv { margin: 6px 4px; }
 .dtNum { background: transparent; }
 .rvGaveta:not(.rvGavetaAcao) { width: min(760px, 100%); }
-.rvGaveta .rcHead .rcChip, .rvGaveta .hospedeName .rcChip {
+.rvGaveta .rcHead .rcChip, .rvGaveta .hospedeName .rcChip, .rvTitularNome .rcChip {
   background: transparent; border: 1px solid var(--border); border-radius: 4px;
   padding: 1px 7px; font-size: 11px; font-weight: 500; color: var(--l-muted-fg);
   text-transform: none; letter-spacing: 0;
@@ -3638,6 +3676,11 @@
 .dtCelTit { display: block; font-size: 12.5px; font-weight: 500; color: var(--l-fg, var(--text)); }
 .dtCelSub { display: block; font-size: 10.5px; line-height: 14px; color: var(--l-muted-fg, var(--text-2)); }
 .dtTrunca { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+/* Texto longo quebra em linhas em vez de ser cortado */
+.dtTable td.dtQuebra { white-space: normal; overflow-wrap: anywhere; }
+.dtQuebra .dtTag { white-space: normal; }
+/* Pagador ocupa a sobra da linha e quebra o nome, sem rolagem lateral */
+.dtTable td.dtPagador { width: 100%; min-width: 80px; word-break: break-word; }
 .rvGaveta .rvCorpo { grid-template-columns: minmax(0, 1fr) 340px; border-bottom: 1px solid var(--border); }
 .rvGaveta .rvCorpoMain > .rcSection { border-bottom: none; }
 @container direita (max-width: 760px) { .rvGaveta .rvCorpo { grid-template-columns: minmax(0, 1fr); } }
@@ -3716,20 +3759,71 @@
 .rvGaveta .rvCorpo { grid-template-columns: minmax(0, 1fr); }
 .rvGaveta .finResumo { margin: 0 18px 16px; }
 .rvGaveta:not(.rvGavetaAcao) { width: min(560px, 100%); }
-.rvGavetaReserva:not(.rvGavetaAcao) { width: min(500px, 100%); }
-.rvGavetaAcao { width: clamp(360px, calc(100% - 512px), 560px); }
-.rvGavetaAcao.rvGavetaPag { width: clamp(340px, calc(100% - 512px), 400px); }
+.rvGavetaReserva:not(.rvGavetaAcao) { width: min(450px, 100%); }
+.rvGavetaAcao { width: clamp(360px, calc(100% - 462px), 560px); }
+.rvGavetaAcao.rvGavetaPag { width: clamp(340px, calc(100% - 462px), 400px); }
 .slotDireita:has(.rvGavetaAcao) .rvGaveta:not(.rvGavetaAcao) {
-  right: calc(clamp(360px, calc(100% - 512px), 560px) + 12px);
-  width: min(500px, calc(100% - 372px));
+  right: calc(clamp(360px, calc(100% - 462px), 560px) + 12px);
+  width: min(450px, calc(100% - 372px));
 }
 .slotDireita:has(.rvGavetaPag) .rvGaveta:not(.rvGavetaAcao) {
-  right: calc(clamp(340px, calc(100% - 512px), 400px) + 12px);
-  width: min(500px, calc(100% - 352px));
+  right: calc(clamp(340px, calc(100% - 462px), 400px) + 12px);
+  width: min(450px, calc(100% - 352px));
 }
 @container direita (min-width: 900px) {
   .slotDireita:has(.rvGavetaAcao) .rvGaveta:not(.rvGavetaAcao) { display: flex; }
 }
+/* Gerenciar pessoas: box mais estreita ao lado da view */
+.rvGavetaAcao.rvGavetaEstreita { width: clamp(306px, calc(100% - 462px), 378px); }
+.slotDireita:has(.rvGavetaEstreita) .rvGaveta:not(.rvGavetaAcao) {
+  right: calc(clamp(306px, calc(100% - 462px), 378px) + 12px);
+  width: min(450px, calc(100% - 318px));
+}
+@container direita (max-width: 899px) {
+  .rvGavetaAcao.rvGavetaEstreita { width: min(378px, 100%); }
+}
+.rvGavetaEstreita .finResumoAcao { margin: 0 0 12px; }
+.finCabAcao { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.finCabFechar {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+  border: none; border-radius: 3px; background: none; color: #fff; cursor: pointer; opacity: .8;
+}
+.finCabFechar:hover { opacity: 1; background: rgb(255 255 255 / 0.1); }
+.rvAcompAcoes { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+.dtTable tr.dtComAcoes td { padding-bottom: 2px; }
+.dtTable tbody tr.dtAcoesLinha td { border-top: none; padding: 0 12px 8px; }
+.rvSecBtnPerigo { color: #b91c1c; }
+
+/* Balão de confirmação acima do botão de decisão */
+.balao {
+  position: fixed; z-index: 100000; width: 260px; padding: 12px;
+  border: 1px solid var(--border); border-radius: 3px;
+  background: var(--l-card, var(--surface)); color: var(--l-fg, var(--text));
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.18);
+  animation: balaoEntra .12s ease-out;
+}
+.balao::after {
+  content: ''; position: absolute; right: 18px; bottom: -6px; width: 10px; height: 10px;
+  background: inherit; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+.balaoAbaixo::after { bottom: auto; top: -6px; transform: rotate(225deg); }
+.balaoCampo { margin-bottom: 10px; background: none; font-size: 12.5px; }
+.balaoBtn:disabled { opacity: .5; cursor: not-allowed; }
+@keyframes balaoEntra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .balao { animation: none; } }
+.balaoMsg { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.balaoMsg b { font-weight: 600; }
+.balaoAcoes { display: flex; justify-content: flex-end; gap: 6px; }
+.balaoBtn {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 3px;
+  background: none; color: var(--l-fg, var(--text)); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.balaoBtn:hover { background: var(--l-secondary, var(--surface-2)); }
+.balaoBtnOk { border-color: transparent; background: var(--l-primary, #2563eb); color: #fff; }
+.balaoBtnOk:hover { background: var(--l-primary, #2563eb); opacity: .9; }
+.balaoBtnPerigo { border-color: transparent; background: #b91c1c; color: #fff; }
+.balaoBtnPerigo:hover { background: #991b1b; }
 
 /* ── Gavetas de lista (grupo, orçamento, dia, quarto) ──────────────────────── */
 .slotDireita:has(.rvGavetaReserva) .rvGavetaLista { display: none; }
@@ -3800,15 +3894,15 @@
 
 .lstSeg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 3px; border-radius: var(--l-r-lg); background: var(--l-secondary); }
 .lstSegBtn {
-  height: 32px; border: none; border-radius: var(--l-r-md); background: transparent;
+  height: 32px; border: none; border-radius: 3px; background: transparent;
   font: inherit; font-size: 12.5px; font-weight: 500; color: var(--l-muted-fg); cursor: pointer;
 }
 .lstSegBtn:hover { color: var(--l-fg); }
-.lstSegBtnOn { background: var(--l-card); color: var(--l-fg); font-weight: 600; box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.lstSegBtnOn { background: var(--l-card); color: var(--l-fg); font-weight: 600; }
 .lstMes { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .lstMesBtn {
   display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
-  border: 1px solid var(--border); border-radius: var(--l-r-md); background: transparent; color: var(--l-muted-fg); cursor: pointer;
+  border: 1px solid var(--border); border-radius: 3px; background: transparent; color: var(--l-muted-fg); cursor: pointer;
 }
 .lstMesBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--l-accent) 55%, transparent); color: var(--l-fg); }
 .lstMesBtn:disabled { opacity: .4; cursor: default; }
@@ -3844,7 +3938,7 @@
 }
 .criarCorpo > * { flex-shrink: 0; }
 .criarRodape { flex-shrink: 0; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--l-card); }
-.criarRodape button { border-radius: var(--l-r-md); box-shadow: none; transform: none; font-weight: 600; min-height: 38px; }
+.criarRodape button { border-radius: 3px; box-shadow: none; transform: none; font-weight: 600; min-height: 38px; }
 
 /* campos no padrão do cadastro de clientes */
 .rvGavetaCriar input:not([type='checkbox']):not([type='radio']):not([type='file']),
@@ -3859,7 +3953,7 @@
 }
 .rvGavetaCriar label:not(:has(input)) { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; }
 .rvGavetaCriar input[type='checkbox'], .rvGavetaCriar input[type='radio'] { accent-color: var(--l-primary); }
-.rvGavetaCriar :is(.rvBtn, .rcBtn) { border-radius: var(--l-r-md); box-shadow: none; }
+.rvGavetaCriar :is(.rvBtn, .rcBtn) { border-radius: 3px; box-shadow: none; }
 .rvGavetaCriar .rcCard { border-color: var(--border); border-radius: var(--l-r-lg); }
 
 /* ── Criando a reserva ─────────────────────────────────────────────────────── */
@@ -3966,7 +4060,7 @@
 .dataPassoBtn {
   flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
   width: 34px; height: 34px; padding: 0; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 7px;
+  border: 1px solid var(--border); border-radius: 3px;
   background: var(--l-card); color: var(--l-fg);
   transition: border-color .15s, color .15s;
 }
@@ -3988,11 +4082,11 @@
 
 /* ── Rodapé fixo da view da reserva ────────────────────────────────────────── */
 .rvGavetaReserva .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
-.rvRodape { flex: 1; display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.rvRodape { flex: 1; display: flex; align-items: stretch; justify-content: flex-end; gap: 8px; min-width: 0; }
 .rvRodapeBtn {
-  flex: 1 1 0; min-width: 0; height: 40px; padding: 0 14px;
+  flex: 0 0 auto; min-width: 0; height: 40px; padding: 0 20px;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  border: 1px solid var(--border); border-radius: var(--l-r-md);
+  border: 1px solid var(--border); border-radius: 3px;
   background: var(--l-card); color: var(--l-fg);
   font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
   transition: background-color .15s, border-color .15s;
@@ -4000,7 +4094,7 @@
 .rvRodapeBtn:hover:not(:disabled) { background: color-mix(in oklch, var(--l-accent) 45%, var(--l-card)); }
 .rvRodapeBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
 .rvRodapeBtn:disabled { opacity: .5; cursor: not-allowed; }
-.rvRodapeHospedar { flex-grow: 1.6; border-color: transparent; background: oklch(0.55 0.12 165); color: #fff; }
+.rvRodapeHospedar { border-color: transparent; background: oklch(0.55 0.12 165); color: #fff; }
 .rvRodapeHospedar:hover:not(:disabled) { background: oklch(0.5 0.12 165); }
 .rvRodapeMais { position: relative; flex-shrink: 0; display: flex; }
 .rvRodapeSeta { flex: 0 0 40px; width: 40px; padding: 0; }
@@ -4016,3 +4110,65 @@
 @media (prefers-reduced-motion: reduce) { .rvRodapeMenu { animation: none; } }
 .rvRodapeMenu .rvAcoesItem { padding: 8px 10px; gap: 10px; font-size: 13px; font-weight: 500; border-radius: var(--l-r-md); }
 .rvRodapeMenu .rvAcoesDiv { margin: 4px 2px; }
+
+/* ── Busca de hóspede dentro da gaveta de ação ─────────────────────────────── */
+/* A gaveta não tem padding no corpo: sem a margem negativa, a faixa ocupa a largura certa. */
+.rvGavetaAcao .gpSearchSticky {
+  margin: 0; padding: 10px 18px;
+  background: var(--l-card); border-bottom: 1px solid var(--border);
+}
+.rvGavetaAcao .hospSearchWrap {
+  min-height: 34px; padding: 0 6px 0 30px; flex-wrap: nowrap;
+  border-radius: 3px; background: none;
+}
+.rvGavetaAcao .hospSearchWrap:focus-within { border-color: var(--l-primary); }
+/* O campo interno não herda a caixa dos inputs da gaveta — a borda é a do wrapper. */
+.rvGavetaAcao .hospSearchWrap input.hospInlineInput {
+  height: 32px; min-height: 0; padding: 0; border: none !important; border-radius: 0;
+  background: transparent; box-shadow: none !important; font-size: 13px;
+}
+.rvGavetaEstreita .finResumoAcao { margin: 14px 18px 4px; }
+
+.gpBusca { margin-bottom: 10px; }
+.rvGavetaAcao .gpBusca .hospSearchWrap { background: none; }
+.finMudanca {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px;
+  border: 1px solid var(--border); border-left: 3px solid var(--tom); border-radius: 3px;
+  font-size: 12px; color: var(--l-muted-fg, var(--text-2));
+}
+.finMudanca b { font-weight: 500; color: var(--tom); font-variant-numeric: tabular-nums; }
+.finMudancaMais  { --tom: oklch(0.6 0.15 55); }
+.finMudancaMenos { --tom: oklch(0.5 0.12 158); }
+.finLinhaMudou { padding-left: 8px; margin-left: -11px; border-left: 3px solid oklch(0.6 0.15 55); }
+.finDifMais  { font-size: 11.5px; color: oklch(0.6 0.15 55); }
+.finDifMenos { font-size: 11.5px; color: oklch(0.5 0.12 158); }
+.rvGavetaEstreita .dtTable th, .rvGavetaEstreita .dtTable td { padding-left: 8px; padding-right: 8px; }
+
+.gdCab { margin: 0; padding: 12px 18px; }
+.rvGavetaAcao .editDadosRoot { gap: 0; }
+.rvGavetaAcao .editDadosRoot > .editDados { padding-top: 16px; }
+.gdDiarias { padding: 14px 18px 18px; border-top: 1px solid var(--border); }
+.gdTotais { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gdTotais .finLinha b, .gdTotais .finPendGrande > b { font-weight: 400; }
+.gdTotais .finPendGrande { padding-top: 8px; }
+.dtTable tbody tr.dtMudou td:first-child { box-shadow: inset 3px 0 0 oklch(0.6 0.15 55); }
+/* Gerenciar diárias: 20% mais estreita, check-in e check-out na mesma linha */
+.rvGavetaAcao.rvGavetaDiarias { width: clamp(288px, calc(100% - 462px), 448px); }
+.slotDireita:has(.rvGavetaDiarias) .rvGaveta:not(.rvGavetaAcao) {
+  right: calc(clamp(288px, calc(100% - 462px), 448px) + 12px);
+  width: min(450px, calc(100% - 300px));
+}
+@container direita (max-width: 899px) {
+  .rvGavetaAcao.rvGavetaDiarias { width: min(448px, 100%); }
+}
+.rvGavetaDiarias .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.rvGavetaDiarias .editDatesGrid > .meiaDiariaBox { grid-column: 1 / -1; }
+.rvGavetaDiarias .dataPasso { gap: 4px; }
+.rvGavetaDiarias .dataPassoBtn { width: 28px; }
+.rvGavetaDiarias .finResumoAcao { margin: 14px 18px 0; }
+.gdAcaoCel { width: 1%; padding-left: 0 !important; text-align: right; }
+.gdAdicionar { display: flex; justify-content: flex-end; margin-top: 8px; }
+.rvSecBtn:disabled { opacity: .45; cursor: not-allowed; text-decoration: none; }
+/* Campos de período compactos */
+.rvGavetaDiarias .dateCompact input { height: 30px !important; min-height: 30px !important; padding: 4px 8px !important; font-size: 12.5px !important; }
+.rvGavetaDiarias .dataPassoBtn { width: 26px; height: 30px; }

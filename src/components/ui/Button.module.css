@@ -5,7 +5,7 @@
   gap: 7px;
 
   padding: 9px 16px;
-  border-radius: 10px;
+  border-radius: 3px;
   border: 1px solid var(--card-border);
 
   font-family: var(--font);
@@ -23,8 +23,6 @@
     opacity 0.14s ease;
 }
 
-.btn:active { transform: scale(0.97); }
-.btn:hover  { transform: scale(1.02); }
 
 .btn:disabled {
   opacity: 0.5;
@@ -34,28 +32,21 @@
 
 /* ── PRIMARY ── */
 .primary {
-  background: var(--violet);
-  border-color: var(--violet);
+  background: var(--l-primary, var(--violet));
+  border-color: var(--l-primary, var(--violet));
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.30);
 }
-.primary:hover {
-  background: var(--violet-2);
-  border-color: var(--violet-2);
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.38);
-}
+.primary:hover { opacity: .9; }
 
 /* ── SECONDARY ── */
 .secondary {
   background: var(--surface);
   color: var(--text);
   border-color: var(--card-border);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07);
 }
 .secondary:hover {
   background: var(--surface-2);
   border-color: #c9cfda;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.10);
 }
 
 /* ── DANGER ── */
@@ -63,7 +54,6 @@
   background: #ef4444;
   border-color: #ef4444;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.28);
 }
 .danger:hover { background: #dc2626; }
 
@@ -72,7 +62,6 @@
   background: #10b981;
   border-color: #10b981;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
 }
 .success:hover { background: #059669; border-color: #059669; }
 
@@ -81,16 +70,14 @@
   background: #f97316;
   border-color: #f97316;
   color: #ffffff;
-  box-shadow: 0 4px 14px rgba(249, 115, 22, 0.28);
 }
-.orange:hover { background: #ea580c; border-color: #ea580c; box-shadow: 0 6px 20px rgba(249, 115, 22, 0.36); }
+.orange:hover { background: #ea580c; border-color: #ea580c;  }
 
 /* ── GHOST ── */
 .ghost {
   background: transparent;
   border-color: transparent;
   color: var(--text-2);
-  box-shadow: none;
 }
 .ghost:hover {
   background: var(--surface-2);
@@ -102,7 +89,6 @@
   background: rgba(255, 255, 255, 0.07);
   border-color: rgba(255, 255, 255, 0.12);
   color: var(--text);
-  box-shadow: none;
 }
 :root[data-theme="dark"] .secondary:hover {
   background: rgba(255, 255, 255, 0.11);

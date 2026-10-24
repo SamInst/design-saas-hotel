@@ -675,12 +675,91 @@ function Janela({ open, onClose, title, acaoTopo = null, children, footer, bodyS
   );
 }
 
+// Balão flutuante de decisão, preso ao elemento que o abriu: acima dele, alinhado à
+// direita (ou abaixo, sem espaço em cima). Vai por portal (position: fixed) para não ser
+// cortado por tabelas com rolagem. Fecha ao clicar fora ou com Esc.
+const alvoDe = (x) => x?.currentTarget ?? (x instanceof Element ? x : null);
+
+function Balao({ anchor, onClose, children }) {
+  const [pos, setPos] = useState(null);
+  const balaoRef = useRef(null);
+
+  useEffect(() => {
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const right = Math.max(8, window.innerWidth - r.right);
+      setPos(r.top < 220
+        ? { right, top: r.bottom + 8, abaixo: true }
+        : { right, bottom: window.innerHeight - r.top + 8, abaixo: false });
+    };
+    const fora = (e) => {
+      if (anchor.contains(e.target) || balaoRef.current?.contains(e.target)) return;
+      onClose();
+    };
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('keydown', esc, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+      document.removeEventListener('mousedown', fora);
+      document.removeEventListener('keydown', esc, true);
+    };
+  }, [anchor, onClose]);
+
+  if (!pos) return null;
+  return createPortal(
+    <div ref={balaoRef} role="dialog" className={[styles.balao, pos.abaixo ? styles.balaoAbaixo : ''].join(' ')}
+      style={{ right: pos.right, top: pos.top, bottom: pos.bottom }}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+// Botões do pé do balão: "Cancelar" fecha, o outro confirma.
+function BalaoAcoes({ onCancelar, confirmar, perigo = false, disabled = false, onConfirmar, cancelarTxt }) {
+  return (
+    <div className={styles.balaoAcoes}>
+      <button type="button" className={styles.balaoBtn} onClick={onCancelar}>{cancelarTxt ?? tr('Cancelar')}</button>
+      <button type="button" className={[styles.balaoBtn, perigo ? styles.balaoBtnPerigo : styles.balaoBtnOk].join(' ')}
+        disabled={disabled} onClick={onConfirmar}>
+        {confirmar}
+      </button>
+    </div>
+  );
+}
+
+// Botão de decisão com confirmação num balão logo acima dele — sem modal.
+function BalaoConfirma({ label, mensagem, confirmar, perigo = false, className, onConfirm }) {
+  const [anchor, setAnchor] = useState(null);
+  const fechar = useCallback(() => setAnchor(null), []);
+  return (
+    <>
+      <button type="button" className={className} aria-expanded={!!anchor}
+        onClick={(e) => { const el = e.currentTarget; setAnchor((a) => (a ? null : el)); }}>
+        {label}
+      </button>
+      {anchor && (
+        <Balao anchor={anchor} onClose={fechar}>
+          <p className={styles.balaoMsg}>{mensagem}</p>
+          <BalaoAcoes onCancelar={fechar} confirmar={confirmar} perigo={perigo}
+            onConfirmar={() => { fechar(); onConfirm(); }} />
+        </Balao>
+      )}
+    </>
+  );
+}
+
 // No desktop o detalhe da reserva abre numa gaveta à direita, por cima do calendário.
-function PainelReserva({ inline, acao = false, pag = false, largo = false, saindo = false, footer, children, ...modal }) {
+function PainelReserva({ inline, acao = false, pag = false, estreito = false, diarias = false, largo = false, saindo = false, footer, children, ...modal }) {
   const slot = useContext(JanelaCtx);
   if (!inline || !slot) return <Modal {...modal} footer={footer}>{children}</Modal>;
   return createPortal(
-    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : styles.rvGavetaReserva, pag ? styles.rvGavetaPag : '', largo ? styles.rvGavetaLarga : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
+    <div className={[styles.rvGaveta, acao ? styles.rvGavetaAcao : styles.rvGavetaReserva, pag ? styles.rvGavetaPag : '', estreito ? styles.rvGavetaEstreita : '', diarias ? styles.rvGavetaDiarias : '', largo ? styles.rvGavetaLarga : '', saindo ? styles.rvGavetaSai : ''].join(' ')}>
       {modal.title && !modal.hideHeader && (
         <header className={styles.janelaHead}>
           <button type="button" className={styles.janelaVoltar} onClick={modal.onClose}
@@ -735,8 +814,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setHasChanges(true);
   };
 
-  const handleClose = () => {
-    if (hasChanges) { setShowDiscard(true); return; }
+  const handleClose = (e) => {
+    if (hasChanges) {
+      const anchor = alvoDe(e);
+      if (anchor) setBalao({ tipo: 'descartarFechar', anchor }); else setShowDiscard(true);
+      return;
+    }
     onClose();
   };
 
@@ -761,6 +844,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const [cancelMotivo,   setCancelMotivo]   = useState('');
   const [viewPagamento,      setViewPagamento]      = useState(null);
   const [confirmPernoite,    setConfirmPernoite]    = useState(false);
+  // Decisões da tela em balão sobre o próprio botão: { tipo, anchor, ... }
+  const [balao, setBalao] = useState(null);
+  const fecharBalao = useCallback(() => setBalao(null), []);
+  const setaRef = useRef(null);
   const [confirmAusente,     setConfirmAusente]     = useState(false);
   const [confirmCancel,      setConfirmCancel]      = useState(false);
   const [confirmCancel2,     setConfirmCancel2]     = useState(false);
@@ -790,6 +877,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setVoucherLoading(true);
     try {
       await buildVoucher(incluirConsumos);
+      onNotify?.(tr('Voucher gerado!'));
+    } catch (e) {
+      onNotify?.(e?.message ?? tr('Erro ao gerar voucher.'), 'error');
     } finally {
       setVoucherLoading(false);
     }
@@ -856,15 +946,17 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
   // Se houver consumos cobráveis, pergunta se devem entrar no voucher; senão gera direto.
   const temConsumos = (reserva.consumos ?? []).some((c) => !c.despesaPessoal);
-  const requestVoucher = () => {
-    if (temConsumos) setShowVoucherChoice(true);
+  const requestVoucher = (origem) => {
+    const anchor = alvoDe(origem);
+    if (temConsumos) { if (anchor) setBalao({ tipo: 'voucherConsumo', anchor }); else setShowVoucherChoice(true); }
     else handleDownloadVoucher(false);
   };
   // Em grupo, pergunta antes se o voucher é só desta reserva ou do grupo inteiro.
   const emGrupo = !!(groupInfo && onVoucherGrupo);
-  const handleVoucherClick = () => {
-    if (emGrupo) setShowVoucherScope(true);
-    else requestVoucher();
+  const handleVoucherClick = (origem) => {
+    const anchor = alvoDe(origem);
+    if (emGrupo) { if (anchor) setBalao({ tipo: 'voucherEscopo', anchor }); else setShowVoucherScope(true); }
+    else requestVoucher(anchor);
   };
 
   // ── Gerenciar Preços (ajuste manual) ───────────────────────────────────────
@@ -1384,7 +1476,29 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // ── Edit save (quarto/datas/obs) ──────────────────────────────────────────
   const [editSaving,    setEditSaving]    = useState(false);
   const [editActiveTab, setEditActiveTab] = useState('dados');
-  const [editObs,       setEditObs]       = useState(reserva.observacao ?? '');
+  // Observação sai da edição: muda direto da view, pelo botão "Alterar observação".
+  const [obsAberta, setObsAberta] = useState(false);
+  const [obsTexto,  setObsTexto]  = useState('');
+  const [obsSaving, setObsSaving] = useState(false);
+
+  const handleSaveObs = async () => {
+    setObsSaving(true);
+    try {
+      const cat = categorias.find((c) => (c.quartos || []).map(String).includes(String(reserva.quarto)));
+      await onUpdate(reserva.id, {
+        quarto_id:          parseInt(reserva.quarto),
+        status:             'RESERVA_ATIVA',
+        data_hora_checkin:  `${toBrDate(reserva.dataInicio)} ${cat?.checkin || '14:00'}`,
+        data_hora_checkout: `${toBrDate(reserva.dataFim)} ${cat?.checkout || '12:00'}`,
+        observacao:         obsTexto.trim(),
+        hora_saida_meia_diaria: reserva.meiaDiaria ? horaMeiaOrig : null,
+        ...(reserva.valorTotal != null ? { valor_total: reserva.valorTotal } : {}),
+      });
+      setObsAberta(false);
+    } finally {
+      setObsSaving(false);
+    }
+  };
 
   const handleSaveEdit = async () => {
     setEditSaving(true);
@@ -1398,7 +1512,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         status:             'RESERVA_ATIVA',
         data_hora_checkin:  `${toBrDate(formatDate(editCheckin))} ${eci}`,
         data_hora_checkout: `${toBrDate(formatDate(editCheckout))} ${eco}`,
-        observacao:         editObs.trim(),
+        observacao:         (reserva.observacao ?? '').trim(),
         hora_saida_meia_diaria: temMeiaEdit ? editHoraMeia : null,
         ...(valorTotal != null ? { valor_total: valorTotal } : {}),
       });
@@ -1415,7 +1529,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     (editCheckin  ? formatDate(editCheckin)  : '') !== reserva.dataInicio ||
     (editCheckout ? formatDate(editCheckout) : '') !== reserva.dataFim;
 
-  const hasChangedData = hasChangedDatesOrRoom || meiaMudou || editObs !== (reserva.observacao ?? '');
+  const hasChangedData = hasChangedDatesOrRoom || meiaMudou;
 
   // Sem arraste: o primeiro cálculo da edição vira o "antes", desde que quarto,
   // datas e pessoas ainda sejam os da reserva.
@@ -1425,9 +1539,145 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setOrigCalc(editCalc);
   }, [editing, editCalc, origCalc, hasChangedDatesOrRoom, hasChanges]); // eslint-disable-line
 
-  const goBackFromEdit = () => {
-    if (hasChanges) { setShowDiscard(true); return; }
+  const goBackFromEdit = (e) => {
+    if (hasChanges) {
+      const anchor = alvoDe(e);
+      if (anchor) setBalao({ tipo: 'descartar', anchor }); else setShowDiscard(true);
+      return;
+    }
     setEditing(false); setEditActiveTab('dados');
+  };
+
+  // Hóspedes no desenho da view: titular com contatos e acompanhantes em tabela (CPF e idade).
+  // acoesAcomp(h) põe ações embaixo de cada acompanhante, à direita (Gerenciar pessoas).
+  const renderHospedes = (lista, acoesAcomp = null) => {
+    // Contato só do titular; acompanhantes mostram CPF e idade.
+    const hoje      = new Date();
+    const [tit, ...acomps] = lista;
+    const idadeTxt  = (h) => { const i = idadeEm(h.dataNascimento, hoje); return i == null ? null : tr('{{idade}} anos', { idade: i }); };
+    const telDigits = String(tit.telefone ?? '').replace(/\D/g, '');
+    const waNumber  = telDigits ? (telDigits.length <= 11 ? `55${telDigits}` : telDigits) : '';
+    const titMeta   = [tit.cpf && fmtCpf(tit.cpf), idadeTxt(tit)].filter(Boolean).join(' · ');
+    return (
+      <>
+        <div className={styles.rvTitular}>
+          <div className={styles.rvTitularInfo}>
+            <div className={styles.rvTitularNome}>
+              {tit.nome}
+              <span className={styles.rcChip}>{tr('Titular')}</span>
+            </div>
+            {titMeta && <div className={styles.rvTitularMeta}>{titMeta}</div>}
+          </div>
+          {(tit.telefone || tit.email) && (
+            <div className={styles.rvTitularContatos}>
+              {tit.telefone && (waNumber ? (
+                <a className={styles.rvContato}
+                  href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
+                  title={tr('WhatsApp {{v0}}', { v0: fmtPhone(tit.telefone) })} onClick={(e) => e.stopPropagation()}>
+                  <img src={whatsappIcon} alt={tr('WhatsApp')} className={styles.rvContactIcon}
+                    loading="eager" decoding="sync" draggable={false} />
+                  <span>{fmtPhone(tit.telefone)}</span>
+                </a>
+              ) : (
+                <div className={styles.rvContato}><span>{fmtPhone(tit.telefone)}</span></div>
+              ))}
+              {tit.email && (
+                <a className={styles.rvContato}
+                  href={`mailto:${tit.email}`} title={tr('E-mail: {{email}}', { email: tit.email })} onClick={(e) => e.stopPropagation()}>
+                  <img src={emailIcon} alt={tr('E-mail')} className={styles.rvContactIcon}
+                    loading="eager" decoding="sync" draggable={false} />
+                  <span>{tit.email}</span>
+                </a>
+              )}
+            </div>
+          )}
+        </div>
+        {acomps.length > 0 && (
+          <div className={styles.dtScroll}>
+            <table className={styles.dtTable}>
+              <thead><tr>
+                <th>{tr('Acompanhantes')}</th><th>{tr('CPF')}</th><th className={styles.dtDir}>{tr('Idade')}</th>
+              </tr></thead>
+              <tbody>
+                {acomps.map((h) => (
+                  <Fragment key={h.id ?? h.nome}>
+                    <tr className={acoesAcomp ? styles.dtComAcoes : undefined}>
+                      <td className={[styles.dtQuebra, styles.dtPagador].join(' ')}><span className={styles.dtCelTit}>{h.nome}</span></td>
+                      <td>{h.cpf ? fmtCpf(h.cpf) : '—'}</td>
+                      <td className={styles.dtDir}>{idadeTxt(h) ?? '—'}</td>
+                    </tr>
+                    {acoesAcomp && (
+                      <tr className={styles.dtAcoesLinha}><td colSpan={3}>{acoesAcomp(h)}</td></tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  const renderBalao = () => {
+    if (!balao?.anchor) return null;
+    const b = balao;
+    const msg = (c) => <p className={styles.balaoMsg}>{c}</p>;
+    let corpo = null;
+    if (b.tipo === 'hospedar') corpo = <>
+      {msg(<>{tr('Mover a reserva de')} <b>{reserva.titularNome}</b> {tr('para')} <b>{tr('Hospedado')}</b>{tr('? Ela não poderá mais ser editada por aqui.')}</>)}
+      <BalaoAcoes onCancelar={fecharBalao} confirmar={tr('Hospedar')}
+        onConfirmar={() => { fecharBalao(); onMoverPernoite?.(reserva.id); onClose(); }} />
+    </>;
+    else if (b.tipo === 'ausente') corpo = <>
+      {msg(<>{tr('Marcar a reserva de')} <b>{reserva.titularNome}</b> {tr('como')} <b>{tr('ausente')}</b>?</>)}
+      <BalaoAcoes onCancelar={fecharBalao} confirmar={saving ? <Loader2 size={13} className={styles.spin} /> : tr('Confirmar')} perigo disabled={saving}
+        onConfirmar={async () => { setSaving(true); try { await onAusente?.(reserva.id); fecharBalao(); onClose(); } finally { setSaving(false); } }} />
+    </>;
+    else if (b.tipo === 'cancelar') corpo = <>
+      {msg(<>{reserva.status === 'orcamento' ? tr('Cancelar o orçamento de') : tr('Cancelar a reserva de')} <b>{reserva.titularNome}</b>? {tr('Esta ação não pode ser desfeita.')}</>)}
+      <textarea className={[styles.motivoTextarea, styles.balaoCampo].join(' ')} rows={2} autoFocus
+        placeholder={tr('Motivo do cancelamento')} value={cancelMotivRes} onChange={(e) => setCancelMotivRes(e.target.value)} />
+      <BalaoAcoes onCancelar={fecharBalao} cancelarTxt={tr('Voltar')} confirmar={tr('Cancelar')} perigo disabled={!cancelMotivRes.trim()}
+        onConfirmar={() => {
+          fecharBalao();
+          // Para orçamentos, passa o ID do orçamento (não da hospedagem) para o endpoint correto
+          const orcId = reserva.status === 'orcamento' ? (reserva.orcamentoInfo?.id ?? null) : null;
+          onCancel(reserva.id, cancelMotivRes.trim(), orcId);
+          onClose();
+        }} />
+    </>;
+    else if (b.tipo === 'cancelarPag') corpo = <>
+      {msg(<>{tr('Cancelar este pagamento? Informe o motivo.')}</>)}
+      <textarea className={[styles.motivoTextarea, styles.balaoCampo].join(' ')} rows={2} autoFocus
+        placeholder={tr('Motivo do cancelamento')} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
+      <BalaoAcoes onCancelar={() => { fecharBalao(); setCancelPagId(null); }} cancelarTxt={tr('Voltar')} confirmar={tr('Confirmar')} perigo
+        disabled={!cancelMotivo.trim()} onConfirmar={() => { fecharBalao(); handleConfirmCancelPagamento(); onNotify?.(tr('Pagamento cancelado. Salve para aplicar.')); }} />
+    </>;
+    else if (b.tipo === 'descartar' || b.tipo === 'descartarFechar') corpo = <>
+      {msg(tr('Descartar as alterações não salvas?'))}
+      <BalaoAcoes onCancelar={fecharBalao} cancelarTxt={tr('Continuar editando')} confirmar={tr('Descartar')} perigo
+        onConfirmar={() => {
+          fecharBalao(); discardPendingOps(); onNotify?.(tr('Alterações descartadas.'));
+          if (b.tipo === 'descartarFechar') onClose(); else { setEditing(false); setEditActiveTab('dados'); }
+        }} />
+    </>;
+    else if (b.tipo === 'voucherEscopo') corpo = <>
+      {msg(tr('Esta reserva faz parte de um grupo. Gerar o voucher só desta reserva ou do grupo inteiro?'))}
+      <BalaoAcoes onCancelar={() => { const a = b.anchor; fecharBalao(); requestVoucher(a); }} cancelarTxt={tr('Só esta')}
+        confirmar={<>{tr('Grupo')}{groupInfo?.count ? tr(' ({{count}} apt{{v1}})', { count: groupInfo.count, v1: groupInfo.count !== 1 ? 's' : '' }) : ''}</>}
+        onConfirmar={async () => {
+          fecharBalao();
+          try { await onVoucherGrupo?.(); onNotify?.(tr('Voucher do grupo gerado!')); }
+          catch (e) { onNotify?.(e?.message ?? tr('Erro ao gerar voucher.'), 'error'); }
+        }} />
+    </>;
+    else if (b.tipo === 'voucherConsumo') corpo = <>
+      {msg(tr('Esta hospedagem possui consumos registrados. Incluí-los no voucher?'))}
+      <BalaoAcoes onCancelar={() => { fecharBalao(); handleDownloadVoucher(false); }} cancelarTxt={tr('Sem consumos')}
+        confirmar={tr('Com consumos')} onConfirmar={() => { fecharBalao(); handleDownloadVoucher(true); }} />
+    </>;
+    return <Balao anchor={b.anchor} onClose={fecharBalao}>{corpo}</Balao>;
   };
 
   // ── Edit mode render ───────────────────────────────────────────────────────
@@ -1552,49 +1802,179 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       );
     };
 
+    // Pessoas ou período alterados recalculam as diárias: compara com o total gravado.
+    const pessoasMudaram = pendingOps.some((o) => o.type === 'addPessoa' || o.type === 'removePessoa');
+    const periodoMudou   = editActiveTab === 'dados' && (hasChangedDatesOrRoom || meiaMudou);
+    const totalAntes     = reserva.valorTotal ?? 0;
+    const difPessoas     = valTotal - totalAntes;
+    const mostraDif      = (pessoasMudaram || periodoMudou) && !editCalcLoading && valDetalhes.length > 0 && Math.abs(difPessoas) >= 0.005;
+
+    const renderValoresResumo = ({ titulo = tr('Valores'), semDiarias = false } = {}) => (
+      <aside className={[styles.finResumo, styles.finResumoView, styles.finResumoAcao].join(' ')}>
+        <div className={[styles.finCab, styles.finCabAcao].join(' ')}>
+          <h4 className={styles.finTit}>{titulo}</h4>
+          <button type="button" className={styles.finCabFechar} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
+            <X size={16} />
+          </button>
+        </div>
+        {!valPersistidas && editCalcLoading && valGrupos.length === 0 && (
+          <div className={styles.finSub}>{tr('Calculando…')}</div>
+        )}
+        {mostraDif && (
+          <div className={[styles.finMudanca, difPessoas > 0 ? styles.finMudancaMais : styles.finMudancaMenos].join(' ')}>
+            <span>{periodoMudou ? tr('O valor mudou com o novo período') : tr('As diárias mudaram com as pessoas')}</span>
+            <b>{fmtBRL(totalAntes)} → {fmtBRL(valTotal)} ({difPessoas > 0 ? '+' : ''}{fmtBRL(difPessoas)})</b>
+          </div>
+        )}
+        {!semDiarias && valGrupos.map((g) => {
+          const hospedes = diariaSubs({ ...g, saz: null });
+          const anterior = valIsDiariaAdj ? g.valorOriginal : g.anterior;
+          const mudou    = !valIsDiariaAdj && anterior != null && Math.abs(anterior - g.valor) >= 0.005;
+          return (
+            <div key={g.key} className={[styles.finLinha, mudou ? styles.finLinhaMudou : ''].join(' ')}>
+              <span className={styles.finLinhaTxt}>
+                {g.qtd > 1
+                  ? tr('{{qtd}} diárias × {{valor}}', { qtd: g.qtd, valor: fmtBRL(g.valor) })
+                  : g.meia ? tr('Meia diária') : tr('Diária')}
+                {hospedes && <small className={styles.finSub}>{hospedes}</small>}
+                {g.saz && <small className={styles.finSub}>{tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}</small>}
+                {mudou && (
+                  <small className={g.valor > anterior ? styles.finDifMais : styles.finDifMenos}>
+                    {tr('{{v}} por diária', { v: `${g.valor > anterior ? '+' : ''}${fmtBRL(g.valor - anterior)}` })}
+                  </small>
+                )}
+              </span>
+              <b>
+                {anterior != null && <span className={styles.rcDiariaOld}>{fmtBRL(anterior * g.qtd)}</span>}
+                {fmtBRL(g.valor * g.qtd)}
+              </b>
+            </div>
+          );
+        })}
+        {!semDiarias && valAdj && !valIsDiariaAdj && Math.abs(valDiff) >= 0.005 && (
+          <div className={styles.finLinha}><span>{describeAdjustment(valAdj)}</span><b>{valDiff > 0 ? '+' : ''}{fmtBRL(valDiff)}</b></div>
+        )}
+        {!semDiarias && <hr className={styles.finSep} />}
+        <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total')}</span><b>{fmtBRL(valTotal)}</b></div>
+        {totalPago > 0.005 && (
+          <div className={[styles.finLinha, styles.finPago].join(' ')}><span>{tr('Pago')}</span><b>{fmtBRL(totalPago)}</b></div>
+        )}
+        {valQuitado ? (
+          <p className={styles.finQuitado}><Check size={15} /> {tr('Pago integralmente')}</p>
+        ) : valPendente > 0.005 && (
+          <div className={styles.finPendGrande}><span>{tr('Pendente')}</span><b>{fmtBRL(valPendente)}</b></div>
+        )}
+      </aside>
+    );
+
+    // Gerenciar diárias: uma linha por diária; o valor anterior aparece riscado quando muda.
+    const renderDiariasTabela = () => (
+      <div className={[styles.rcSection, styles.gdDiarias].join(' ')}>
+        <div className={styles.rcSectionHead}>
+          <span className={styles.rcSectionLabel}>{tr('Diárias')}</span>
+          {!valPersistidas && editCalcLoading && <Loader2 size={13} className={styles.spin} />}
+        </div>
+        {valDetalhesComAnterior.length === 0 ? (
+          <div className={styles.pagEmpty}>{editCalcLoading ? tr('Calculando…') : tr('Sem diárias para o período.')}</div>
+        ) : (
+          <div className={styles.dtScroll}>
+            <table className={styles.dtTable}>
+              <thead><tr>
+                <th>{tr('Nº')}</th><th>{tr('Período')}</th><th>{tr('Ocupação')}</th><th className={styles.dtDir}>{tr('Valor')}</th><th />
+              </tr></thead>
+              <tbody>
+                {valDetalhesComAnterior.map((d, i, arr) => {
+                  const ini    = addDaysStr(editCheckin ? formatDate(editCheckin) : reserva.dataInicio, i);
+                  const orig   = d.valor_final ?? 0;
+                  const valor  = valIsDiariaAdj ? valDiariaValor : orig;
+                  const antes  = valIsDiariaAdj ? orig : d._valorAnterior;
+                  const mudou  = antes != null && Math.abs(antes - valor) >= 0.005;
+                  const per    = periodoDiaria(d.descricao);
+                  // Só dá para tirar diária das pontas: a primeira adia o check-in, a última antecipa o check-out.
+                  const primeira = i === 0 && arr.length > 1 && podeCheckinDepois;
+                  const ultima   = i === arr.length - 1 && arr.length > 1 && podeCheckoutAntes;
+                  return (
+                    <tr key={i} className={mudou ? styles.dtMudou : undefined}>
+                      <td><span className={styles.dtNum}>{String(i + 1).padStart(2, '0')}</span></td>
+                      <td>{per ? per.replace(/(\d{2}\/\d{2})\/\d{4}/g, '$1').replace(/\s*->\s*/, ' → ') : `${fmtDiaMes(ini)} → ${fmtDiaMes(addDaysStr(ini, 1))}`}</td>
+                      <td className={styles.dtQuebra}>
+                        {normalizaAdultos(descricaoHospedes(d.descricao)) || '—'}
+                        {d.meia_diaria && <span className={styles.dtTag}>{tr('Meia diária')}</span>}
+                        {d.sazonalidade?.descricao && <span className={styles.dtTag}>{d.sazonalidade.descricao}</span>}
+                      </td>
+                      <td className={[styles.dtDir, styles.dtValor].join(' ')}>
+                        {mudou && <span className={styles.rcDiariaOld}>{fmtBRL(antes)}</span>}
+                        {fmtBRL(valor)}
+                      </td>
+                      <td className={styles.gdAcaoCel}>
+                        {(primeira || ultima) && (
+                          <button type="button" className={styles.removeIconBtn} title={tr('Remover diária')} aria-label={tr('Remover diária')}
+                            onClick={() => (ultima ? setEditCheckout(somaDia(editCheckout, -1)) : mudaCheckin(somaDia(editCheckin, 1)))}>
+                            <X size={12} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {valAdj && !valIsDiariaAdj && Math.abs(valDiff) >= 0.005 && (
+                  <tr>
+                    <td colSpan={3}>{describeAdjustment(valAdj)}</td>
+                    <td className={[styles.dtDir, valDiff < 0 ? styles.dtMenos : styles.dtMais].join(' ')}>{valDiff > 0 ? '+' : ''}{fmtBRL(valDiff)}</td>
+                    <td />
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <div className={styles.gdAdicionar}>
+          <button type="button" className={styles.rvSecBtn} disabled={!podeCheckoutDepois}
+            title={!podeCheckoutDepois ? tr('O quarto não está livre no dia seguinte') : undefined}
+            onClick={() => setEditCheckout(somaDia(editCheckout, 1))}>
+            {tr('+ Adicionar diária')}
+          </button>
+        </div>
+      </div>
+    );
+
+    const salvarBtns = (
+      <div style={{ display: 'flex', gap: 8 }}>
+        {hasChanges && (
+          <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
+            {saving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar alterações')}
+          </Button>
+        )}
+        {hasChangedData && (
+          <Button variant="primary" disabled={!canSave || editSaving} onClick={handleSaveEdit}>
+            {editSaving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar Dados')}
+          </Button>
+        )}
+      </div>
+    );
+    // Gerenciar pessoas fecha pelo X do topo: o rodapé só aparece para salvar.
+    const naPessoas = editActiveTab === 'pessoas';
+    const semVoltar = naPessoas || editActiveTab === 'dados';
+
     return (
       <>
-      <PainelReserva inline={inline} acao largo={editActiveTab === 'dados'} saindo={saindo} open onClose={goBackFromEdit} size={editActiveTab === 'dados' ? 'lg' : 'md'}
-        containerStyle={editActiveTab === 'dados' ? { maxWidth: 'min(640px, 96vw)' } : undefined}
+      <PainelReserva inline={inline} acao estreito={naPessoas} diarias={editActiveTab === 'dados'} saindo={saindo} open onClose={goBackFromEdit} size="md"
         hideHeader
         bodyStyle={{ padding: 0, gap: 0 }}
-        footer={
+        footer={semVoltar ? ((hasChanges || hasChangedData) ? <div className={styles.footerRight}>{salvarBtns}</div> : null) : (
           <div className={styles.footerSpread}>
             <Button variant="secondary" onClick={goBackFromEdit}>{tr('← Voltar')}</Button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {hasChanges && (
-                <Button variant="primary" disabled={saving} onClick={handleSaveChanges}>
-                  {saving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar')}
-                </Button>
-              )}
-              {hasChangedData && (
-                <Button variant="primary" disabled={!canSave || editSaving} onClick={handleSaveEdit}>
-                  {editSaving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar Dados')}
-                </Button>
-              )}
-            </div>
+            {salvarBtns}
           </div>
-        }
+        )}
       >
         <div className={[styles.detailTabContent, editActiveTab !== 'dados' ? styles.detailTabContentAuto : ''].join(' ')}>
         {editActiveTab === 'dados' && (
           <div className={styles.editDadosRoot}>
-            {/* Valores — no topo, largura toda. O valor anterior de cada diária
-                aparece riscado quando o quarto ou o período mudam. */}
-            <div className={styles.rcCard}>
-              <div className={styles.rcSection}>
-                <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>{tr('Valores')}</span>
-                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
-                    <X size={17} />
-                  </button>
-                </div>
-                {renderValoresLista()}
-              </div>
-            </div>
+            {renderValoresResumo({ titulo: tr('Gerenciar diárias'), semDiarias: true })}
 
             <div className={styles.editDados}>
-              {/* Esquerda — apartamento, período e observação */}
+              {/* Esquerda — apartamento e período */}
               <div className={styles.editDadosForm}>
                 <div className={styles.editFieldCap}>
                   <RoomCombobox
@@ -1669,38 +2049,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     </div>
                   )}
                 </div>
-
-                <div className={[styles.editFieldCap, styles.editObsGrow].join(' ')}>
-                  <FormField label={tr('Observação')}>
-                    <textarea
-                      className={styles.motivoTextarea}
-                      placeholder={tr('Observação sobre a reserva...')}
-                      rows={2}
-                      value={editObs}
-                      onChange={(e) => setEditObs(e.target.value)}
-                    />
-                  </FormField>
-                </div>
-              </div>
-
-              {/* Direita — calendário só de leitura, compacto */}
-              <div className={styles.editDadosCal}>
-                <DatePicker
-                  inline readOnly mode="range"
-                  startDate={editCheckin} endDate={editCheckout}
-                  occupancy={occupancy}
-                  onMonthChange={handleEditMonthChange}
-                />
-              </div>
-
-              <div className={styles.editCalLegend}>
-                <span className={styles.editCalLegendItem}><i className={styles.lgTod} /> {tr('Hoje')}</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgSel} /> {tr('Selecionado')}</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgHalf} /> {tr('Entrada/saída (meio-dia)')}</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgBlk} /> {tr('Ocupado')}</span>
-                <span className={styles.editCalLegendItem}><i className={styles.lgFree} /> {tr('Disponível')}</span>
               </div>
             </div>
+
+            {renderDiariasTabela()}
           </div>
         )}
 
@@ -1772,38 +2124,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           return (
           <div className={styles.detailBody}>
             {/* Valores — adicionar ou remover pessoa recalcula as diárias */}
-            <div className={styles.rcCard}>
-              <div className={styles.rcSection}>
-                <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>{tr('Valores')}</span>
-                  <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
-                    <X size={17} />
-                  </button>
-                </div>
-                {renderValoresLista()}
-              </div>
-            </div>
-
-            {/* Busca — campo do assistente, resultados flutuantes */}
-            {editavel && (
-              <div className={styles.gpSearchSticky}>
-                <div ref={pessoaWrapRef} className={styles.hospSearchWrap}>
-                  {pessoaSearching
-                    ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
-                    : <Search size={13} className={styles.hospSearchIcon} />}
-                  <div className={styles.hospInputInner}>
-                    <input className={styles.hospInlineInput} placeholder={tr('Buscar hóspede...')}
-                      value={pessoaQuery} onChange={(e) => handlePessoaQuery(e.target.value)} />
-                  </div>
-                  {pessoaQuery && (
-                    <button type="button" className={styles.gpSearchClear}
-                      onClick={() => { setPessoaQuery(''); setPessoaResults([]); setPendingPessoa(null); }}>
-                      <X size={13} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+            {renderValoresResumo()}
 
             {/* Hóspedes — mesma lista do modal de visualização */}
             <div className={styles.rcCard}>
@@ -1811,32 +2132,38 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.rcSectionHead}>
                   <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
                 </div>
-                {lista.length === 0 ? (
-                  <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
-                ) : (
-                  <div className={styles.hospedeList}>
-                    {lista.map((h, i) => (
-                      <div key={h.id ?? h.nome} className={styles.hospedeRow}>
-                        <div className={styles.hospedeAvatar}>{initials(h.nome)}</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className={styles.hospedeName}>
-                            {h.nome}
-                            {i === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>{tr('Titular')}</span>}
-                          </div>
-                          {h.cpf && <div className={styles.hospedeCpf}>{fmtCpf(h.cpf)}</div>}
-                        </div>
-                        {i > 0 && editavel && orcPessoas.length === 0 && (
-                          <div className={styles.rvGuestContacts}>
-                            <button className={styles.makeTitularBtn} title={tr('Tornar titular')}
-                              onClick={() => handleSetTitular(h.id)}><Crown size={12} /></button>
-                            <button className={styles.removeIconBtn} title={tr('Remover')}
-                              onClick={() => setConfirmRemovePessoa({ id: h.id, nome: h.nome })}><X size={12} /></button>
-                          </div>
-                        )}
+                {/* Busca — campo do assistente, resultados flutuantes */}
+                {editavel && (
+                  <div className={styles.gpBusca}>
+                    <div ref={pessoaWrapRef} className={styles.hospSearchWrap}>
+                      {pessoaSearching
+                        ? <Loader2 size={13} className={[styles.hospSearchIcon, styles.spin].join(' ')} />
+                        : <Search size={13} className={styles.hospSearchIcon} />}
+                      <div className={styles.hospInputInner}>
+                        <input className={styles.hospInlineInput} placeholder={tr('Buscar hóspede...')}
+                          value={pessoaQuery} onChange={(e) => handlePessoaQuery(e.target.value)} />
                       </div>
-                    ))}
+                      {pessoaQuery && (
+                        <button type="button" className={styles.gpSearchClear}
+                          onClick={() => { setPessoaQuery(''); setPessoaResults([]); setPendingPessoa(null); }}>
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
+                {lista.length === 0 ? (
+                  <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
+                ) : renderHospedes(lista, editavel && orcPessoas.length === 0 ? (h) => (
+                  <div className={styles.rvAcompAcoes}>
+                    <BalaoConfirma className={styles.rvSecBtn} label={tr('Tornar titular')} confirmar={tr('Tornar titular')}
+                      mensagem={<>{tr('Tornar')} <b>{h.nome}</b> {tr('o titular da reserva?')}</>}
+                      onConfirm={() => { handleSetTitular(h.id); onNotify?.(tr('Titular alterado. Salve para aplicar.')); }} />
+                    <BalaoConfirma className={[styles.rvSecBtn, styles.rvSecBtnPerigo].join(' ')} label={tr('Remover')} confirmar={tr('Remover')} perigo
+                      mensagem={<>{tr('Remover')} <b>{h.nome}</b> {tr('desta reserva?')}</>}
+                      onConfirm={() => { handleRemovePessoa(h.id); onNotify?.(tr('Pessoa removida. Salve para aplicar.')); }} />
+                  </div>
+                ) : null)}
               </div>
             </div>
 
@@ -1868,7 +2195,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         <span className={p.cancelado ? styles.pagCardValorCancelado : styles.step3PagVal}>{fmtBRL(p.valor)}</span>
                         {!p.cancelado && editavel && (
                           <button className={styles.removeIconBtn} title={tr('Cancelar pagamento')}
-                            onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); }}>
+                            onClick={(e) => { e.stopPropagation(); setCancelPagId(p.id); setCancelMotivo(''); setBalao({ tipo: 'cancelarPag', anchor: e.currentTarget }); }}>
                             <Trash2 size={12} />
                           </button>
                         )}
@@ -1899,6 +2226,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         })()}
         </div>
       </PainelReserva>
+
+      {!inline && renderBalao()}
 
       <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
         footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
@@ -1932,13 +2261,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       )) : (
         <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
       )}
-
-      <Modal open={!!cancelPagId} onClose={() => setCancelPagId(null)} size="sm" title={tr('Cancelar Pagamento')}
-        footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setCancelPagId(null)}>{tr('Voltar')}</Button><Button variant="danger" disabled={!cancelMotivo.trim()} onClick={handleConfirmCancelPagamento}>{tr('Confirmar')}</Button></div>}
-      >
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>{tr('Informe o motivo do cancelamento deste pagamento.')}</p>
-        <textarea className={styles.motivoTextarea} placeholder={tr('Motivo do cancelamento...')} rows={3} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
-      </Modal>
 
       <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title={tr('Descartar alterações?')}
         footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>{tr('Continuar editando')}</Button><Button variant="danger" onClick={() => { setShowDiscard(false); discardPendingOps(); setEditing(false); setEditActiveTab('dados'); }}>{tr('Descartar')}</Button></div>}
@@ -2023,7 +2345,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       ? reserva.pessoasOrcamento
       : (reserva.status === 'orcamento' && reserva.orcamentoInfo && pessoas.length === 0)
         ? [{ id: 0, nome: reserva.orcamentoInfo.nome_solicitante }]
-        : pessoas;
+        : (isOvernight ? pessoas : (reserva.hospedes ?? []));
 
   // Cabeçalho do card: descrição do apartamento (ou categoria) como chip.
   const headChip   = roomDesc || catNome;
@@ -2058,13 +2380,13 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       <button type="button" className={styles.rvRodapeBtn} disabled={pagamentoDeGrupo}
         title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
         onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
-        <Plus size={15} /> {tr('Pagamento')}
+        {tr('Pagamento')}
       </button>
       <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeHospedar].join(' ')}
         disabled={!canCheckin || voucherLoading}
         title={!canCheckin ? tr('Check-in: {{v0}}', { v0: fmtDateBR(reserva.dataInicio) }) : undefined}
-        onClick={() => { setAcoesOpen(false); setConfirmPernoite(true); }}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> {tr('Hospedar')}
+        onClick={(e) => { setAcoesOpen(false); setBalao({ tipo: 'hospedar', anchor: e.currentTarget }); }}>
+        {tr('Hospedar')}
       </button>
       <div className={styles.rvRodapeMais}>
         {acoesOpen && (
@@ -2072,11 +2394,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
             <div className={styles.rvRodapeMenu} role="menu">
               <button className={styles.rvAcoesItem} disabled={voucherLoading}
-                onClick={() => { setAcoesOpen(false); handleVoucherClick(); }}>
+                onClick={() => { setAcoesOpen(false); handleVoucherClick(setaRef.current); }}>
                 <FileDown size={15}/> {tr('Voucher')}
               </button>
               <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                <Pencil size={15}/> {tr('Editar reserva')}
+                <Pencil size={15}/> {tr('Gerenciar diárias')}
               </button>
               <div className={styles.rvAcoesDiv} />
               <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
@@ -2094,18 +2416,18 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               <div className={styles.rvAcoesDiv} />
               {reserva.status === 'confirmada' && (
                 <button className={styles.rvAcoesItem}
-                  onClick={() => { setAcoesOpen(false); setConfirmAusente(true); }}>
+                  onClick={() => { setAcoesOpen(false); setBalao({ tipo: 'ausente', anchor: setaRef.current }); }}>
                   <UserX size={15}/> {tr('Marcar como ausente')}
                 </button>
               )}
               <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
-                onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setConfirmCancel(true); }}>
+                onClick={() => { setAcoesOpen(false); setCancelMotivRes(''); setBalao({ tipo: 'cancelar', anchor: setaRef.current }); }}>
                 <Trash2 size={14}/> {tr('Cancelar reserva')}
               </button>
             </div>
           </>
         )}
-        <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeSeta].join(' ')}
+        <button ref={setaRef} type="button" className={[styles.rvRodapeBtn, styles.rvRodapeSeta].join(' ')}
           onClick={() => setAcoesOpen((v) => !v)} aria-haspopup="menu" aria-expanded={acoesOpen}
           title={tr('Opções')} aria-label={tr('Opções')}>
           {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <ChevronDown size={16} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />}
@@ -2126,7 +2448,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       <PainelReserva inline={inline} saindo={saindo} open onClose={handleClose} size="lg" hideHeader closeOnBackdrop
         footer={rodapeEl}
         bodyStyle={{ padding: '14px 16px 16px', gap: 12 }}
-        containerStyle={{ maxWidth: overnight ? 'min(518px, 96vw)' : 'min(628px, 96vw)' }}
+        containerStyle={{ maxWidth: overnight ? 'min(466px, 96vw)' : 'min(565px, 96vw)' }}
       >
         <div className={[styles.rcCard, reserva.status === 'cancelado' ? styles.rvCancelado : ''].join(' ')}>
 
@@ -2189,50 +2511,17 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           <div className={styles.rcSection}>
             <div className={styles.rcSectionHead}>
               <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
+              {temOpcoes && (
+                <button type="button" className={styles.rvSecBtn}
+                  onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
+                  {tr('Gerenciar pessoas')}
+                </button>
+              )}
             </div>
             {guestList.length === 0 ? (
               <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
             ) : (
-              <div className={styles.hospedeList}>
-                {guestList.map((h, hi) => {
-                  const telDigits = String(h.telefone ?? '').replace(/\D/g, '');
-                  const waNumber  = hi === 0 && telDigits ? (telDigits.length <= 11 ? `55${telDigits}` : telDigits) : '';
-                  const showEmail = hi === 0 && !!h.email;
-                  return (
-                    <div key={h.id ?? h.nome} className={styles.hospedeRow}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className={styles.hospedeName}>
-                          {h.nome}
-                          {hi === 0 && <span className={[styles.rcChip, styles.rcChipGreen].join(' ')}>{tr('Titular')}</span>}
-                        </div>
-                        {(h.telefone || h.dataNascimento) && (
-                          <div className={styles.hospedeCpf}>{h.telefone ? fmtPhone(h.telefone) : h.dataNascimento}</div>
-                        )}
-                        {h.email && <div className={styles.hospedeCpf}>{h.email}</div>}
-                      </div>
-                      {(waNumber || showEmail) && (
-                        <div className={styles.rvGuestContacts}>
-                          {waNumber && (
-                            <a className={[styles.rvContactBtn, styles.rvContactBtnWa].join(' ')}
-                              href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
-                              title={tr('WhatsApp {{v0}}', { v0: fmtPhone(h.telefone) })} onClick={(e) => e.stopPropagation()}>
-                              <img src={whatsappIcon} alt={tr('WhatsApp')} className={styles.rvContactIcon}
-                                loading="eager" decoding="sync" draggable={false} />
-                            </a>
-                          )}
-                          {showEmail && (
-                            <a className={[styles.rvContactBtn, styles.rvContactBtnMail].join(' ')}
-                              href={`mailto:${h.email}`} title={tr('E-mail: {{email}}', { email: h.email })} onClick={(e) => e.stopPropagation()}>
-                              <img src={emailIcon} alt={tr('E-mail')} className={styles.rvContactIcon}
-                                loading="eager" decoding="sync" draggable={false} />
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              renderHospedes(guestList)
             )}
           </div>
 
@@ -2243,35 +2532,61 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             const grupos    = groupDiarias(effectiveDetalhes, isDiariaAdj ? () => diariaAdjValor : null);
             const pendente  = Math.max(0, cardTotal - totalPago);
             const pagosLista = pagamentoDeGrupo ? [] : pagamentos.filter((p) => !p.cancelado);
+            const pctPago    = cardTotal > 0 ? Math.min(100, Math.round((totalPago / cardTotal) * 100)) : 0;
             return (
-              <aside className={styles.finResumo}>
-                <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
-                {grupos.map((g) => (
-                  <div key={g.key} className={styles.finLinha}>
-                    <span>
-                      {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : tr('Diária')}
-                      {diariaSubs(g) && <small className={styles.finSub}> · {diariaSubs(g)}</small>}
-                    </span>
-                    <b>{g.qtd > 1 && <small className={styles.finSub}>{g.qtd}{tr('x')} </small>}{fmtBRL(g.valor)}</b>
-                  </div>
-                ))}
+              <aside className={[styles.finResumo, styles.finResumoView].join(' ')}>
+                <div className={styles.finCab}>
+                  <h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4>
+                </div>
+                {grupos.map((g) => {
+                  const hospedes = diariaSubs({ ...g, saz: null });
+                  return (
+                    <div key={g.key} className={styles.finLinha}>
+                      <span className={styles.finLinhaTxt}>
+                        {g.qtd > 1
+                          ? tr('{{qtd}} diárias × {{valor}}', { qtd: g.qtd, valor: fmtBRL(g.valor) })
+                          : g.meia ? tr('Meia diária') : tr('Diária')}
+                        {hospedes && <small className={styles.finSub}>{hospedes}</small>}
+                        {g.saz && <small className={styles.finSub}>{tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}</small>}
+                      </span>
+                      <b>{fmtBRL(g.valor * g.qtd)}</b>
+                    </div>
+                  );
+                })}
                 {grupos.length === 0 && (
                   <div className={styles.finLinha}><span>{tr('Diárias')}</span><b>{fmtBRL(cardTotal)}</b></div>
                 )}
                 {priceAdj && !isDiariaAdj && Math.abs(ajuste) >= 0.005 && (
                   <div className={styles.finLinha}><span>{describeAdjustment(priceAdj)}</span><b>{ajuste > 0 ? '+' : ''}{fmtBRL(ajuste)}</b></div>
                 )}
-                <hr className={styles.finSep} />
-                <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                {(pagamentoDeGrupo || cardTotal <= 0) && (
+                  <>
+                    <hr className={styles.finSep} />
+                    <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total')}</span><b>{fmtBRL(cardTotal)}</b></div>
+                  </>
+                )}
                 {pagosLista.map((p) => (
                   <div key={p.id} className={[styles.finLinha, styles.finPago].join(' ')}>
-                    <span>{p.descricao || p.formaPagamento || tr('Pagamento')}</span><b>{fmtBRL(p.valor)}</b>
+                    <span className={styles.finLinhaTxt}>
+                      {p.descricao || p.formaPagamento || tr('Pagamento')}
+                      {p.dataRegistro && <small className={styles.finSub}>{String(p.dataRegistro).slice(0, 16)}</small>}
+                    </span>
+                    <b>{fmtBRL(p.valor)}</b>
                   </div>
                 ))}
+                {!pagamentoDeGrupo && cardTotal > 0 && (
+                  <div className={styles.finProg}>
+                    <div className={styles.finProgBarra}><span style={{ width: `${pctPago}%` }} /></div>
+                    <div className={styles.finProgLeg}>
+                      <span>{pctPago}%</span>
+                      <span>{tr('de {{total}}', { total: fmtBRL(cardTotal) })}</span>
+                    </div>
+                  </div>
+                )}
                 {!pagamentoDeGrupo && (pagoIntegral ? (
                   <p className={styles.finQuitado}><Check size={15} /> {tr('Pago integralmente')}</p>
                 ) : pendente > 0.005 && (
-                  <div className={[styles.finLinha, styles.finPend].join(' ')}><span>{tr('Pendente')}</span><b>{fmtBRL(pendente)}</b></div>
+                  <div className={styles.finPendGrande}><span>{tr('Pendente')}</span><b>{fmtBRL(pendente)}</b></div>
                 ))}
 
           {groupInfo && (() => {
@@ -2316,6 +2631,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               <div className={styles.rcSection}>
                 <div className={styles.rcSectionHead}>
                   <span className={styles.rcSectionLabel}>{tr('Diárias')}</span>
+                  {temOpcoes && (
+                    <button type="button" className={styles.rvSecBtn}
+                      onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
+                      {tr('Gerenciar diárias')}
+                    </button>
+                  )}
                 </div>
                 <div className={styles.dtScroll}>
                   <table className={styles.dtTable}>
@@ -2331,12 +2652,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                           <tr key={i}>
                             <td><span className={styles.dtNum}>{String(i + 1).padStart(2, '0')}</span></td>
                             <td>{periodoDiaria(d.descricao) ? periodoDiaria(d.descricao).replace(/(\d{2}\/\d{2})\/\d{4}/g, '$1').replace(/\s*->\s*/, ' → ') : `${fmtDiaMes(ini)} → ${fmtDiaMes(addDaysStr(ini, 1))}`}</td>
-                            <td>
+                            <td className={styles.dtQuebra}>
                               {normalizaAdultos(descricaoHospedes(d.descricao)) || '—'}
                               {d.meia_diaria && <span className={styles.dtTag}>{tr('Meia diária')}</span>}
                               {d.sazonalidade?.descricao && <span className={styles.dtTag}>{d.sazonalidade.descricao}</span>}
                             </td>
-                            <td className={[styles.dtDir, styles.dtForte].join(' ')}>
+                            <td className={[styles.dtDir, styles.dtValor].join(' ')}>
                               {isDiariaAdj && Math.abs(valor - orig) >= 0.005 && <span className={styles.rcDiariaOld}>{fmtBRL(orig)}</span>}
                               {fmtBRL(valor)}
                             </td>
@@ -2363,6 +2684,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             <div className={styles.rcSection}>
               <div className={styles.rcSectionHead}>
                 <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
+                {temOpcoes && (
+                  <button type="button" className={styles.rvSecBtn}
+                    onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
+                    {tr('Gerenciar pagamentos')}
+                  </button>
+                )}
               </div>
               <div className={styles.dtScroll}>
                 <table className={styles.dtTable}>
@@ -2387,8 +2714,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                           </span>
                         </td>
                         <td><DataHora valor={p.dataRegistro} /></td>
-                        <td className={styles.dtTrunca}>{p.nomePagador || '—'}</td>
-                        <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(p.valor)}</td>
+                        <td className={[styles.dtQuebra, styles.dtPagador].join(' ')}>{p.nomePagador || '—'}</td>
+                        <td className={[styles.dtDir, styles.dtValor].join(' ')}>{fmtBRL(p.valor)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -2413,12 +2740,33 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 </div>
               )}
             </div>
-          ) : reserva.observacao ? (
+          ) : (reserva.observacao || temOpcoes) ? (
             <div className={styles.rcSection}>
               <div className={styles.rcSectionHead}>
                 <span className={styles.rcSectionLabel}>{tr('Observação')}</span>
+                {temOpcoes && !obsAberta && (
+                  <button type="button" className={styles.rvSecBtn}
+                    onClick={() => { setAcoesOpen(false); setObsTexto(reserva.observacao ?? ''); setObsAberta(true); }}>
+                    {tr('Alterar observação')}
+                  </button>
+                )}
               </div>
-              <div className={styles.rvObsText}>{reserva.observacao}</div>
+              {obsAberta ? (
+                <div className={styles.rvObsEdit}>
+                  <textarea className={styles.motivoTextarea} rows={3} autoFocus
+                    placeholder={tr('Observação sobre a reserva...')}
+                    value={obsTexto} onChange={(e) => setObsTexto(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setObsAberta(false); } }} />
+                  <div className={styles.footerRight}>
+                    <Button variant="secondary" disabled={obsSaving} onClick={() => setObsAberta(false)}>{tr('Cancelar')}</Button>
+                    <Button variant="primary" disabled={obsSaving || obsTexto.trim() === (reserva.observacao ?? '').trim()} onClick={handleSaveObs}>
+                      {obsSaving && <Loader2 size={13} className={styles.spin} />} {tr('Salvar')}
+                    </Button>
+                  </div>
+                </div>
+              ) : reserva.observacao
+                ? <div className={styles.rvObsText}>{reserva.observacao}</div>
+                : <div className={styles.pagEmpty}>{tr('Sem observação')}</div>}
             </div>
           ) : null}
 
@@ -2478,7 +2826,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           })() : reserva.status === 'orcamento' ? (
             <>
               <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>{tr('Ativar Reserva')}</button>
-              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={() => { setCancelMotivRes(''); setConfirmCancel(true); }}>{tr('Cancelar')}</button>
+              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={(e) => { setCancelMotivRes(''); setBalao({ tipo: 'cancelar', anchor: e.currentTarget }); }}>{tr('Cancelar')}</button>
             </>
           ) : reserva.status === 'solicitada' ? (
             <>
@@ -2499,6 +2847,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         </div>
         )}
       </PainelReserva>
+
+      {renderBalao()}
 
       <Modal open={showVoucherScope} onClose={() => setShowVoucherScope(false)} size="sm"
         title={<><FileDown size={14} /> {tr('Gerar Voucher')}</>}
@@ -2534,98 +2884,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
           {tr('Esta hospedagem possui consumos registrados. Deseja incluí-los no voucher?')}
         </p>
-      </Modal>
-
-      <Modal open={confirmPernoite} onClose={() => setConfirmPernoite(false)} size="sm"
-        title={tr('Hospedar')}
-        footer={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmPernoite(false)}>{tr('Cancelar')}</Button>
-            <Button variant="primary" style={{ flex: 1 }} onClick={() => { setConfirmPernoite(false); onMoverPernoite?.(reserva.id); onClose(); }}>
-              {tr('Confirmar')}
-            </Button>
-          </div>
-        }
-      >
-        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          {tr('Tem certeza que deseja mover a reserva de')} <b>{reserva.titularNome}</b> {tr('para pernoites? O status será alterado para')} <b>{tr('Hospedado')}</b> {tr('e a reserva não poderá mais ser editada por aqui.')}
-        </p>
-      </Modal>
-
-      <Modal open={confirmAusente} onClose={() => setConfirmAusente(false)} size="sm"
-        title={tr('Reserva Ausente')}
-        footer={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmAusente(false)}>{tr('Cancelar')}</Button>
-            <Button variant="danger" style={{ flex: 1 }} disabled={saving}
-              onClick={async () => { setSaving(true); try { await onAusente?.(reserva.id); setConfirmAusente(false); onClose(); } finally { setSaving(false); } }}>
-              {saving && <Loader2 size={14} className={styles.spin} />} {tr('Confirmar')}
-            </Button>
-          </div>
-        }
-      >
-        <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-          {tr('Tem certeza que deseja marcar a reserva de')} <b>{reserva.titularNome}</b> {tr('como')} <b>{tr('ausente')}</b>{tr('? O status será alterado para')} <b>{tr('Reserva Ausente')}</b>.
-        </p>
-      </Modal>
-
-      <Modal open={confirmCancel} onClose={() => setConfirmCancel(false)} size="sm"
-        title={reserva.status === 'orcamento' ? tr('Cancelar Orçamento') : tr('Cancelar Reserva')}
-        footer={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => setConfirmCancel(false)}>{tr('Voltar')}</Button>
-            <Button variant="danger" style={{ flex: 1 }} disabled={!cancelMotivRes.trim()}
-              onClick={() => { setConfirmCancel(false); setConfirmCancel2(true); }}>
-              {tr('Avançar')}
-            </Button>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-            {tr('Informe o motivo do cancelamento da reserva de')} <b>{reserva.titularNome}</b>:
-          </p>
-          <textarea
-            style={{
-              width: '100%', boxSizing: 'border-box', minHeight: 80,
-              padding: '8px 10px', borderRadius: 'var(--radius)',
-              border: '1.5px solid var(--border)', background: 'var(--surface-2)',
-              color: 'var(--text)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit',
-            }}
-            placeholder={tr('Ex: Solicitação do hóspede')}
-            value={cancelMotivRes}
-            onChange={(e) => setCancelMotivRes(e.target.value)}
-            autoFocus
-          />
-        </div>
-      </Modal>
-
-      <Modal open={confirmCancel2} onClose={() => setConfirmCancel2(false)} size="sm"
-        title={tr('Confirmar Cancelamento')}
-        footer={
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button style={{ flex: 1 }} onClick={() => { setConfirmCancel2(false); setConfirmCancel(true); }}>{tr('Voltar')}</Button>
-            <Button variant="danger" style={{ flex: 1 }}
-              onClick={() => {
-                setConfirmCancel2(false);
-                // Para orçamentos, passa o ID do orçamento (não da hospedagem) para o endpoint correto
-                const orcId = reserva.status === 'orcamento' ? (reserva.orcamentoInfo?.id ?? null) : null;
-                onCancel(reserva.id, cancelMotivRes.trim(), orcId);
-                onClose();
-              }}>
-              {tr('Cancelar Definitivamente')}
-            </Button>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>
-            {tr('Tem certeza? Esta ação não pode ser desfeita.')}
-          </p>
-          <div style={{ padding: '8px 12px', borderRadius: 'var(--radius)', background: 'var(--surface-2)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--text-2)' }}>
-            <span style={{ fontWeight: 600, color: 'var(--text)' }}>{tr('Motivo:')} </span>{cancelMotivRes}
-          </div>
-        </div>
       </Modal>
 
       <Modal open={!editing && !!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm"
@@ -2771,31 +3029,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         )}
       </Modal>
       )}
-
-      <Modal open={!editing && !!cancelPagId} onClose={() => setCancelPagId(null)} size="sm"
-        title={tr('Cancelar Pagamento')}
-        footer={
-          <div className={styles.footerRight}>
-            <Button variant="secondary" onClick={() => setCancelPagId(null)}>{tr('Voltar')}</Button>
-            <Button variant="danger"
-              disabled={!cancelMotivo.trim()}
-              onClick={handleConfirmCancelPagamento}>
-              {tr('Confirmar')}
-            </Button>
-          </div>
-        }
-      >
-        <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--text-2)' }}>
-          {tr('Informe o motivo do cancelamento deste pagamento.')}
-        </p>
-        <textarea
-          className={styles.motivoTextarea}
-          placeholder={tr('Motivo do cancelamento...')}
-          rows={3}
-          value={cancelMotivo}
-          onChange={(e) => setCancelMotivo(e.target.value)}
-        />
-      </Modal>
 
       {/* ── Discard confirmation ── */}
       <Modal open={!editing && showDiscard} onClose={() => setShowDiscard(false)} size="sm"
@@ -6958,11 +7191,16 @@ export default function BookingCalendar() {
   };
   // orcamentoId: ID do orçamento (não da hospedagem) — passado quando status === 'orcamento'
   const handleCancelReserva = async (id, motivo, orcamentoId = null) => {
-    if (orcamentoId) {
-      // PUT /orcamento/{orcamentoId}/cancelar — cancela todas as hospedagens do orçamento
-      await orcamentoApi.cancelar(orcamentoId, motivo);
-    } else {
-      await reservaApi.cancelar(id, motivo);
+    try {
+      if (orcamentoId) {
+        // PUT /orcamento/{orcamentoId}/cancelar — cancela todas as hospedagens do orçamento
+        await orcamentoApi.cancelar(orcamentoId, motivo);
+      } else {
+        await reservaApi.cancelar(id, motivo);
+      }
+    } catch (e) {
+      notify(e?.message ?? (orcamentoId ? tr('Erro ao cancelar orçamento.') : tr('Erro ao cancelar reserva.')), 'error');
+      return;
     }
     setReservas((rs) => rs.filter((r) => r.id !== id));
     setSolicitacoes((rs) => rs.filter((r) => r.id !== id));

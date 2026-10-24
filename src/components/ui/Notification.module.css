@@ -1,48 +1,50 @@
+/* Mesmo desenho do balão de decisão: cartão claro, borda fina, cantos quase retos.
+   O tipo aparece na faixa à esquerda e no marcador. */
 .wrap {
   position: fixed;
   top: 16px;
   right: 16px;
   z-index: 110;
-  animation: slideIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: slideIn 0.14s ease-out;
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(16px) scale(0.96); }
-  to   { opacity: 1; transform: translateX(0) scale(1); }
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
 }
 
+@media (prefers-reduced-motion: reduce) { .wrap { animation: none; } }
+
 .toast {
+  --tom: var(--l-fg, var(--text));
   display: inline-flex;
   align-items: center;
   gap: 10px;
 
-  padding: 11px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.15);
-
-  color: white;
-  font-family: var(--font);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.25);
   min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--tom);
+  border-radius: 3px;
+
+  background: var(--l-card, var(--surface));
+  color: var(--l-fg, var(--text));
+  font-family: var(--font);
+  box-shadow: 0 10px 28px rgb(15 23 42 / 0.18);
 }
 
 .dot {
   width: 7px;
   height: 7px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.85);
+  border-radius: 2px;
+  background: var(--tom);
   flex-shrink: 0;
-  animation: pulse 1.4s ease-in-out infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; transform: scale(0.9); }
-  50%       { opacity: 1;   transform: scale(1.1); }
-}
+.text { font-weight: 500; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
 
-.text { font-weight: 600; font-size: 13px; }
-
-.success { background: linear-gradient(135deg, #059669, #10b981); }
-.error   { background: linear-gradient(135deg, #dc2626, #ef4444); }
-.info    { background: linear-gradient(135deg, #2563eb, #3b82f6); }
-.default { background: linear-gradient(135deg, #374151, #4b5563); }
+.success { --tom: oklch(0.5 0.12 158); }
+.error   { --tom: #b91c1c; }
+.info    { --tom: var(--l-primary, #2563eb); }
+.default { --tom: var(--l-muted-fg, var(--text-2)); }

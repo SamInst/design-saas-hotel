@@ -298,7 +298,7 @@
 .backBtn {
   display: none; align-items: center; justify-content: center;
   width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   background: transparent; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s;
 }
@@ -328,7 +328,7 @@
 
 /* ── Botões: cor sólida, sem brilho nem ícone ── */
 .page .btnSolid {
-  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
+  gap: 0; border-radius: 3px; border: 1px solid transparent;
   padding: 8px 14px; font-size: 13px; font-weight: 600;
   background: var(--l-secondary); color: var(--l-secondary-fg);
   box-shadow: none; transition: background-color .15s, color .15s;
@@ -415,7 +415,7 @@
 .pagination { display: flex; align-items: center; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--l-border); }
 .pageBtn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: var(--l-r-md);
+  width: 32px; height: 32px; border-radius: 3px;
   border: 1px solid var(--l-border); background: transparent; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s;
 }

@@ -111,7 +111,7 @@
 }
 .segmentedBtn {
   flex: 1; cursor: pointer;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   padding: 6px 12px;
   background: transparent; color: var(--l-muted-fg);
   font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
@@ -321,7 +321,7 @@
 .backBtn {
   display: none; align-items: center; justify-content: center;
   width: 28px; height: 28px; flex-shrink: 0; margin-left: -4px;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   background: transparent; color: var(--l-fg);
   cursor: pointer; transition: background-color .15s;
 }
@@ -351,7 +351,7 @@
 
 /* ── Botões: cor sólida, sem brilho nem ícone ── */
 .page .btnSolid {
-  gap: 0; border-radius: var(--l-r-md); border: 1px solid transparent;
+  gap: 0; border-radius: 3px; border: 1px solid transparent;
   padding: 8px 14px; font-size: 13px; font-weight: 600;
   background: var(--l-secondary); color: var(--l-secondary-fg);
   box-shadow: none; transition: background-color .15s, color .15s;
@@ -507,7 +507,7 @@
 }
 .viewToggleBtn {
   display: inline-flex; align-items: center; justify-content: center; width: 32px;
-  border: none; border-radius: var(--l-r-md); background: transparent;
+  border: none; border-radius: 3px; background: transparent;
   color: var(--l-muted-fg); cursor: pointer; transition: background-color .15s, color .15s;
 }
 .viewToggleBtn:hover { color: var(--l-fg); }
@@ -519,7 +519,7 @@
 .itemMenuBtn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; margin: -4px -4px 0 0;
-  border: none; border-radius: var(--l-r-md);
+  border: none; border-radius: 3px;
   background: transparent; color: var(--l-muted-fg);
   cursor: pointer; transition: background-color .15s, color .15s;
 }
@@ -652,7 +652,7 @@
 .actionBtns { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: nowrap; }
 .actionBtn  {
   display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 8px; border-radius: 6px;
+  padding: 4px 8px; border-radius: 3px;
   border: 1px solid var(--border); background: var(--surface);
   color: var(--text-2); font-size: 11px; font-weight: 600;
   cursor: pointer; transition: all .12s; white-space: nowrap;
@@ -857,7 +857,7 @@
 }
 
 .acaoPopFoot .btnSolid {
-  gap: 6px; border-radius: 6px; border: 1px solid transparent;
+  gap: 6px; border-radius: 3px; border: 1px solid transparent;
   padding: 8px 14px; font-size: 13px; font-weight: 600;
   box-shadow: none; transition: background-color .15s, color .15s;
 }
