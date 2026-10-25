@@ -58,7 +58,7 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
-@media (min-width: 1024px) { .split { grid-template-columns: 336px minmax(0, 1fr); } }
+@media (min-width: 1024px) { .split { grid-template-columns: 370px minmax(0, 1fr); } }
 
 .sidePanel {
   min-height: 0; overflow-y: auto;
@@ -4172,3 +4172,96 @@ a.rvContato:hover span { text-decoration: underline; }
 /* Campos de período compactos */
 .rvGavetaDiarias .dateCompact input { height: 30px !important; min-height: 30px !important; padding: 4px 8px !important; font-size: 12.5px !important; }
 .rvGavetaDiarias .dataPassoBtn { width: 26px; height: 30px; }
+
+/* ── Reservas de hoje (esquerda) e linha do tempo das listas do dia ────────── */
+.sideHoje { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; }
+.slotEsq:not(:empty) ~ .sideHoje { display: none; }
+
+.lstLinha { position: relative; display: flex; flex-direction: column; gap: 10px; }
+.lstLinha::before {
+  content: ''; position: absolute; left: 7px; top: 14px; bottom: 28px; width: 2px;
+  border-radius: 1px; background: var(--border);
+}
+.lstLinha .lstSecaoHead .lstDot { position: relative; z-index: 1; box-shadow: 0 0 0 3px var(--l-card); }
+.lstTomSaida   { --dot: oklch(0.65 0.16 50); }
+.lstTomChegada { --dot: oklch(0.6 0.13 158); }
+.lstTomFica    { --dot: var(--l-muted-fg); }
+.lstItem { position: relative; padding-left: 16px; }
+.lstItem::before {
+  content: ''; position: absolute; left: 9px; top: 50%; z-index: 1;
+  width: 10px; height: 10px; margin-top: -5px; border-radius: 50%;
+  background: var(--l-card); border: 2px solid var(--dot, var(--l-muted-fg));
+}
+
+/* ── Mini dashboard do dia no cabeçalho do calendário ──────────────────────── */
+.hdrResumo {
+  margin-left: auto; display: flex; align-items: center; height: 40px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--l-r-lg); overflow: hidden;
+}
+.hdrResumoDia {
+  align-self: stretch; display: inline-flex; align-items: center; padding: 0 12px;
+  background: var(--l-hero); color: var(--l-hero-fg); font-size: 12px; font-weight: 600;
+}
+.hdrStat { display: inline-flex; align-items: baseline; gap: 5px; padding: 0 12px; }
+.hdrStat + .hdrStat { box-shadow: inset 1px 0 0 var(--border); }
+.hdrStat b { font-size: 14px; font-weight: 700; color: var(--l-fg); font-variant-numeric: tabular-nums; }
+.hdrStat span { font-size: 12px; color: var(--l-muted-fg); }
+.sidePanel > * { zoom: .9; }
+.lstLinha .lstNum { background: var(--dot, var(--l-hero)); color: #fff; }
+.sideGrupo:has(> .slotEsq:not(:empty)) > .sideGrupoTit { display: none; }
+.diaTopo { display: flex; align-items: flex-start; gap: 8px; }
+.diaTopoTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.diaTopoTxt .sideGrupoTit { padding-bottom: 0; }
+.diaTopoTxt small { padding: 0 10px; font-size: 12px; color: var(--l-muted-fg); }
+.diaTopoFechar {
+  display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px;
+  border: none; border-radius: 3px; background: transparent; color: var(--l-muted-fg); cursor: pointer;
+}
+.diaTopoFechar:hover { background: color-mix(in oklch, var(--l-accent) 55%, transparent); color: var(--l-fg); }
+.slotEsq .janela:has(.diaTopo) .janelaCorpo { padding-top: 0; }
+.diaTopo { margin-bottom: 6px; }
+.diaTopoTxt .sideGrupoTit, .sideHoje > .sideGrupoTit { font-size: 14px; }
+.diaTopoTxt small { font-size: 13px; }
+.diaTopoFechar {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: var(--l-r-md);
+  background: var(--l-secondary); color: var(--l-fg);
+}
+.diaTopoFechar:hover { background: var(--l-accent); color: var(--l-accent-fg); border-color: transparent; }
+.diaTopoFechar { background: var(--danger); color: #fff; border-color: transparent; }
+.diaTopoFechar:hover { background: color-mix(in oklch, var(--danger) 85%, black); color: #fff; }
+.lstLinhaSoItens::before { top: 24px; bottom: 24px; }
+.slotEsq .janela:has(.diaTopo) .janelaCorpo { display: flex; flex-direction: column; gap: 12px; }
+.slotEsq .janela:has(.diaTopo) .diaTopo { margin-bottom: 0; }
+.diaTopo { align-items: center; }
+.diaTopoFechar { flex-shrink: 0; }
+.diaTopoTxt .sideGrupoTit, .diaTopoTxt small { padding-left: 2px; padding-right: 0; }
+
+/* Abas da view por quarto: mesmo alternador da tela de Cadastros */
+.lstSeg { display: flex; gap: 4px; padding: 4px; border-radius: 3px; border: 1px solid var(--l-border); background: transparent; }
+.lstSegBtn {
+  flex: 1; height: auto; padding: 6px 12px; border: none; border-radius: 3px;
+  background: transparent; color: var(--l-muted-fg);
+  font-family: inherit; font-size: 12px; line-height: 16px; font-weight: 600;
+  transition: background-color .15s, color .15s;
+}
+.lstSegBtn:hover { color: var(--l-fg); }
+.lstSegBtnOn, .lstSegBtnOn:hover { background: var(--l-primary); color: var(--l-primary-fg); }
+.lstTomSt_confirmada         { --dot: #10b981; }
+.lstTomSt_hospedado          { --dot: #374151; }
+.lstTomSt_finalizado         { --dot: #9ca3af; }
+.lstTomSt_cancelado          { --dot: #ef4444; }
+.lstTomSt_ausente            { --dot: #f97316; }
+.lstTomSt_pernoite_cancelado { --dot: #dc2626; }
+.lstTomSt_pagamento_pendente { --dot: #eab308; }
+.lstPaginas { display: flex; justify-content: center; }
+.cadPaginacao { display: flex; align-items: center; gap: 4px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--l-border); }
+.cadPageBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px;
+  border-radius: 3px; border: 1px solid var(--l-border);
+  background: var(--l-card); color: var(--l-muted-fg);
+  cursor: pointer; transition: background-color .15s, color .15s;
+}
+.cadPageBtn:hover:not(:disabled) { background: var(--l-accent); color: var(--l-accent-fg); }
+.cadPageBtn:disabled { opacity: .5; cursor: not-allowed; }
+.cadPageAtual { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--l-fg); white-space: nowrap; }

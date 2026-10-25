@@ -409,7 +409,7 @@ const initials = (nome) => {
 };
 
 const STATUS_LABEL = {
-  hospedado: tr('Hospedado'), confirmada: tr('Confirmada'),
+  hospedado: tr('Hospedado'), confirmada: tr('Reservado'),
   solicitada: tr('Solicitada'), finalizado: tr('Finalizado'), cancelado: tr('Cancelado'),
   orcamento: tr('Orçamento'),
 };
@@ -623,7 +623,7 @@ function LinhaReserva({ r, onClick, mostrarQuarto = true }) {
         <b>{r.titularNome}</b>
         <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</small>
       </span>
-      <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
+      {r.status !== 'confirmada' && <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>}
       <ChevronRight size={15} className={styles.sideSeta} />
     </button>
   );
@@ -3079,92 +3079,148 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 }
 
 // ─── Day Modal ────────────────────────────────────────────────────────────────
-function DayModal({ dateStr, refreshKey, onClose, onNewReserva, categorias, onSelectReserva }) {
-  const [dayList,  setDayList]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
+function useReservasDoDia(dateStr, refreshKey) {
+  const [lista,   setLista]   = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!dateStr) return;
+    let vivo = true;
     setLoading(true);
     hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], data: toBrDate(dateStr) })
       .then((data) => {
+        if (!vivo) return;
         const flat = Array.isArray(data) ? data : [];
         const seen = new Set();
         const out = [];
         for (const r of flat) {
           if (!seen.has(r.id)) { seen.add(r.id); out.push(normalizeReserva(r)); }
         }
-        setDayList(out.filter((r) => r.dataInicio).sort((a, b) => a.quarto - b.quarto));
+        setLista(out.filter((r) => r.dataInicio).sort((a, b) => a.quarto - b.quarto));
       })
-      .catch(() => setDayList([]))
-      .finally(() => setLoading(false));
-  }, [dateStr, refreshKey]); // eslint-disable-line
+      .catch(() => { if (vivo) setLista([]); })
+      .finally(() => { if (vivo) setLoading(false); });
+    return () => { vivo = false; };
+  }, [dateStr, refreshKey]);
 
-  const dayReservas    = dayList;
-  const occupiedRooms  = new Set(dayReservas.map((r) => r.quarto));
-  const totalRooms     = categorias.flatMap((c) => c.quartos).length;
-  const availableRooms = categorias.flatMap((c) => c.quartos).filter((r) => !occupiedRooms.has(r));
-  const totalPeople    = dayReservas.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
+  return { lista, loading };
+}
 
-  // Movimentações do dia: saídas (checkout hoje, até 12:00) e chegadas (checkin hoje, após 12:00)
-  const saidas     = dayReservas.filter((r) => r.dataFim === dateStr);
-  const chegadas   = dayReservas.filter((r) => r.dataInicio === dateStr);
-  const permanecem = dayReservas.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr);
+function resumoDoDia(lista, categorias) {
+  const ocupados = new Set(lista.map((r) => r.quarto));
+  const quartos  = categorias.flatMap((c) => c.quartos);
+  const livres   = quartos.filter((q) => !ocupados.has(q)).length;
+  const pessoas  = lista.reduce((s, r) => s + (r.hospedes?.length || (1 + (r.quantidadeAcompanhantes || 0))), 0);
+  return [
+    [`${ocupados.size}/${quartos.length}`, tr('Ocupados')],
+    [lista.length, lista.length === 1 ? tr('Reserva') : tr('Reservas')],
+    [pessoas, pessoas === 1 ? tr('Pessoa') : tr('Pessoas')],
+    [livres, livres === 1 ? tr('Livre') : tr('Livres')],
+  ];
+}
 
+function ResumoDia({ itens, loading, rotulo = null, compacto = false }) {
+  return (
+    <div className={compacto ? styles.hdrResumo : styles.lstStats}>
+      {rotulo && <span className={styles.hdrResumoDia}>{rotulo}</span>}
+      {itens.map(([n, rot]) => (
+        <div key={rot} className={compacto ? styles.hdrStat : styles.lstStat}>
+          {loading ? <span className={[styles.sk, compacto ? '' : styles.skEscuro].join(' ')} style={{ width: compacto ? 22 : 34, height: compacto ? 14 : 18 }} /> : <b>{n}</b>}
+          <span>{rot}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-  const daySecoes = [
-    { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),          tom: 'lstDotSaida',   list: saidas },
-    { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'), tom: 'lstDotChegada', list: chegadas },
-    { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),  tom: 'lstDotFica',    list: permanecem },
+function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
+  if (loading) return <Esqueleto />;
+  if (lista.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
+
+  // Movimentações do dia: saídas (checkout no dia, até 12:00) e chegadas (checkin no dia, após 12:00)
+  const secoes = [
+    { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),          tom: 'Saida',   list: lista.filter((r) => r.dataFim === dateStr) },
+    { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'), tom: 'Chegada', list: lista.filter((r) => r.dataInicio === dateStr) },
+    { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),  tom: 'Fica',    list: lista.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr) },
   ].filter((s) => s.list.length > 0);
 
+  return (
+    <div className={styles.lstLinha}>
+      {secoes.map((sec) => (
+        <div key={sec.key} className={[styles.lstSecao, styles[`lstTom${sec.tom}`]].join(' ')}>
+          <div className={styles.lstSecaoHead}>
+            <span className={[styles.lstDot, styles[`lstDot${sec.tom}`]].join(' ')} />
+            <span className={styles.lstSecaoTit}>{sec.label}</span>
+            <span className={styles.lstSecaoSub}>{sec.sub}</span>
+            <span className={styles.lstQtd}>{sec.list.length}</span>
+          </div>
+          {sec.list.map((r) => (
+            <div key={r.id} className={styles.lstItem}>
+              <LinhaReserva r={r} onClick={() => onSelectReserva(r)} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Paginação das listas, no mesmo desenho da tela de Cadastros. Página começa em 0.
+function Paginacao({ pagina, total, onIr }) {
+  return (
+    <div className={styles.cadPaginacao}>
+      <button type="button" className={styles.cadPageBtn} disabled={pagina === 0} onClick={() => onIr(pagina - 1)}
+        aria-label={tr('Página anterior')}>
+        <ChevronLeft size={16} />
+      </button>
+      <span className={styles.cadPageAtual}>{pagina + 1} {tr('de')} {total}</span>
+      <button type="button" className={styles.cadPageBtn} disabled={pagina >= total - 1} onClick={() => onIr(pagina + 1)}
+        aria-label={tr('Próxima página')}>
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
+
+// Título discreto das listas na box da esquerda, com o voltar em destaque.
+function TopoDiscreto({ titulo, sub, onClose }) {
+  return (
+    <div className={styles.diaTopo}>
+      <button type="button" className={styles.diaTopoFechar} onClick={onClose}
+        title={tr('Voltar ao calendário')} aria-label={tr('Voltar ao calendário')}>
+        <ChevronLeft size={17} />
+      </button>
+      <span className={styles.diaTopoTxt}>
+        <span className={styles.sideGrupoTit}>{titulo}</span>
+        {sub && <small>{sub}</small>}
+      </span>
+    </div>
+  );
+}
+
+function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserva }) {
+  const naEsquerda = !!useContext(JanelaCtx);
   const dayObj  = new Date(dateStr + 'T00:00:00');
   const weekday = dayObj.toLocaleDateString(locale(), { weekday: 'long' });
   const cap     = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+  if (naEsquerda) {
+    return (
+      <Janela open onClose={onClose} hideHeader>
+        <TopoDiscreto titulo={<>{tr('Reservas')} {fmtDateBR(dateStr)}</>} sub={cap} onClose={onClose} />
+        <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} />
+      </Janela>
+    );
+  }
   return (
     <Janela open onClose={onClose} size="md"
       title={<><CalendarDays size={15} /> {tr('Reservas do dia')}</>}
-      footer={
-        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary, styles.lstBtnCheio].join(' ')}
-          onClick={() => { onClose(); onNewReserva(dateStr, availableRooms); }}>
-          {tr('Nova reserva neste dia')}
-        </Button>
-      }
     >
       <div className={styles.lstDia}>
         <span className={styles.lstDiaData}>{fmtDateBR(dateStr)}</span>
         <span className={styles.lstDiaSemana}>{cap}</span>
       </div>
-      <div className={styles.lstStats}>
-        {[
-          [`${occupiedRooms.size}/${totalRooms}`, tr('Ocupados')],
-          [dayReservas.length, dayReservas.length === 1 ? tr('Reserva') : tr('Reservas')],
-          [totalPeople, totalPeople === 1 ? tr('Pessoa') : tr('Pessoas')],
-          [availableRooms.length, availableRooms.length === 1 ? tr('Livre') : tr('Livres')],
-        ].map(([n, rot]) => (
-          <div key={rot} className={styles.lstStat}>
-            {loading ? <span className={[styles.sk, styles.skEscuro].join(' ')} style={{ width: 34, height: 18 }} /> : <b>{n}</b>}
-            <span>{rot}</span>
-          </div>
-        ))}
-      </div>
-
-      {loading ? (
-        <Esqueleto />
-      ) : dayReservas.length === 0 ? (
-        <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>
-      ) : (
-        daySecoes.map((sec) => (
-          <div key={sec.key} className={styles.lstSecao}>
-            <div className={styles.lstSecaoHead}>
-              <span className={[styles.lstDot, styles[sec.tom]].join(' ')} />
-              <span className={styles.lstSecaoTit}>{sec.label}</span>
-              <span className={styles.lstSecaoSub}>{sec.sub}</span>
-              <span className={styles.lstQtd}>{sec.list.length}</span>
-            </div>
-            {sec.list.map((r) => <LinhaReserva key={r.id} r={r} onClick={() => onSelectReserva(r)} />)}
-          </div>
-        ))
-      )}
+      <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
+      <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} />
     </Janela>
   );
 }
@@ -3636,11 +3692,14 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
 
   const FILTROS = [['mes', tr('Por mês')], ['anteriores', tr('Anteriores')], ['proximas', tr('Próximas')]];
 
+  const naEsquerda = !!useContext(JanelaCtx);
+
   return (
-    <Janela open onClose={onClose} size="md"
-      title={<><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)}{cat?.nome && <span className={styles.janelaChip}>{cat.nome}</span>}</>}
+    <Janela open onClose={onClose} size="md" hideHeader={naEsquerda}
+      title={naEsquerda ? null : <><BedDouble size={15} /> {tr('Apartamento')} {fmtRoom(room)}{cat?.nome && <span className={styles.janelaChip}>{cat.nome}</span>}</>}
       footer={null}
     >
+      {naEsquerda && <TopoDiscreto titulo={<>{tr('Apartamento')} {fmtRoom(room)}</>} sub={cat?.nome} onClose={onClose} />}
       <div className={styles.lstSeg} role="tablist">
         {FILTROS.map(([id, label]) => (
           <button key={id} type="button" role="tab" aria-selected={modo === id}
@@ -3672,17 +3731,17 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
               {modo === 'mes' ? tr('Nenhuma reserva neste mês.') : modo === 'anteriores' ? tr('Nenhuma reserva anterior.') : tr('Nenhuma reserva futura.')}
             </p>
           ) : (
-            <div className={styles.lstSecao}>
-              {res.content.map((r) => <LinhaReserva key={r.id} r={r} mostrarQuarto={false} onClick={() => onSelectReserva(r)} />)}
+            <div className={[styles.lstLinha, styles.lstLinhaSoItens].join(' ')}>
+              <div className={[styles.lstSecao, styles.lstTomFica].join(' ')}>
+                {res.content.map((r) => (
+                  <div key={r.id} className={styles.lstItem}>
+                    <LinhaReserva r={r} mostrarQuarto={false} onClick={() => onSelectReserva(r)} />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-          {res.totalPages > 1 && (
-            <div className={styles.lstMes}>
-              <button type="button" className={styles.lstMesBtn} disabled={page === 0} onClick={() => setPage((p) => p - 1)} aria-label={tr('Página anterior')}><ChevronLeft size={15} /></button>
-              <span className={styles.lstMesNome}>{tr('Página')} {page + 1} {tr('de')} {res.totalPages}</span>
-              <button type="button" className={styles.lstMesBtn} disabled={page >= res.totalPages - 1} onClick={() => setPage((p) => p + 1)} aria-label={tr('Próxima página')}><ChevronRight size={15} /></button>
-            </div>
-          )}
+          {res.totalPages > 1 && <Paginacao pagina={page} total={res.totalPages} onIr={setPage} />}
         </>
       )}
     </Janela>
@@ -3705,7 +3764,6 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
   const [page,    setPage]    = useState(1);
   const [list,    setList]    = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search,  setSearch]  = useState('');
 
   const API_STATUS = {
     confirmada:         'RESERVA_ATIVA',
@@ -3732,77 +3790,47 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
       .finally(() => setLoading(false));
   }, [status]);
 
-  const norm     = normalizeStr(search.trim());
-  const filtered = norm.length >= 1
-    ? list.filter((r) =>
-        normalizeStr(r.titularNome).includes(norm) ||
-        (r.empresaNome && normalizeStr(r.empresaNome).includes(norm)) ||
-        (r.pessoasOrcamento ?? []).some((p) => normalizeStr(p.nome).includes(norm))
-      )
-    : list;
-
-  const total = filtered.length;
+  const total = list.length;
   const pages = Math.max(1, Math.ceil(total / STATUS_PAGE_SIZE));
   const safePage = Math.min(page, pages);
-  const slice = filtered.slice((safePage - 1) * STATUS_PAGE_SIZE, safePage * STATUS_PAGE_SIZE);
+  const slice = list.slice((safePage - 1) * STATUS_PAGE_SIZE, safePage * STATUS_PAGE_SIZE);
 
-  const handleSearch = (v) => { setSearch(v); setPage(1); };
+  const naEsquerda = !!useContext(JanelaCtx);
+  const paginacao = !loading && pages > 1 && (
+    <Paginacao pagina={safePage - 1} total={pages} onIr={(p) => setPage(p + 1)} />
+  );
 
   return (
-    <Janela open onClose={onClose} size="md"
-      bodyStyle={{ flexShrink: 0, flexGrow: 0, flexBasis: 'clamp(200px, 48vh, 360px)' }}
-      title={<><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
-      footer={
+    <Janela open onClose={onClose} size="md" hideHeader={naEsquerda}
+      bodyStyle={naEsquerda ? undefined : { flexShrink: 0, flexGrow: 0, flexBasis: 'clamp(200px, 48vh, 360px)' }}
+      title={naEsquerda ? null : <><span className={[styles.statusDot, styles[`status_${status}`]].join(' ')} style={{ width: 10, height: 10, borderRadius: '50%', display: 'inline-block', marginRight: 6 }} />{label}{!loading && ` (${total})`}</>}
+      footer={naEsquerda ? null : (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
           <span style={{ fontSize: 12, color: 'var(--text-2)' }}>{loading ? <span className={styles.sk} style={{ width: 80, display: 'inline-block' }} /> : `${total} reserva${total !== 1 ? 's' : ''}`}</span>
-          {!loading && pages > 1 && (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button className={styles.pageBtn} disabled={safePage === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={13} /></button>
-              {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
-                <button key={p} className={[styles.pageBtn, p === safePage ? styles.pageBtnActive : ''].join(' ')} onClick={() => setPage(p)}>{p}</button>
-              ))}
-              <button className={styles.pageBtn} disabled={safePage === pages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={13} /></button>
-            </div>
-          )}
+          {paginacao}
         </div>
-      }
+      )}
     >
-      {/* Search field */}
-      <div className={styles.statusFilterSearch}>
-        <Search size={13} className={styles.statusFilterSearchIcon} />
-        <input
-          className={styles.statusFilterSearchInput}
-          placeholder={tr('Buscar por nome...')}
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-        />
-        {search && (
-          <button className={styles.clearSearch} onClick={() => handleSearch('')}><X size={12} /></button>
-        )}
-      </div>
-
+      {naEsquerda && (
+        <TopoDiscreto titulo={label}
+          sub={loading ? '…' : `${total} ${total === 1 ? tr('reserva') : tr('reservas')}`} onClose={onClose} />
+      )}
       {loading ? (
         <Esqueleto linhas={6} />
       ) : total === 0 ? (
-        <div className={styles.emptyState}>{search ? tr('Nenhum resultado para "{{search}}".', { search }) : tr('Nenhuma reserva com status "{{label}}".', { label })}</div>
+        <p className={styles.sideVazio}>{tr('Nenhuma reserva com status "{{label}}".', { label })}</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {slice.map((r) => {
-            const dias     = diffDays(r.dataInicio, r.dataFim);
-            const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
-            return (
-              <div key={r.id} className={styles.searchDropItem} onClick={() => { onSelectReserva(r); onClose(); }}>
-                <div className={[styles.searchDropRoomCircle, styles[`dayRoomBadge_${r.status}`]].join(' ')}>{fmtRoom(r.quarto)}</div>
-                <div className={styles.searchDropInfo}>
-                  <div className={styles.searchDropName}>{r.titularNome}</div>
-                  <div className={styles.searchDropDates}>{fmtDateBR(r.dataInicio)} → {fmtDateBR(r.dataFim)}</div>
-                  <div className={styles.searchDropMeta}>{diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</div>
-                </div>
+        <div className={[styles.lstLinha, styles.lstLinhaSoItens].join(' ')}>
+          <div className={[styles.lstSecao, styles[`lstTomSt_${status}`]].join(' ')}>
+            {slice.map((r) => (
+              <div key={r.id} className={styles.lstItem}>
+                <LinhaReserva r={r} onClick={() => { onSelectReserva(r); if (!naEsquerda) onClose(); }} />
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
+      {naEsquerda && paginacao}
     </Janela>
   );
 }
@@ -6744,6 +6772,9 @@ export default function BookingCalendar() {
   const [solicitacoes,       setSolicitacoes]       = useState([]);
   const [dayModal,        setDayModal]        = useState(null);
   const [dayRefreshKey,   setDayRefreshKey]   = useState(0);
+  const diaHoje = useReservasDoDia(todayStr, dayRefreshKey);
+  const diaSel  = useReservasDoDia(dayModal?.dateStr ?? null, dayRefreshKey);
+  const diaResumo = dayModal ? diaSel : diaHoje;
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [pickerYear,      setPickerYear]      = useState(() => new Date().getFullYear());
   const [roomModal, setRoomModal] = useState(null);
@@ -7707,6 +7738,11 @@ export default function BookingCalendar() {
                     </button>
                   ))}
                   </div>
+                  <div className={styles.sideHoje}>
+                    <span className={styles.sideGrupoTit}>{tr('Reservas de hoje')}</span>
+                    <ListaDia dateStr={todayStr} lista={diaHoje.lista} loading={diaHoje.loading}
+                      onSelectReserva={(r) => setSelectedReserva(r)} />
+                  </div>
                 </div>
                 )}
           </aside>
@@ -7757,6 +7793,11 @@ export default function BookingCalendar() {
             )}
 
             {!isDesktop && buscaEl}
+
+            {isDesktop && (
+              <ResumoDia compacto itens={resumoDoDia(diaResumo.lista, categorias)} loading={diaResumo.loading}
+                rotulo={dayModal && dayModal.dateStr !== todayStr ? fmtDiaMes(dayModal.dateStr) : tr('Hoje')} />
+            )}
 
           </div>
         </div>
@@ -7886,8 +7927,7 @@ export default function BookingCalendar() {
       )}
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {dayModal && (
-        <DayModal dateStr={dayModal.dateStr} refreshKey={dayRefreshKey} onClose={() => setDayModal(null)} categorias={categorias}
-          onNewReserva={(dateStr, available) => { setCreateInit({ room: null, start: dateStr, end: null, available }); setShowCreateModal(true); }}
+        <DayModal dateStr={dayModal.dateStr} lista={diaSel.lista} loading={diaSel.loading} onClose={() => setDayModal(null)} categorias={categorias}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       </JanelaCtx.Provider>
@@ -7916,6 +7956,7 @@ export default function BookingCalendar() {
         />
       )}
       </JanelaCtx.Provider>
+      <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {statusModalFilter && (
         <StatusFilterModal
           status={statusModalFilter.key}
@@ -7924,6 +7965,7 @@ export default function BookingCalendar() {
           onSelectReserva={(r) => setSelectedReserva(r)}
         />
       )}
+      </JanelaCtx.Provider>
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showOrcamentos && (
         <OrcamentosModal
