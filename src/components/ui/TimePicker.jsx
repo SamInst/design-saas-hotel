@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import styles from './TimePicker.module.css';
 import { tr } from '../../i18n';
 
@@ -7,7 +8,7 @@ const HOURS   = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 const ITEM_H  = 34;
 const VISIVEIS = 5; // itens visíveis na roda (ímpar: o do meio é o selecionado)
-const DROP_H  = ITEM_H * VISIVEIS + 60; // altura aproximada do popup
+const DROP_H  = ITEM_H * VISIVEIS + 124; // altura aproximada do popup, com os botões de passo
 
 /** Coluna em roda, no estilo do seletor de horas do iPhone. */
 function Roda({ itens, valor, onPick }) {
@@ -20,6 +21,12 @@ function Roda({ itens, valor, onPick }) {
     // só na abertura; depois quem manda é a rolagem
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Valor mudado por fora (botões de passo): a roda gira até ele.
+  useEffect(() => {
+    const el = ref.current;
+    if (el && Math.round(el.scrollTop / ITEM_H) !== valor) el.scrollTo({ top: valor * ITEM_H, behavior: 'smooth' });
+  }, [valor]);
 
   const onScroll = () => {
     const st = ref.current.scrollTop;
@@ -126,11 +133,21 @@ export function TimePicker({ value, onChange }) {
       />
       {open && createPortal(
         <div ref={dropRef} className={styles.timeDrop} style={{ top: pos.top, left: pos.left }}>
+          <div className={styles.passos}>
+            <button type="button" className={styles.passo} onClick={() => emit((h + 1) % 24, m)} aria-label={tr('Mais uma hora')}><ChevronUp size={16} /></button>
+            <span />
+            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 1) % 60)} aria-label={tr('Mais um minuto')}><ChevronUp size={16} /></button>
+          </div>
           <div className={styles.rodas} style={{ height: ITEM_H * VISIVEIS }}>
             <div className={styles.faixa} style={{ height: ITEM_H, top: ITEM_H * ((VISIVEIS - 1) / 2) }} />
             <Roda itens={HOURS}   valor={h} onPick={(hh) => emit(hh, parse(atual.current).m)} />
             <span className={styles.timeSep}>:</span>
             <Roda itens={MINUTES} valor={m} onPick={(mm) => emit(parse(atual.current).h, mm)} />
+          </div>
+          <div className={styles.passos}>
+            <button type="button" className={styles.passo} onClick={() => emit((h + 23) % 24, m)} aria-label={tr('Menos uma hora')}><ChevronDown size={16} /></button>
+            <span />
+            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 59) % 60)} aria-label={tr('Menos um minuto')}><ChevronDown size={16} /></button>
           </div>
           <button type="button" className={styles.timeOk} onClick={() => setOpen(false)}>{tr('OK')}</button>
         </div>,

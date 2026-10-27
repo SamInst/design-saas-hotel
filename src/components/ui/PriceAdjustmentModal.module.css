@@ -58,3 +58,37 @@
 .diariaVals { display: flex; align-items: center; gap: 6px; }
 .diariaOld { text-decoration: line-through; color: var(--text-2); }
 .diariaDiff { min-width: 72px; text-align: right; }
+
+/* Novo padrão: cantos retos e seleção neutra */
+.choiceCard { border-radius: 3px; }
+.choiceCard:hover { border-color: color-mix(in srgb, var(--text) 35%, var(--border)); }
+.choiceCardOn { border-color: var(--text); background: color-mix(in srgb, var(--text) 5%, var(--surface)); }
+.checkBox { border-radius: 3px; }
+.checkBoxOn { background: var(--text); border-color: var(--text); color: var(--surface); }
+.previewUp { color: #b45309; }
+
+/* Desconto/adicional bloqueados no modo "Por diária" */
+.choiceCardsOff .choiceCard { opacity: .45; cursor: not-allowed; }
+.choiceCardsOff .choiceCard:hover { border-color: var(--border); }
+
+/* Por diária: todas ou específicas */
+.alcance { display: flex; flex-direction: column; gap: 10px; }
+.alcanceSeg { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; }
+.alcanceBtn {
+  flex: 1; padding: 6px 12px; border: none; border-radius: 3px; background: transparent;
+  color: var(--text-2); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.alcanceBtn:hover { color: var(--text); }
+.alcanceBtnOn, .alcanceBtnOn:hover { background: var(--text); color: var(--surface); }
+.alcanceLista { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 3px; max-height: 200px; overflow-y: auto; }
+.alcanceItem {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer;
+  font-size: 13px; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.alcanceItem + .alcanceItem { border-top: 1px solid var(--border); }
+.alcanceItem input { accent-color: var(--text); margin: 0; }
+.alcanceValor { margin-left: auto; color: var(--text-2); }
+.alcanceSegOff { opacity: .45; } .alcanceSegOff .alcanceBtn { cursor: not-allowed; }
+.alcanceTxt { display: flex; flex-direction: column; gap: 1px; } .alcanceTxt small { font-size: 11.5px; color: oklch(0.5 0.1 65); }
+.confirma { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; flex-wrap: wrap; font-size: 13px; color: var(--text); }
+.confirmaBtns { display: flex; gap: 8px; margin-left: auto; }

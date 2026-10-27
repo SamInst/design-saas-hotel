@@ -62,6 +62,7 @@ export function DatePicker({
   label,
   error = false,
   className = '',
+  sobrio = false,
   triggerClassName = '',
 }) {
   const today = sod(new Date());
@@ -450,13 +451,13 @@ export function DatePicker({
   }
 
   const popup = open && (
-    <div ref={popRef} className={styles.pop} style={popStyle}>
+    <div ref={popRef} className={[styles.pop, sobrio ? styles.sobrio : ''].join(' ')} style={popStyle}>
       {calendarInner}
     </div>
   );
 
   return (
-    <div className={[styles.wrap, className].join(' ')} ref={ref}>
+    <div className={[styles.wrap, sobrio ? styles.sobrio : '', className].join(' ')} ref={ref}>
       {label && <label className={styles.label}>{label}</label>}
 
       <div

@@ -16,7 +16,7 @@
   display: flex; flex-direction: column; align-items: stretch; gap: 8px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; box-shadow: 0 12px 40px rgba(0,0,0,.18);
-  padding: 10px 14px; box-sizing: border-box; height: 230px;
+  padding: 10px 14px; box-sizing: border-box;
 }
 
 .rodas {
@@ -58,3 +58,13 @@
   font-size: 14px; font-weight: 600;
 }
 .timeOk:hover { background: color-mix(in oklch, var(--violet) 10%, transparent); }
+
+/* Botões de passo acima e abaixo de cada roda */
+.passos { display: flex; align-items: center; justify-content: center; gap: 2px; }
+.passos > span { width: 8px; }
+.passo {
+  width: 56px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 3px; background: var(--surface);
+  color: var(--text-2); cursor: pointer; transition: background .12s, color .12s;
+}
+.passo:hover { background: color-mix(in oklch, var(--text) 7%, transparent); color: var(--text); }

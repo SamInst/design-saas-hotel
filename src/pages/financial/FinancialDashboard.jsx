@@ -132,6 +132,11 @@ export default function FinancialDashboard() {
   const [searchTerm,     setSearchTerm]     = useState('');
   const [selDay,         setSelDay]         = useState(null);
   const [showFormas,     setShowFormas]     = useState(false);
+  // Dashboard: total (segue os filtros da lista), por mês ou por semana.
+  const [dashModo,       setDashModo]       = useState('total');
+  const [dashRef,        setDashRef]        = useState(() => new Date());
+  const [dashDados,      setDashDados]      = useState(null); // { pagamentos, grupos }
+  const [dashLoading,    setDashLoading]    = useState(false);
   const [isDesktop,      setIsDesktop]      = useState(() => window.matchMedia('(min-width: 1024px)').matches);
   const [activeFilters,  setActiveFilters]  = useState({});
   const [abaLanc,        setAbaLanc]        = useState('dados');
@@ -141,6 +146,7 @@ export default function FinancialDashboard() {
   const [showFilter,      setShowFilter]      = useState(false);
   const [showDetail,      setShowDetail]      = useState(false);
   const [showEdit,        setShowEdit]        = useState(false);
+  const [editInicial,     setEditInicial]     = useState('');
   const [showPaymentEdit, setShowPaymentEdit] = useState(false);
   const [item,            setItem]            = useState(null);
 
@@ -189,8 +195,10 @@ export default function FinancialDashboard() {
     setLoadingData(true);
     try {
       const res = await relatorioApi.listar({ size: 200, ...filters });
-      setGrupos(res?.page?.content ?? []);
+      const lista = res?.page?.content ?? [];
+      setGrupos(lista);
       setPagamentos(res?.pagamentos ?? {});
+      return lista;
     } catch {
       showNotif(tr('Erro ao carregar lançamentos.'), 'error');
     } finally {
@@ -299,14 +307,22 @@ export default function FinancialDashboard() {
       };
       await relatorioApi.atualizar(body, _arqEdit ?? null);
       setShowEdit(false);
+      setShowPaymentEdit(false);
       showNotif(tr('Lançamento editado!'));
-      fetchData(activeFilters);
+      // Gaveta aberta: volta aos detalhes com o lançamento recarregado da lista.
+      const lista = await fetchData(activeFilters);
+      if (showDetail) {
+        const atual = (lista ?? []).flatMap(g => g.relatorios ?? []).find(t => t.id === item.id);
+        if (atual) openDetail(atual);
+        else relatorioApi.buscar(item.id).then(openDetail).catch(() => {});
+      }
     } catch (e) {
       showNotif(e.message || tr('Erro ao editar.'), 'error');
     } finally { setIsSubmitting(false); }
   };
 
   const openDetail = (t) => {
+    setShowEdit(false);
     setItem(t);
     setAbaLanc('dados');
     setShowPaymentAdd(false);
@@ -322,11 +338,19 @@ export default function FinancialDashboard() {
     if (!item) return;
     let full = item;
     try { full = await relatorioApi.buscar(item.id); } catch (_) { /* usa item parcial */ }
-    setEditTipoRegistro(full.valor >= 0 ? 'ENTRADA' : 'SAIDA');
-    setEditQuarto(String(full.quarto?.id ?? ''));
-    setEditPessoal(full.despesa_pessoal ?? false);
-    setEditPagamento(full.pagamento ?? null);
-    setShowDetail(false);
+    const ini = {
+      tipo:      full.valor >= 0 ? 'ENTRADA' : 'SAIDA',
+      quarto:    String(full.quarto?.id ?? ''),
+      pessoal:   full.despesa_pessoal ?? false,
+      pagamento: full.pagamento ?? null,
+    };
+    setEditTipoRegistro(ini.tipo);
+    setEditQuarto(ini.quarto);
+    setEditPessoal(ini.pessoal);
+    setEditPagamento(ini.pagamento);
+    setEditInicial(JSON.stringify(ini));
+    // Na gaveta (desktop, com o dia aberto) a edição abre no lugar dos detalhes.
+    if (!(isDesktop && diaAberto)) setShowDetail(false);
     setShowEdit(true);
   };
 
@@ -352,6 +376,42 @@ export default function FinancialDashboard() {
     setShowFilter(false);
     fetchData();
   };
+
+  // ── DASHBOARD: período por mês ou semana ─────────────────
+  const dashPeriodo = (() => {
+    if (dashModo === 'mes') {
+      const ini = new Date(dashRef.getFullYear(), dashRef.getMonth(), 1);
+      const fim = new Date(dashRef.getFullYear(), dashRef.getMonth() + 1, 0);
+      const nome = ini.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      return { ini, fim, rotulo: nome.charAt(0).toUpperCase() + nome.slice(1) };
+    }
+    if (dashModo === 'semana') {
+      const ini = new Date(dashRef); ini.setHours(0, 0, 0, 0);
+      ini.setDate(ini.getDate() - ((ini.getDay() + 6) % 7)); // segunda-feira
+      const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+      const dm = (d) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      return { ini, fim, rotulo: `${dm(ini)} – ${dm(fim)}/${fim.getFullYear()}` };
+    }
+    return null;
+  })();
+  const dashIniIso = dashPeriodo ? toApiDate(new Date(Date.UTC(dashPeriodo.ini.getFullYear(), dashPeriodo.ini.getMonth(), dashPeriodo.ini.getDate()))) : null;
+  const dashFimIso = dashPeriodo ? toApiDate(new Date(Date.UTC(dashPeriodo.fim.getFullYear(), dashPeriodo.fim.getMonth(), dashPeriodo.fim.getDate()))) : null;
+  const moverDash = (n) => setDashRef((d) => {
+    const x = new Date(d);
+    if (dashModo === 'mes') x.setMonth(x.getMonth() + n, 1); else x.setDate(x.getDate() + 7 * n);
+    return x;
+  });
+
+  useEffect(() => {
+    if (!showFormas || !dashIniIso) return;
+    let vivo = true;
+    setDashLoading(true);
+    relatorioApi.listar({ size: 200, data_inicio: dashIniIso, data_fim: dashFimIso })
+      .then((res) => { if (vivo) setDashDados({ pagamentos: res?.pagamentos ?? {}, grupos: res?.page?.content ?? [] }); })
+      .catch(() => { if (vivo) setDashDados({ pagamentos: {}, grupos: [] }); })
+      .finally(() => { if (vivo) setDashLoading(false); });
+    return () => { vivo = false; };
+  }, [showFormas, dashIniIso, dashFimIso]);
 
   // ── RESUMO ────────────────────────────────────────────────
   const total = pagamentos?.TOTAL ?? { receitas: 0, despesas: 0, lucro: 0 };
@@ -532,8 +592,15 @@ export default function FinancialDashboard() {
     const fechar = () => setShowFormas(false);
     const ini = activeFilters.data_inicio;
     const fim = activeFilters.data_fim;
-    const periodoTitulo = (ini || fim) ? periodoTexto : tr('Todos os dias listados');
-    const saldoCx = verSaldoCaixa && grupos.length ? saldoFechamento(grupos[0]) : null;
+    const porPeriodo = dashModo !== 'total';
+    const dPag     = porPeriodo ? (dashDados?.pagamentos ?? {}) : pagamentos;
+    const dGrupos  = porPeriodo ? (dashDados?.grupos ?? []) : grupos;
+    const total         = dPag?.TOTAL ?? { receitas: 0, despesas: 0, lucro: 0 };
+    const methodEntries = Object.entries(dPag ?? {}).filter(([k]) => k !== 'TOTAL');
+    const carregando    = porPeriodo ? (dashLoading || !dashDados) : loadingData;
+    const periodoTitulo = porPeriodo ? dashPeriodo.rotulo : (ini || fim) ? periodoTexto : tr('Todos os dias listados');
+    const periodoSub    = porPeriodo ? (dashModo === 'mes' ? tr('Mês') : tr('Semana')) : tr('Período');
+    const saldoCx = verSaldoCaixa && dGrupos.length ? saldoFechamento(dGrupos[0]) : null;
     return (
       <div className={styles.detailPanel}>
         <section className={[styles.dCard, styles.fichaCard].join(' ')}>
@@ -545,6 +612,26 @@ export default function FinancialDashboard() {
             <LayoutDashboard size={16} />
             <span className={styles.dCardTitle}>{tr('Dashboard financeiro')}</span>
             <div className={styles.dCardActions}>
+              <div className={styles.dashFiltro}>
+                <div className={styles.dashSeg} role="tablist">
+                  {[['total', tr('Total')], ['mes', tr('Mensal')], ['semana', tr('Semanal')]].map(([k, rot]) => (
+                    <button key={k} type="button" role="tab" aria-selected={dashModo === k}
+                      className={[styles.dashSegBtn, dashModo === k ? styles.dashSegBtnOn : ''].join(' ')}
+                      onClick={() => { setDashModo(k); setDashRef(new Date()); }}>
+                      {rot}
+                    </button>
+                  ))}
+                </div>
+                {dashPeriodo && (
+                  <div className={styles.dashNav}>
+                    <button type="button" className={styles.dashNavBtn} onClick={() => moverDash(-1)}
+                      aria-label={dashModo === 'mes' ? tr('Mês anterior') : tr('Semana anterior')}><ChevronLeft size={15} /></button>
+                    <span className={styles.dashNavRot}>{dashPeriodo.rotulo}</span>
+                    <button type="button" className={styles.dashNavBtn} onClick={() => moverDash(1)}
+                      aria-label={dashModo === 'mes' ? tr('Próximo mês') : tr('Próxima semana')}><ChevronRight size={15} /></button>
+                  </div>
+                )}
+              </div>
               <button type="button" className={styles.idClose} onClick={fechar}
                 title={tr('Fechar')} aria-label={tr('Fechar')}>
                 <X size={16} />
@@ -552,7 +639,7 @@ export default function FinancialDashboard() {
             </div>
           </h3>
           <div className={[styles.dCardBody, styles.fichaBody].join(' ')}>
-            {loadingData ? (<>
+            {carregando ? (<>
               <div className={[styles.sk, styles.skHero].join(' ')} />
               <SkLinhas n={5} />
             </>) : (<>
@@ -560,7 +647,7 @@ export default function FinancialDashboard() {
                 <div className={styles.diaHero}>
                   <div className={styles.diaHeroTopo}>
                     <div className={styles.diaData}>
-                      <span className={styles.diaSemana}>{tr('Período')}</span>
+                      <span className={styles.diaSemana}>{periodoSub}</span>
                       <h2 className={styles.diaNome}>{periodoTitulo}</h2>
                     </div>
                   </div>
@@ -593,7 +680,7 @@ export default function FinancialDashboard() {
               </div>
               <div className={styles.reguaTit}>
                 <span>{tr('Faturamento por forma de pagamento')}</span>
-                <span className={styles.reguaQtd}>{periodoTexto}</span>
+                <span className={styles.reguaQtd}>{porPeriodo ? dashPeriodo.rotulo : periodoTexto}</span>
               </div>
               <div className={styles.tScroll}>
                 <table className={styles.iTable}>
@@ -910,6 +997,194 @@ export default function FinancialDashboard() {
     );
   };
 
+  // ── Lançamento na gaveta lateral: mesmo desenho dos detalhes de pagamento da reserva ──
+  const renderLancamentoGaveta = () => {
+    const pag     = item.pagamento;
+    const metDesc = pag?.tipo_pagamento?.descricao;
+    const isExp   = item.valor < 0;
+    const sinal   = isExp ? '−' : '+';
+    const bruto   = Math.abs(pag?.valor ?? item.valor);
+    const d       = pag?.desconto;
+    const desc    = d ? (d.porcentagem > 0 ? bruto * (d.porcentagem / 100) : (d.valor ?? 0)) : 0;
+    const fechar  = () => setShowDetail(false);
+    const linha   = (rot, val, mono = false) => (
+      <div><span>{rot}</span><b className={mono ? styles.lgMono : undefined}>{val || '—'}</b></div>
+    );
+    if (showEdit) {
+      const alterado = JSON.stringify({ tipo: editTipoRegistro, quarto: editQuarto, pessoal: editPessoal, pagamento: editPagamento }) !== editInicial;
+      const sair = () => { if (showPaymentEdit) setShowPaymentEdit(false); else setShowEdit(false); };
+      return (
+        <div key={`e${item.id}`} className={styles.lgPainel}>
+          <header className={styles.lgHead}>
+            <Edit2 size={15} />
+            <span className={styles.lgTit}>{showPaymentEdit ? tr('Pagamento') : tr('Editar lançamento')}</span>
+            <button type="button" className={styles.lgFechar} onClick={sair} title={tr('Fechar')} aria-label={tr('Fechar')}>
+              <X size={17} />
+            </button>
+          </header>
+          {showPaymentEdit ? (
+            <div className={styles.lgCorpo}>
+              <PaymentModal
+                inline compacto open
+                onClose={() => setShowPaymentEdit(false)}
+                onConfirm={pg => { setEditPagamento(pg); setShowPaymentEdit(false); }}
+                tiposPagamento={tiposPagamento}
+                initialPayment={editPagamento}
+                defaultValor={Math.abs(editPagamento?.valor ?? 0)}
+                tipoRegistro={editTipoRegistro}
+                loggedUser={loggedUser}
+                canAplicarDesconto={false}
+              />
+            </div>
+          ) : (<>
+            <div className={[styles.lgCorpo, styles.lgForm].join(' ')}>
+              <FormField label={tr('Tipo')}>
+                <Select value={editTipoRegistro} onChange={e => setEditTipoRegistro(e.target.value)}>
+                  <option value="ENTRADA">{tr('Receita (+)')}</option>
+                  <option value="SAIDA">{tr('Despesa (−)')}</option>
+                </Select>
+              </FormField>
+              <FormField label={tr('Quarto')}>
+                <Select value={editQuarto} onChange={e => setEditQuarto(e.target.value)}>
+                  <option value="">{tr('Nenhum')}</option>
+                  {quartos.map(q => <option key={q.id} value={q.id}>{fmtQuarto(q)}</option>)}
+                </Select>
+              </FormField>
+              <label className={styles.checkRow}>
+                <input type="checkbox" checked={editPessoal} onChange={e => setEditPessoal(e.target.checked)} />
+                <span>{tr('Despesa interna do Hotel')}</span>
+              </label>
+
+              <h5 className={styles.lgSecao}>{tr('Pagamento')}</h5>
+              {editPagamento ? (
+                <div className={styles.lgLista}>
+                  {linha(tr('Forma'), editPagamento.tipo_pagamento?.descricao)}
+                  {linha(tr('Valor'), fmt(Math.abs(editPagamento.valor ?? 0)))}
+                  {linha(tr('Pagador'), editPagamento.nome_pagador)}
+                </div>
+              ) : <p className={styles.lgVazio}>{tr('Sem pagamento definido.')}</p>}
+              {canEditarPagamento && (
+                <div className={styles.lgAcaoSec}>
+                  <button type="button" className={styles.linkBtn} onClick={() => setShowPaymentEdit(true)}>
+                    {editPagamento ? tr('Alterar pagamento') : tr('Definir pagamento')}
+                  </button>
+                </div>
+              )}
+            </div>
+            {alterado && (
+              <footer className={styles.lgRodape}>
+                <Button variant="primary" onClick={handleEdit} disabled={isSubmitting}>
+                  {isSubmitting ? <><Loader2 size={13} className={styles.spinnerInline} /> {tr('Salvando...')}</> : tr('Salvar alterações')}
+                </Button>
+              </footer>
+            )}
+          </>)}
+        </div>
+      );
+    }
+    return (
+      <div key={`g${item.id}`} className={styles.lgPainel}>
+        <header className={styles.lgHead}>
+          <FileText size={15} />
+          <span className={styles.lgTit}>{tr('Detalhes do lançamento')}</span>
+          {canEditar && <Button className={styles.btnSolid} onClick={openEdit}>{tr('Editar')}</Button>}
+          <button type="button" className={styles.lgFechar} onClick={fechar} title={tr('Fechar')} aria-label={tr('Fechar')}>
+            <X size={17} />
+          </button>
+        </header>
+        <div className={styles.lgCorpo}>
+          <h5 className={[styles.lgSecao, styles.lgSecaoPrimeira].join(' ')}>{tr('Lançamento')}</h5>
+          <div className={styles.lgLista}>
+            <div className={styles.lgLinhaValor}><span>{tr('Valor')}</span><b className={isExp ? styles.vOut : styles.vIn}>{sinal}{fmt(bruto - desc)}</b></div>
+            {linha(tr('Tipo'), item.despesa_pessoal ? tr('Despesa interna') : isExp ? tr('Despesa') : tr('Receita'))}
+            {item.editado && linha(tr('Editado'), tr('Sim'))}
+            {linha(tr('Descrição'), item.relatorio)}
+            {linha(tr('Quarto'), item.quarto ? fmtQuarto(item.quarto) : '')}
+            {canHistoricoSaldo && linha(tr('Saldo do caixa'), fmt(item.valor_historico_dinheiro ?? 0))}
+          </div>
+
+          <h5 className={styles.lgSecao}>{tr('Pagamento')}</h5>
+          <div className={styles.lgLista}>
+            {linha(tr('Forma'), metDesc)}
+            {linha(tr('Pagador'), pag?.nome_pagador)}
+            {pag?.path_arquivo && linha(tr('Comprovante'), (
+              <button type="button" className={styles.arquivoLink} onClick={() => arquivoApi.abrir(pag.path_arquivo)}>
+                <Download size={13} /> {tr('Ver comprovante')}
+              </button>
+            ))}
+            {linha('UUID', pag?.uuid, true)}
+          </div>
+
+          {d && (<>
+            <h5 className={styles.lgSecao}>{tr('Desconto')}</h5>
+            <div className={styles.lgLista}>
+              {linha(tr('Valor bruto'), `${sinal}${fmt(bruto)}`)}
+              {linha(tr('Desconto'), `−${fmt(desc)}${d.porcentagem > 0 ? ` (${d.porcentagem}%)` : ''}`)}
+              {linha(tr('Autorizado por'), d.funcionario?.nome)}
+              {linha(tr('Data'), d.data_hora_registro)}
+            </div>
+          </>)}
+
+          <h5 className={styles.lgSecao}>{tr('Registro')}</h5>
+          <div className={styles.lgLista}>
+            {linha(tr('Registrado por'), item.funcionario?.nome)}
+            {linha(tr('Data'), item.data_hora_registro)}
+          </div>
+
+          <h5 className={styles.lgSecao}>{tr('Histórico de alterações')}</h5>
+          {loadingHist ? (
+            <span className={[styles.sk, styles.skTxt].join(' ')} style={{ width: '60%' }} />
+          ) : historico.length === 0 ? (
+            <p className={styles.lgVazio}>{tr('Nenhuma alteração registrada.')}</p>
+          ) : (
+            <div className={styles.lgLista}>
+              {historico.map(h => (
+                <div key={h.id} className={styles.lgHist}>
+                  <span>{h.funcionario?.nome ?? '—'} · {h.data_hora}</span>
+                  {(h.alteracoes ?? []).map((a, i) => (
+                    <small key={i}>{a.campo}: {a.de ?? '—'} → {a.para ?? '—'}</small>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Nova receita / despesa na gaveta lateral (desktop, com o dia à vista) ──
+  const renderNovoGaveta = () => {
+    const fechar = () => setShowPaymentAdd(false);
+    const despesa = addTipoRegistro === 'SAIDA';
+    return (
+      <div key={`ng${addTipoRegistro}`} className={styles.lgPainel}>
+        <header className={styles.lgHead}>
+          {despesa ? <ArrowDownRight size={15} className={styles.vOut} /> : <ArrowUpRight size={15} className={styles.vIn} />}
+          <span className={styles.lgTit}>{despesa ? tr('Nova despesa') : tr('Nova receita')}</span>
+          <button type="button" className={styles.lgFechar} onClick={fechar} title={tr('Fechar')} aria-label={tr('Fechar')}>
+            <X size={17} />
+          </button>
+        </header>
+        <div className={[styles.lgCorpo, styles.lgNovo].join(' ')}>
+          <PaymentModal
+            key={addTipoRegistro}
+            inline compacto open
+            onClose={fechar}
+            onConfirm={handleAddFromPayment}
+            tiposPagamento={tiposPagamento}
+            tipoRegistro={addTipoRegistro}
+            quartos={quartos}
+            despesaInternaEnabled={despesa}
+            isSubmitting={isSubmitting}
+            loggedUser={loggedUser}
+            canAplicarDesconto={false}
+          />
+        </div>
+      </div>
+    );
+  };
+
   // ── Nova receita / despesa: campos no painel da direita ────
   const renderNovo = () => {
     const fechar = () => setShowPaymentAdd(false);
@@ -990,7 +1265,7 @@ export default function FinancialDashboard() {
                   {showFilter && (
                     <div className={styles.filtroPop} role="dialog" aria-label={tr('Filtros')}>
                       <DatePicker
-                        mode="range" label={tr('Período')}
+                        mode="range" label={tr('Período')} sobrio
                         startDate={fStart} endDate={fEnd}
                         onRangeChange={({ start, end }) => { setFStart(start); setFEnd(end); }}
                         placeholder={tr('Selecione o período...')}
@@ -1121,7 +1396,20 @@ export default function FinancialDashboard() {
           </aside>
 
           {/* ══ DIREITA ═══════════════════════════════════ */}
-          {showPaymentAdd ? renderNovo()
+          {showPaymentAdd && diaAberto && isDesktop ? (
+              <div className={styles.diaComGaveta}>
+                {renderDia(diaAberto)}
+                <div className={[styles.lancGaveta, styles.lancGavetaNovo].join(' ')}>{renderNovoGaveta()}</div>
+              </div>
+            )
+            : showPaymentAdd ? renderNovo()
+            // No desktop o lançamento abre numa gaveta lateral, com o dia continuando à vista.
+            : showDetail && item && diaAberto && isDesktop ? (
+              <div className={styles.diaComGaveta}>
+                {renderDia(diaAberto)}
+                <div className={styles.lancGaveta}>{renderLancamentoGaveta()}</div>
+              </div>
+            )
             : showDetail && item ? renderLancamento()
             : showFormas ? renderFormas()
             : loadingData ? (isDesktop ? renderCarregandoPainel() : null)
@@ -1138,7 +1426,7 @@ export default function FinancialDashboard() {
       </div>
 
       {/* ══ MODAL: EDITAR ═══════════════════════════════════ */}
-      <Modal open={showEdit} onClose={() => setShowEdit(false)} title={tr('Editar Lançamento')}
+      <Modal open={showEdit && !(isDesktop && diaAberto && showDetail)} onClose={() => setShowEdit(false)} title={tr('Editar Lançamento')}
         footer={
           <div className={styles.modalFooter}>
             <Button onClick={() => setShowEdit(false)} className={styles.full}>{tr('Cancelar')}</Button>
@@ -1184,7 +1472,7 @@ export default function FinancialDashboard() {
 
       {/* ══ PAYMENT MODALS ══════════════════════════════════ */}
       <PaymentModal
-        open={showPaymentEdit}
+        open={showPaymentEdit && !(isDesktop && diaAberto && showDetail)}
         onClose={() => setShowPaymentEdit(false)}
         onConfirm={pag => { setEditPagamento(pag); setShowPaymentEdit(false); }}
         tiposPagamento={tiposPagamento}

@@ -352,7 +352,7 @@ export function PaymentModal({
     return (
       <div className={[styles.inline, compacto ? styles.compacto : ''].join(' ')}>
         <section className={styles.secao}>
-          <h4 className={styles.secaoTit}>{tr('Valor')}</h4>
+          {!compacto && <h4 className={styles.secaoTit}>{tr('Valor')}</h4>}
           <div className={styles.secaoGrid}>
             <FormField label={tr('Valor *')}>
               <Input type="text" inputMode="numeric" placeholder={tr('R$ 0,00')} autoFocus
@@ -390,9 +390,21 @@ export function PaymentModal({
                 value={nomePagador} onChange={e => setNomePagador(e.target.value.toUpperCase())} />
             </FormField>
           )}
-          {(compacto ? outros.filter(([rot]) => rot !== tr('Titular')) : outros).length > 0 && (
+          {/* Compacto: atalhos de pagador como checkbox, igual ao "Titular" */}
+          {compacto && outros.filter(([rot]) => rot !== tr('Titular')).length > 0 && (
+            <div className={styles.atalhosCheck}>
+              {outros.filter(([rot]) => rot !== tr('Titular')).map(([rot, nome]) => (
+                <label key={rot} className={styles.nomeTitular}>
+                  <input type="checkbox" checked={nomePagador === nome}
+                    onChange={e => setNomePagador(e.target.checked ? nome : '')} />
+                  {rot}
+                </label>
+              ))}
+            </div>
+          )}
+          {!compacto && outros.length > 0 && (
             <div className={styles.atalhos}>
-              {(compacto ? outros.filter(([rot]) => rot !== tr('Titular')) : outros).map(([rot, nome]) => (
+              {outros.map(([rot, nome]) => (
                 <button key={rot} type="button"
                   className={[styles.atalho, nomePagador === nome ? styles.atalhoOn : ''].join(' ')}
                   onClick={() => setNomePagador(nomePagador === nome ? '' : nome)}>

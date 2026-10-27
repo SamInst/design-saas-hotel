@@ -239,3 +239,15 @@
 .smActive { background:var(--violet) !important; color:#fff !important; font-weight:700; }
 
 :root[data-theme="dark"] .pop { box-shadow:0 10px 40px rgba(0,0,0,.45); }
+
+/* Variante sóbria: cantos retos e sem o roxo/verde — padrão das telas do sistema */
+.sobrio .trigger { border-radius: 3px; border-width: 1px; border-color: var(--border); }
+.sobrio .trigger:hover, .sobrio .open { border-color: color-mix(in srgb, var(--text) 35%, transparent) !important; }
+.pop.sobrio { border-radius: 3px; box-shadow: 0 8px 24px rgba(15,23,42,.12); animation: none; }
+.sobrio .nav { border-radius: 3px; background: transparent; }
+.sobrio .nav:hover, .sobrio .headBtn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); border-color: var(--border); color: var(--text); }
+.sobrio .day { border-radius: 3px; }
+.sobrio .day:hover:not(.dis):not(.sel):not(.inR) { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+.sobrio .tod { background: transparent !important; color: var(--text) !important; font-weight: 700 !important; box-shadow: inset 0 0 0 1px var(--border); }
+.sobrio .sel { background-color: var(--text) !important; color: var(--surface) !important; border-radius: 3px; }
+.sobrio .tod.sel { box-shadow: none !important; border-radius: 3px !important; color: var(--surface) !important; }

@@ -3401,7 +3401,7 @@ a.rvContato:hover span { text-decoration: underline; }
 .skGradeCanto { width: var(--lw); flex-shrink: 0; background: var(--l-hero); }
 .skGradeDias { flex: 1; display: flex; overflow: hidden; }
 .skGradeDia {
-  flex: 0 0 168px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
+  flex: 0 0 185px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px;
   border-right: 1px solid var(--border);
 }
 .skGradeLinha { display: flex; height: 72px; border-bottom: 1px solid var(--border); }
@@ -3668,8 +3668,6 @@ a.rvContato:hover span { text-decoration: underline; }
 .rvGaveta:has(.rvAcoesMenu) { right: 272px; }
 
 .dtVazio { text-align: center; padding: 16px 12px !important; white-space: normal !important; }
-.dtLinkRow { cursor: pointer; transition: background-color .15s; }
-.dtLinkRow:hover td { background: color-mix(in oklch, var(--l-accent, var(--surface-2)) 55%, transparent); }
 .dtCancelado { opacity: .55; }
 .dtCancelado .dtForte { text-decoration: line-through; }
 .dtForma { display: flex; align-items: center; gap: 10px; }
@@ -4265,3 +4263,337 @@ a.rvContato:hover span { text-decoration: underline; }
 .cadPageBtn:hover:not(:disabled) { background: var(--l-accent); color: var(--l-accent-fg); }
 .cadPageBtn:disabled { opacity: .5; cursor: not-allowed; }
 .cadPageAtual { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--l-fg); white-space: nowrap; }
+
+/* ── Experimental: resumo financeiro flutuante à esquerda da view ──────────── */
+.rvFlutuante {
+  position: absolute; top: 0; right: calc(100% + 12px); z-index: 1;
+  width: 300px; max-height: 100%; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: var(--l-r-xl);
+  background: var(--l-card); box-shadow: -12px 0 32px rgb(15 23 42 / 0.14);
+}
+.rvGaveta .rvFlutuante .finResumo { margin: 0; border: none; border-radius: 0; }
+.rvFlutuante .finCab { position: sticky; top: 0; z-index: 1; }
+@container direita (max-width: 779px) { .rvFlutuante { display: none; } }
+/* Edição aberta dentro da view: mesma posição e largura da view */
+.rvGavetaAcao.rvGavetaNaView { width: min(450px, 100%); }
+.rvGavetaNaView > .janelaHead + .rvPainelCorpo { padding: 0; gap: 0; }
+.rvGavetaNaView > .janelaHead { border-bottom: 1px solid var(--border); }
+.slotDireita:has(.rvGavetaPag) .rvGavetaAcao.rvGavetaNaView:not(.rvGavetaPag) {
+  display: flex;
+  right: calc(clamp(340px, calc(100% - 462px), 400px) + 12px);
+  width: min(450px, calc(100% - 352px));
+}
+.slotDireita:has(.pagDetIcone) .rvGavetaAcao.rvGavetaNaView:not(.rvGavetaPag) { right: 312px; }
+/* Com outra gaveta aberta ao lado, a janela só aparece se couber */
+@container direita (max-width: 1349px) {
+  .slotDireita:has(.rvGavetaAcao:not(.rvGavetaNaView)) .rvGaveta:not(.rvGavetaAcao) .rvFlutuante { display: none; }
+}
+@container direita (max-width: 1179px) {
+  .slotDireita:has(.rvGavetaPag) .rvGavetaNaView .rvFlutuante { display: none; }
+}
+
+/* ── Gerenciar diárias: apartamento, check-in e check-out numa linha ───────── */
+.rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(540px, 100%); }
+.rvGavetaAcao .gdLinha {
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px; align-items: end;
+}
+.gdLinha .editFieldCap { max-width: none; min-width: 0; }
+.rvGavetaAcao .gdLinha .editDatesGrid { display: contents; }
+.rvGavetaAcao .gdLinha .meiaDiariaBox { grid-column: 1 / -1; margin-top: 0; }
+.gdLinha .editDatesGrid .dateCompact > div > div > input { flex: 1 1 auto; width: auto; min-width: 0; }
+.gdSazLista { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.gdSaz { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--l-muted-fg); }
+.gdSaz .dtTag { margin: 0; }
+/* Os três campos com a mesma largura e altura */
+.rvGavetaAcao .gdLinha { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rvGavetaAcao .gdLinha .comboTrigger,
+.rvGavetaAcao .gdLinha .dateCompact > div > div {
+  height: 36px !important; min-height: 36px !important; box-sizing: border-box;
+  padding-top: 0 !important; padding-bottom: 0 !important; border-radius: 3px !important;
+}
+.rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(500px, 100%); }
+.gdLinha .hospedeChipRect { background: none; border: none; padding: 0; font-size: 13px; }
+.gdLinha .dateCompact, .gdLinha .dateCompact * { cursor: pointer; }
+
+/* ── Seletor de apartamentos: novo padrão (cantos retos, sem cores fortes) ── */
+.comboDropdown { border-radius: 3px; padding: 6px; box-shadow: 0 8px 24px rgba(15,23,42,.12); }
+.comboGroupLabel {
+  background: var(--surface); color: var(--text-2);
+  font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none;
+  padding: 8px 8px 4px; margin: 0;
+}
+.comboItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: 3px; cursor: pointer;
+}
+.comboItem:hover:not(.comboItemUnavail) { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.comboItemSel, .comboItemSel:hover:not(.comboItemUnavail) { background: color-mix(in srgb, var(--text) 9%, transparent); }
+.comboItemNum {
+  flex-shrink: 0; min-width: 32px; height: 28px; padding: 0 6px; border-radius: 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: oklch(0.27 0.02 260); color: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.comboItemTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.comboItemTxt b { font-size: 13px; font-weight: 500; color: var(--text); }
+.comboItemTxt small { font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.comboItemOcupado { border-radius: 3px; }
+.comboCheck { border-radius: 3px; }
+.comboCheckSel { background: var(--text); border-color: var(--text); }
+.comboTrigger { border-radius: 3px; }
+.comboTrigger:focus, .comboTrigger:hover { border-color: color-mix(in srgb, var(--text) 35%, transparent); }
+.rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(425px, 100%); }
+/* Ocupação colada ao valor: a sobra da largura vai para a coluna do Remover */
+.gdDiarias .dtTable td:nth-child(3) { min-width: 110px; }
+.gdDiarias .dtTable td:nth-child(4), .gdDiarias .dtTable th:nth-child(4) { padding-left: 6px; white-space: nowrap; }
+.gdDiarias .dtTable td:nth-child(5), .gdDiarias .dtTable th:nth-child(5) { width: 100%; text-align: right; }
+.gdDiarias .dtTable td:nth-child(3), .gdDiarias .dtTable th:nth-child(3) { padding-right: 4px; width: 1%; white-space: nowrap; min-width: 0; }
+.gdDiarias .dtTable td:nth-child(4), .gdDiarias .dtTable th:nth-child(4) { padding-left: 4px; text-align: left; }
+.rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(460px, 100%); }
+.gdDiarias .dtTable td:nth-child(3) { white-space: nowrap !important; padding-right: 8px; }
+.gdDiarias .dtTable td:nth-child(4), .gdDiarias .dtTable th:nth-child(4) { padding-left: 8px; }
+/* Tabela do tamanho do conteúdo: o Remover fica colado ao valor */
+.gdDiarias .dtTable { width: auto; }
+.gdDiarias .dtTable td:nth-child(5), .gdDiarias .dtTable th:nth-child(5) { width: auto; padding-left: 8px !important; }
+/* Campos em cascata, um embaixo do outro */
+.rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(380px, 100%); }
+.rvGavetaAcao .gdLinha { grid-template-columns: minmax(0, 220px); align-items: start; }
+.gdDiarias .dtTable td:nth-child(2) { white-space: nowrap; }
+/* Gerenciar pagamentos: box 20% mais estreita que a view */
+.rvGavetaAcao.rvGavetaNaView.rvGavetaPagamentos { width: min(360px, 100%); }
+.slotDireita:has(.rvGavetaPag) .rvGavetaAcao.rvGavetaNaView.rvGavetaPagamentos:not(.rvGavetaPag) { width: min(360px, calc(100% - 352px)); }
+.rvGavetaPagamentos .rcActions { padding: 12px 18px 16px; }
+.rvGavetaAcao.rvGavetaNaView.rvGavetaPagamentos { width: min(470px, 100%); }
+.slotDireita:has(.rvGavetaPag) .rvGavetaAcao.rvGavetaNaView.rvGavetaPagamentos:not(.rvGavetaPag) { width: min(470px, calc(100% - 352px)); }
+.rvGaveta .rcBtnAuto { flex: 0 0 auto; width: auto; }
+/* Gerenciar preços dentro da view */
+.rvGavetaNaView > .janelaHead + .rvPainelCorpo:has(> [class*="stack"]) { padding: 16px 18px; }
+.dtForma .finPgIcon { width: auto; height: auto; border: none; border-radius: 0; background: none; box-shadow: none; }
+.gdSaz { display: block; } .gdSaz b { font-weight: 600; color: var(--l-fg); }
+.gdSaz {
+  position: relative; padding: 8px 10px 8px 32px; border-radius: 3px;
+  border: 1px solid color-mix(in oklch, oklch(0.75 0.15 75) 55%, transparent);
+  background: color-mix(in oklch, oklch(0.85 0.12 85) 22%, transparent);
+  color: oklch(0.42 0.09 65); font-size: 12px; line-height: 1.45;
+}
+.gdSaz b { color: oklch(0.35 0.09 60); }
+.gdSazIco { position: absolute; left: 10px; top: 9px; color: oklch(0.6 0.15 65); }
+.gdSaz { background: none; border: none; padding: 2px 0 2px 22px; } .gdSazIco { left: 0; top: 3px; }
+.janelaHead .rcCloseBtn { margin-left: auto; flex-shrink: 0; }
+.finProgLeg { font-size: 12.5px; }
+
+/* ── Nova reserva: padrão de design (cantos retos, sem laranja/roxo) ───────── */
+.rvGavetaCriar > .janelaHead .rcCloseBtn { margin-left: auto; }
+.rvGavetaCriar input:not([type='checkbox']):not([type='radio']):not([type='file']),
+.rvGavetaCriar select, .rvGavetaCriar textarea { border-radius: 3px; }
+.rvGavetaCriar .comboTrigger, .rvGavetaCriar .dateCompact > div > div { border-radius: 3px !important; }
+.rvGavetaCriar input[type='checkbox'] { width: 15px; height: 15px; }
+/* passos */
+.rvGavetaCriar .stepBar { border-radius: 3px; background: transparent; }
+.rvGavetaCriar .stepActive { background: color-mix(in oklch, var(--l-primary) 8%, transparent); color: var(--l-fg); }
+.rvGavetaCriar .stepActive .stepDot { background: var(--l-primary); color: var(--l-primary-fg); }
+.rvGavetaCriar .stepDone { color: var(--l-muted-fg); }
+.rvGavetaCriar .stepDone .stepDot { background: var(--l-fg); color: var(--l-card); }
+/* cartões de escolha */
+.rvGavetaCriar .choiceCard { border-radius: 3px; }
+.rvGavetaCriar .choiceCard:hover { border-color: color-mix(in oklch, var(--l-fg) 35%, var(--border)); }
+.rvGavetaCriar .choiceCardOn { border-color: var(--l-primary); background: color-mix(in oklch, var(--l-primary) 5%, transparent); }
+.rvGavetaCriar .pagModoCheckBox { border-radius: 3px; }
+.rvGavetaCriar .pagModoCheckBoxOn { background: var(--l-primary); border-color: var(--l-primary); color: var(--l-primary-fg); }
+.rvGavetaCriar { width: min(506px, 100%); }
+/* Busca de pessoas: lista quadrada com título escuro */
+.searchResultsList { border-radius: 3px; }
+.buscaTitulo {
+  position: sticky; top: 0; z-index: 1;
+  padding: 7px 12px; background: oklch(0.27 0.02 260); color: #fff;
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hospSearchWrap { border-radius: 3px !important; }
+
+/* ── Resumo da nova reserva no desenho da view ─────────────────────────────── */
+/* Período: faixa escura, igual à da view */
+.rvGavetaCriar .step3PeriodoCard { border-radius: 3px; border-color: var(--border); overflow: hidden; }
+.rvGavetaCriar .step3PeriodoHead { background: var(--l-hero); border-bottom: none; padding: 14px 16px; }
+.rvGavetaCriar .step3PeriodoHead .step3PeriodoBandLabel { color: var(--l-hero-mut); }
+.rvGavetaCriar .step3PeriodoHead .ovDateLabel  { color: var(--l-hero-mut); }
+.rvGavetaCriar .step3PeriodoHead .ovDateValue  { color: var(--l-hero-fg); }
+.rvGavetaCriar .step3PeriodoHead .ovDateArrow  { color: var(--l-hero-mut); }
+.rvGavetaCriar .step3PeriodoHead .ovNightsCell { border-left-color: var(--l-hero-ln); }
+.rvGavetaCriar .step3PeriodoHead .ovNightsNum  { color: var(--l-hero-fg); }
+.rvGavetaCriar .step3PeriodoHead .ovNightsLabel { color: var(--l-hero-mut); }
+/* Hóspedes: titular e tabela como na view */
+.rvGavetaCriar .step3RoomRow .rvTitular { padding: 4px 0 8px; }
+/* Resumo financeiro no topo */
+.rvGavetaCriar .finResumoCriar { margin: 0 0 14px; border: 1px solid var(--border); border-radius: 3px; }
+.finCabBtn {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+  border: 1px solid rgb(255 255 255 / .3); border-radius: 3px; background: transparent;
+  color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.finCabBtn:hover:not(:disabled) { background: rgb(255 255 255 / .12); }
+.finCabBtn:disabled { opacity: .5; cursor: not-allowed; }
+.finPagAcoes { display: inline-flex; align-items: center; gap: 10px; }
+/* Apartamentos e pessoas na paleta do sistema (sem laranja/roxo) */
+.hospedeChipRect {
+  background: color-mix(in oklch, var(--l-fg, var(--text)) 6%, transparent);
+  border-color: var(--border); border-radius: 3px;
+}
+.rvGavetaCriar .rcChip, .rvGavetaCriar .rvTitularNome .rcChip {
+  background: transparent; border: 1px solid var(--border); color: var(--l-muted-fg); border-radius: 3px;
+}
+.rvGavetaCriar .hospedeAvatar { border-radius: 3px; background: var(--l-hero); color: var(--l-hero-fg); }
+.rvGavetaCriar .roomBtn { border-radius: 3px; }
+.rvGavetaCriar .roomBtn:hover:not(:disabled) { border-color: var(--l-primary); color: var(--l-primary); }
+.rvGavetaCriar .roomBtnSel, .rvGavetaCriar .roomBtnSel:hover { background: var(--l-primary); border-color: var(--l-primary); color: var(--l-primary-fg); }
+.rvGavetaCriar .rcBtnWarn, .rvGavetaCriar .rcBtnWarnActive { color: var(--l-fg); }
+.finCabSec { color: #fff; }
+.rvSecBtn:disabled { opacity: .45; cursor: not-allowed; text-decoration: none; }
+.rvGavetaCriar .rcHeadActions { gap: 10px; }
+/* Gaveta de ação ao lado da criação (pagamento, desconto) */
+.rvGavetaCriar.gavetaLado {
+  right: calc(min(506px, 100%) + 12px); width: min(380px, calc(100% - 518px)); z-index: 4;
+}
+.gavetaLadoRodape { display: flex; justify-content: flex-end; gap: 8px; }
+@container direita (max-width: 860px) {
+  .rvGavetaCriar.gavetaLado { right: 0; width: min(506px, 100%); z-index: 5; }
+}
+.criarPagSec { margin: -4px 0 14px; padding: 0; border-bottom: none; }
+.hospTitChip { margin-left: 6px; vertical-align: middle; }
+
+/* ── Reservas em grupo ─────────────────────────────────────────────────────── */
+/* Períodos já adicionados */
+.rvGavetaCriar .periodoItem { border-radius: 3px; border-color: var(--border); background: transparent; align-items: flex-start; }
+.rvGavetaCriar .periodoItemEditing { border-color: var(--l-primary); background: color-mix(in oklch, var(--l-primary) 5%, transparent); }
+.periodoItemTit { font-size: 11px; font-weight: 600; color: var(--l-muted-fg, var(--text-2)); }
+.rvGavetaCriar .periodoItemRoomNum {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 22px; padding: 0 6px;
+  border-radius: 3px; background: var(--l-hero); color: var(--l-hero-fg); font-size: 11.5px;
+}
+.periodoItemAcoes { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.periodoItemEditando { font-size: 12px; font-weight: 600; color: var(--l-primary); }
+/* Adicionar período à direita */
+.mpAcoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+/* Hóspedes: titular e acompanhantes em tabelas separadas, ocupando a largura toda */
+.hospTabelas { display: flex; flex-direction: column; gap: 10px; }
+.rvGavetaCriar .step3RoomRow .rcSection,
+.rvGavetaCriar .step3RoomRow .rcObsToggleLinha { margin: 0 16px; }
+.rcObsToggleLinha { padding: 4px 0 12px; }
+/* Responsável e registrar pagamento lado a lado */
+.respLinha { display: flex; align-items: flex-end; gap: 12px; }
+.respLinha > :first-child { flex: 1; min-width: 0; }
+.respLinha > .rvSecBtn { height: 34px; flex-shrink: 0; }
+.respSolo { margin-bottom: 14px; }
+/* Resumo financeiro por apartamento (pagamento individual) */
+.rvGavetaCriar .finResumoQuarto { margin: 4px 0 10px; border: 1px solid var(--border); border-radius: 3px; }
+.criarPagQuarto { margin-bottom: 8px; }
+.comboRodape {
+  position: sticky; bottom: -6px; z-index: 2; display: flex; justify-content: flex-end;
+  margin: 6px -6px -6px; padding: 8px 10px; border-top: 1px solid var(--border); background: var(--surface);
+}
+.finAcaoRodape { display: flex; justify-content: flex-end; margin-top: -4px; }
+
+.periodoQuartos { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.periodoQuarto { display: grid; grid-template-columns: auto 1fr; align-items: start; column-gap: 8px; }
+.periodoNomes { display: flex; flex-direction: column; gap: 2px; min-height: 22px; justify-content: center; }
+
+.rvGavetaGrupo { display: flex; flex-direction: column; }
+.rvGavetaGrupo .rvPainelCorpo { flex: 1; min-height: 0; overflow-y: auto; }
+.rvGavetaGrupo .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
+
+.rvGavetaGrupo .dtNum { width: auto; min-width: 28px; height: 22px; padding: 0 6px; border: none; border-radius: 3px; background: var(--l-hero); color: var(--l-hero-fg); }
+.grpPeriodo {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 8px 12px; border-radius: 3px;
+  background: var(--l-hero); color: var(--l-hero-mut); font-size: 12px; font-weight: 500; text-transform: none; letter-spacing: 0;
+}
+.grpPeriodo b { color: var(--l-hero-fg); font-size: 13.5px; font-weight: 600; }
+.grpPeriodo > span:last-child { margin-left: auto; }
+.rvGavetaGrupo .rcSectionHead:has(.grpPeriodo) { margin-bottom: 8px; }
+.rvGavetaGrupo .rcSectionLabel:has(.grpPeriodo) { flex: 1; }
+
+/* Reserva aberta a partir do grupo: a view da reserva carrega ao lado do grupo */
+.slotDireita:has(.rvGavetaReserva) .rvGavetaLista.rvGavetaGrupo { display: flex; }
+.slotDireita:has(.rvGavetaGrupo):not(:has(.rvGavetaAcao:not(.rvGavetaDoGrupo))) .rvGavetaReserva:not(.rvGavetaAcao) { right: calc(min(560px, 100%) + 12px); }
+.slotDireita:has(.rvGavetaDoGrupo) .rvGavetaReserva { display: none; }
+.slotDireita:has(.rvGavetaAcao:not(.rvGavetaDoGrupo)) .rvGavetaLista.rvGavetaGrupo { display: none; }
+@container direita (max-width: 1040px) {
+  .slotDireita:has(.rvGavetaReserva) .rvGavetaLista.rvGavetaGrupo { display: none; }
+  .slotDireita:has(.rvGavetaGrupo) .rvGavetaReserva:not(.rvGavetaAcao) { right: 0; }
+}
+.dtTable .dtCentro { text-align: center; }
+.rvGavetaGrupo .dtQuebra { min-width: 0; }
+
+.dtTable td.dtSetaCel { width: 1%; padding-left: 0; padding-right: 8px; text-align: right; }
+.dtSeta {
+  display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0;
+  border: none; border-radius: 3px; background: none; color: var(--l-muted-fg, var(--text-2)); cursor: pointer;
+}
+.dtSeta:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+
+.barName { font-weight: 400; }
+.barSub {
+  font-size: 11px; font-weight: 400; line-height: 1.2; opacity: .85;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.barInfoTags {
+  position: absolute; bottom: -10px; left: 22px; z-index: 1;
+  display: flex; gap: 4px; max-width: calc(100% - 30px); overflow: hidden; pointer-events: none;
+}
+.barInfoTagsInline { left: 8px; }
+.barInfoTag {
+  display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  color: #fff; border-radius: 4px; background: color-mix(in srgb, var(--bar-bg) 70%, #000); padding: 3px 7px;
+}
+.bar_cancelado .barInfoTag { background: color-mix(in srgb, #ef4444 70%, #000); }
+.bar_orcamento .barInfoTag { background: color-mix(in srgb, oklch(0.5 0.21 274) 75%, #000); }
+.barStatusTag, .barStatusTagInline, .barInfoTag { font-weight: 500; }
+.barInfo {
+  flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: 3px 6px; border-radius: 5px; background: var(--bar-soft);
+  font-size: 11px; font-weight: 500; line-height: 1.15; white-space: nowrap;
+}
+.barInfo > span { display: inline-flex; align-items: center; gap: 4px; }
+.barInfo { align-self: center; background: color-mix(in srgb, var(--bar-bg) 70%, #000); color: #fff; }
+.bar_cancelado .barInfo { background: color-mix(in srgb, #ef4444 70%, #000); }
+.bar_orcamento .barInfo { background: color-mix(in srgb, oklch(0.5 0.21 274) 75%, #000); }
+.barInfo { position: absolute; top: 50%; left: 0; z-index: 3; transform: translate(-50%, -50%); pointer-events: none; }
+.barInfoInline { left: 6px; transform: translateY(-50%); }
+.barContentInfo { padding-left: 30px; }
+.barContentInfoInline { padding-left: 60px; }
+
+/* Box esquerda: todo título em faixa escura */
+.sideGrupoTitEscuro {
+  display: block; padding: 10px 12px; margin-bottom: 8px; border-radius: var(--l-r-lg);
+  background: var(--l-hero); color: var(--l-hero-fg);
+}
+.diaTopo { padding: 8px 10px; border-radius: var(--l-r-lg); background: var(--l-hero); }
+.diaTopoTxt .sideGrupoTit { color: var(--l-hero-fg); }
+.diaTopoTxt small { color: var(--l-hero-mut); }
+.slotEsq .janelaHead {
+  margin-bottom: 12px; padding: 8px 10px; border-radius: var(--l-r-lg);
+  background: var(--l-hero); color: var(--l-hero-fg);
+}
+.slotEsq .janelaTit, .slotEsq .janelaTit svg { color: var(--l-hero-fg); }
+.slotEsq .janelaVoltar { width: 30px; height: 30px; background: var(--danger); color: #fff; }
+.slotEsq .janelaVoltar:hover { background: color-mix(in oklch, var(--danger) 85%, black); }
+.slotEsq .janelaHead .janelaChip { background: color-mix(in oklch, var(--l-hero-fg) 16%, transparent); color: var(--l-hero-fg); }
+
+.dayRoomRowAtivo { background: color-mix(in oklch, var(--l-accent, var(--surface-2)) 55%, transparent); }
+.searchDropName .orcStatusPill { margin-left: 6px; vertical-align: middle; }
+
+/* Gaveta aberta: calendário levemente escurecido para dar foco */
+.slotDireita::before {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: rgb(15 23 42 / 0.22); animation: veuEntra .2s ease-out;
+}
+@keyframes veuEntra { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .slotDireita::before { animation: none; } }
+
+.rvGavetaComRodape { display: flex; flex-direction: column; }
+.rvGavetaComRodape .rvPainelCorpo { flex: 1; min-height: 0; overflow-y: auto; }
+.rvGavetaComRodape .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
+.barEmpresa { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; opacity: 1; text-transform: uppercase; letter-spacing: .02em; }
+.barEmpresa svg { flex-shrink: 0; }
