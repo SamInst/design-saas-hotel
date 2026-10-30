@@ -1,11 +1,22 @@
+import { useState } from 'react';
 import { Languages, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../../i18n';
+import { usePermissions } from '../../hooks/usePermissions';
+import { Notification } from '../../components/ui/Notification';
+import StoneIntegracao from './StoneIntegracao';
 import styles from './SettingsPage.module.css';
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
   const current = i18n.resolvedLanguage;
+  const { hasTela } = usePermissions();
+  const [notification, setNotification] = useState(null);
+
+  const notify = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3200);
+  };
 
   return (
     <div className={styles.page}>
@@ -46,7 +57,10 @@ export default function SettingsPage() {
             })}
           </div>
         </section>
+
+        {hasTela('ADMIN') && <StoneIntegracao onNotify={notify} />}
       </div>
+      <Notification notification={notification} />
     </div>
   );
 }

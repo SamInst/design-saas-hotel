@@ -975,6 +975,19 @@ export const permissaoApi = {
 };
 
 // ─────────────────────────────────────────────────────────────
+//  INTEGRAÇÃO STONE (maquininha — opcional, por hotel)
+// ─────────────────────────────────────────────────────────────
+export const integracaoStoneApi = {
+  // GET /integracao/stone → { ativo, partnerId, secretKeyConfigurada, secretKeyFinal, maquininhas }
+  buscar()                { return request('/integracao/stone'); },
+  // PUT /integracao/stone — { ativo, partnerId, secretKey } (secretKey vazia mantém a atual)
+  salvar(body)            { return request('/integracao/stone', { method: 'PUT', body }); },
+  testar()                { return request('/integracao/stone/testar', { method: 'POST' }); },
+  adicionarMaquininha(body) { return request('/integracao/stone/maquininhas', { method: 'POST', body }); },
+  removerMaquininha(id)   { return request(`/integracao/stone/maquininhas/${id}`, { method: 'DELETE' }); },
+};
+
+// ─────────────────────────────────────────────────────────────
 //  DASHBOARD
 // ─────────────────────────────────────────────────────────────
 export const dashboardApi = {

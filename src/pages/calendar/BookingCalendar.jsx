@@ -17,8 +17,6 @@ import { addDaysStr }        from './calendarMocks';
 import { gerarVoucherReserva, ADJ_OBS_PREFIX } from './gerarVoucherReserva';
 import { reservaApi, quartoApi, quartoCategoriApi, cadastroApi, enumApi, userStorage, orcamentoApi, hospedagemApi } from '../../services/api';
 import { useCalendarSocket } from '../../hooks/useCalendarSocket';
-import whatsappIcon from '../../assets/whatsapp.png';
-import emailIcon    from '../../assets/gmail.png';
 import icoPix           from '../../assets/pagamento/pix.png';
 import icoCartao        from '../../assets/pagamento/cartao.png';
 import icoDinheiro      from '../../assets/pagamento/dinheiro.png';
@@ -1014,6 +1012,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const [showVoucherChoice,  setShowVoucherChoice]  = useState(false);
   const [showVoucherScope,   setShowVoucherScope]   = useState(false); // escolha: voucher individual ou do grupo
   const [acoesOpen,          setAcoesOpen]          = useState(false);
+  const [abaView,            setAbaView]            = useState('resumo');
   const [showAdjPreco,       setShowAdjPreco]       = useState(false);
   const [adjCalc,            setAdjCalc]            = useState(null);   // { valor_total, detalhes }
   const [infoCalc,           setInfoCalc]           = useState(null);   // diárias calculadas (aba Informações)
@@ -1702,76 +1701,52 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setEditing(false); setEditActiveTab('dados');
   };
 
-  // Hóspedes no desenho da view: titular com contatos e acompanhantes em tabela (CPF e idade).
-  // acoesAcomp(h) põe ações embaixo de cada acompanhante, à direita (Gerenciar pessoas).
+  // Hóspedes em lista: nome, CPF e idade; o titular tem o botão de contato (WhatsApp ou e-mail).
+  // acoesAcomp(h) põe ações embaixo de cada acompanhante, à direita (Editar pessoas).
   const renderHospedes = (lista, acoesAcomp = null) => {
-    // Contato só do titular; acompanhantes mostram CPF e idade.
-    const hoje      = new Date();
-    const [tit, ...acomps] = lista;
-    const idadeTxt  = (h) => { const i = idadeEm(h.dataNascimento, hoje); return i == null ? null : tr('{{idade}} anos', { idade: i }); };
-    const telDigits = String(tit.telefone ?? '').replace(/\D/g, '');
-    const waNumber  = telDigits ? (telDigits.length <= 11 ? `55${telDigits}` : telDigits) : '';
-    const titMeta   = [tit.cpf && fmtCpf(tit.cpf), idadeTxt(tit)].filter(Boolean).join(' · ');
+    const hoje     = new Date();
+    const idadeTxt = (h) => { const i = idadeEm(h.dataNascimento, hoje); return i == null ? null : tr('{{idade}} anos', { idade: i }); };
     return (
-      <>
-        <div className={styles.rvTitular}>
-          <div className={styles.rvTitularInfo}>
-            <div className={styles.rvTitularNome}>
-              {tit.nome}
-              <span className={styles.rcChip}>{tr('Titular')}</span>
-            </div>
-            {titMeta && <div className={styles.rvTitularMeta}>{titMeta}</div>}
-          </div>
-          {(tit.telefone || tit.email) && (
-            <div className={styles.rvTitularContatos}>
-              {tit.telefone && (waNumber ? (
-                <a className={styles.rvContato}
-                  href={`https://wa.me/${waNumber}`} target="_blank" rel="noopener noreferrer"
-                  title={tr('WhatsApp {{v0}}', { v0: fmtPhone(tit.telefone) })} onClick={(e) => e.stopPropagation()}>
-                  <img src={whatsappIcon} alt={tr('WhatsApp')} className={styles.rvContactIcon}
-                    loading="eager" decoding="sync" draggable={false} />
-                  <span>{fmtPhone(tit.telefone)}</span>
-                </a>
-              ) : (
-                <div className={styles.rvContato}><span>{fmtPhone(tit.telefone)}</span></div>
-              ))}
-              {tit.email && (
-                <a className={styles.rvContato}
-                  href={`mailto:${tit.email}`} title={tr('E-mail: {{email}}', { email: tit.email })} onClick={(e) => e.stopPropagation()}>
-                  <img src={emailIcon} alt={tr('E-mail')} className={styles.rvContactIcon}
-                    loading="eager" decoding="sync" draggable={false} />
-                  <span>{tit.email}</span>
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-        {acomps.length > 0 && (
-          <div className={styles.dtScroll}>
-            <table className={styles.dtTable}>
-              <thead><tr>
-                <th>{tr('Acompanhantes')}</th><th>{tr('CPF')}</th><th className={styles.dtDir}>{tr('Idade')}</th>
-              </tr></thead>
-              <tbody>
-                {acomps.map((h) => (
-                  <Fragment key={h.id ?? h.nome}>
-                    <tr className={acoesAcomp ? styles.dtComAcoes : undefined}>
-                      <td className={[styles.dtQuebra, styles.dtPagador].join(' ')}><span className={styles.dtCelTit}>{h.nome}</span></td>
-                      <td>{h.cpf ? fmtCpf(h.cpf) : '—'}</td>
-                      <td className={styles.dtDir}>{idadeTxt(h) ?? '—'}</td>
-                    </tr>
-                    {acoesAcomp && (
-                      <tr className={styles.dtAcoesLinha}><td colSpan={3}>{acoesAcomp(h)}</td></tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </>
+      <ul className={styles.rvHospLista}>
+        {lista.map((h, i) => {
+          const meta = [h.cpf && fmtCpf(h.cpf), idadeTxt(h)].filter(Boolean).join(' · ');
+          return (
+            <li key={h.id ?? h.nome ?? i} className={styles.rvHospItem}>
+              <div className={styles.rvHospLinha}>
+                <div className={styles.rvHospInfo}>
+                  <span className={styles.rvHospNome}>
+                    {h.nome}
+                    {i === 0 && <span className={styles.rvHospTag}>{tr('Titular')}</span>}
+                  </span>
+                  {meta && <span className={styles.rvHospMeta}>{meta}</span>}
+                </div>
+                {i === 0 && (h.telefone || h.email) && (
+                  <button type="button" className={styles.rvSecBtn}
+                    onClick={(e) => setBalao({ tipo: 'contato', anchor: e.currentTarget, pessoa: h })}>
+                    {tr('Contatar')}
+                  </button>
+                )}
+              </div>
+              {i > 0 && acoesAcomp && <div className={styles.rvHospAcoes}>{acoesAcomp(h)}</div>}
+            </li>
+          );
+        })}
+      </ul>
     );
   };
+
+  // Tornar titular / remover ficam sempre à mostra; na view, usar um deles já abre a edição de pessoas para salvar.
+  const abreEdicaoPessoas = () => { setAcoesOpen(false); setAbaView('hospedes'); setEditActiveTab('pessoas'); setEditing(true); };
+  const acoesPessoa = (h) => (
+    <div className={styles.rvAcompAcoes}>
+      <BalaoConfirma className={styles.rvSecBtn} label={tr('Tornar titular')} confirmar={tr('Tornar titular')}
+        mensagem={<>{tr('Tornar')} <b>{h.nome}</b> {tr('o titular da reserva?')}</>}
+        onConfirm={() => { abreEdicaoPessoas(); handleSetTitular(h.id); onNotify?.(tr('Titular alterado. Salve para aplicar.')); }} />
+      <BalaoConfirma className={[styles.rvSecBtn, styles.rvSecBtnPerigo].join(' ')} label={tr('Remover')} confirmar={tr('Remover')} perigo
+        mensagem={<>{tr('Remover')} <b>{h.nome}</b> {tr('desta reserva?')}</>}
+        onConfirm={() => { abreEdicaoPessoas(); handleRemovePessoa(h.id); onNotify?.(tr('Pessoa removida. Salve para aplicar.')); }} />
+    </div>
+  );
 
   const renderBalao = () => {
     if (!balao?.anchor) return null;
@@ -1831,12 +1806,36 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       <BalaoAcoes onCancelar={() => { fecharBalao(); handleDownloadVoucher(false); }} cancelarTxt={tr('Sem consumos')}
         confirmar={tr('Com consumos')} onConfirmar={() => { fecharBalao(); handleDownloadVoucher(true); }} />
     </>;
+    else if (b.tipo === 'contato') {
+      const tel = String(b.pessoa.telefone ?? '').replace(/D/g, '');
+      const wa  = tel ? (tel.length <= 11 ? `55${tel}` : tel) : '';
+      corpo = <>
+        {msg(<>{tr('Falar com')} <b>{b.pessoa.nome}</b> {tr('por:')}</>)}
+        <div className={styles.balaoContatos}>
+          <span><b>{tr('Telefone')}:</b> {b.pessoa.telefone ? fmtPhone(b.pessoa.telefone) : '—'}</span>
+          <span><b>{tr('E-mail')}:</b> {b.pessoa.email || '—'}</span>
+        </div>
+        <div className={styles.balaoAcoes}>
+          <button type="button" className={styles.balaoBtn} disabled={!b.pessoa.email}
+            title={b.pessoa.email ? undefined : tr('Sem e-mail')}
+            onClick={() => { fecharBalao(); window.location.href = `mailto:${b.pessoa.email}`; }}>
+            {tr('E-mail')}
+          </button>
+          <button type="button" className={[styles.balaoBtn, styles.balaoBtnOk].join(' ')} disabled={!wa}
+            title={wa ? undefined : tr('Sem telefone')}
+            onClick={() => { fecharBalao(); window.open(`https://wa.me/${wa}`, '_blank', 'noopener,noreferrer'); }}>
+            {tr('WhatsApp')}
+          </button>
+        </div>
+      </>;
+    }
     return <Balao anchor={b.anchor} onClose={fecharBalao}>{corpo}</Balao>;
   };
 
   // ── Edit mode render ───────────────────────────────────────────────────────
   // No painel a edição abre ao lado da view, que continua visível à esquerda.
-  const renderEdicao = () => {
+  // embutido: devolve as partes para a edição abrir dentro da aba da view.
+  const renderEdicao = (embutido = false) => {
     // Botões de um dia a mais / a menos, nos mesmos limites dos calendários.
     const somaDia = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
     const podeCheckinDepois  = !!editCheckin && (!editCheckout || somaDia(editCheckin, 1) < editCheckout);
@@ -2109,33 +2108,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     const semVoltar = naPessoas || editActiveTab === 'dados' || inline;
     // Experimental: no painel a edição abre dentro da própria view, e o resumo
     // financeiro fica na janela flutuante à esquerda, acompanhando cada alteração.
-    const tituloEdicao = editActiveTab === 'pessoas' ? tr('Gerenciar pessoas')
-      : editActiveTab === 'pagamentos' ? tr('Gerenciar pagamentos') : tr('Gerenciar diárias');
+    const tituloEdicao = editActiveTab === 'pessoas' ? tr('Editar pessoas')
+      : editActiveTab === 'pagamentos' ? tr('Editar pagamentos') : tr('Editar diárias');
 
-    return (
-      <>
-      <PainelReserva inline={inline} acao naView={inline} fecharX={editActiveTab !== 'pagamentos'} pagamentos={editActiveTab === 'pagamentos'} estreito={naPessoas && !inline} diarias={editActiveTab === 'dados'} saindo={saindo} open onClose={goBackFromEdit} size="md"
-        hideHeader={!inline} title={inline ? tituloEdicao : undefined}
-        lateral={inline ? renderValoresResumo({ titulo: tr('Resumo financeiro'), fechar: false }) : null}
-        bodyStyle={{ padding: 0, gap: 0 }}
-        footer={inline && editActiveTab === 'pagamentos' && !['hospedado', 'finalizado', 'cancelado'].includes(reserva.status) ? (
-          <div className={styles.footerRight}>
-            <button type="button" className={[styles.rcBtn, styles.rcBtnPay, styles.rcBtnAuto].join(' ')} onClick={() => setShowPayModal(true)}>
-              <DollarSign size={15} /> {tr('Registrar pagamento')}
-            </button>
-            {(hasChanges || hasChangedData) && salvarBtns}
-          </div>
-        ) : semVoltar ? ((hasChanges || hasChangedData) ? <div className={styles.footerRight}>{salvarBtns}</div> : null) : (
-          <div className={styles.footerSpread}>
-            <Button variant="secondary" onClick={goBackFromEdit}>{tr('← Voltar')}</Button>
-            {salvarBtns}
-          </div>
-        )}
-      >
+    const conteudoEdicao = (
         <div className={[styles.detailTabContent, editActiveTab !== 'dados' ? styles.detailTabContentAuto : ''].join(' ')}>
         {editActiveTab === 'dados' && (
           <div className={styles.editDadosRoot}>
-            {!inline && renderValoresResumo({ titulo: tr('Gerenciar diárias'), semDiarias: true })}
+            {!inline && renderValoresResumo({ titulo: tr('Editar diárias'), semDiarias: true })}
 
             <div className={styles.editDados}>
               {/* Esquerda — apartamento e período */}
@@ -2302,16 +2282,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 )}
                 {lista.length === 0 ? (
                   <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
-                ) : renderHospedes(lista, editavel && orcPessoas.length === 0 ? (h) => (
-                  <div className={styles.rvAcompAcoes}>
-                    <BalaoConfirma className={styles.rvSecBtn} label={tr('Tornar titular')} confirmar={tr('Tornar titular')}
-                      mensagem={<>{tr('Tornar')} <b>{h.nome}</b> {tr('o titular da reserva?')}</>}
-                      onConfirm={() => { handleSetTitular(h.id); onNotify?.(tr('Titular alterado. Salve para aplicar.')); }} />
-                    <BalaoConfirma className={[styles.rvSecBtn, styles.rvSecBtnPerigo].join(' ')} label={tr('Remover')} confirmar={tr('Remover')} perigo
-                      mensagem={<>{tr('Remover')} <b>{h.nome}</b> {tr('desta reserva?')}</>}
-                      onConfirm={() => { handleRemovePessoa(h.id); onNotify?.(tr('Pessoa removida. Salve para aplicar.')); }} />
-                  </div>
-                ) : null)}
+                ) : renderHospedes(lista, editavel && orcPessoas.length === 0 ? acoesPessoa : null)}
               </div>
             </div>
 
@@ -2328,6 +2299,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               <div className={[styles.rcSection, styles.rcSectionNoLine].join(' ')}>
                 <div className={styles.rcSectionHead}>
                   <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
+                  {inline && editavel && (
+                    <button type="button" className={styles.rvSecBtn} onClick={() => setShowPayModal(true)}>
+                      {tr('+ Adicionar pagamento')}
+                    </button>
+                  )}
                   {!inline && (
                     <button type="button" className={styles.rcCloseBtn} onClick={goBackFromEdit} aria-label={tr('Fechar')}>
                       <X size={17} />
@@ -2407,23 +2383,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           );
         })()}
         </div>
-      </PainelReserva>
-
-      {!inline && renderBalao()}
-
-      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
-        footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
-      ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>{tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}</p></Modal>
-
-      {inline ? (showPayModal && (
-        <PainelReserva inline acao pag open onClose={fecharPag}
-          title={<><DollarSign size={15} /> {pagRegistrado ? tr('Pagamento registrado') : tr('Registrar pagamento')}</>}
-          footer={pagRegistrado ? (
-            <>
-              <Button className={styles.btnSolid} onClick={() => setPagRegistrado(null)}>{tr('Registrar outro')}</Button>
-              <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={fecharPag}>{tr('Concluir')}</Button>
-            </>
-          ) : null}>
+    );
+    const pagConteudo = (
+      <>
           {pagRegistrado ? (
             <div className={styles.pagRecibo}>
               <span className={styles.pagReciboOk}><Check size={22} /></span>
@@ -2439,6 +2401,85 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           ) : (
             <PaymentModal inline compacto open onClose={fecharPag} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
           )}
+      </>
+    );
+    const pagRodape = pagRegistrado ? (
+      <>
+        <Button className={styles.btnSolid} onClick={() => setPagRegistrado(null)}>{tr('Registrar outro')}</Button>
+        <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')} onClick={fecharPag}>{tr('Concluir')}</Button>
+      </>
+    ) : null;
+
+    if (embutido) {
+      // Dentro da aba: o registro de pagamento ocupa a aba Pagamentos, e o resumo
+      // financeiro fica do lado de fora, acompanhando cada alteração.
+      const conteudoAba = (
+        <div className={[styles.rvEdicaoEmbutida, editActiveTab === 'dados' ? styles.rvEdicaoDiarias : ''].join(' ')}>
+          {showPayModal ? (
+            <div className={styles.rcSection}>
+              <div className={styles.rcSectionHead}>
+                <span className={styles.rcSectionLabel}>{pagRegistrado ? tr('Pagamento registrado') : tr('Registrar pagamento')}</span>
+              </div>
+              {pagConteudo}
+            </div>
+          ) : conteudoEdicao}
+        </div>
+      );
+      const rodape = showPayModal ? (pagRodape && <div className={styles.footerRight}>{pagRodape}</div>) : (
+        <div className={styles.footerSpread}>
+          <Button variant="secondary" onClick={goBackFromEdit}>{tr('Cancelar')}</Button>
+          {(hasChanges || hasChangedData) && salvarBtns}
+        </div>
+      );
+      return {
+        conteudo: conteudoAba,
+        rodape,
+        lateral: renderValoresResumo({ titulo: tr('Resumo financeiro'), fechar: false }),
+        extras: (<>
+          <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
+            footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
+          ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>{tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}</p></Modal>
+          <Modal open={showDiscard} onClose={() => setShowDiscard(false)} size="sm" title={tr('Descartar alterações?')}
+            footer={<div className={styles.footerRight}><Button variant="secondary" onClick={() => setShowDiscard(false)}>{tr('Continuar editando')}</Button><Button variant="danger" onClick={() => { setShowDiscard(false); discardPendingOps(); setEditing(false); setEditActiveTab('dados'); }}>{tr('Descartar')}</Button></div>}
+          ><p style={{ margin: 0, fontSize: 14, color: 'var(--text-2)' }}>{tr('Há alterações não salvas. Deseja descartá-las?')}</p></Modal>
+        </>),
+      };
+    }
+
+    return (
+      <>
+      <PainelReserva inline={inline} acao naView={inline} fecharX={editActiveTab !== 'pagamentos'} pagamentos={editActiveTab === 'pagamentos'} estreito={naPessoas && !inline} diarias={editActiveTab === 'dados'} saindo={saindo} open onClose={goBackFromEdit} size="md"
+        hideHeader={!inline} title={inline ? tituloEdicao : undefined}
+        lateral={inline ? renderValoresResumo({ titulo: tr('Resumo financeiro'), fechar: false }) : null}
+        bodyStyle={{ padding: 0, gap: 0 }}
+        footer={inline && editActiveTab === 'pagamentos' && !['hospedado', 'finalizado', 'cancelado'].includes(reserva.status) ? (
+          <div className={styles.footerRight}>
+            <button type="button" className={[styles.rcBtn, styles.rcBtnPay, styles.rcBtnAuto].join(' ')} onClick={() => setShowPayModal(true)}>
+              <DollarSign size={15} /> {tr('Registrar pagamento')}
+            </button>
+            {(hasChanges || hasChangedData) && salvarBtns}
+          </div>
+        ) : semVoltar ? ((hasChanges || hasChangedData) ? <div className={styles.footerRight}>{salvarBtns}</div> : null) : (
+          <div className={styles.footerSpread}>
+            <Button variant="secondary" onClick={goBackFromEdit}>{tr('← Voltar')}</Button>
+            {salvarBtns}
+          </div>
+        )}
+      >
+        {conteudoEdicao}
+      </PainelReserva>
+
+      {!inline && renderBalao()}
+
+      <Modal open={!!confirmRemovePessoa} onClose={() => setConfirmRemovePessoa(null)} size="sm" title={tr('Remover pessoa')}
+        footer={<div style={{ display: 'flex', gap: 8 }}><Button style={{ flex: 1 }} onClick={() => setConfirmRemovePessoa(null)}>{tr('Cancelar')}</Button><Button variant="danger" style={{ flex: 1 }} onClick={() => { handleRemovePessoa(confirmRemovePessoa.id); setConfirmRemovePessoa(null); }}>{tr('Remover')}</Button></div>}
+      ><p style={{ fontSize: 13, color: 'var(--text)', margin: 0 }}>{tr('Tem certeza que deseja remover')} <b>{confirmRemovePessoa?.nome}</b> {tr('desta reserva?')}</p></Modal>
+
+      {inline ? (showPayModal && (
+        <PainelReserva inline acao pag open onClose={fecharPag}
+          title={<><DollarSign size={15} /> {pagRegistrado ? tr('Pagamento registrado') : tr('Registrar pagamento')}</>}
+          footer={pagRodape}>
+          {pagConteudo}
         </PainelReserva>
       )) : (
         <PaymentModal open={showPayModal} onClose={() => setShowPayModal(false)} onConfirm={handleAddPagamento} tiposPagamento={tiposPagamento} isSubmitting={false} titularNome={reserva.titularNome} lastPayerName={pagamentos.filter(p => !p.cancelado).at(-1)?.nomePagador ?? null} canAplicarDesconto={false} valorTotal={reserva.valorTotal} valorPago={totalPago} />
@@ -2561,7 +2602,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     <div className={styles.rvRodape}>
       <button type="button" className={styles.rvRodapeBtn} disabled={pagamentoDeGrupo}
         title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
-        onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
+        onClick={() => { setAcoesOpen(false); setAbaView('pagamentos'); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
         {tr('Pagamento')}
       </button>
       <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeHospedar].join(' ')}
@@ -2579,21 +2620,21 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 onClick={() => { setAcoesOpen(false); handleVoucherClick(setaRef.current); }}>
                 <FileDown size={15}/> {tr('Voucher')}
               </button>
-              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                <Pencil size={15}/> {tr('Gerenciar diárias')}
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('diarias'); setEditActiveTab('dados'); setEditing(true); }}>
+                <Pencil size={15}/> {tr('Editar diárias')}
               </button>
               <div className={styles.rvAcoesDiv} />
-              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
-                <Users size={15}/> {tr('Gerenciar pessoas')}
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('hospedes'); setEditActiveTab('pessoas'); setEditing(true); }}>
+                <Users size={15}/> {tr('Editar pessoas')}
               </button>
               <button className={styles.rvAcoesItem}
                 disabled={pagamentoDeGrupo}
                 title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
-                onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
-                <DollarSign size={15}/> {tr('Gerenciar pagamentos')}
+                onClick={() => { setAcoesOpen(false); setAbaView('pagamentos'); setEditActiveTab('pagamentos'); setEditing(true); }}>
+                <DollarSign size={15}/> {tr('Editar pagamentos')}
               </button>
-              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); openGerenciarPreco(); }}>
-                <Tag size={15}/> {tr('Gerenciar preços')}
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('resumo'); openGerenciarPreco(); }}>
+                <Tag size={15}/> {tr('Editar preços')}
               </button>
               <div className={styles.rvAcoesDiv} />
               {reserva.status === 'confirmada' && (
@@ -2720,12 +2761,34 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             );
           })();
 
+  // No painel, editar pessoas, diárias ou pagamentos abre dentro da aba correspondente.
+  const edicao      = editing && inline ? renderEdicao(true) : null;
+  const ABA_EDICAO  = { pessoas: 'hospedes', dados: 'diarias', pagamentos: 'pagamentos' };
+  const EDICAO_ABA  = { hospedes: 'pessoas', diarias: 'dados', pagamentos: 'pagamentos' };
+  const abaEdicao   = edicao ? ABA_EDICAO[editActiveTab] : null;
+
+  // Abaixo do período, o resto da reserva fica em abas.
+  const abasView = [
+    ['resumo', tr('Resumo')],
+    ['hospedes', tr('Hóspedes')],
+    ...(!pagamentoDeGrupo || abaEdicao === 'pagamentos' ? [['pagamentos', tr('Pagamentos')]] : []),
+    ...(effectiveDetalhes.length > 0 || abaEdicao === 'diarias' ? [['diarias', tr('Diárias')]] : []),
+    ...((reserva.status === 'cancelado' && reserva.motivoCancelamento) || reserva.observacao || temOpcoes
+      ? [['observacao', reserva.status === 'cancelado' && reserva.motivoCancelamento ? tr('Cancelamento') : tr('Observação')]] : []),
+  ];
+  const abaAtiva = abasView.some(([k]) => k === abaView) ? abaView : 'resumo';
+  // Em edição, trocar de aba leva a edição junto quando a aba tem edição própria.
+  const trocaAba = (k) => {
+    setAbaView(k);
+    if (edicao && EDICAO_ABA[k] && EDICAO_ABA[k] !== editActiveTab) { setShowPayModal(false); setPagRegistrado(null); setEditActiveTab(EDICAO_ABA[k]); }
+  };
+
   return (
     <>
       {/* Card único no mesmo desenho do passo "Resumo & Pagamento" da criação. */}
-      {!((editing || showAdjPreco) && inline) && (
+      {!(showAdjPreco && inline) && (
       <PainelReserva inline={inline} saindo={saindo} open onClose={handleClose} size="lg" hideHeader closeOnBackdrop
-        footer={rodapeEl} lateral={inline ? resumoFinEl : null}
+        footer={edicao ? edicao.rodape : rodapeEl} lateral={edicao?.lateral ?? null}
         bodyStyle={{ padding: '14px 16px 16px', gap: 12 }}
         containerStyle={{ maxWidth: overnight ? 'min(466px, 96vw)' : 'min(565px, 96vw)' }}
       >
@@ -2771,29 +2834,44 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
                 <div className={styles.ovDateTime}>{checkoutTime}{tr('h')}</div>
               </div>
-              <div className={styles.ovNightsCell}>
-                <div className={styles.ovNightsNum}>{dias}</div>
-                <div className={styles.ovNightsLabel}>{dias === 1 ? tr('Diária') : tr('Diárias')}</div>
-              </div>
-              {guestList.length > 0 && (
-                <div className={styles.ovNightsCell}>
-                  <div className={styles.ovNightsNum}>{guestList.length}</div>
-                  <div className={styles.ovNightsLabel}>{guestList.length === 1 ? tr('Pessoa') : tr('Pessoas')}</div>
-                </div>
-              )}
             </div>
           </div>
 
-          <div className={styles.rvCorpo}>
-          <div className={styles.rvCorpoMain}>
+
+          <div className={styles.rvTabs} role="tablist">
+            {abasView.map(([k, label]) => (
+              <button key={k} type="button" role="tab" aria-selected={abaAtiva === k}
+                className={[styles.rvTab, abaAtiva === k ? styles.rvTabAtiva : ''].join(' ')}
+                onClick={() => trocaAba(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {edicao && abaAtiva === abaEdicao ? edicao.conteudo : (<>
+          {/* ── Resumo: pessoas e quantidade de diárias em "rótulo: valor", seguidas do resumo financeiro ── */}
+          {abaAtiva === 'resumo' && (
+            <div className={styles.rcSection}>
+              <div className={styles.rvKvCol}>
+                {guestList.length === 0
+                  ? <p><b>{tr('Titular')}:</b> —</p>
+                  : guestList.map((h, i) => (
+                    <p key={h.id ?? i}><b>{i === 0 ? tr('Titular') : tr('Acompanhante')}:</b> {h.nome}</p>
+                  ))}
+                <p><b>{tr('Diárias')}:</b> {dias}</p>
+              </div>
+            </div>
+          )}
+          {abaAtiva === 'resumo' && resumoFinEl && <div className={styles.rvResumoFin}>{resumoFinEl}</div>}
+
           {/* ── Hóspedes ── */}
+          {abaAtiva === 'hospedes' && (
           <div className={styles.rcSection}>
             <div className={styles.rcSectionHead}>
               <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
               {temOpcoes && (
-                <button type="button" className={styles.rvSecBtn}
-                  onClick={() => { setAcoesOpen(false); setEditActiveTab('pessoas'); setEditing(true); }}>
-                  {tr('Gerenciar pessoas')}
+                <button type="button" className={styles.rvSecBtn} onClick={abreEdicaoPessoas}>
+                  {tr('Editar pessoas')}
                 </button>
               )}
             </div>
@@ -2803,12 +2881,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               renderHospedes(guestList)
             )}
           </div>
-
-          </div>
-          {!inline && resumoFinEl}
-          </div>
+          )}
           {/* ── Diárias — tabela no desenho do histórico de hospedagem ── */}
-          {effectiveDetalhes.length > 0 && (() => {
+          {abaAtiva === 'diarias' && (() => {
             const aggDiff    = cardTotal - baseTotal;
             const funcAjuste = reserva.novoPreco?.funcionario?.nome;
             return (
@@ -2818,7 +2893,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   {temOpcoes && (
                     <button type="button" className={styles.rvSecBtn}
                       onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
-                      {tr('Gerenciar diárias')}
+                      {tr('Editar diárias')}
                     </button>
                   )}
                 </div>
@@ -2864,14 +2939,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           })()}
 
           {/* ── Pagamentos ── */}
-          {!pagamentoDeGrupo && (
+          {abaAtiva === 'pagamentos' && (
             <div className={styles.rcSection}>
               <div className={styles.rcSectionHead}>
                 <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
                 {temOpcoes && (
                   <button type="button" className={styles.rvSecBtn}
-                    onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); }}>
-                    {tr('Gerenciar pagamentos')}
+                    onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
+                    {tr('+ Adicionar pagamento')}
                   </button>
                 )}
               </div>
@@ -2910,7 +2985,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           )}
 
           {/* ── Cancelamento / Observação ── */}
-          {reserva.status === 'cancelado' && reserva.motivoCancelamento ? (
+          {abaAtiva === 'observacao' && (reserva.status === 'cancelado' && reserva.motivoCancelamento ? (
             <div className={[styles.rcSection, styles.rvCancelSection].join(' ')}>
               <div className={styles.rcSectionHead}>
                 <span className={[styles.rcSectionLabel, styles.rvCancelLabel].join(' ')}>
@@ -2953,7 +3028,8 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 ? <div className={styles.rvObsText}>{reserva.observacao}</div>
                 : <div className={styles.pagEmpty}>{tr('Sem observação')}</div>}
             </div>
-          ) : null}
+          ) : null)}
+          </>)}
 
         </div>
 
@@ -2974,11 +3050,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             // (pernoite usa os callbacks padrão; reservado/etc. passam overnight.acoes).
             const acoesItems = (overnight.acoes ?? [
               overnight.onAcionarLimpeza      && { label: tr('Acionar Limpeza'),      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{width:15,height:15}}><path d="M3 21h18"/><path d="M7 21V11l5-4 5 4v10"/><path d="M10 21v-4h4v4"/></svg>, onClick: overnight.onAcionarLimpeza },
-              overnight.onGerenciarDiarias    && { label: tr('Gerenciar Diárias'),    icon: <CalendarDays size={15}/>, onClick: overnight.onGerenciarDiarias },
+              overnight.onGerenciarDiarias    && { label: tr('Editar diárias'),    icon: <CalendarDays size={15}/>, onClick: overnight.onGerenciarDiarias },
               overnight.onAdicionarConsumo    && { label: tr('Adicionar Consumo'),    icon: <Plus size={15}/>,        onClick: overnight.onAdicionarConsumo },
-              overnight.onGerenciarPagamentos && { label: tr('Gerenciar Pagamentos'), icon: <DollarSign size={15}/>,  onClick: overnight.onGerenciarPagamentos },
-              overnight.onGerenciarPreco      && { label: tr('Gerenciar Preços'),     icon: <Tag size={15}/>,         onClick: overnight.onGerenciarPreco },
-              overnight.onGerenciarPessoas    && { label: tr('Gerenciar Pessoas'),    icon: <Users size={15}/>,       onClick: overnight.onGerenciarPessoas },
+              overnight.onGerenciarPagamentos && { label: tr('Editar pagamentos'), icon: <DollarSign size={15}/>,  onClick: overnight.onGerenciarPagamentos },
+              overnight.onGerenciarPreco      && { label: tr('Editar preços'),     icon: <Tag size={15}/>,         onClick: overnight.onGerenciarPreco },
+              overnight.onGerenciarPessoas    && { label: tr('Editar pessoas'),    icon: <Users size={15}/>,       onClick: overnight.onGerenciarPessoas },
               overnight.onVoucher             && { label: tr('Voucher'),              icon: <FileDown size={15}/>,    onClick: overnight.onVoucher },
               overnight.onFinalizar           && { label: tr('Finalizar Pernoite'),   icon: <Check size={15}/>,       onClick: overnight.onFinalizar, primary: true, divider: true },
               overnight.onCancelar            && { label: tr('Cancelar Pernoite'),    icon: <XCircle size={14}/>,     onClick: overnight.onCancelar,  danger: true },
@@ -3275,14 +3351,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             />
           );
         })() : (
-          <PainelReserva inline={inline} acao naView={inline} open onClose={() => setShowAdjPreco(false)} size="sm" title={tr('Gerenciar Preços')}>
+          <PainelReserva inline={inline} acao naView={inline} open onClose={() => setShowAdjPreco(false)} size="sm" title={tr('Editar preços')}>
             <div style={{ padding: 8 }}>
               <Esqueleto linhas={3} avatar={false} />
             </div>
           </PainelReserva>
         )
       )}
-      {editing && inline && renderEdicao()}
+      {edicao?.extras}
     </>
   );
 }
@@ -3474,7 +3550,7 @@ function ReciboPagamento({ p }) {
   );
 }
 
-function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify }) {
+function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify }) {
   const naDireita = !!useContext(JanelaCtx);
   const dir = useContext(JanelaDirCtx);
   const gid = grupo.grupo_id;
@@ -3502,7 +3578,7 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
       .finally(() => setLoading(false));
   }, [gid]);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { carregar(); }, [carregar, refreshKey]);
 
   const registrarPagamento = async (payment) => {
     setSalvando(true);
@@ -3572,11 +3648,16 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
     const linhaReserva = (r, comPeriodo) => (
       <tr key={r.id} className={r.status === 'cancelado' ? styles.dtCancelado : ''}>
         <td><span className={styles.dtNum}>{fmtRoom(r.quarto)}</span></td>
-        <td className={styles.dtQuebra}><span className={styles.dtCelTit}>{r.titularNome}</span></td>
+        <td className={styles.dtQuebra}>
+          {(r.hospedes?.length ? r.hospedes.map((h) => h.nome) : [r.titularNome]).map((nome, i, arr) => (
+            <span key={i} className={styles.dtCelTit}>{arr.length > 1 ? `${i + 1}. ${nome}` : nome}</span>
+          ))}
+        </td>
         {comPeriodo && <td>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)}</td>}
-        <td className={styles.dtCentro}>{r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0))}</td>
-        <td><span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span></td>
-        <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(r.valorTotal ?? 0)}</td>
+        <td className={[styles.dtDir, styles.dtForte].join(' ')}>
+          <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>
+          <span className={styles.dtValorSob}>{fmtBRL(r.valorTotal ?? 0)}</span>
+        </td>
         <td className={styles.dtSetaCel}>
           <button type="button" className={styles.dtSeta} onClick={() => onSelectReserva(r)} title={tr('Ver reserva')} aria-label={tr('Ver reserva')}>
             <ChevronRight size={16} />
@@ -3633,12 +3714,12 @@ function GrupoDetalheModal({ grupo, tiposPagamento, onClose, onRenomeado, onSele
                   <b>{fmtDateBR(pr.inicio)} → {fmtDateBR(pr.fim)}</b>
                   <span>{diariasTxt(diffDays(pr.inicio, pr.fim))}</span>
                 </span>}
-                colunas={[[tr('Apto')], [tr('Titular')], [tr('Pessoas'), 'centro'], [tr('Status')], [tr('Valor'), true], ['']]}>
+                colunas={[[tr('Apto')], [tr('Pessoas')], [tr('Valor'), true], ['']]}>
                 {pr.itens.map((r) => linhaReserva(r, false))}
               </SecaoTabela>
             )) : (
               <SecaoTabela titulo={tr('Reservas do grupo')} temLinhas={lista.length > 0} vazio={tr('Nenhuma reserva neste grupo.')}
-                colunas={[[tr('Apto')], [tr('Titular')], [tr('Período')], [tr('Pessoas'), 'centro'], [tr('Status')], [tr('Valor'), true], ['']]}>
+                colunas={[[tr('Apto')], [tr('Pessoas')], [tr('Período')], [tr('Valor'), true], ['']]}>
                 {lista.map((r) => linhaReserva(r, true))}
               </SecaoTabela>
             )}
@@ -3947,6 +4028,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
       {detalhe && (
         <GrupoDetalheModal
           grupo={detalhe}
+          refreshKey={refreshKey}
           tiposPagamento={tiposPagamento}
           onClose={() => setDetalhe(null)}
           onRenomeado={aplicarNome}
@@ -7249,6 +7331,7 @@ export default function BookingCalendar() {
         hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_FINALIZADO'], mes: nextMes, ano: nextAno }),
       ]);
       setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
+      if (showGrupos) setGruposRefreshKey((k) => k + 1);
     } catch (_) {
       // ignore load failures here
     } finally {
@@ -7704,6 +7787,7 @@ export default function BookingCalendar() {
       setReservas((rs) => rs.map((r) => r.id === id ? normalized : r));
       setSelectedReserva((prev) => prev?.id === id ? normalized : prev);
       setDragEditValues(null);
+      setGruposRefreshKey((k) => k + 1);
       notify(tr('Reserva atualizada!'));
     } catch (e) {
       notify(e?.message ?? tr('Erro ao atualizar reserva.'), 'error');

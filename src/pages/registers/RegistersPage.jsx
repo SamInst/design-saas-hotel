@@ -2673,7 +2673,7 @@ export default function RegistersPage() {
                   </label>
                   <label className={styles.opcaoRow}>
                     <input type="checkbox" checked={temDependentes} onChange={e => toggleTemDependentes(e.target.checked)} />
-                    <Users size={13} /> <span>{tr('Possui dependentes')}</span>
+                    <Users size={13} /> <span>{tr('Possui acompanhantes')}</span>
                   </label>
                   <label className={styles.opcaoRow}>
                     <input type="checkbox" checked={temEmpresa} onChange={e => toggleTemEmpresa(e.target.checked)} />

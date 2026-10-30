@@ -3672,6 +3672,7 @@ a.rvContato:hover span { text-decoration: underline; }
 .dtCancelado .dtForte { text-decoration: line-through; }
 .dtForma { display: flex; align-items: center; gap: 10px; }
 .dtCelTit { display: block; font-size: 12.5px; font-weight: 500; color: var(--l-fg, var(--text)); }
+.dtCelTit + .dtCelTit { margin-top: 4px; }
 .dtCelSub { display: block; font-size: 10.5px; line-height: 14px; color: var(--l-muted-fg, var(--text-2)); }
 .dtTrunca { max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 /* Texto longo quebra em linhas em vez de ser cortado */
@@ -3742,18 +3743,18 @@ a.rvContato:hover span { text-decoration: underline; }
 .pagReciboAviso { font-size: 11px; }
 
 /* ── Campos de todas as ações no padrão do cadastro de clientes ────────────── */
-.rvGavetaAcao input:not([type='checkbox']):not([type='radio']):not([type='file']),
-.rvGavetaAcao select {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) input:not([type='checkbox']):not([type='radio']):not([type='file']),
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) select {
   box-sizing: border-box; height: 34px; min-height: 34px;
   padding: 7px 10px; border-radius: 7px; box-shadow: none; font-size: 13px;
 }
-.rvGavetaAcao select { padding-right: 28px; background-position: right 9px center; }
-.rvGavetaAcao textarea { padding: 7px 10px; border-radius: 7px; box-shadow: none; font-size: 13px; }
-.rvGavetaAcao input:focus, .rvGavetaAcao select:focus, .rvGavetaAcao textarea:focus {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) select { padding-right: 28px; background-position: right 9px center; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) textarea { padding: 7px 10px; border-radius: 7px; box-shadow: none; font-size: 13px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) input:focus, :is(.rvGavetaAcao, .rvEdicaoEmbutida) select:focus, :is(.rvGavetaAcao, .rvEdicaoEmbutida) textarea:focus {
   outline: none; border-color: var(--l-primary) !important; box-shadow: none !important;
 }
-.rvGavetaAcao label:not(:has(input)) { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; }
-.rvGavetaAcao input[type='checkbox'], .rvGavetaAcao input[type='radio'] { accent-color: var(--l-primary); }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) label:not(:has(input)) { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) input[type='checkbox'], :is(.rvGavetaAcao, .rvEdicaoEmbutida) input[type='radio'] { accent-color: var(--l-primary); }
 .rvGaveta .rvCorpo { grid-template-columns: minmax(0, 1fr); }
 .rvGaveta .finResumo { margin: 0 18px 16px; }
 .rvGaveta:not(.rvGavetaAcao) { width: min(560px, 100%); }
@@ -3788,8 +3789,6 @@ a.rvContato:hover span { text-decoration: underline; }
 }
 .finCabFechar:hover { opacity: 1; background: rgb(255 255 255 / 0.1); }
 .rvAcompAcoes { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
-.dtTable tr.dtComAcoes td { padding-bottom: 2px; }
-.dtTable tbody tr.dtAcoesLinha td { border-top: none; padding: 0 12px 8px; }
 .rvSecBtnPerigo { color: #b91c1c; }
 
 /* Balão de confirmação acima do botão de decisão */
@@ -3832,6 +3831,7 @@ a.rvContato:hover span { text-decoration: underline; }
   display: inline-block; padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border);
   font-size: 11px; font-weight: 500; color: var(--l-muted-fg); white-space: nowrap;
 }
+.dtValorSob { display: block; margin-top: 4px; }
 .dtStatus_confirmada { color: oklch(0.5 0.1 178); border-color: color-mix(in oklch, oklch(0.5 0.1 178) 35%, transparent); }
 .dtStatus_solicitada { color: oklch(0.58 0.13 70); border-color: color-mix(in oklch, oklch(0.58 0.13 70) 35%, transparent); }
 .dtStatus_hospedado  { color: var(--l-fg); border-color: color-mix(in oklch, var(--l-fg) 30%, transparent); }
@@ -4022,15 +4022,15 @@ a.rvContato:hover span { text-decoration: underline; }
 .rvGavetaPag:has(.pagDetIcone) .rvPainelCorpo { flex: 0 1 auto; padding-bottom: 18px; }
 .rvGavetaPag:has(.pagDetIcone) .pagReciboLista:last-child > div:last-child { border-bottom: none; }
 /* Edição na gaveta: tudo em uma coluna */
-.rvGavetaAcao .detailTabContent { height: auto; max-height: none; overflow: visible; padding: 0; }
-.rvGavetaAcao .editDados { display: flex; flex-direction: column; gap: 14px; padding: 0 18px 18px; }
-.rvGavetaAcao .editFieldCap { max-width: none; }
-.rvGavetaAcao .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.rvGavetaAcao .editDatesGrid .dateCompact > div > div > input { flex: 1 1 auto; width: auto; min-width: 0; }
-.rvGavetaAcao .editObsGrow, .rvGavetaAcao .editObsGrow > div { display: block; }
-.rvGavetaAcao .editObsGrow textarea { width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box; }
-.rvGavetaAcao .editDadosCal > div:first-child { width: 100%; box-sizing: border-box; }
-.rvGavetaAcao .editCalLegend { grid-column: auto; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .detailTabContent { height: auto; max-height: none; overflow: visible; padding: 0; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDados { display: flex; flex-direction: column; gap: 14px; padding: 0 18px 18px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editFieldCap { max-width: none; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDatesGrid .dateCompact > div > div > input { flex: 1 1 auto; width: auto; min-width: 0; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editObsGrow, :is(.rvGavetaAcao, .rvEdicaoEmbutida) .editObsGrow > div { display: block; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editObsGrow textarea { width: 100%; min-height: 72px; resize: vertical; box-sizing: border-box; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDadosCal > div:first-child { width: 100%; box-sizing: border-box; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editCalLegend { grid-column: auto; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 
 /* ── Editar reserva: gaveta larga, a view fecha e o calendário vai para a direita ── */
 .slotDireita:has(.rvGavetaLarga) .rvGaveta:not(.rvGavetaAcao) { display: none !important; }
@@ -4049,8 +4049,8 @@ a.rvContato:hover span { text-decoration: underline; }
   .rvGavetaLarga .editDadosRoot { display: flex; flex-direction: column; }
   .rvGavetaLarga .editDados { display: flex; padding: 0; }
 }
-.rvGavetaAcao .editDatesGrid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.rvGavetaAcao .motivoTextarea { background: transparent; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDatesGrid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .motivoTextarea { background: transparent; }
 
 /* um dia a mais / a menos ao lado da data */
 .dataPasso { display: flex; align-items: center; gap: 6px; }
@@ -4065,8 +4065,8 @@ a.rvContato:hover span { text-decoration: underline; }
 .dataPassoBtn:hover:not(:disabled) { border-color: var(--l-primary); color: var(--l-primary); }
 .dataPassoBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
 .dataPassoBtn:disabled { opacity: .4; cursor: not-allowed; }
-.rvGavetaAcao .meiaDiariaBox { margin-top: -4px; }
-.rvGavetaAcao .meiaDiariaRow { flex-wrap: wrap; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .meiaDiariaBox { margin-top: -4px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .meiaDiariaRow { flex-wrap: wrap; }
 .rvGavetaLarga .editDadosCal > div:first-child { zoom: .88; }
 .rvGavetaLarga .editCalLegendItem { font-size: 10.5px; }
 .rvGavetaAcao.rvGavetaPag:has(.pagDetIcone) { width: min(300px, 100%); }
@@ -4111,24 +4111,24 @@ a.rvContato:hover span { text-decoration: underline; }
 
 /* ── Busca de hóspede dentro da gaveta de ação ─────────────────────────────── */
 /* A gaveta não tem padding no corpo: sem a margem negativa, a faixa ocupa a largura certa. */
-.rvGavetaAcao .gpSearchSticky {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gpSearchSticky {
   margin: 0; padding: 10px 18px;
   background: var(--l-card); border-bottom: 1px solid var(--border);
 }
-.rvGavetaAcao .hospSearchWrap {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .hospSearchWrap {
   min-height: 34px; padding: 0 6px 0 30px; flex-wrap: nowrap;
   border-radius: 3px; background: none;
 }
-.rvGavetaAcao .hospSearchWrap:focus-within { border-color: var(--l-primary); }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .hospSearchWrap:focus-within { border-color: var(--l-primary); }
 /* O campo interno não herda a caixa dos inputs da gaveta — a borda é a do wrapper. */
-.rvGavetaAcao .hospSearchWrap input.hospInlineInput {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .hospSearchWrap input.hospInlineInput {
   height: 32px; min-height: 0; padding: 0; border: none !important; border-radius: 0;
   background: transparent; box-shadow: none !important; font-size: 13px;
 }
 .rvGavetaEstreita .finResumoAcao { margin: 14px 18px 4px; }
 
 .gpBusca { margin-bottom: 10px; }
-.rvGavetaAcao .gpBusca .hospSearchWrap { background: none; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gpBusca .hospSearchWrap { background: none; }
 .finMudanca {
   display: flex; flex-direction: column; gap: 2px; padding: 8px 10px;
   border: 1px solid var(--border); border-left: 3px solid var(--tom); border-radius: 3px;
@@ -4143,8 +4143,8 @@ a.rvContato:hover span { text-decoration: underline; }
 .rvGavetaEstreita .dtTable th, .rvGavetaEstreita .dtTable td { padding-left: 8px; padding-right: 8px; }
 
 .gdCab { margin: 0; padding: 12px 18px; }
-.rvGavetaAcao .editDadosRoot { gap: 0; }
-.rvGavetaAcao .editDadosRoot > .editDados { padding-top: 16px; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDadosRoot { gap: 0; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .editDadosRoot > .editDados { padding-top: 16px; }
 .gdDiarias { padding: 14px 18px 18px; border-top: 1px solid var(--border); }
 .gdTotais { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
 .gdTotais .finLinha b, .gdTotais .finPendGrande > b { font-weight: 400; }
@@ -4159,17 +4159,17 @@ a.rvContato:hover span { text-decoration: underline; }
 @container direita (max-width: 899px) {
   .rvGavetaAcao.rvGavetaDiarias { width: min(448px, 100%); }
 }
-.rvGavetaDiarias .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.rvGavetaDiarias .editDatesGrid > .meiaDiariaBox { grid-column: 1 / -1; }
-.rvGavetaDiarias .dataPasso { gap: 4px; }
-.rvGavetaDiarias .dataPassoBtn { width: 28px; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .editDatesGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .editDatesGrid > .meiaDiariaBox { grid-column: 1 / -1; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .dataPasso { gap: 4px; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .dataPassoBtn { width: 28px; }
 .rvGavetaDiarias .finResumoAcao { margin: 14px 18px 0; }
 .gdAcaoCel { width: 1%; padding-left: 0 !important; text-align: right; }
 .gdAdicionar { display: flex; justify-content: flex-end; margin-top: 8px; }
 .rvSecBtn:disabled { opacity: .45; cursor: not-allowed; text-decoration: none; }
 /* Campos de período compactos */
-.rvGavetaDiarias .dateCompact input { height: 30px !important; min-height: 30px !important; padding: 4px 8px !important; font-size: 12.5px !important; }
-.rvGavetaDiarias .dataPassoBtn { width: 26px; height: 30px; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .dateCompact input { height: 30px !important; min-height: 30px !important; padding: 4px 8px !important; font-size: 12.5px !important; }
+:is(.rvGavetaDiarias, .rvEdicaoDiarias) .dataPassoBtn { width: 26px; height: 30px; }
 
 /* ── Reservas de hoje (esquerda) e linha do tempo das listas do dia ────────── */
 .sideHoje { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; }
@@ -4294,21 +4294,21 @@ a.rvContato:hover span { text-decoration: underline; }
 
 /* ── Gerenciar diárias: apartamento, check-in e check-out numa linha ───────── */
 .rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(540px, 100%); }
-.rvGavetaAcao .gdLinha {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha {
   display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 10px; align-items: end;
 }
 .gdLinha .editFieldCap { max-width: none; min-width: 0; }
-.rvGavetaAcao .gdLinha .editDatesGrid { display: contents; }
-.rvGavetaAcao .gdLinha .meiaDiariaBox { grid-column: 1 / -1; margin-top: 0; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha .editDatesGrid { display: contents; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha .meiaDiariaBox { grid-column: 1 / -1; margin-top: 0; }
 .gdLinha .editDatesGrid .dateCompact > div > div > input { flex: 1 1 auto; width: auto; min-width: 0; }
 .gdSazLista { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .gdSaz { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--l-muted-fg); }
 .gdSaz .dtTag { margin: 0; }
 /* Os três campos com a mesma largura e altura */
-.rvGavetaAcao .gdLinha { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.rvGavetaAcao .gdLinha .comboTrigger,
-.rvGavetaAcao .gdLinha .dateCompact > div > div {
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha .comboTrigger,
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha .dateCompact > div > div {
   height: 36px !important; min-height: 36px !important; box-sizing: border-box;
   padding-top: 0 !important; padding-bottom: 0 !important; border-radius: 3px !important;
 }
@@ -4358,7 +4358,7 @@ a.rvContato:hover span { text-decoration: underline; }
 .gdDiarias .dtTable td:nth-child(5), .gdDiarias .dtTable th:nth-child(5) { width: auto; padding-left: 8px !important; }
 /* Campos em cascata, um embaixo do outro */
 .rvGavetaAcao.rvGavetaNaView.rvGavetaDiarias { width: min(380px, 100%); }
-.rvGavetaAcao .gdLinha { grid-template-columns: minmax(0, 220px); align-items: start; }
+:is(.rvGavetaAcao, .rvEdicaoEmbutida) .gdLinha { grid-template-columns: minmax(0, 220px); align-items: start; }
 .gdDiarias .dtTable td:nth-child(2) { white-space: nowrap; }
 /* Gerenciar pagamentos: box 20% mais estreita que a view */
 .rvGavetaAcao.rvGavetaNaView.rvGavetaPagamentos { width: min(360px, 100%); }
@@ -4499,6 +4499,7 @@ a.rvContato:hover span { text-decoration: underline; }
 .periodoNomes { display: flex; flex-direction: column; gap: 2px; min-height: 22px; justify-content: center; }
 
 .rvGavetaGrupo { display: flex; flex-direction: column; }
+.rvGaveta.rvGavetaGrupo:not(.rvGavetaAcao) { width: min(480px, 100%); }
 .rvGavetaGrupo .rvPainelCorpo { flex: 1; min-height: 0; overflow-y: auto; }
 .rvGavetaGrupo .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
 
@@ -4514,7 +4515,7 @@ a.rvContato:hover span { text-decoration: underline; }
 
 /* Reserva aberta a partir do grupo: a view da reserva carrega ao lado do grupo */
 .slotDireita:has(.rvGavetaReserva) .rvGavetaLista.rvGavetaGrupo { display: flex; }
-.slotDireita:has(.rvGavetaGrupo):not(:has(.rvGavetaAcao:not(.rvGavetaDoGrupo))) .rvGavetaReserva:not(.rvGavetaAcao) { right: calc(min(560px, 100%) + 12px); }
+.slotDireita:has(.rvGavetaGrupo):not(:has(.rvGavetaAcao:not(.rvGavetaDoGrupo))) .rvGavetaReserva:not(.rvGavetaAcao) { right: calc(min(480px, 100%) + 12px); }
 .slotDireita:has(.rvGavetaDoGrupo) .rvGavetaReserva { display: none; }
 .slotDireita:has(.rvGavetaAcao:not(.rvGavetaDoGrupo)) .rvGavetaLista.rvGavetaGrupo { display: none; }
 @container direita (max-width: 1040px) {
@@ -4597,3 +4598,53 @@ a.rvContato:hover span { text-decoration: underline; }
 .rvGavetaComRodape .rvPainelRodape { padding: 12px 16px; border-top: 1px solid var(--border); background: var(--l-card); border-radius: 0 0 var(--l-r-xl) var(--l-r-xl); }
 .barEmpresa { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; opacity: 1; text-transform: uppercase; letter-spacing: .02em; }
 .barEmpresa svg { flex-shrink: 0; }
+
+/* Abas da view da reserva — mesmo desenho das abas da ficha de cadastro */
+.rvTabs {
+  display: flex; gap: 22px; overflow-x: auto;
+  padding: 14px 18px 0;
+  border-bottom: 1px solid var(--l-border, var(--border));
+  scrollbar-width: none;
+}
+.rvTab {
+  position: relative; flex-shrink: 0;
+  padding: 0 0 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; line-height: 20px; font-weight: 500;
+  color: var(--l-muted-fg);
+  transition: color .15s;
+}
+.rvTab:hover { color: var(--l-fg); }
+.rvTabAtiva { color: var(--l-fg); }
+.rvTabAtiva::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 2px; border-radius: 2px; background: var(--l-fg);
+}
+.rvTab:focus-visible { outline: 2px solid var(--l-ring, var(--l-primary)); outline-offset: 2px; border-radius: 4px; }
+.rvTabs + .rcSection { border-bottom: none; }
+
+/* Aba Resumo: pares "rótulo: valor", com o resumo financeiro abaixo */
+.rvKvCol { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.rvKvCol p { margin: 0; font-size: 13px; line-height: 20px; color: var(--l-muted-fg, var(--text-2)); overflow-wrap: anywhere; }
+.rvKvCol b { font-weight: 500; color: var(--l-fg, var(--text)); }
+.rvGaveta .rvResumoFin .finResumo { margin: 0 18px 14px; }
+/* Aba Hóspedes: lista simples, uma pessoa por linha */
+.rvHospLista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.rvHospItem { padding: 10px 2px; }
+.rvHospItem + .rvHospItem { border-top: 1px solid var(--border); }
+.rvHospLinha { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rvHospInfo { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rvHospNome { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 13px; font-weight: 500; color: var(--l-fg, var(--text)); overflow-wrap: anywhere; }
+.rvHospMeta { font-size: 12px; color: var(--l-muted-fg, var(--text-2)); font-variant-numeric: tabular-nums; }
+.rvHospAcoes { margin-top: 6px; display: flex; justify-content: flex-end; }
+.balaoContatos { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 10px; font-size: 12px; color: var(--l-muted-fg, var(--text-2)); overflow-wrap: anywhere; }
+.balaoContatos b { font-weight: 500; color: var(--l-fg, var(--text)); }
+/* Edição aberta dentro da aba da view */
+.rvEdicaoEmbutida { display: flex; flex-direction: column; min-width: 0; }
+.rvEdicaoDiarias { min-width: 0; }
+.rvHospTag {
+  padding: 0 5px; border: 1px solid currentColor; border-radius: 2px; background: none;
+  font-size: 10px; line-height: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--violet);
+}
+/* Diárias dentro da aba: apartamento, check-in e check-out na mesma linha */
+.rvEdicaoEmbutida.rvEdicaoDiarias .gdLinha { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
