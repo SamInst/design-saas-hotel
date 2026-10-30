@@ -1819,5 +1819,13 @@
   "Sem e-mail": "No email",
   "Sem telefone": "No phone",
   "Contatar": "Contact",
-  "+ Adicionar pagamento": "+ Add payment"
+  "+ Adicionar pagamento": "+ Add payment",
+  "Individual": "Single",
+  "Duplo": "Double",
+  "Triplo": "Triple",
+  "Quádruplo": "Quadruple",
+  "Quíntuplo": "Quintuple",
+  "Sêxtuplo": "Sextuple",
+  "Tipo de hospedagem": "Accommodation type",
+  "Informe o tipo de hospedagem do Ap. {{v0}}.": "Select the accommodation type for room {{v0}}."
 }

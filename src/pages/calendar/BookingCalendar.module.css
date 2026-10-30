@@ -4648,3 +4648,69 @@ a.rvContato:hover span { text-decoration: underline; }
 }
 /* Diárias dentro da aba: apartamento, check-in e check-out na mesma linha */
 .rvEdicaoEmbutida.rvEdicaoDiarias .gdLinha { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+
+.rvPeriodoCard {
+  border-radius: var(--l-r-lg, 10px); overflow: hidden;
+  background: var(--l-hero); color: var(--l-hero-fg);
+}
+.rvPeriodoDatas { display: flex; align-items: center; gap: 12px; padding: 14px 16px; }
+.rvPeriodoData { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.rvPeriodoDataFim { align-items: flex-end; text-align: right; }
+.rvPeriodoRot { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; line-height: 1.4; color: var(--l-hero-mut); }
+.rvPeriodoDia { font-size: 14px; font-weight: 500; line-height: 1.25; margin-top: 2px; color: var(--l-hero-fg); font-variant-numeric: tabular-nums; }
+.rvPeriodoSub { font-size: 12px; line-height: 1.33; color: var(--l-hero-mut); }
+.rvPeriodoSeta {
+  flex-shrink: 0; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%;
+  background: var(--l-hero-ln); color: var(--l-hero-fg);
+}
+.rvPeriodoInfos { display: flex; border-top: 1px solid var(--l-hero-ln); }
+.rvPeriodoInfo {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 8px; color: var(--l-hero-mut);
+}
+.rvPeriodoInfo + .rvPeriodoInfo { border-left: 1px solid var(--l-hero-ln); }
+.rvPeriodoInfo span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .025em; color: var(--l-hero-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rvPeriodoInfo svg { flex-shrink: 0; }
+.rvGaveta .rvPeriodoSecao { border-bottom: none; padding-bottom: 4px; }
+.criarTipoHosp { display: flex; align-items: center; gap: 12px; }
+.criarTipoHosp .rcSectionLabel { flex-shrink: 0; }
+.criarTipoHosp select { flex: 1; min-width: 0; max-width: 220px; margin-left: auto; }
+.criarTipoVazio { color: var(--l-muted-fg, var(--text-2)); }
+
+.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) {
+  & .rcTitle          { font-size: 20px; }
+  & .rcHeadMeta       { font-size: 12px; }
+  & .rcChip           { font-size: 12px; }
+  & .rvTab            { font-size: 14px; }
+  & .rcSectionLabel   { font-size: 14px; }
+  & .rvSecBtn         { font-size: 12px; }
+  & .rvKvCol p        { font-size: 14px; }
+  & .rvHospNome       { font-size: 14px; }
+  & .rvHospMeta       { font-size: 12px; }
+  & .rvHospTag        { font-size: 10px; }
+  & .finTit           { font-size: 14px; }
+  & .finLinha         { font-size: 14px; }
+  & .finSub           { font-size: 11px; }
+  & .finTotal, & .finTotal b { font-size: 14px; }
+  & .finTotal b       { font-size: 18px; }
+  & .finProgLeg       { font-size: 11px; }
+  & .finQuitado       { font-size: 14px; }
+  & .finPendGrande > span { font-size: 12px; }
+  & .finPendGrande > b    { font-size: 24px; }
+  & .finPgTit         { font-size: 14px; }
+  & .finPgTit span, & .finPgSub { font-size: 12px; }
+  & .finPgValor b     { font-size: 14px; }
+  & .finPgValor small { font-size: 11px; }
+  & .dtTable          { font-size: 14px; }
+  & .dtCelTit         { font-size: 14px; }
+  & .dtCelSub, & .dtDataHora small { font-size: 12px; }
+  & .rvObsText        { font-size: 14px; }
+  & .rvRodapeBtn      { font-size: 14px; height: 44px; }
+  & .rvRodapeMenu .rvAcoesItem { font-size: 14px; }
+}
+.hospRes { display: flex; flex-direction: column; gap: 12px; }
+.hospResGrupo { display: flex; flex-direction: column; gap: 8px; }
+.hospResTit { font-size: 12px; color: var(--l-muted-fg, var(--text-2)); }
+.hospResItem { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hospResNome { font-size: 14px; color: var(--l-fg, var(--text)); overflow-wrap: anywhere; }
+.hospResMeta { font-size: 12px; color: var(--l-muted-fg, var(--text-2)); font-variant-numeric: tabular-nums; }

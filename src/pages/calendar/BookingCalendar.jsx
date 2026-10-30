@@ -3,11 +3,11 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2,
+  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, Moon,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
-import { FormField, Input } from '../../components/ui/Input';
+import { FormField, Input, Select } from '../../components/ui/Input';
 import { DatePicker }    from '../../components/ui/DatePicker';
 import { TimePicker }    from '../../components/ui/TimePicker';
 import { Notification }  from '../../components/ui/Notification';
@@ -37,6 +37,12 @@ const toBrDate = (iso) => {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
+};
+const diaSemana = (iso) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  const w = new Date(y, m - 1, d).toLocaleDateString(locale(), { weekday: 'long' }).split('-')[0];
+  return w.charAt(0).toUpperCase() + w.slice(1);
 };
 
 // ─── Status mapping (backend enums → frontend keys) ───────────────────────────
@@ -115,6 +121,7 @@ export const normalizeReserva = (r) => {
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
     observacao:              r.observacao ?? null,
+    tipoHospedagem:          r.tipo_hospedagem ?? null,
     quantidadeAcompanhantes: Math.max(0, pessoas.length - 1),
     dataInicio:              parseBrDate(dataEntrada),
     dataFim:                 parseBrDate(dataSaida),
@@ -380,26 +387,24 @@ function TabelaPagamentosCriar({ lista, tiposPagamento, onRemover }) {
 // Hóspedes do resumo da criação: o titular numa tabela própria, acima dos acompanhantes.
 function HospedesResumo({ lista, rotuloTitular = tr('Titular') }) {
   const idade = (h) => { const a = calcAge(h.dataNascimento); return a == null ? null : tr('{{idade}} anos', { idade: a }); };
-  const tabela = (titulo, itens) => (
-    <div className={styles.dtScroll}>
-      <table className={[styles.dtTable, styles.hospTabela].join(' ')}>
-        <thead><tr><th>{titulo}</th><th>{tr('CPF')}</th><th className={styles.dtDir}>{tr('Idade')}</th></tr></thead>
-        <tbody>
-          {itens.map((h, i) => (
-            <tr key={h.id ?? i}>
-              <td className={styles.dtQuebra}><span className={styles.dtCelTit}>{h.nome}</span></td>
-              <td>{h.cpf ? fmtCpf(h.cpf) : '—'}</td>
-              <td className={styles.dtDir}>{idade(h) ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  const grupo = (titulo, itens) => (
+    <div className={styles.hospResGrupo}>
+      <span className={styles.hospResTit}>{titulo}</span>
+      {itens.map((h, i) => {
+        const meta = [h.cpf && fmtCpf(h.cpf), idade(h)].filter(Boolean).join(' · ');
+        return (
+          <div key={h.id ?? i} className={styles.hospResItem}>
+            <span className={styles.hospResNome}>{h.nome}</span>
+            {meta && <span className={styles.hospResMeta}>{meta}</span>}
+          </div>
+        );
+      })}
     </div>
   );
   return (
-    <div className={styles.hospTabelas}>
-      {tabela(rotuloTitular, lista.slice(0, 1))}
-      {lista.length > 1 && tabela(tr('Acompanhantes'), lista.slice(1))}
+    <div className={styles.hospRes}>
+      {grupo(rotuloTitular, lista.slice(0, 1))}
+      {lista.length > 1 && grupo(tr('Acompanhantes'), lista.slice(1))}
     </div>
   );
 }
@@ -495,6 +500,25 @@ const initials = (nome) => {
   if (p.length === 1) return p[0][0].toUpperCase();
   return (p[0][0] + p[p.length - 1][0]).toUpperCase();
 };
+
+const TIPOS_HOSPEDAGEM = [
+  ['INDIVIDUAL', tr('Individual')], ['CASAL', tr('Casal')], ['DUPLO', tr('Duplo')], ['TRIPLO', tr('Triplo')],
+  ['QUADRUPLO', tr('Quádruplo')], ['QUINTUPLO', tr('Quíntuplo')], ['SEXTUPLO', tr('Sêxtuplo')],
+];
+const TIPO_HOSPEDAGEM_LABEL = Object.fromEntries(TIPOS_HOSPEDAGEM);
+const TIPO_POR_PESSOAS = [null, 'INDIVIDUAL', 'DUPLO', 'TRIPLO', 'QUADRUPLO', 'QUINTUPLO', 'SEXTUPLO'];
+const sugerirTipo = (n) => (n > 0 ? TIPO_POR_PESSOAS[Math.min(n, 6)] : undefined);
+
+function TipoHospedagemSelect({ value, onChange }) {
+  return (
+    <FormField label={tr('Tipo de hospedagem')}>
+      <Select value={value ?? ''} className={!value ? styles.criarTipoVazio : ''} onChange={(e) => onChange(e.target.value || undefined)}>
+        <option value="">{tr('Selecione...')}</option>
+        {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </Select>
+    </FormField>
+  );
+}
 
 const STATUS_LABEL = {
   hospedado: tr('Hospedado'), confirmada: tr('Reservado'),
@@ -956,6 +980,10 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // ── Pending ops + dirty tracking ───────────────────────────────────────────
   // Each op: { type: 'addPessoa'|'removePessoa'|'addPagamento'|'cancelPagamento', ...data }
   const [pendingOps,   setPendingOps]   = useState([]);
+  const [editTipo,     setEditTipo]     = useState(reserva.tipoHospedagem ?? '');
+  const [editTipoManual, setEditTipoManual] = useState(
+    !!reserva.tipoHospedagem && reserva.tipoHospedagem !== sugerirTipo(reserva.hospedes?.length ?? 0),
+  );
   const [pagRegistrado, setPagRegistrado] = useState(null);
   const [hasChanges,   setHasChanges]   = useState(false);
   const [showDiscard,  setShowDiscard]  = useState(false);
@@ -982,6 +1010,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
   // ── Pessoas ────────────────────────────────────────────────────────────────
   const [pessoas,         setPessoas]         = useState(reserva.hospedes ?? []);
+  useEffect(() => {
+    if (!editTipoManual) setEditTipo(sugerirTipo(pessoas.length) ?? '');
+  }, [pessoas.length, editTipoManual]);
   const [pessoaQuery,     setPessoaQuery]     = useState('');
   const [pessoaResults,   setPessoaResults]   = useState([]);
   const [pessoaSearching, setPessoaSearching] = useState(false);
@@ -1352,6 +1383,14 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setHasChanges(false);
     setPessoas(reserva.hospedes ?? []);
     setPagamentos(reserva.pagamentos ?? []);
+    setEditTipo(reserva.tipoHospedagem ?? '');
+    setEditTipoManual(!!reserva.tipoHospedagem && reserva.tipoHospedagem !== sugerirTipo(reserva.hospedes?.length ?? 0));
+  };
+
+  const handleSetTipo = (tipo) => {
+    setEditTipo(tipo);
+    setEditTipoManual(!!tipo);
+    setHasChanges(true);
   };
 
   // ── Save all pending ops ────────────────────────────────────────────────────
@@ -1369,6 +1408,9 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       const titularOp = [...pendingOps].reverse().find((o) => o.type === 'setTitular');
       if (titularOp) await hospedagemApi.definirTitular(reserva.id, titularOp.pessoaId);
 
+      const tipoMudou = editActiveTab === 'pessoas' && editTipo && editTipo !== reserva.tipoHospedagem;
+      if (tipoMudou) await reservaApi.editar(reserva.id, { tipo_hospedagem: editTipo });
+
       // Payment ops (one at a time)
       const statusBackend = reserva.status === 'hospedado' ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA';
       for (const op of pendingOps) {
@@ -1385,7 +1427,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       setPendingOps([]);
       setHasChanges(false);
 
-      if (hasPessoaOps || hasPagOps) {
+      if (hasPessoaOps || hasPagOps || tipoMudou) {
         // Os endpoints de pessoas recalculam diárias/valor_total no backend (e removem o
         // desconto vigente); os de pagamento devolvem id real, data/hora e funcionário.
         // Nos dois casos re-buscamos a reserva para a view refletir o que foi gravado.
@@ -2284,6 +2326,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <div className={styles.pagEmpty}>{tr('Sem hóspedes vinculados')}</div>
                 ) : renderHospedes(lista, editavel && orcPessoas.length === 0 ? acoesPessoa : null)}
               </div>
+              {editavel && (
+                <div className={[styles.rcSection, styles.rcSectionNoLine, styles.criarTipoHosp].join(' ')}>
+                  <span className={styles.rcSectionLabel}>{tr('Tipo de hospedagem')}</span>
+                  <Select value={editTipo} className={!editTipo ? styles.criarTipoVazio : ''} onChange={(e) => handleSetTipo(e.target.value)}>
+                    <option value="">{tr('Selecione...')}</option>
+                    {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </Select>
+                </div>
+              )}
             </div>
 
             {dropdown}
@@ -2802,7 +2853,6 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 {reserva.status === 'cancelado' && (
                   <span className={[styles.rcChip, styles.rcChipRed].join(' ')}>{tr('Cancelada')}</span>
                 )}
-                {headChip && <span className={styles.rcChip}>{headChip}</span>}
               </div>
               {reserva.funcionario && (
                 <span className={styles.rcHeadMeta}>{tr('registrado por')} {reserva.funcionario}</span>
@@ -2817,22 +2867,30 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           </div>
 
           {/* ── Período — acima dos hóspedes, em linha cheia ── */}
-          <div className={[styles.rcSection, styles.rvDestaque].join(' ')}>
-            <div className={[styles.rcPeriodRow, styles.rvPeriodRowFull].join(' ')}>
-              <div className={styles.ovDateCell}>
-                <div className={styles.ovDateLabel}>{tr('Check-in')}</div>
-                <div className={styles.ovDateValue}>{toBrDate(reserva.dataInicio)}</div>
-                <div className={styles.ovDateTime}>{checkinTime}{tr('h')}</div>
+          <div className={[styles.rcSection, styles.rvPeriodoSecao].join(' ')}>
+            <div className={styles.rvPeriodoCard}>
+              <div className={styles.rvPeriodoDatas}>
+                <div className={styles.rvPeriodoData}>
+                  <span className={styles.rvPeriodoRot}>{tr('Check-in')}</span>
+                  <b className={styles.rvPeriodoDia}>{toBrDate(reserva.dataInicio)}</b>
+                  <span className={styles.rvPeriodoSub}>{diaSemana(reserva.dataInicio)} · {checkinTime}</span>
+                </div>
+                <span className={styles.rvPeriodoSeta}><ArrowRight size={16} /></span>
+                <div className={[styles.rvPeriodoData, styles.rvPeriodoDataFim].join(' ')}>
+                  <span className={styles.rvPeriodoRot}>{tr('Check-out')}</span>
+                  <b className={styles.rvPeriodoDia}>{toBrDate(reserva.dataFim)}</b>
+                  <span className={styles.rvPeriodoSub}>{diaSemana(reserva.dataFim)} · {checkoutTime}</span>
+                </div>
               </div>
-              <div className={styles.ovDateArrow}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-                </svg>
-              </div>
-              <div className={[styles.ovDateCell, styles.ovDateCellRight].join(' ')}>
-                <div className={styles.ovDateLabel}>{tr('Check-out')}</div>
-                <div className={styles.ovDateValue}>{toBrDate(reserva.dataFim)}</div>
-                <div className={styles.ovDateTime}>{checkoutTime}{tr('h')}</div>
+              <div className={styles.rvPeriodoInfos}>
+                <div className={styles.rvPeriodoInfo}><Moon size={14} /><span>{diariasTxt(dias)}</span></div>
+                {(() => {
+                  const n = guestList.length || 1 + (reserva.quantidadeAcompanhantes ?? 0);
+                  return <div className={styles.rvPeriodoInfo}><Users size={14} /><span>{n} {n === 1 ? tr('hóspede') : tr('hóspedes')}</span></div>;
+                })()}
+                {(reserva.tipoHospedagem || headChip) && (
+                  <div className={styles.rvPeriodoInfo}><BedDouble size={14} /><span>{TIPO_HOSPEDAGEM_LABEL[reserva.tipoHospedagem] ?? headChip}</span></div>
+                )}
               </div>
             </div>
           </div>
@@ -2849,7 +2907,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           </div>
 
           {edicao && abaAtiva === abaEdicao ? edicao.conteudo : (<>
-          {/* ── Resumo: pessoas e quantidade de diárias em "rótulo: valor", seguidas do resumo financeiro ── */}
+          {/* ── Resumo: pessoas em "rótulo: valor", seguidas do resumo financeiro ── */}
           {abaAtiva === 'resumo' && (
             <div className={styles.rcSection}>
               <div className={styles.rvKvCol}>
@@ -2858,11 +2916,25 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   : guestList.map((h, i) => (
                     <p key={h.id ?? i}><b>{i === 0 ? tr('Titular') : tr('Acompanhante')}:</b> {h.nome}</p>
                   ))}
-                <p><b>{tr('Diárias')}:</b> {dias}</p>
               </div>
             </div>
           )}
           {abaAtiva === 'resumo' && resumoFinEl && <div className={styles.rvResumoFin}>{resumoFinEl}</div>}
+          {abaAtiva === 'resumo' && reserva.status === 'cancelado' && reserva.motivoCancelamento && (
+            <div className={[styles.rcSection, styles.rvCancelSection].join(' ')}>
+              <div className={styles.rcSectionHead}>
+                <span className={[styles.rcSectionLabel, styles.rvCancelLabel].join(' ')}>
+                  <XCircle size={12} style={{ flexShrink: 0 }} /> {tr('Motivo do cancelamento')}
+                </span>
+              </div>
+              <div className={styles.rvObsText}>{reserva.motivoCancelamento}</div>
+              {(reserva.funcMotivo || reserva.dataMotivo) && (
+                <div className={styles.rvCancelMeta}>
+                  {[reserva.funcMotivo && `por ${reserva.funcMotivo}`, reserva.dataMotivo].filter(Boolean).join(' · ')}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Hóspedes ── */}
           {abaAtiva === 'hospedes' && (
@@ -5603,6 +5675,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const [mpRoomHospedes,    setMpRoomHospedes]    = useState({});
   const [mpRoomHospedesOrc, setMpRoomHospedesOrc] = useState({});
   const [editingPeriodoIdx, setEditingPeriodoIdx] = useState(null); // index of period being edited
+  const [mpRoomTipo,        setMpRoomTipo]        = useState({});
+  const [mpTipoManual,      setMpTipoManual]      = useState({});
 
   // Step 3: Pagamentos
 
@@ -5612,6 +5686,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const [showPagModal,   setShowPagModal]   = useState(false);
   const [showPagModalRoom, setShowPagModalRoom] = useState(null);   // quartoId for individual mode
   const [quartosObs,     setQuartosObs]     = useState({}); // { [quartoId]: string }
+  const [quartosTipo,    setQuartosTipo]    = useState({}); // { [quartoId]: TIPOS_HOSPEDAGEM }
+  const [tipoManual,     setTipoManual]     = useState({});
   const [saving,      setSaving]      = useState(false);
   const [precosCalc,       setPrecosCalc]       = useState({}); // { [`${quartoId}_${periodoIdx}`]: calcResponse }
   const [calcLoading,      setCalcLoading]      = useState(false);
@@ -5748,7 +5824,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
   const resetMpForm = () => {
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
-    setMpRoomHospedes({}); setMpRoomHospedesOrc({});
+    setMpRoomHospedes({}); setMpRoomHospedesOrc({}); setMpRoomTipo({}); setMpTipoManual({});
     setEditingPeriodoIdx(null);
   };
 
@@ -5758,6 +5834,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       rooms: [...mpRooms], checkin: mpCheckin, checkout: mpCheckout,
       roomHospedes:    { ...mpRoomHospedes },
       roomHospedesOrc: { ...mpRoomHospedesOrc },
+      roomTipo:        { ...mpRoomTipo },
     };
     if (editingPeriodoIdx !== null) {
       setPeriodos((ps) => ps.map((p, i) => i === editingPeriodoIdx ? entry : p));
@@ -5774,6 +5851,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     setMpCheckout(p.checkout instanceof Date ? p.checkout : new Date(p.checkout + 'T00:00:00'));
     setMpRoomHospedes({ ...(p.roomHospedes || {}) });
     setMpRoomHospedesOrc({ ...(p.roomHospedesOrc || {}) });
+    setMpRoomTipo({ ...(p.roomTipo || {}) });
+    setMpTipoManual(Object.fromEntries(p.rooms.map((q) => {
+      const n = (p.roomHospedes?.[q]?.length || 0) + (p.roomHospedesOrc?.[q]?.length || 0);
+      return [q, !!p.roomTipo?.[q] && p.roomTipo[q] !== sugerirTipo(n)];
+    })));
     setEditingPeriodoIdx(i);
   };
 
@@ -5791,9 +5873,33 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   // Reserva com mais de um apartamento precisa de um responsável pelo grupo.
   const totalAptosGrupo = periodoMode === 'unico' ? quartos.length : periodos.reduce((acc, pr) => acc + (pr.rooms?.length ?? 0), 0);
   const faltaResponsavel = !isOrcamento && !isSolicitacao && totalAptosGrupo > 1 && !grupoResponsavel.trim();
+  useEffect(() => {
+    setQuartosTipo((prev) => {
+      const next = { ...prev };
+      quartos.forEach((q) => {
+        if (!tipoManual[q]) next[q] = sugerirTipo((quartoHospedes[q]?.length || 0) + (quartoHospedesOrc[q]?.length || 0));
+      });
+      return next;
+    });
+  }, [quartos, quartoHospedes, quartoHospedesOrc, tipoManual]);
+
+  useEffect(() => {
+    setMpRoomTipo((prev) => {
+      const next = { ...prev };
+      mpRooms.forEach((q) => {
+        if (!mpTipoManual[q]) next[q] = sugerirTipo((mpRoomHospedes[q]?.length || 0) + (mpRoomHospedesOrc[q]?.length || 0));
+      });
+      return next;
+    });
+  }, [mpRooms, mpRoomHospedes, mpRoomHospedesOrc, mpTipoManual]);
+
+  const tipoDe = (q, pi) => (periodoMode === 'multiplos' ? periodos[pi]?.roomTipo?.[q] : quartosTipo[q]);
+  const hasTipoForAllRooms = periodoMode === 'unico'
+    ? quartos.every((q) => quartosTipo[q])
+    : periodos.every((pr, pi) => pr.rooms.every((q) => tipoDe(q, pi)));
   const canNext2 = periodoMode === 'unico'
-    ? quartos.length > 0 && checkinStr && checkoutStr && dias > 0 && hasGuestsForAllRooms && !semCadastroDraft
-    : periodos.length > 0 && !mpFormDirty && hasGuestsForAllRooms && !semCadastroDraft;
+    ? quartos.length > 0 && checkinStr && checkoutStr && dias > 0 && hasGuestsForAllRooms && hasTipoForAllRooms && !semCadastroDraft
+    : periodos.length > 0 && !mpFormDirty && hasGuestsForAllRooms && hasTipoForAllRooms && !semCadastroDraft;
 
   // Derived: all unique hospedes across all rooms/periods
   const allHospedes = useMemo(() => {
@@ -6041,6 +6147,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             })),
             ...(obs?.trim() ? { observacao: obs.trim() } : {}),
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
+            tipo_hospedagem:    tipoDe(quartoId, periodoIdx),
           };
         };
 
@@ -6085,6 +6192,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             data_hora_checkin:  `${toBrDate(dataEntrada)} ${ct.checkin}`,
             data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
             pessoas_orcamento:  pessoasOrc,
+            tipo_hospedagem:    tipoDe(quartoId, periodoIdx),
             ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
             ...(obs ? { observacao: obs } : {}),
           };
@@ -6151,6 +6259,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           status:             forcePernoite ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA',
           data_hora_checkin:  `${toBrDate(dataEntrada)} ${ciHora}`,
           data_hora_checkout: `${toBrDate(dataSaida)} ${ct.checkout}`,
+          tipo_hospedagem:    tipoDe(quartoId, periodoIdx),
           ...(horaMeia ? { hora_saida_meia_diaria: horaMeia } : {}),
           ...(valorTotal !== undefined ? { valor_total: valorTotal } : {}),
           ...(pessoasIds.length ? { pessoas: pessoasIds } : {}),
@@ -6376,6 +6485,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     value={quartoHospedesOrc[q] || []}
                     onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                     onDraftChange={setSemCadastroDraft} />
+                  <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
                 </div>
               ))}
             </>
@@ -6469,6 +6579,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       value={mpRoomHospedesOrc[q] || []}
                       onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                       onDraftChange={setSemCadastroDraft} />
+                    <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
@@ -6476,7 +6587,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     <Button variant="secondary" onClick={resetMpForm}>{tr('Cancelar')}</Button>
                   )}
                   <Button variant="primary"
-                    disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => !(mpRoomHospedesOrc[q]?.length > 0))}
+                    disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => !(mpRoomHospedesOrc[q]?.length > 0) || !mpRoomTipo[q])}
                     onClick={addPeriodo}>
                     {editingPeriodoIdx !== null ? <><Check size={13} /> {tr('Salvar Alterações')}</> : <><Plus size={13} /> {tr('Adicionar Período')}</>}
                   </Button>
@@ -6595,6 +6706,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       value={quartoHospedes[q] || []}
                       onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))} />
                   )}
+                  <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
                 </div>
               ))}
               {halfDailyMinCheckin && (
@@ -6711,13 +6823,14 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         value={mpRoomHospedes[q] || []}
                         onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))} />
                     )}
+                    <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
                   {editingPeriodoIdx !== null && (
                     <Button variant="secondary" onClick={resetMpForm}>{tr('Cancelar')}</Button>
                   )}
-                  <Button variant="primary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => isOrcSemCadastro ? !(mpRoomHospedesOrc[q]?.length > 0) : !(mpRoomHospedes[q]?.length > 0))} onClick={addPeriodo}>
+                  <Button variant="primary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => !mpRoomTipo[q] || (isOrcSemCadastro ? !(mpRoomHospedesOrc[q]?.length > 0) : !(mpRoomHospedes[q]?.length > 0)))} onClick={addPeriodo}>
                     {editingPeriodoIdx !== null ? <><Check size={13} /> {tr('Salvar Alterações')}</> : <><Plus size={13} /> {tr('Adicionar Período')}</>}
                   </Button>
                 </div>
