@@ -709,6 +709,7 @@ export default function RolePermissions() {
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             <div className={styles.listTopo}>
               <span className={styles.listTitulo}>{tr('Cargos')}</span>
               {!formModal && (
@@ -737,6 +738,8 @@ export default function RolePermissions() {
                 )}
             </div>
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loading ? tr('Carregando...') : totalElements !== 1 ? tr('{{n}} cargos', { n: totalElements }) : tr('{{n}} cargo', { n: totalElements })}
@@ -791,6 +794,7 @@ export default function RolePermissions() {
                 </button>
               </div>
             )}
+            </div>
           </aside>
 
           {/* ══ DIREITA: formulário ou ficha ══════ */}

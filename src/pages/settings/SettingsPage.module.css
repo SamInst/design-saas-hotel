@@ -152,3 +152,6 @@
 }
 .iconBtn:hover { background: var(--l-accent); color: oklch(0.55 0.2 25); }
 .formGridAdd > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+.page { overflow-y: auto; }
+.container { flex-shrink: 0; }

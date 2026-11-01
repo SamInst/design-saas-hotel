@@ -249,6 +249,11 @@ export const relatorioApi = {
     return request('/relatorio', { method: 'PUT', formData: fd });
   },
 
+  /** GET /relatorio/pagamento/{uuid} — lançamento do pagamento */
+  buscarPorPagamento(pagamentoId) {
+    return request(`/relatorio/pagamento/${pagamentoId}`);
+  },
+
   /** GET /relatorio/{id}/historico — histórico de alterações (quem alterou e o que mudou) */
   historico(id) {
     return request(`/relatorio/${id}/historico`);

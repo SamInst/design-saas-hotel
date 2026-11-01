@@ -1995,6 +1995,7 @@ export default function InventoryManagement() {
 
           {/* ══ LISTA — CATEGORIAS OU QUARTOS ═══════════════════ */}
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             {/* abas Categorias / Quartos e o cadastro de categoria ao lado */}
             <div className={styles.listTopo}>
               <div className={styles.segmented}>
@@ -2033,6 +2034,8 @@ export default function InventoryManagement() {
               )}
             </div>
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loading
@@ -2112,6 +2115,7 @@ export default function InventoryManagement() {
                   </button>
                 );
               })}
+            </div>
             </div>
           </aside>
 

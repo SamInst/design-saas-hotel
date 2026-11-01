@@ -975,6 +975,7 @@ export default function EmployeeManagement() {
           {/* ══ LISTA ═══════════════════════════════════════════ */}
           <div className={styles.listCol}>
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             <div className={styles.listTopo}>
               <span className={styles.listTitulo}>{tr('Funcionários')}</span>
               {!formAtivo && (
@@ -1047,6 +1048,8 @@ export default function EmployeeManagement() {
               </div>
             )}
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loading
@@ -1099,6 +1102,7 @@ export default function EmployeeManagement() {
                 </button>
               </div>
             )}
+            </div>
           </aside>
           </div>
 

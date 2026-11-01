@@ -872,3 +872,38 @@
 .dashNavBtn { width: auto; height: 100%; padding: 0 10px; border: none; border-radius: 0; background: transparent; color: var(--l-muted-fg); }
 .dashNavBtn:hover { background: color-mix(in oklch, var(--l-accent) 70%, transparent); color: var(--l-fg); }
 .dashNavRot { min-width: 130px; padding: 0 8px; font-size: 13px; font-weight: 600; text-transform: capitalize; }
+
+
+/* ── Box esquerda em duas caixas: topo grafite (botão, busca, filtros) e lista branca ── */
+.listPanel { padding: 0; gap: 12px; background: transparent; border: none; box-shadow: none; border-radius: 0; }
+.listTopoEscuro {
+  --te-bg: #2a2a2e; --te-campo: #34343a; --te-txt: #d9d9de; --te-mudo: #9a9aa3;
+  flex-shrink: 0; display: flex; flex-direction: column;
+  padding: 16px; border-radius: var(--l-r-xl); background: var(--te-bg); color: var(--te-txt);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+}
+.listCorpo {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  padding: 16px; border-radius: var(--l-r-xl); border: 1px solid var(--l-border);
+  background: var(--l-card); box-shadow: var(--l-shadow);
+}
+.listTopoEscuro .listTitulo { color: #fff; }
+.listTopoEscuro .segmented { background: var(--te-campo); border-color: transparent; }
+.listTopoEscuro .segmentedBtn { color: var(--te-mudo); }
+.listTopoEscuro .segmentedBtn:hover { color: #fff; }
+.listTopoEscuro .segmentedBtnActive, .listTopoEscuro .segmentedBtnActive:hover { color: var(--l-primary-fg); }
+.listTopoEscuro .searchInput {
+  background: var(--te-campo) !important; border-color: transparent !important; color: var(--te-txt) !important;
+}
+.listTopoEscuro .searchInput::placeholder { color: var(--te-mudo) !important; }
+.listTopoEscuro .searchInput:focus { border-color: #93c5fd !important; }
+.listTopoEscuro .searchIcon, .listTopoEscuro .searchClear, .listTopoEscuro .searchSpinner { color: var(--te-mudo); }
+.listTopoEscuro .searchClear:hover { color: #fff; }
+.listTopoEscuro .filterBtn { color: var(--te-mudo); border-radius: var(--l-r-lg); }
+.listTopoEscuro .filterBtn:hover { color: #fff; }
+.listTopoEscuro .filterBtnOn, .listTopoEscuro .filterBtnOn:hover { color: #93c5fd; }
+.listTopoEscuro .filterMenu, .listTopoEscuro .filtroPop { color: var(--l-fg); }
+@media (max-width: 1023px) {
+  .listPanel { padding: 0; }
+  .listTopoEscuro, .listCorpo { padding: 12px; }
+}

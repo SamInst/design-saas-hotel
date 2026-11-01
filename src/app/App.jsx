@@ -91,7 +91,7 @@ export default function App() {
       onToggleTheme={toggleTheme}
       onLogout={handleLogout}
     >
-      {PAGE_MAP[currentPage] ?? null}
+      {currentPage === 'settings' ? <SettingsPage isDark={isDark} onToggleTheme={toggleTheme} /> : (PAGE_MAP[currentPage] ?? null)}
     </AppLayout>
   );
 }

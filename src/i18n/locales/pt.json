@@ -61,5 +61,27 @@
   "settings.stone.saveError": "Erro ao salvar a integração Stone.",
   "settings.stone.testError": "Erro ao testar a conexão.",
   "settings.stone.addError": "Erro ao adicionar a maquininha.",
-  "settings.stone.removeError": "Erro ao remover a maquininha."
+  "settings.stone.removeError": "Erro ao remover a maquininha.",
+  "saída: {{hora}}": "saída: {{hora}}",
+  "Reserva Casal": "Reserva Casal",
+  "Reserva Dupla": "Reserva Dupla",
+  "Reserva Tripla": "Reserva Tripla",
+  "Reserva Quádrupla": "Reserva Quádrupla",
+  "Reserva Quíntupla": "Reserva Quíntupla",
+  "Reserva Sêxtupla": "Reserva Sêxtupla",
+  "Resumo de hoje": "Resumo de hoje",
+  "Resumo de {{dia}}": "Resumo de {{dia}}",
+  "quarto": "quarto",
+  "quartos": "quartos",
+  "+{{n}} mais": "+{{n}} mais",
+  "Entradas": "Entradas",
+  "Saídas": "Saídas",
+  "settings": {
+    "calendar": {
+      "title": "Visualização do calendário",
+      "description": "Escolha como as reservas aparecem na tela de reservas.",
+      "timeline": "Matriz (Quarto x dias da semana)",
+      "month": "Calendário do mês"
+    }
+  }
 }

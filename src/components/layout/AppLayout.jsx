@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import TopBar from './TopBar';
+import Sidebar from './Sidebar';
 import styles from './AppLayout.module.css';
 
 export default function AppLayout({ children, currentPage, onNavigate, ...topBarProps }) {
@@ -24,7 +25,13 @@ export default function AppLayout({ children, currentPage, onNavigate, ...topBar
 
   return (
     <div className={styles.shell}>
-      <TopBar currentPage={currentPage} onNavigate={onNavigate} {...topBarProps} />
+      <div className={styles.lateral}>
+        <Sidebar currentPage={currentPage} onNavigate={onNavigate} {...topBarProps} />
+      </div>
+      <div className={styles.coluna}>
+      <div className={styles.topoMobile}>
+        <TopBar currentPage={currentPage} onNavigate={onNavigate} {...topBarProps} />
+      </div>
 
       {/* key: refaz a animação a cada troca de tela */}
       <main key={currentPage} className={styles.main}>
@@ -37,6 +44,7 @@ export default function AppLayout({ children, currentPage, onNavigate, ...topBar
           </div>
         )}
       </main>
+      </div>
     </div>
   );
 }

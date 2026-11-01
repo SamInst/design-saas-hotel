@@ -62,3 +62,17 @@
     overflow-y: auto;
   }
 }
+
+/* Menu lateral no desktop; no celular fica a barra de topo */
+.shell { flex-direction: row; }
+.lateral { display: flex; min-height: 0; }
+.coluna { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.topoMobile { display: none; }
+@media (max-width: 600px) {
+  .lateral { display: none; }
+  .topoMobile { display: block; }
+}
+/* Barra no topo: o menu fica em cima do conteúdo */
+.shell { flex-direction: column; }
+.lateral { display: block; flex-shrink: 0; }
+@media (max-width: 600px) { .lateral { display: none; } }

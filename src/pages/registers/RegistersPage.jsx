@@ -2929,6 +2929,7 @@ export default function RegistersPage() {
             )}
 
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             {/* Hóspedes / Empresas — e o cadastro, que antes ficava na visão geral;
                 some quando o formulário já está aberto na direita */}
             <div className={styles.listTopo}>
@@ -3021,6 +3022,8 @@ export default function RegistersPage() {
               </div>
             )}
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loading
@@ -3101,6 +3104,7 @@ export default function RegistersPage() {
                 </button>
               </div>
             )}
+            </div>
           </aside>
           </div>
 

@@ -1866,6 +1866,7 @@ export default function PricingManagement() {
 
           {/* ══ LISTA ═══════════════════════════════════════════ */}
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             {/* abas Categorias / Sazonalidades e o cadastro da aba atual ao lado */}
             <div className={styles.listTopo}>
               <div className={styles.segmented}>
@@ -1904,6 +1905,8 @@ export default function PricingManagement() {
               )}
             </div>
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loading
@@ -1949,6 +1952,7 @@ export default function PricingManagement() {
                   </button>
                 );
               })}
+            </div>
             </div>
           </aside>
 

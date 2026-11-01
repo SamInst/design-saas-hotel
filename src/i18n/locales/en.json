@@ -1827,5 +1827,23 @@
   "Quíntuplo": "Quintuple",
   "Sêxtuplo": "Sextuple",
   "Tipo de hospedagem": "Accommodation type",
-  "Informe o tipo de hospedagem do Ap. {{v0}}.": "Select the accommodation type for room {{v0}}."
+  "Informe o tipo de hospedagem do Ap. {{v0}}.": "Select the accommodation type for room {{v0}}.",
+  "saída: {{hora}}": "out: {{hora}}",
+  "Reserva Casal": "Couple booking",
+  "Reserva Dupla": "Double booking",
+  "Reserva Tripla": "Triple booking",
+  "Reserva Quádrupla": "Quadruple booking",
+  "Reserva Quíntupla": "Quintuple booking",
+  "Reserva Sêxtupla": "Sextuple booking",
+  "Resumo de hoje": "Today's summary",
+  "Resumo de {{dia}}": "Summary for {{dia}}",
+  "+{{n}} mais": "+{{n}} more",
+  "settings": {
+    "calendar": {
+      "title": "Calendar view",
+      "description": "Choose how bookings appear on the bookings screen.",
+      "timeline": "Matrix (Room x weekdays)",
+      "month": "Month calendar"
+    }
+  }
 }

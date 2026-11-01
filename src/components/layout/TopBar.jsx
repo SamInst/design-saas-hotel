@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  CalendarDays, Wallet, Package, Tag, LogOut, Sun, Moon, ChevronDown,
+  CalendarDays, Wallet, Package, Tag, LogOut, ChevronDown,
   UserCog, Users, ShieldCheck, Building2, Settings,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -180,16 +180,6 @@ export default function TopBar({
               </div>
 
               <div className={styles.divider} />
-
-              <button
-                type="button"
-                role="menuitem"
-                className={styles.menuItem}
-                onClick={() => { setProfileOpen(false); onToggleTheme(); }}
-              >
-                <span className={styles.menuIcon}>{isDark ? <Sun size={17} /> : <Moon size={17} />}</span>
-                <span className={styles.menuLabel}>{isDark ? t('profile.lightMode') : t('profile.darkMode')}</span>
-              </button>
 
               <button
                 type="button"

@@ -1229,6 +1229,7 @@ export default function FinancialDashboard() {
 
           {/* ══ DIAS ═══════════════════════════════════════ */}
           <aside className={styles.listPanel}>
+            <div className={styles.listTopoEscuro}>
             {canNovoLancamento && (
               <div className={styles.novoRow}>
                 <Button className={[styles.btnSolid, styles.btnIn].join(' ')} onClick={openNovaReceita}>
@@ -1333,6 +1334,8 @@ export default function FinancialDashboard() {
               </div>
             )}
 
+            </div>
+            <div className={styles.listCorpo}>
             <div className={styles.listMeta}>
               <span>
                 {loadingData ? tr('Carregando...')
@@ -1392,6 +1395,7 @@ export default function FinancialDashboard() {
                   </button>
                 );
               })}
+            </div>
             </div>
           </aside>
 
