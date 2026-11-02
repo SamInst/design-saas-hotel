@@ -1844,6 +1844,14 @@
       "description": "Choose how bookings appear on the bookings screen.",
       "timeline": "Matrix (Room x weekdays)",
       "month": "Month calendar"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose how the system looks in this browser.",
+      "light": "Light",
+      "dark": "Dark",
+      "neon": "Dark blue neon"
     }
-  }
+  },
+  "Hospedar como empresa": "Book as company"
 }

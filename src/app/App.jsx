@@ -33,7 +33,7 @@ export default function App() {
   });
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { isDark, toggleTheme } = useTheme();
+  const { mode, setMode, isDark, toggleTheme } = useTheme();
   const { t } = useTranslation();
 
   // Salva a página atual no localStorage quando muda
@@ -91,7 +91,7 @@ export default function App() {
       onToggleTheme={toggleTheme}
       onLogout={handleLogout}
     >
-      {currentPage === 'settings' ? <SettingsPage isDark={isDark} onToggleTheme={toggleTheme} /> : (PAGE_MAP[currentPage] ?? null)}
+      {currentPage === 'settings' ? <SettingsPage tema={mode} onTema={setMode} /> : (PAGE_MAP[currentPage] ?? null)}
     </AppLayout>
   );
 }

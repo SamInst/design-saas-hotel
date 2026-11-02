@@ -155,3 +155,14 @@
 
 .page { overflow-y: auto; }
 .container { flex-shrink: 0; }
+
+/* Tema escuro grafite */
+[data-theme='dark'][data-tone='grafite'] .page {
+  --l-bg:        oklch(0.212 0.006 286);
+  --l-card:      oklch(0.271 0.006 286);
+  --l-fg:        oklch(0.984 0.006 286);
+  --l-muted-fg:  oklch(0.704 0.006 286);
+  --l-accent:    oklch(0.324 0.006 286);
+  --l-accent-fg: oklch(0.984 0.006 286);
+  --l-ring:      oklch(0.551 0.006 286);
+}

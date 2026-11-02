@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Languages, Check, Sun, Moon, Palette, CalendarDays, GanttChartSquare, CalendarRange } from 'lucide-react';
+import { Languages, Check, Sun, Moon, Sparkles, Palette, CalendarDays, GanttChartSquare, CalendarRange } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { LANGUAGES } from '../../i18n';
 import { usePermissions } from '../../hooks/usePermissions';
@@ -7,7 +7,7 @@ import { Notification } from '../../components/ui/Notification';
 import StoneIntegracao from './StoneIntegracao';
 import styles from './SettingsPage.module.css';
 
-export default function SettingsPage({ isDark = false, onToggleTheme }) {
+export default function SettingsPage({ tema = 'light', onTema }) {
   const { t, i18n } = useTranslation();
   const current = i18n.resolvedLanguage;
   const { hasTela } = usePermissions();
@@ -70,8 +70,8 @@ export default function SettingsPage({ isDark = false, onToggleTheme }) {
           </div>
 
           <div className={styles.options} role="radiogroup" aria-label={t('settings.theme.title', 'Tema')}>
-            {[[false, t('profile.lightMode'), Sun], [true, t('profile.darkMode'), Moon]].map(([escuro, label, Icone]) => {
-              const active = isDark === escuro;
+            {[['light', t('settings.theme.light', 'Claro'), Sun], ['dark', t('settings.theme.dark', 'Escuro'), Moon], ['neon', t('settings.theme.neon', 'Azul escuro neon'), Sparkles]].map(([modo, label, Icone]) => {
+              const active = tema === modo;
               return (
                 <button
                   key={label}
@@ -79,7 +79,7 @@ export default function SettingsPage({ isDark = false, onToggleTheme }) {
                   role="radio"
                   aria-checked={active}
                   className={[styles.option, active ? styles.optionActive : ''].join(' ')}
-                  onClick={() => { if (!active) onToggleTheme?.(); }}
+                  onClick={() => { if (!active) onTema?.(modo); }}
                 >
                   <span className={styles.flag} aria-hidden="true"><Icone size={18} /></span>
                   <span className={styles.optionLabel}>{label}</span>

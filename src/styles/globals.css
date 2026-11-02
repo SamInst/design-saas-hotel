@@ -77,3 +77,13 @@ body {
 :root[data-theme="dark"] .scrollbarThin::-webkit-scrollbar-thumb {
   background: rgba(100, 116, 139, 0.45);
 }
+
+/* Tema escuro grafite */
+/* ── DARK THEME ── */
+:root[data-theme="dark"][data-tone='grafite'] {
+  --bg:        #252529;
+  --surface:   #2a2a2e;
+  --surface-2: #2a2a2e;
+  --border:    #3e3e42;
+  --card-border: #3e3e42;
+}

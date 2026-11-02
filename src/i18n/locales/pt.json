@@ -82,6 +82,14 @@
       "description": "Escolha como as reservas aparecem na tela de reservas.",
       "timeline": "Matriz (Quarto x dias da semana)",
       "month": "Calendário do mês"
+    },
+    "theme": {
+      "title": "Tema",
+      "description": "Escolha a aparência do sistema neste navegador.",
+      "light": "Claro",
+      "dark": "Escuro",
+      "neon": "Azul escuro neon"
     }
-  }
+  },
+  "Hospedar como empresa": "Hospedar como empresa"
 }

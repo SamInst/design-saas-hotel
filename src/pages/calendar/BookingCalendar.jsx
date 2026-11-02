@@ -523,7 +523,17 @@ const rotuloReservaTipo = (tipo, pessoas) =>
   RESERVA_POR_TIPO[tipo] ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
 const sugerirTipo = (n) => (n > 0 ? TIPO_POR_PESSOAS[Math.min(n, 6)] : undefined);
 
-function TipoHospedagemSelect({ value, onChange }) {
+function TipoHospedagemSelect({ value, onChange, compacto = false }) {
+  if (compacto) {
+    return (
+      <Select value={value ?? ''} title={tr('Tipo de hospedagem')} aria-label={tr('Tipo de hospedagem')}
+        className={[styles.tipoCompacto, !value ? styles.criarTipoVazio : ''].join(' ')}
+        onChange={(e) => onChange(e.target.value || undefined)}>
+        <option value="">{tr('Tipo de hospedagem')}</option>
+        {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </Select>
+    );
+  }
   return (
     <FormField label={tr('Tipo de hospedagem')}>
       <Select value={value ?? ''} className={!value ? styles.criarTipoVazio : ''} onChange={(e) => onChange(e.target.value || undefined)}>
@@ -5454,16 +5464,23 @@ function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
 }
 
 // ─── Room Hospedes Picker ─────────────────────────────────────────────────────
-function RoomHospedesPicker({ value = [], onChange }) {
+function RoomHospedesPicker({ value = [], onChange, extra = null, empresaMode }) {
   const [search,        setSearch]        = useState('');
   const [results,       setResults]       = useState([]);
   const [searching,     setSearching]     = useState(false);
   const [dropStyle,     setDropStyle]     = useState({});
   const [pending,       setPending]       = useState(null); // { type:'pessoa'|'empresa', ... }
-  const [isEmpresaMode, setIsEmpresaMode] = useState(false);
+  const [modoInterno, setIsEmpresaMode] = useState(false);
+  const controlado    = empresaMode !== undefined;
+  const isEmpresaMode = controlado ? empresaMode : modoInterno;
   const inputRef = useRef(null);
   const wrapRef  = useRef(null);
   const dropRef  = useRef(null);
+
+  useEffect(() => {
+    if (controlado) { setSearch(''); setResults([]); setPending(null); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empresaMode]);
 
   const mapPessoa = (p) => ({
     id: p.id, nome: p.nome, cpf: p.cpf ?? '',
@@ -5727,10 +5744,13 @@ function RoomHospedesPicker({ value = [], onChange }) {
               placeholder={value.length === 0 ? (isEmpresaMode ? tr('Buscar empresa...') : tr('Buscar hóspede...')) : ''} />
           </div>
         </div>
-        <label className={styles.empresaModeToggle}>
-          <input type="checkbox" checked={isEmpresaMode} onChange={(e) => toggleEmpresaMode(e.target.checked)} />
-          <span>{tr('Empresa')}</span>
-        </label>
+        {extra}
+        {!controlado && (
+          <label className={styles.empresaModeToggle}>
+            <input type="checkbox" checked={isEmpresaMode} onChange={(e) => toggleEmpresaMode(e.target.checked)} />
+            <span>{tr('Empresa')}</span>
+          </label>
+        )}
       </div>
       {dropdown}
     </div>
@@ -5739,6 +5759,7 @@ function RoomHospedesPicker({ value = [], onChange }) {
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
 export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false, initialGrupo = null }) {
+  const [hospEmpresa, setHospEmpresa] = useState(false);
   const isSolicitacao = forceSolicitacao;
 
   const [step,             setStep]             = useState((!isSolicitacao && initialRoom) ? 2 : 1);
@@ -6463,7 +6484,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       <div className={styles.stepBar}>
         {STEPS.map((s, i) => (
           <div key={i} className={[styles.stepItem, step === i + 1 ? styles.stepActive : '', step > i + 1 ? styles.stepDone : ''].join(' ')}>
-            <div className={styles.stepDot}>{step > i + 1 ? '✓' : i + 1}</div>
+            <div className={styles.stepDot}>{step > i + 1 ? <Check size={12} strokeWidth={3.4} /> : i + 1}</div>
             <span className={styles.stepLabel}>{s}</span>
           </div>
         ))}
@@ -6815,6 +6836,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   disabled={!checkinStr || !checkoutStr}
                   loading={availLoading} />
               </FormField>
+              {!isOrcSemCadastro && (
+                <label className={[styles.empresaModeToggle, styles.empresaHospedar].join(' ')}>
+                  <input type="checkbox" checked={hospEmpresa} onChange={(e) => setHospEmpresa(e.target.checked)} />
+                  <span>{tr('Hospedar como empresa')}</span>
+                </label>
+              )}
               {/* Per-room hospedes */}
               {quartos.map((q) => (
                 <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
@@ -6829,9 +6856,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   ) : (
                     <RoomHospedesPicker
                       value={quartoHospedes[q] || []}
-                      onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))} />
+                      onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))}
+                      empresaMode={hospEmpresa}
+                      extra={<TipoHospedagemSelect compacto value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                   )}
-                  <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
+                  {isOrcSemCadastro && <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />}
                 </div>
               ))}
               {halfDailyMinCheckin && (
@@ -6934,6 +6963,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     disabled={!mpCheckin || !mpCheckout}
                     loading={mpAvailLoading} />
                 </FormField>
+                {!isOrcSemCadastro && (
+                  <label className={[styles.empresaModeToggle, styles.empresaHospedar].join(' ')}>
+                    <input type="checkbox" checked={hospEmpresa} onChange={(e) => setHospEmpresa(e.target.checked)} />
+                    <span>{tr('Hospedar como empresa')}</span>
+                  </label>
+                )}
                 {/* Per-room hospedes for this period */}
                 {mpRooms.map((q) => (
                   <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
@@ -6946,9 +6981,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     ) : (
                       <RoomHospedesPicker
                         value={mpRoomHospedes[q] || []}
-                        onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))} />
+                        onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))}
+                        empresaMode={hospEmpresa}
+                        extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                     )}
-                    <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
+                    {isOrcSemCadastro && <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />}
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
@@ -8444,7 +8481,7 @@ export default function BookingCalendar() {
                   { k: 'orc',    ic: <FileText size={16} />, rot: tr('Orçamentos'),   sub: tr('Propostas enviadas aos hóspedes'), on: () => setShowOrcamentos(true) },
                   { k: 'sol',    ic: <Bell size={16} />,     rot: tr('Solicitações'), sub: tr('Pedidos aguardando aprovação'),    on: () => setShowSolicitacoes(true), n: solicitadasCount },
                 ].map((s) => (
-                  <button key={s.k} type="button" className={styles.hdrServico} onClick={s.on} title={s.sub}>
+                  <button key={s.k} type="button" className={[styles.hdrServico, styles["hdrServico_" + s.k]].join(" ")} onClick={s.on} title={s.sub}>
                     {s.ic}
                     <span>{s.rot}</span>
                     {s.n > 0 && <span className={styles.sideBadge}>{s.n}</span>}
