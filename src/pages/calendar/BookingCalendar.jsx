@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, Moon,
+  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, Moon, DoorOpen, DoorClosed,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -599,8 +599,8 @@ function CalendarioMes({ base, reservas, todayStr, diaSel, onDia }) {
               </span>
               {(entradas > 0 || saidas > 0) && (
                 <span className={styles.mesMov}>
-                  {entradas > 0 && <span title={tr('Entradas')}>↓ {entradas}</span>}
-                  {saidas > 0 && <span title={tr('Saídas')}>↑ {saidas}</span>}
+                  {entradas > 0 && <span title={tr('Entradas')}><DoorOpen size={13} className={styles.mesMovIn} /> {entradas}</span>}
+                  {saidas > 0 && <span title={tr('Saídas')}><DoorClosed size={13} className={styles.mesMovOut} /> {saidas}</span>}
                 </span>
               )}
             </button>
@@ -3545,15 +3545,18 @@ function ResumoDia({ itens, loading, rotulo = null, compacto = false }) {
   );
 }
 
-function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
+function ListaDia({ dateStr, lista, loading, onSelectReserva, categorias = [] }) {
   if (loading) return <Esqueleto />;
-  if (lista.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
+  const ocupados = new Set(lista.map((r) => r.quarto));
+  const livres = categorias.flatMap((c) => (c.quartos || []).filter((q) => !ocupados.has(q)).map((q) => ({ q, cat: c.nome })));
+  if (lista.length === 0 && livres.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
 
   // Movimentações do dia: saídas (checkout no dia, até 12:00) e chegadas (checkin no dia, após 12:00)
   const secoes = [
     { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),          tom: 'Saida',   list: lista.filter((r) => r.dataFim === dateStr) },
     { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'), tom: 'Chegada', list: lista.filter((r) => r.dataInicio === dateStr) },
     { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),  tom: 'Fica',    list: lista.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr) },
+    { key: 'livres',     label: tr('Quartos livres'), sub: tr('sem reserva no dia'), tom: 'Livre', list: livres, livre: true },
   ].filter((s) => s.list.length > 0);
 
   return (
@@ -3566,7 +3569,17 @@ function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
             <span className={styles.lstSecaoSub}>{sec.sub}</span>
             <span className={styles.lstQtd}>{sec.list.length}</span>
           </div>
-          {sec.list.map((r) => (
+          {sec.livre ? (
+            <div className={styles.lstItem}>
+              <div className={styles.lstLivres}>
+                {sec.list.map(({ q, cat }) => (
+                  <span key={q} className={styles.lstLivre} title={cat || undefined}>
+                    <BedDouble size={12} /> {fmtRoom(q)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : sec.list.map((r) => (
             <div key={r.id} className={styles.lstItem}>
               <LinhaReserva r={r} onClick={() => onSelectReserva(r)} />
             </div>
@@ -3620,7 +3633,7 @@ function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserv
       <Janela open onClose={onClose} hideHeader>
         <TopoDiscreto titulo={<>{tr('Reservas')} {fmtDateBR(dateStr)}</>} sub={cap} onClose={onClose} />
         <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
-        <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} />
+        <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} />
       </Janela>
     );
   }
@@ -3633,7 +3646,7 @@ function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserv
         <span className={styles.lstDiaSemana}>{cap}</span>
       </div>
       <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
-      <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} />
+      <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} />
     </Janela>
   );
 }
@@ -8421,7 +8434,7 @@ export default function BookingCalendar() {
                   <div className={styles.sideHoje}>
                     <ResumoDia itens={resumoDoDia(diaHoje.lista, categorias)} loading={diaHoje.loading} />
                     <ListaDia dateStr={todayStr} lista={diaHoje.lista} loading={diaHoje.loading}
-                      onSelectReserva={(r) => setSelectedReserva(r)} />
+                      onSelectReserva={(r) => setSelectedReserva(r)} categorias={categorias} />
                   </div>
                 </div>
                 )}

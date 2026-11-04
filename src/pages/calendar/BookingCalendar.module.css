@@ -4184,6 +4184,14 @@ a.rvContato:hover span { text-decoration: underline; }
 .lstTomSaida   { --dot: oklch(0.65 0.16 50); }
 .lstTomChegada { --dot: oklch(0.6 0.13 158); }
 .lstTomFica    { --dot: var(--l-muted-fg); }
+.lstTomLivre   { --dot: oklch(0.6 0.12 250); }
+.lstDotLivre   { background: oklch(0.6 0.12 250); }
+.lstLivres { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 10px 6px 0; }
+.lstLivre {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 500; color: var(--l-fg);
+  background: color-mix(in oklch, oklch(0.6 0.12 250) 12%, transparent);
+}
 .lstItem { position: relative; padding-left: 16px; }
 .lstItem::before {
   content: ''; position: absolute; left: 9px; top: 50%; z-index: 1;
@@ -4960,6 +4968,9 @@ a.rvContato:hover span { text-decoration: underline; }
 .mesItem_orcamento  { background: oklch(0.94 0.03 264); color: oklch(0.4 0.08 264); }
 .mesMais { font-size: 11px; color: var(--text-2); padding-left: 6px; }
 .mesMov { margin-top: auto; display: flex; gap: 8px; font-size: 11px; color: var(--text-2); }
+.mesMov > span { display: inline-flex; align-items: center; gap: 3px; }
+.mesMovIn  { color: #16a34a; }
+.mesMovOut { color: #dc2626; }
 [data-theme='dark'] .mesItem { background: color-mix(in oklch, oklch(0.7 0.08 178) 22%, transparent); color: var(--text); }
 [data-theme='dark'] .mesItem_hospedado  { background: color-mix(in oklch, oklch(0.7 0.12 150) 22%, transparent); }
 [data-theme='dark'] .mesItem_solicitada { background: color-mix(in oklch, oklch(0.75 0.12 80) 22%, transparent); }

@@ -88,7 +88,7 @@ export default function LoginPage({ onLogin }) {
       });
     } catch (err) {
       if (err.status === 401 || err.status === 403) {
-        setError(t('login.errors.invalid'));
+        setError(err.message && !/credenciais/i.test(err.message) ? err.message : t('login.errors.invalid'));
       } else if (err.status === 0 || !err.status) {
         setError(t('login.errors.network'));
       } else {

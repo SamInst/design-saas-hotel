@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/layout/AppLayout';
 import LoginPage from '../pages/LoginPage';
 import { useTheme } from '../hooks/useTheme';
-import { userStorage, tokenStorage, authApi } from '../services/api';
+import { userStorage, tokenStorage, contextoStorage, authApi } from '../services/api';
+import SistemaApp from '../pages/sistema/SistemaApp';
 
 import FinancialDashboard  from '../pages/financial/FinancialDashboard';
 import RegistersPage       from '../pages/registers/RegistersPage';
@@ -28,6 +29,11 @@ const PAGE_MAP = {
 };
 
 export default function App() {
+  if (window.location.pathname.startsWith('/sistema')) return <SistemaApp />;
+  return <HotelApp />;
+}
+
+function HotelApp() {
   const [currentPage, setCurrentPage] = useState(() => {
     return localStorage.getItem('currentPage') || 'financial';
   });
@@ -50,6 +56,7 @@ export default function App() {
       // Valida se a sessão ainda está ativa no backend
       if (authApi.isAuthenticated()) {
         setUser(storedUser);
+        if (!contextoStorage.get()) authApi.carregarContexto().catch(() => {});
       } else {
         // Token expirou ou é inválido, limpa o storage
         authApi.logout();

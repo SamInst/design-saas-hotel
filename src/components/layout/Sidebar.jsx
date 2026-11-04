@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   CalendarDays, Wallet, Package, Tag, LogOut, MoreVertical,
-  UserCog, Users, ShieldCheck, Building2, Settings, ChevronsLeft, ChevronsRight, Hotel,
+  UserCog, Users, ShieldCheck, Building2, Settings, ChevronsLeft, ChevronsRight, Hotel, ChevronDown, Check, Loader2,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import styles from './Sidebar.module.css';
 import { usePermissions } from '../../hooks/usePermissions';
-import { NOME_HOTEL } from '../../constants/hotel';
+import { authApi } from '../../services/api';
 
 const NAV_ITEMS = [
   { id: 'reception',   label: 'nav.reception',   icon: Building2,    tela: 'DASHBOARD' },
@@ -25,8 +25,36 @@ const gravarRecolhido = (v) => { try { localStorage.setItem('sidebar:recolhido',
 
 export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
   const { t } = useTranslation();
-  const { hasTela, loggedUser } = usePermissions();
-  const isAdmin = hasTela('ADMIN');
+  const { hasTela, loggedUser, contexto } = usePermissions();
+  const hoteis = contexto?.hoteis ?? [];
+  const hotelAtual = contexto?.hotel;
+  const podeTrocar = hoteis.length > 1;
+  const [hoteisAberto, setHoteisAberto] = useState(false);
+  const [trocando, setTrocando] = useState(null);
+  const [erroTroca, setErroTroca] = useState('');
+  const hotelRef = useRef(null);
+
+  useEffect(() => {
+    if (!hoteisAberto) return undefined;
+    const fora  = (e) => { if (hotelRef.current && !hotelRef.current.contains(e.target)) setHoteisAberto(false); };
+    const tecla = (e) => { if (e.key === 'Escape') setHoteisAberto(false); };
+    document.addEventListener('mousedown', fora);
+    document.addEventListener('keydown', tecla);
+    return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', tecla); };
+  }, [hoteisAberto]);
+
+  const trocarHotel = async (id) => {
+    if (id === hotelAtual?.id || trocando) return;
+    setTrocando(id);
+    setErroTroca('');
+    try {
+      await authApi.trocarHotel(id);
+      window.location.reload();
+    } catch (err) {
+      setErroTroca(err.message);
+      setTrocando(null);
+    }
+  };
 
   const [recolhido, setRecolhido] = useState(lerRecolhido);
   const [contaAberta, setContaAberta] = useState(false);
@@ -49,7 +77,7 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
   const cargo   = loggedUser?.cargo?.descricao ?? user?.role ?? t('profile.defaultRole');
   const iniciais = parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (nome.charAt(0) || 'U').toUpperCase();
 
-  const permitidos = NAV_ITEMS.filter((i) => isAdmin || hasTela(i.tela));
+  const permitidos = NAV_ITEMS.filter((i) => hasTela(i.tela));
   const visiveis = [...permitidos.filter((i) => i.id === currentPage), ...permitidos.filter((i) => i.id !== currentPage)];
 
   const go = (id) => onNavigate(id);
@@ -69,7 +97,35 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
     <aside className={[styles.sidebar, recolhido ? styles.recolhido : ''].join(' ')} aria-label={t('nav.menu')} role="navigation">
       <div className={styles.topo}>
         <span className={styles.logo}><Hotel size={18} strokeWidth={2} /></span>
-        <span className={styles.marca}>{NOME_HOTEL}</span>
+        <div className={styles.hotel} ref={hotelRef}>
+          {podeTrocar ? (
+            <button type="button" className={[styles.marca, styles.marcaBotao].join(' ')}
+              onClick={() => setHoteisAberto((v) => !v)} aria-haspopup="menu" aria-expanded={hoteisAberto}
+              title={t('nav.switchHotel', 'Trocar de hotel')}>
+              <span className={styles.marcaTxt}>{hotelAtual?.nome}</span>
+              <ChevronDown size={14} className={hoteisAberto ? styles.marcaSetaAberta : ''} />
+            </button>
+          ) : (
+            <span className={styles.marca}>{hotelAtual?.nome ?? ''}</span>
+          )}
+          {hoteisAberto && (
+            <div className={styles.hoteisMenu} role="menu">
+              {hoteis.map((h) => (
+                <button key={h.id} type="button" role="menuitemradio" aria-checked={h.id === hotelAtual?.id}
+                  className={[styles.hotelOpcao, h.id === hotelAtual?.id ? styles.hotelOpcaoAtual : ''].join(' ')}
+                  onClick={() => trocarHotel(h.id)} disabled={!!trocando}>
+                  <Hotel size={14} />
+                  <span className={styles.hotelOpcaoTxt}>
+                    <b>{h.nome}</b>
+                    {h.redeNome && <small>{h.redeNome}</small>}
+                  </span>
+                  {trocando === h.id ? <Loader2 size={14} className={styles.girando} /> : h.id === hotelAtual?.id ? <Check size={14} /> : null}
+                </button>
+              ))}
+              {erroTroca && <p className={styles.hotelErro}>{erroTroca}</p>}
+            </div>
+          )}
+        </div>
         <button type="button" className={styles.recolher} onClick={alterna}
           aria-label={recolhido ? t('nav.expand', 'Expandir menu') : t('nav.collapse', 'Recolher menu')}
           title={recolhido ? t('nav.expand', 'Expandir menu') : t('nav.collapse', 'Recolher menu')}>

@@ -1,5 +1,6 @@
-import { useMemo } from 'react';
-import { userStorage } from '../services/api';
+
+import { useEffect, useMemo, useState } from 'react';
+import { userStorage, contextoStorage } from '../services/api';
 
 /**
  * Hook global de permissões.
@@ -20,8 +21,21 @@ import { userStorage } from '../services/api';
 
 const norm = s => (s ?? '').trim().toUpperCase();
 
+export function useContextoHotel() {
+  const [ctx, setCtx] = useState(contextoStorage.get);
+  useEffect(() => {
+    const atualiza = () => setCtx(contextoStorage.get());
+    window.addEventListener('hotel:contexto', atualiza);
+    return () => window.removeEventListener('hotel:contexto', atualiza);
+  }, []);
+  return ctx;
+}
+
 export function usePermissions() {
   const rawUser = userStorage.get();
+  const contexto = useContextoHotel();
+  const telasPlano = useMemo(() => (contexto?.telas ? new Set(contexto.telas.map(norm)) : null), [contexto]);
+  const noPlano = (nome) => norm(nome) === 'ADMIN' || !telasPlano || telasPlano.has(norm(nome));
 
   const { telaMap, isAdmin } = useMemo(() => {
     const telas = rawUser?.cargo?.telas ?? [];
@@ -36,13 +50,14 @@ export function usePermissions() {
   }, [rawUser?.id, rawUser?.cargo?.id, JSON.stringify(rawUser?.cargo?.telas)]);
 
   /** Verifica se o usuário tem acesso à tela (independente de permissão). */
-  const hasTela = (nome) => isAdmin || !!telaMap[norm(nome)];
+  const hasTela = (nome) => noPlano(nome) && (isAdmin || !!telaMap[norm(nome)]);
 
   /**
    * Verifica se o usuário pode executar uma ação na tela.
    * ACESSO TOTAL na tela libera qualquer permissão.
    */
   const can = (tela, permissao) => {
+    if (!noPlano(tela)) return false;
     if (isAdmin) return true;
     const set = telaMap[norm(tela)];
     if (!set) return false;
@@ -52,6 +67,8 @@ export function usePermissions() {
   return {
     can,
     hasTela,
+    noPlano,
+    contexto,
     loggedUser: rawUser,
   };
 }

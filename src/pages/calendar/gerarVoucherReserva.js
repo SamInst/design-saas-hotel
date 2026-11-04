@@ -1,4 +1,4 @@
-import { NOME_HOTEL } from '../../constants/hotel';
+import { nomeHotel } from '../../constants/hotel';
 import { tr, locale } from '../../i18n';
 
 // Prefixo da linha de observação gerada ao ajustar o preço ("Gerenciar Preços").
@@ -272,7 +272,7 @@ export const gerarVoucherReserva = ({ tipo, periodoMode, displayPeriodos, precos
 </head><body>
 <div class="page">
   <div class="doc-header">
-    <div class="doc-title">${NOME_HOTEL} &nbsp;|&nbsp; ${headerTitle}</div>
+    <div class="doc-title">${nomeHotel()} &nbsp;|&nbsp; ${headerTitle}</div>
     <div class="doc-sub">${tr('Gerado em {{data}}', { data: new Date().toLocaleDateString(locale(), { day: '2-digit', month: 'long', year: 'numeric' }) })}${userName ? ` ${tr('por {{nome}}', { nome: userName })}` : ''}</div>
     <div class="info-grid"${titularNome ? ' style="grid-template-columns:repeat(3,1fr)"' : ''}>
       ${titularNome ? `<div class="info-item"><label>${tr('Responsável')}</label><span>${titularNome}</span></div>` : ''}

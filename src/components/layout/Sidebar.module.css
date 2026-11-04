@@ -185,3 +185,35 @@
 :root:not([data-theme='dark']) .logo { background: #e8effc; }
 :root:not([data-theme='dark']) .dica { background: #1f2329; color: #fff; }
 :root:not([data-theme='dark']) .avatar { color: #fff; }
+
+.hotel { position: relative; display: flex; align-items: center; min-width: 0; }
+.marcaBotao {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; margin: -4px -8px;
+  border: none; border-radius: 7px; background: transparent; font: inherit; font-size: 15px; font-weight: 600;
+  color: var(--sb-forte); cursor: pointer;
+}
+.marcaBotao:hover { background: var(--sb-hover); }
+.marcaTxt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marcaBotao svg { flex-shrink: 0; color: var(--sb-mudo); transition: transform 0.15s ease; }
+.marcaSetaAberta { transform: rotate(180deg); }
+.hoteisMenu {
+  position: absolute; left: -8px; top: calc(100% + 10px); min-width: 240px; max-height: 360px; overflow-y: auto;
+  padding: 4px; border-radius: 10px; background: var(--sb-bg); border: 1px solid var(--sb-linha);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3); z-index: 70;
+}
+.hotelOpcao {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 38px; padding: 6px 10px;
+  border: none; border-radius: 7px; background: none; color: var(--sb-forte); font: inherit; font-size: 13px;
+  text-align: left; cursor: pointer;
+}
+.hotelOpcao:hover:not(:disabled) { background: var(--sb-hover); }
+.hotelOpcao:disabled { cursor: progress; }
+.hotelOpcao > svg:first-child { color: var(--sb-mudo); flex-shrink: 0; }
+.hotelOpcaoAtual { background: var(--sb-hover); }
+.hotelOpcaoTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hotelOpcaoTxt b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hotelOpcaoTxt small { font-size: 11px; color: var(--sb-mudo); }
+.hotelErro { margin: 4px 8px 6px; font-size: 12px; color: #fca5a5; }
+.girando { animation: sbGira 0.9s linear infinite; }
+@keyframes sbGira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .girando { animation: none; } .marcaBotao svg { transition: none; } }

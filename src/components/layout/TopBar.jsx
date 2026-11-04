@@ -85,7 +85,7 @@ export default function TopBar({
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : (displayName.charAt(0) || 'U').toUpperCase();
 
-  const visibleItems = NAV_ITEMS.filter((item) => isAdmin || hasTela(item.tela));
+  const visibleItems = NAV_ITEMS.filter((item) => hasTela(item.tela));
 
   // Se a página atual não está acessível, redireciona para a primeira disponível
   const firstAvailable = visibleItems[0]?.id;

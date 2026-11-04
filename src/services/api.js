@@ -9,6 +9,8 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 // ── Chaves do localStorage ────────────────────────────────────
 const TOKEN_KEY   = 'hotel_token';
 const USER_KEY    = 'hotel_user';
+const CONTEXTO_KEY = 'hotel_contexto';
+const SISTEMA_TOKEN_KEY = 'sistema_token';
 
 // ─────────────────────────────────────────────────────────────
 //  TOKEN HELPERS
@@ -17,6 +19,18 @@ export const tokenStorage = {
   get:    ()        => localStorage.getItem(TOKEN_KEY),
   set:    (token)   => localStorage.setItem(TOKEN_KEY, token),
   remove: ()        => localStorage.removeItem(TOKEN_KEY),
+};
+
+export const contextoStorage = {
+  get:    ()      => { try { return JSON.parse(localStorage.getItem(CONTEXTO_KEY)); } catch { return null; } },
+  set:    (ctx)   => { localStorage.setItem(CONTEXTO_KEY, JSON.stringify(ctx)); window.dispatchEvent(new Event('hotel:contexto')); },
+  remove: ()      => localStorage.removeItem(CONTEXTO_KEY),
+};
+
+export const sistemaTokenStorage = {
+  get:    ()      => { try { return sessionStorage.getItem(SISTEMA_TOKEN_KEY); } catch { return null; } },
+  set:    (token) => { try { sessionStorage.setItem(SISTEMA_TOKEN_KEY, token); } catch { /* sem storage */ } },
+  remove: ()      => { try { sessionStorage.removeItem(SISTEMA_TOKEN_KEY); } catch { /* sem storage */ } },
 };
 
 export const userStorage = {
@@ -131,6 +145,7 @@ async function request(path, { method = 'GET', body, headers = {}, params, formD
     if (res.status === 401) {
       tokenStorage.remove();
       userStorage.remove();
+      contextoStorage.remove();
       window.dispatchEvent(new Event('auth:unauthorized'));
     }
 
@@ -166,7 +181,7 @@ export const authApi = {
     try { data = await res.json(); } catch { data = null; }
 
     if (!res.ok) {
-      const message = data?.message || data?.error || tr('Usuário ou senha inválidos');
+      const message = data?.mensagem || data?.message || data?.error || tr('Usuário ou senha inválidos');
       const err = new Error(message);
       err.status = res.status;
       throw err;
@@ -186,13 +201,32 @@ export const authApi = {
 
     tokenStorage.set(token);
     userStorage.set(funcionario);
+    await this.carregarContexto();
 
     return { token, user: funcionario };
+  },
+
+  async carregarContexto() {
+    const ctx = await request('/auth/contexto');
+    contextoStorage.set(ctx);
+    return ctx;
+  },
+
+  async trocarHotel(hotelId) {
+    const data = await request('/auth/trocar-hotel', { method: 'POST', body: { hotelId } });
+    const token = data?.token;
+    if (!token) throw new Error(tr('Token não recebido do servidor'));
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    tokenStorage.set(token);
+    userStorage.set(payload.funcionario);
+    await this.carregarContexto();
+    return payload.funcionario;
   },
 
   logout() {
     tokenStorage.remove();
     userStorage.remove();
+    contextoStorage.remove();
   },
 
   isAuthenticated() {
@@ -1052,4 +1086,71 @@ export default {
   cargo:       cargoApi,
   permissao:   permissaoApi,
   dashboard:   dashboardApi,
+};
+// ─────────────────────────────────────────────────────────────
+//  SISTEMA (administração da plataforma)
+// ─────────────────────────────────────────────────────────────
+async function sistemaRequest(path, { method = 'GET', body, params } = {}) {
+  let url = `${BASE_URL}/sistema${path}`;
+  if (params) {
+    const qs = new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')),
+    ).toString();
+    if (qs) url += `?${qs}`;
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  const token = sistemaTokenStorage.get();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+  if (res.status === 204) return null;
+  let data;
+  try { data = await res.json(); } catch { data = null; }
+  if (!res.ok) {
+    if (res.status === 401 && path !== '/auth/login') {
+      sistemaTokenStorage.remove();
+      window.dispatchEvent(new Event('sistema:unauthorized'));
+    }
+    const err = new Error(data?.mensagem || data?.message || data?.error || tr('Erro {{status}}', { status: res.status }));
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+export const sistemaApi = {
+  async login(email, senha) {
+    const data = await sistemaRequest('/auth/login', { method: 'POST', body: { email, senha } });
+    sistemaTokenStorage.set(data.token);
+    return data;
+  },
+  logout: () => sistemaTokenStorage.remove(),
+  autenticado: () => !!sistemaTokenStorage.get(),
+  eu: () => sistemaRequest('/auth/eu'),
+  dashboard: () => sistemaRequest('/dashboard'),
+  hoteis: () => sistemaRequest('/hoteis'),
+  hotel: (id) => sistemaRequest(`/hoteis/${id}`),
+  criarHotel: (body) => sistemaRequest('/hoteis', { method: 'POST', body }),
+  atualizarHotel: (id, body) => sistemaRequest(`/hoteis/${id}`, { method: 'PUT', body }),
+  ativarHotel: (id, ativo) => sistemaRequest(`/hoteis/${id}/ativo`, { method: 'PATCH', body: { ativo } }),
+  cnpj: (cnpj) => sistemaRequest(`/cnpj/${String(cnpj).replace(/\D/g, '')}`),
+  cep: (cep) => sistemaRequest(`/cep/${String(cep).replace(/\D/g, '')}`),
+  redes: () => sistemaRequest('/redes'),
+  criarRede: (body) => sistemaRequest('/redes', { method: 'POST', body }),
+  atualizarRede: (id, body) => sistemaRequest(`/redes/${id}`, { method: 'PUT', body }),
+  planos: () => sistemaRequest('/planos'),
+  telas: () => sistemaRequest('/telas'),
+  atualizarPlano: (id, body) => sistemaRequest(`/planos/${id}`, { method: 'PUT', body }),
+  novaAssinatura: (hotelId, body) => sistemaRequest(`/hoteis/${hotelId}/assinatura`, { method: 'POST', body }),
+  statusAssinatura: (id, status) => sistemaRequest(`/assinaturas/${id}/status`, { method: 'PATCH', body: { status } }),
+  faturas: (params) => sistemaRequest('/faturas', { params }),
+  gerarFaturas: (competencia) => sistemaRequest('/faturas/gerar', { method: 'POST', body: { competencia } }),
+  pagarFatura: (id, body) => sistemaRequest(`/faturas/${id}/pagar`, { method: 'PATCH', body }),
+  cancelarFatura: (id) => sistemaRequest(`/faturas/${id}/cancelar`, { method: 'PATCH' }),
+  proprietarios: () => sistemaRequest('/proprietarios'),
+  proprietario: (id) => sistemaRequest(`/proprietarios/${id}`),
+  criarProprietario: (body) => sistemaRequest('/proprietarios', { method: 'POST', body }),
+  atualizarProprietario: (id, body) => sistemaRequest(`/proprietarios/${id}`, { method: 'PUT', body }),
+  vincular: (id, body) => sistemaRequest(`/proprietarios/${id}/hoteis`, { method: 'POST', body }),
+  desvincular: (id, hotelId) => sistemaRequest(`/proprietarios/${id}/hoteis/${hotelId}`, { method: 'DELETE' }),
+  auditoria: (limite) => sistemaRequest('/auditoria', { params: { limite } }),
 };
