@@ -943,7 +943,7 @@ function ProprietarioGaveta({ id, hoteis, onFechar, onMudou }) {
 
           <h4 className={styles.formTitulo}>Acesso ao sistema</h4>
           <div className={styles.grade}>
-            <Campo label="Usuário" largura={3}><input value={form.username} autoComplete="off" onChange={set('username')} /></Campo>
+            <Campo label="Usuário" largura={3} dica="Se o usuário já existir no sistema, ele é vinculado a este proprietário; a senha só muda se for preenchida"><input value={form.username} autoComplete="off" onChange={set('username')} /></Campo>
             <Campo label={atualId && form.username ? 'Nova senha' : 'Senha'} largura={3} dica="Mínimo 8 caracteres, com letras e números">
               <span className={styles.senha}>
                 <input type={verSenha ? 'text' : 'password'} value={form.senha} autoComplete="new-password" onChange={set('senha')}

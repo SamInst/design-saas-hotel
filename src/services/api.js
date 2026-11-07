@@ -458,6 +458,11 @@ export const reservaApi = {
     return request('/reserva/solicitar', { method: 'POST', body });
   },
 
+  /** POST /reserva/solicitar/lote — solicitação com um ou mais aptos (mais de um vira grupo). */
+  solicitarLote(bodies) {
+    return request('/reserva/solicitar/lote', { method: 'POST', body: bodies });
+  },
+
   /** Cancela uma reserva informando o motivo. */
   cancelar(id, motivoCancelamento) {
     return request(`/reserva/${id}/cancelar`, { method: 'PUT', body: { motivo_cancelamento: motivoCancelamento } });
@@ -555,6 +560,12 @@ export const orcamentoApi = {
     });
   },
 
+  // ─── Excluir orçamento (apaga de vez) ─────────────────────────
+  // DELETE /orcamento/{orcamentoId}
+  excluir(orcamentoId) {
+    return request(`/orcamento/${orcamentoId}`, { method: 'DELETE' });
+  },
+
   // ─── Editar nome do solicitante ───────────────────────────────
   // PUT /orcamento/editar  { id, nome_solicitante }
   editar({ id, nome_solicitante }) {
@@ -572,12 +583,6 @@ export const orcamentoApi = {
   // DELETE /orcamento/pessoas  [id1, id2]
   removerPessoas(pessoaIds) {
     return request('/orcamento/pessoas', { method: 'DELETE', body: pessoaIds });
-  },
-
-  // ─── Aprovar orçamento → converte em reserva ─────────────────
-  // PUT /orcamento/{orcamentoId}/aprovar
-  aprovar(orcamentoId) {
-    return request(`/orcamento/${orcamentoId}/aprovar`, { method: 'PUT' });
   },
 
   // ─── Calcular preço (endpoint exclusivo de orçamento) ────────
@@ -606,6 +611,15 @@ export const hospedagemApi = {
     if (data)                qs.append('data',         data);
     const qsStr = qs.toString();
     return request(`/hospedagem/buscar${qsStr ? `?${qsStr}` : ''}`);
+  },
+
+  /** GET /hospedagem/calendario?status&inicio&fim — reservas que cruzam o período, versão leve. */
+  calendario({ status, inicio, fim } = {}) {
+    const qs = new URLSearchParams();
+    if (status != null) (Array.isArray(status) ? status : [status]).forEach((s) => qs.append('status', s));
+    qs.append('inicio', inicio);
+    if (fim) qs.append('fim', fim);
+    return request(`/hospedagem/calendario?${qs.toString()}`);
   },
 
   /** GET /hospedagem/{hospedagemId} — busca uma hospedagem/reserva completa por ID. */

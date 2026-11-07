@@ -3240,12 +3240,14 @@ a.rvContato:hover span { text-decoration: underline; }
   background: var(--border); pointer-events: none;
 }
 .roomLabel {
-  background: var(--l-hero);
-  border-right-color: var(--l-hero-ln); box-shadow: inset 0 -1px 0 var(--l-hero-ln);
+  background: var(--surface);
+  border-right-color: var(--border); box-shadow: inset 0 -1px 0 var(--border);
+  transition: background 0.12s;
 }
-.roomLabel:hover { background: color-mix(in oklch, var(--l-hero) 90%, white); }
-.roomLabel .roomNum { color: var(--l-hero-fg); }
-.roomLabel .roomPax { color: var(--l-hero-mut); }
+.roomLabel:hover { background: color-mix(in oklch, var(--l-accent) 60%, var(--surface)); }
+.roomLabel .roomNum { font-size: 13px; font-weight: 600; color: var(--text); transition: color 0.12s; }
+.roomLabel:hover .roomNum { color: var(--violet); }
+.roomLabel .roomPax { font-size: 12px; font-weight: 400; color: var(--text-2); }
 .catRow, .catRow:hover { background: var(--l-hero-cat); box-shadow: inset 0 -1px 0 var(--l-hero-ln); }
 .catRow:hover, .catRow:hover .catLabel { background: color-mix(in oklch, var(--l-hero-cat) 88%, white); }
 .catLabel, .catRow:hover .catLabel { box-shadow: inset 0 -1px 0 var(--l-hero-ln); }
@@ -5194,3 +5196,80 @@ a.rvContato:hover span { text-decoration: underline; }
 .hospSearchWrap .hospedeChipRect { width: 100%; justify-content: space-between; box-sizing: border-box; }
 .hospSearchWrap .hospedeChipRect > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hospSearchWrap .hospInlineInput { min-height: 26px; }
+
+/* Sininho de solicitações no canto do botão */
+.hdrServico, .floatBtn { position: relative; }
+.sinoContagem {
+  position: absolute; top: -7px; right: -7px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 2px;
+  min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+  background: #ef4444; color: #fff; box-shadow: 0 0 0 2px var(--l-card, var(--surface));
+  font-size: 10.5px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.sinoContagem svg { color: #fff !important; transform-origin: 50% 0; animation: sinoBalanca 2.4s ease-in-out infinite; }
+@keyframes sinoBalanca {
+  0%, 70%, 100% { transform: rotate(0); }
+  75% { transform: rotate(14deg); } 80% { transform: rotate(-12deg); }
+  85% { transform: rotate(8deg); }  90% { transform: rotate(-5deg); }
+}
+@media (prefers-reduced-motion: reduce) { .sinoContagem svg { animation: none; } }
+
+/* Solicitações: grupos e individuais separados */
+.solListas { display: flex; flex-direction: column; gap: 16px; }
+.solSecao { display: flex; flex-direction: column; gap: 8px; }
+.solSecaoTit { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--l-muted-fg, var(--text-2)); }
+.solGrupo { border: 1px solid var(--border); border-radius: var(--l-r-lg, 8px); overflow: hidden; }
+.solGrupoHead {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; background: color-mix(in oklch, var(--l-accent, var(--surface-2)) 45%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+.solGrupoNome { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; font-weight: 600; color: var(--l-fg, var(--text)); }
+.solGrupoNome small { font-size: 12px; font-weight: 400; color: var(--l-muted-fg, var(--text-2)); margin-left: 4px; white-space: nowrap; }
+.solGrupo .dayRoomList { padding: 4px; }
+
+/* Hóspedes sem cadastro: campo com painel (tipo, adultos, crianças) */
+.hpCampo {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%;
+  min-height: 52px; padding: 8px 36px 8px 12px; border: 1px solid var(--border); border-radius: var(--l-r-lg, 8px);
+  background: var(--l-card, var(--surface)); color: var(--l-fg, var(--text)); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .13s, box-shadow .13s;
+}
+.hpCampo:hover { border-color: color-mix(in srgb, var(--l-primary, var(--violet)) 50%, var(--border)); }
+.hpCampoAberto { border-color: var(--l-primary, var(--violet)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--l-primary, var(--violet)) 25%, transparent); }
+.hpCampoRot { font-size: 11.5px; font-weight: 600; color: var(--l-muted-fg, var(--text-2)); }
+.hpCampoVal { font-size: 14px; color: var(--l-fg, var(--text)); }
+.hpCampoVazio { color: var(--l-muted-fg, var(--text-2)); }
+.hpCampoSeta { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--l-muted-fg, var(--text-2)); }
+.hpPainel {
+  display: flex; flex-direction: column; gap: 16px; padding: 18px;
+  background: var(--l-card, var(--surface)); color: var(--l-fg, var(--text));
+  border: 1px solid var(--border); border-radius: var(--l-r-xl, 12px); box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  max-height: calc(100vh - 24px); overflow-y: auto;
+}
+.hpBloco { display: flex; flex-direction: column; gap: 8px; }
+.hpBlocoTit { font-size: 14px; font-weight: 600; }
+.hpTipo > * { width: 100% !important; flex: 1 1 auto !important; }
+.hpLinha { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hpLinhaTxt { display: flex; flex-direction: column; gap: 2px; }
+.hpLinhaTxt b { font-size: 14px; font-weight: 600; }
+.hpLinhaTxt span { font-size: 12.5px; color: var(--l-muted-fg, var(--text-2)); }
+.hpContador { display: flex; align-items: center; gap: 12px; }
+.hpPasso {
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 6px; background: var(--l-secondary, var(--surface-2)); color: var(--l-fg, var(--text));
+  font: inherit; font-size: 18px; line-height: 1; cursor: pointer; transition: background .13s;
+}
+.hpPasso:hover:not(:disabled) { background: var(--l-accent, var(--surface-2)); }
+.hpPasso:disabled { opacity: .45; cursor: not-allowed; }
+.hpNum { min-width: 18px; text-align: center; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hpIdades { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hpIdade { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--l-muted-fg, var(--text-2)); }
+.hpIdade select { height: 34px; }
+.hpAplicar {
+  height: 42px; border: none; border-radius: 6px; cursor: pointer;
+  background: var(--l-primary, var(--violet)); color: #fff; font: inherit; font-size: 14px; font-weight: 600;
+}
+.hpAplicar:hover:not(:disabled) { filter: brightness(1.08); }
+.hpAplicar:disabled { opacity: .5; cursor: not-allowed; }

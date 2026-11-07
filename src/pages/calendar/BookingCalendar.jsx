@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, Moon, DoorOpen, DoorClosed,
+  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, Moon, DoorOpen, DoorClosed, Inbox,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -117,7 +117,7 @@ export const normalizeReserva = (r) => {
     quarto:                  quartoId,
     quartoId:                quartoId, // cópia explícita para uso em display
     categoria:               r.categoria?.nome ?? '',
-    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.nome_solicitante ?? r.titular_nome ?? tr('Hóspede'),
+    titularNome:             titular?.nome ?? r.orcamento_info?.nome_solicitante ?? r.pessoas_orcamento?.[0]?.nome ?? r.nome_solicitante ?? r.titular_nome ?? tr('Hóspede'),
     empresaNome:             r.empresa?.nome_fantasia || r.empresa?.razao_social || r.empresa_nome || null,
     funcionario:             r.usuario?.pessoa?.nome ?? r.usuario?.nome ?? r.funcionario?.nome ?? null,
     dataHoraRegistro:        r.data_hora_registro ?? null,
@@ -521,6 +521,12 @@ const RESERVA_POR_TIPO = {
 };
 const rotuloReservaTipo = (tipo, pessoas) =>
   RESERVA_POR_TIPO[tipo] ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
+const HOSPEDAGEM_POR_TIPO = {
+  INDIVIDUAL: tr('Hospedagem Individual'), CASAL: tr('Hospedagem Casal'), DUPLO: tr('Hospedagem Dupla'), TRIPLO: tr('Hospedagem Tripla'),
+  QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
+};
+const rotuloHospedagemTipo = (tipo, pessoas) =>
+  HOSPEDAGEM_POR_TIPO[tipo] ?? HOSPEDAGEM_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Hospedagem Individual');
 const sugerirTipo = (n) => (n > 0 ? TIPO_POR_PESSOAS[Math.min(n, 6)] : undefined);
 
 function TipoHospedagemSelect({ value, onChange, compacto = false }) {
@@ -1038,7 +1044,7 @@ const PainelAcaoReserva = (props) => <PainelReserva inline acao {...props} />;
 //   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
 //     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
 //     onVoucher, onCancelar }
-export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null, inline = false, saindo = false, onVoltar = null }) {
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null, inline = false, saindo = false, onVoltar = null, carregarDetalhes = false, onAprovarSolicitacao = null }) {
   const isOvernight = !!overnight;
   // Botão "Finalizar Limpeza" — compartilhado entre pernoite (overnight) e reserva.
   // Em pernoite vem de overnight.hasLimpeza; em reserva vem da prop `limpeza`.
@@ -1088,6 +1094,15 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
   // ── Pessoas ────────────────────────────────────────────────────────────────
   const [pessoas,         setPessoas]         = useState(reserva.hospedes ?? []);
+  // O calendário carrega a versão leve; ao abrir, completa com consumos e composição das diárias.
+  useEffect(() => {
+    if (!carregarDetalhes || !Number.isFinite(Number(reserva.id))) return undefined;
+    let vivo = true;
+    hospedagemApi.buscarPorId(reserva.id)
+      .then((h) => { if (vivo && h) onSync?.(normalizeReserva(h), { silencioso: true }); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [reserva.id]); // eslint-disable-line
   useEffect(() => {
     if (!editTipoManual) setEditTipo(sugerirTipo(pessoas.length) ?? '');
   }, [pessoas.length, editTipoManual]);
@@ -3214,12 +3229,11 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             );
           })() : reserva.status === 'orcamento' ? (
             <>
-              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} onClick={() => onActivate?.(reserva.id)}>{tr('Ativar Reserva')}</button>
-              <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={(e) => { setCancelMotivRes(''); setBalao({ tipo: 'cancelar', anchor: e.currentTarget }); }}>{tr('Cancelar')}</button>
+                            <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={(e) => { setCancelMotivRes(''); setBalao({ tipo: 'cancelar', anchor: e.currentTarget }); }}>{tr('Cancelar')}</button>
             </>
           ) : reserva.status === 'solicitada' ? (
             <>
-              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onApprove?.(reserva.id, reserva.quarto); onClose(); } finally { setSaving(false); } }}>
+              <button className={[styles.rvBtn, styles.rvBtnPrimary].join(' ')} disabled={saving} onClick={async () => { if (onAprovarSolicitacao) { onAprovarSolicitacao([reserva], reserva.grupo_id ?? null); return; } setSaving(true); try { await onApprove?.(reserva.id, reserva.quarto); onClose(); } finally { setSaving(false); } }}>
                 {saving && <Loader2 size={14} className={styles.spin}/>} {tr('Aprovar')}
               </button>
               <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} disabled={saving} onClick={async () => { setSaving(true); try { await onReject?.(reserva.id); onClose(); } finally { setSaving(false); } }}>
@@ -3518,6 +3532,16 @@ function useReservasDoDia(dateStr, refreshKey) {
   return { lista, loading };
 }
 
+// Sininho no canto superior direito do botão, com a quantidade pendente.
+function SinoContagem({ n }) {
+  return (
+    <span className={styles.sinoContagem} aria-label={tr('{{n}} pendentes', { n })}>
+      <Bell size={10} strokeWidth={2.6} />
+      {n > 99 ? '99+' : n}
+    </span>
+  );
+}
+
 function resumoDoDia(lista, categorias) {
   const ocupados = new Set(lista.map((r) => r.quarto));
   const quartos  = categorias.flatMap((c) => c.quartos);
@@ -3545,18 +3569,15 @@ function ResumoDia({ itens, loading, rotulo = null, compacto = false }) {
   );
 }
 
-function ListaDia({ dateStr, lista, loading, onSelectReserva, categorias = [] }) {
+function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
   if (loading) return <Esqueleto />;
-  const ocupados = new Set(lista.map((r) => r.quarto));
-  const livres = categorias.flatMap((c) => (c.quartos || []).filter((q) => !ocupados.has(q)).map((q) => ({ q, cat: c.nome })));
-  if (lista.length === 0 && livres.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
+  if (lista.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
 
   // Movimentações do dia: saídas (checkout no dia, até 12:00) e chegadas (checkin no dia, após 12:00)
   const secoes = [
     { key: 'saidas',     label: tr('Saídas'),     sub: tr('até 12:00'),          tom: 'Saida',   list: lista.filter((r) => r.dataFim === dateStr) },
     { key: 'chegadas',   label: tr('Chegadas'),   sub: tr('a partir das 12:00'), tom: 'Chegada', list: lista.filter((r) => r.dataInicio === dateStr) },
     { key: 'permanecem', label: tr('Permanecem'), sub: tr('hospedados no dia'),  tom: 'Fica',    list: lista.filter((r) => r.dataInicio !== dateStr && r.dataFim !== dateStr) },
-    { key: 'livres',     label: tr('Quartos livres'), sub: tr('sem reserva no dia'), tom: 'Livre', list: livres, livre: true },
   ].filter((s) => s.list.length > 0);
 
   return (
@@ -3569,17 +3590,7 @@ function ListaDia({ dateStr, lista, loading, onSelectReserva, categorias = [] })
             <span className={styles.lstSecaoSub}>{sec.sub}</span>
             <span className={styles.lstQtd}>{sec.list.length}</span>
           </div>
-          {sec.livre ? (
-            <div className={styles.lstItem}>
-              <div className={styles.lstLivres}>
-                {sec.list.map(({ q, cat }) => (
-                  <span key={q} className={styles.lstLivre} title={cat || undefined}>
-                    <BedDouble size={12} /> {fmtRoom(q)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : sec.list.map((r) => (
+          {sec.list.map((r) => (
             <div key={r.id} className={styles.lstItem}>
               <LinhaReserva r={r} onClick={() => onSelectReserva(r)} />
             </div>
@@ -3776,7 +3787,7 @@ function DetalhePagamento({ p, onVoltar }) {
   );
 }
 
-function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify }) {
+function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify, onAprovarGrupo }) {
   const naDireita = !!useContext(JanelaCtx);
   const dir = useContext(JanelaDirCtx);
   const gid = grupo.grupo_id;
@@ -3894,6 +3905,10 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
     return (
       <>
         <GavetaDir classe={styles.rvGavetaGrupo} footer={<RodapeOpcoes itens={[
+                ...(onAprovarGrupo && lista.some((r) => r.status === 'solicitada') ? [{
+                  label: tr('Aprovar grupo'), icon: <Check size={15} />,
+                  onClick: () => onAprovarGrupo(lista, gid, grupo.descricao ?? ''),
+                }] : []),
                 { label: tr('Pagamento do grupo'), icon: <DollarSign size={15} />, onClick: () => { setPagVer(null); setPagAberto(true); } },
                 { label: tr('Nova reserva'), icon: <Plus size={15} />, onClick: () => onNovaReservaGrupo(gid, periodoUnico),
                   title: periodoUnico ? tr('Já abre em {{v0}} → {{v1}}', { v0: fmtDateBR(periodoUnico.dataInicio), v1: fmtDateBR(periodoUnico.dataFim) }) : undefined },
@@ -4177,7 +4192,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
 /** Reservas em grupo: lista os grupos em aberto (o back-end esconde os que tiveram
  *  a última reserva finalizada). Abrir um grupo empilha o modal de conteúdo por
  *  cima — esta listagem continua aberta atrás. */
-function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify, grupoInicial = null }) {
+function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify, grupoInicial = null, onAprovarGrupo }) {
   const naDireita = !!useContext(JanelaCtx);
   const [grupos,  setGrupos]  = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4255,6 +4270,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
           onSelectReserva={onSelectReserva}
           onNovaReservaGrupo={onNovaReservaGrupo}
           onNotify={onNotify}
+          onAprovarGrupo={onAprovarGrupo}
         />
       )}
     </>
@@ -4652,7 +4668,7 @@ function OrcamentoDetailModal({ orcamentoId, onClose, onSelectReserva, roomDescM
 }
 
 // ─── Orçamentos Modal ─────────────────────────────────────────────────────────
-function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reservas = [], roomDescMap = {}, onSave, onSelectReserva }) {
+function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reservas = [], roomDescMap = {}, onSave, onSelectReserva, onNotify, onAlterado }) {
   const [search,      setSearch]      = useState('');
   const [orcamentos,  setOrcamentos]  = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -4666,7 +4682,6 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
   const [cancelMotivo,  setCancelMotivo]  = useState('');
   const [cancelSaving,  setCancelSaving]  = useState(false);
   const [openMenuId,    setOpenMenuId]    = useState(null);  // id do orçamento com menu aberto
-  const [approveSaving, setApproveSaving] = useState(false);
   const [orcAberto,     setOrcAberto]     = useState(null);
   const dirOrc = useContext(JanelaDirCtx);
   const timerRef  = useRef(null);
@@ -4683,7 +4698,8 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
     setLoading(true);
     const params = nome.trim() ? { nomeSolicitante: nome.trim() } : {};
     orcamentoApi.buscar(params)
-      .then((data) => setOrcamentos(Array.isArray(data) ? data : []))
+      .then((data) => setOrcamentos((Array.isArray(data) ? data : [])
+        .sort((a, b) => maisRecentePrimeiro({ data: a.data_hora_registro, id: a.id }, { data: b.data_hora_registro, id: b.id }))))
       .catch(() => setOrcamentos([]))
       .finally(() => setLoading(false));
   }, []);
@@ -4753,18 +4769,6 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
     });
   };
 
-  // ── Aprovar orçamento ─────────────────────────────────────────────────────
-  const handleApprove = async (orc) => {
-    setOpenMenuId(null);
-    setApproveSaving(true);
-    try {
-      await orcamentoApi.aprovar(orc.id);
-      fetchOrcamentos(search);
-    } catch { /* silencia */ } finally {
-      setApproveSaving(false);
-    }
-  };
-
   // Hospedagem do orçamento abre na view da reserva — só quando já tem pessoa.
   const verHosp = (orc, h) => {
     if (!onSelectReserva || !(h.pessoas_orcamento ?? []).length) return;
@@ -4781,17 +4785,19 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
   };
   const fecharCancelOrc = () => { setCancelOrc(null); setCancelAnchor(null); setCancelMotivo(''); };
 
+  // Excluir: apaga o orçamento de vez (só cotação), depois da confirmação no balão.
   const handleConfirmCancel = async () => {
-    if (!cancelOrc || !cancelMotivo.trim()) return;
+    if (!cancelOrc) return;
     setCancelSaving(true);
     try {
-      await orcamentoApi.cancelar(cancelOrc.id, cancelMotivo.trim());
-      // Atualiza status localmente — o backend não deleta, só muda para ORCAMENTO_CANCELADO
-      setOrcamentos((prev) => prev.map((o) =>
-        o.id === cancelOrc.id ? { ...o, status: 'ORCAMENTO_CANCELADO' } : o
-      ));
+      await orcamentoApi.excluir(cancelOrc.id);
+      setOrcamentos((prev) => prev.filter((o) => o.id !== cancelOrc.id));
+      setOrcAberto((a) => (a === cancelOrc.id ? null : a));
+      onNotify?.(tr('Orçamento excluído.'));
       fecharCancelOrc();
-    } catch { /* silencia */ } finally {
+    } catch (e) {
+      onNotify?.(e?.message ?? tr('Erro ao excluir o orçamento.'), 'error');
+    } finally {
       setCancelSaving(false);
     }
   };
@@ -4844,7 +4850,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
               return co && co < todayISO;
             });
             return (
-              <div key={orc.id} className={[styles.dayRoomRow, orcAberto === orc.id ? styles.dayRoomRowAtivo : '', isCancelado ? styles.orcListGroupCancelado : ''].join(' ')}
+              <div key={orc.id} data-orc={orc.id} className={[styles.dayRoomRow, orcAberto === orc.id ? styles.dayRoomRowAtivo : '', isCancelado ? styles.orcListGroupCancelado : ''].join(' ')}
                 onClick={() => setOrcAberto(orcAberto === orc.id ? null : orc.id)}>
                 <div className={styles.searchDropInfo}>
                   <div className={styles.searchDropName}>
@@ -4883,7 +4889,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
             });
 
             return (
-              <div key={orc.id} className={[
+              <div key={orc.id} data-orc={orc.id} className={[
                 styles.orcListGroup,
                 isCancelado ? styles.orcListGroupCancelado : '',
                 isExpired ? styles.orcListGroupExpired : '',
@@ -4932,16 +4938,9 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                           <button className={styles.orcMenuItem} onClick={(e) => { setOpenMenuId(null); handleVoucher(e, orc); }}>
                             <FileDown size={12} /> {tr('Gerar PDF')}
                           </button>
-                          <button
-                            className={[styles.orcMenuItem, styles.orcMenuItemApprove].join(' ')}
-                            disabled={approveSaving || isExpired}
-                            title={isExpired ? tr('Orçamento vencido: o check-out já passou e não pode ser aprovado.') : undefined}
-                            onClick={() => handleApprove(orc)}>
-                            <Check size={12} /> {isExpired ? tr('Vencido — não aprovável') : tr('Aprovar Orçamento')}
-                          </button>
                           <div className={styles.orcMenuDivider} />
-                          <button className={[styles.orcMenuItem, styles.orcMenuItemDanger].join(' ')} onClick={(e) => { setOpenMenuId(null); openCancelOrc(e, orc); }}>
-                            <Trash2 size={12} /> {tr('Cancelar')}
+                          <button className={[styles.orcMenuItem, styles.orcMenuItemDanger].join(' ')} onClick={(e) => { setOpenMenuId(null); openCancelOrc(e, orc, document.querySelector(`[data-orc="${orc.id}"]`)); }}>
+                            <Trash2 size={12} /> {tr('Excluir')}
                           </button>
                         </div>
                       )}
@@ -5053,19 +5052,52 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
         <GavetaDir classe={styles.rvGavetaComRodape} footer={isCancelado ? null : <RodapeOpcoes itens={[
           { label: tr('Editar'), icon: <Pencil size={15} />, onClick: () => openEditOrc(ev, orc) },
           { label: tr('Gerar PDF'), icon: <FileDown size={15} />, onClick: () => handleVoucher(ev, orc) },
-          { label: isExpired ? tr('Vencido — não aprovável') : tr('Aprovar Orçamento'), icon: <Check size={15} />,
-            disabled: approveSaving || isExpired,
-            title: isExpired ? tr('Orçamento vencido: o check-out já passou e não pode ser aprovado.') : undefined,
-            onClick: () => handleApprove(orc) },
-          { label: tr('Cancelar'), icon: <Trash2 size={14} />, danger: true, divider: true, onClick: (_, anchor) => openCancelOrc(ev, orc, anchor) },
+          { label: tr('Excluir'), icon: <Trash2 size={14} />, danger: true, divider: true, onClick: (_, anchor) => openCancelOrc(ev, orc, anchor) },
         ]} />}>
           <div className={[styles.rcCard, isCancelado ? styles.rvCancelado : ''].join(' ')}>
             <CabecalhoGaveta titulo={orc.nome_solicitante || tr('Orçamento')}
               chips={[isCancelado && { txt: tr('Cancelado'), red: true }, isExpired && { txt: tr('Vencido'), red: true }]}
               meta={[`${tr('Orçamento #')}${orc.id}`, orc.data_hora_registro].filter(Boolean).join(' · ')}
               onClose={() => setOrcAberto(null)} />
-            <FaixaPeriodo inicio={inicios[0]} fim={fins[fins.length - 1]}
-              celulas={[[hospedagens.length, hospedagens.length === 1 ? tr('Hospedagem') : tr('Hospedagens')], [nPessoas, nPessoas === 1 ? tr('Pessoa') : tr('Pessoas')]]} />
+            {(() => {
+              // Período no desenho da view da reserva: datas com dia da semana e hora, e as infos embaixo.
+              const ini = inicios[0];
+              const fim = fins[fins.length - 1];
+              const horaDe = (campo, alvo) => {
+                const h = hospedagens.find((x) => parseBrDate(x[campo]) === alvo);
+                return (h?.[campo] ?? '').split(' ')[1]?.slice(0, 5) ?? '';
+              };
+              const hIn  = ini ? horaDe('data_hora_checkin', ini) : '';
+              const hOut = fim ? horaDe('data_hora_checkout', fim) : '';
+              const periodoUnico = new Set(hospedagens.map((h) => `${h.data_hora_checkin}|${h.data_hora_checkout}`)).size <= 1;
+              const nApts = hospedagens.length;
+              return (
+                <div className={[styles.rcSection, styles.rvPeriodoSecao].join(' ')}>
+                  <div className={styles.rvPeriodoCard}>
+                    <div className={styles.rvPeriodoDatas}>
+                      <div className={styles.rvPeriodoData}>
+                        <span className={styles.rvPeriodoRot}>{tr('Check-in')}</span>
+                        <b className={styles.rvPeriodoDia}>{ini ? toBrDate(ini) : '—'}</b>
+                        {ini && <span className={styles.rvPeriodoSub}>{diaSemana(ini)}{hIn ? ` · ${hIn}` : ''}</span>}
+                      </div>
+                      <span className={styles.rvPeriodoSeta}><ArrowRight size={16} /></span>
+                      <div className={[styles.rvPeriodoData, styles.rvPeriodoDataFim].join(' ')}>
+                        <span className={styles.rvPeriodoRot}>{tr('Check-out')}</span>
+                        <b className={styles.rvPeriodoDia}>{fim ? toBrDate(fim) : '—'}</b>
+                        {fim && <span className={styles.rvPeriodoSub}>{diaSemana(fim)}{hOut ? ` · ${hOut}` : ''}</span>}
+                      </div>
+                    </div>
+                    <div className={styles.rvPeriodoInfos}>
+                      {ini && fim && (
+                        <div className={styles.rvPeriodoInfo}><Moon size={14} /><span>{periodoUnico ? diariasTxt(diffDays(ini, fim)) : tr('Períodos variados')}</span></div>
+                      )}
+                      <div className={styles.rvPeriodoInfo}><BedDouble size={14} /><span>{nApts} {nApts === 1 ? tr('apartamento') : tr('apartamentos')}</span></div>
+                      <div className={styles.rvPeriodoInfo}><Users size={14} /><span>{nPessoas} {nPessoas === 1 ? tr('hóspede') : tr('hóspedes')}</span></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             <aside className={[styles.finResumo, styles.finResumoView].join(' ')}>
               <div className={styles.finCab}><h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4></div>
@@ -5154,41 +5186,13 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
     {cancelOrc && cancelAnchor && (
       <Balao anchor={cancelAnchor} onClose={fecharCancelOrc}>
         <p className={styles.balaoMsg}>
-          {tr('Cancelar o orçamento de')} <b>{cancelOrc.nome_solicitante}</b>? {tr('Esta ação não pode ser desfeita.')}
+          {tr('Excluir o orçamento de')} <b>{cancelOrc.nome_solicitante}</b>? {tr('Ele será apagado e esta ação não pode ser desfeita.')}
         </p>
-        <textarea className={[styles.motivoTextarea, styles.balaoCampo].join(' ')} rows={2} autoFocus
-          placeholder={tr('Motivo do cancelamento')} value={cancelMotivo} onChange={(e) => setCancelMotivo(e.target.value)} />
         <BalaoAcoes onCancelar={fecharCancelOrc} cancelarTxt={tr('Voltar')} perigo
-          confirmar={cancelSaving ? <Loader2 size={13} className={styles.spin} /> : tr('Cancelar')}
-          disabled={!cancelMotivo.trim() || cancelSaving} onConfirmar={handleConfirmCancel} />
+          confirmar={cancelSaving ? <Loader2 size={13} className={styles.spin} /> : tr('Excluir')}
+          disabled={cancelSaving} onConfirmar={handleConfirmCancel} />
       </Balao>
     )}
-    <Modal open={!!cancelOrc && !cancelAnchor} onClose={() => { setCancelOrc(null); setCancelMotivo(''); }} size="sm"
-      title={<><Trash2 size={14} /> {tr('Cancelar Orçamento')}</>}
-      footer={
-        <div className={styles.footerRight}>
-          <Button variant="secondary" onClick={() => { setCancelOrc(null); setCancelMotivo(''); }}>{tr('Voltar')}</Button>
-          <Button variant="danger" disabled={!cancelMotivo.trim() || cancelSaving} onClick={handleConfirmCancel}>
-            {cancelSaving && <Loader2 size={13} className={styles.spin} />} {tr('Cancelar Definitivamente')}
-          </Button>
-        </div>
-      }
-    >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
-          {tr('Informe o motivo do cancelamento do orçamento de')}{' '}
-          <b>{cancelOrc?.nome_solicitante}</b>:
-        </p>
-        <textarea
-          className={styles.motivoTextarea}
-          placeholder={tr('Ex.: Solicitação do cliente')}
-          rows={3}
-          value={cancelMotivo}
-          onChange={(e) => setCancelMotivo(e.target.value)}
-          autoFocus
-        />
-      </div>
-    </Modal>
     </>
   );
 }
@@ -5196,7 +5200,15 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
 
 
 // ─── Solicitações Modal ───────────────────────────────────────────────────────
-function SolicitacoesModal({ onClose, onSelectReserva }) {
+// Mais recente primeiro: data de registro (dd/MM/yyyy HH:mm) e, no empate, o maior id.
+const chaveRegistro = (dh) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/.exec(dh ?? '');
+  return m ? `${m[3]}${m[2]}${m[1]}${m[4] ?? '00'}${m[5] ?? '00'}` : '';
+};
+const maisRecentePrimeiro = (a, b) =>
+  chaveRegistro(b.data) .localeCompare(chaveRegistro(a.data)) || (Number(b.id) || 0) - (Number(a.id) || 0);
+
+function SolicitacoesModal({ onClose, onSelectReserva, onAprovar }) {
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [showCreate,   setShowCreate]   = useState(false);
@@ -5211,7 +5223,8 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
         for (const r of flat) {
           if (!seen.has(r.id)) { seen.add(r.id); out.push(normalizeReserva(r)); }
         }
-        setSolicitacoes(out.filter((r) => r.dataInicio));
+        setSolicitacoes(out.filter((r) => r.dataInicio)
+          .sort((a, b) => maisRecentePrimeiro({ data: a.dataHoraRegistro, id: a.id }, { data: b.dataHoraRegistro, id: b.id })));
       })
       .catch(() => setSolicitacoes([]))
       .finally(() => setLoading(false));
@@ -5242,19 +5255,57 @@ function SolicitacoesModal({ onClose, onSelectReserva }) {
         ) : solicitacoes.length === 0 ? (
           <div className={styles.emptyState}>{tr('Nenhuma solicitação pendente.')}</div>
         ) : (
-          <div className={styles.dayRoomList}>
-            {solicitacoes.map((r) => (
+          (() => {
+            const linha = (r) => (
               <div key={r.id} className={styles.dayRoomRow} onClick={() => onSelectReserva(r)}>
                 <div className={styles.searchDropInfo}>
                   <div className={styles.searchDropName}>{r.pessoasOrcamento?.[0]?.nome ?? r.titularNome}</div>
                   <div className={styles.searchDropMeta}>
-                    {tr('Apartamento')} {fmtRoom(r.quarto)} · {fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(diffDays(r.dataInicio, r.dataFim))}
+                    {r.quarto != null ? <>{tr('Apartamento')} {fmtRoom(r.quarto)} · </> : <>{tr('Sem apartamento')} · </>}{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(diffDays(r.dataInicio, r.dataFim))}
                   </div>
                 </div>
                 <ChevronRight size={15} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
               </div>
-            ))}
-          </div>
+            );
+            const grupos = new Map();
+            const individuais = [];
+            for (const r of solicitacoes) {
+              if (r.grupo_id != null) grupos.set(r.grupo_id, [...(grupos.get(r.grupo_id) ?? []), r]);
+              else individuais.push(r);
+            }
+            return (
+              <div className={styles.solListas}>
+                {grupos.size > 0 && (
+                  <div className={styles.solSecao}>
+                    <span className={styles.solSecaoTit}>{tr('Grupos')}</span>
+                    {[...grupos.entries()].map(([gid, membros]) => (
+                      <div key={gid} className={styles.solGrupo}>
+                        <div className={styles.solGrupoHead}>
+                          <span className={styles.solGrupoNome}>
+                            <Users size={14} /> {membros[0].titularNome}
+                            <small>{tr('Grupo')} {gid} · {membros.length} {membros.length === 1 ? tr('apartamento') : tr('apartamentos')}</small>
+                          </span>
+                          {onAprovar && (
+                            <button type="button" className={[styles.rvBtn, styles.rvBtnPrimary, styles.rvBtnSm].join(' ')}
+                              onClick={() => onAprovar(membros, gid, membros[0].titularNome)}>
+                              <Check size={13} /> {tr('Aprovar grupo')}
+                            </button>
+                          )}
+                        </div>
+                        <div className={styles.dayRoomList}>{membros.map(linha)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {individuais.length > 0 && (
+                  <div className={styles.solSecao}>
+                    <span className={styles.solSecaoTit}>{tr('Individuais')}</span>
+                    <div className={styles.dayRoomList}>{individuais.map(linha)}</div>
+                  </div>
+                )}
+              </div>
+            );
+          })()
         )}
       </Janela>
     </>
@@ -5399,80 +5450,142 @@ function RoomCombobox({ value, onChange, availableRooms, categorias, roomDescMap
 }
 
 // ─── Sem Cadastro Hospedes Picker (orçamento sem cadastro) ───────────────────
-function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange }) {
-  const autoNome = (len) => `ADULTO ${len + 1}`;
-  const isAutoNome = (s) => /^ADULTO \d+$/i.test(s.trim());
-
-  const [nome,     setNome]     = useState(() => autoNome(value.length));
-  const [dob,      setDob]      = useState(null);
-  const [isAdulto, setIsAdulto] = useState(true);
-
-  // Atualiza o campo automaticamente quando o tamanho da lista muda,
-  // mas só se o usuário ainda está com o nome automático (ou vazio)
-  useEffect(() => {
-    setNome((prev) => (prev === '' || isAutoNome(prev) ? autoNome(value.length) : prev));
-  }, [value.length]); // eslint-disable-line
-
-  const canAdd   = nome.trim().length > 0 && (isAdulto || dob !== null);
-  const hasDraft = !isAutoNome(nome) || dob !== null; // draft real = nome customizado ou dob preenchido
-
-  useEffect(() => { onDraftChange?.(hasDraft); }, [hasDraft]); // eslint-disable-line
-
-  const adulto18Date = () => {
+// Hóspedes sem cadastro (orçamento/solicitação): um campo que abre um painel com tipo de
+// hospedagem e a quantidade de adultos e crianças (idade de cada criança, que entra no preço).
+// O valor continua sendo a lista [{ nome, dataNascimento, _adulto }] usada no salvar.
+function SemCadastroHospedesPicker({ value = [], onChange, onDraftChange, extra = null }) {
+  const nascPorIdade = (idade) => {
     const t = new Date();
-    return formatDate(new Date(t.getFullYear() - 18, t.getMonth(), t.getDate()));
+    return formatDate(new Date(t.getFullYear() - idade, t.getMonth(), t.getDate()));
+  };
+  const ehAdulto = (p) => p._adulto || (calcAge(p.dataNascimento) ?? 18) >= 18;
+  const adultosAtuais  = value.filter(ehAdulto);
+  const criancasAtuais = value.filter((p) => !ehAdulto(p));
+
+  const [aberto,  setAberto]  = useState(false);
+  const [adultos, setAdultos] = useState(adultosAtuais.length);
+  const [idades,  setIdades]  = useState(criancasAtuais.map((c) => calcAge(c.dataNascimento) ?? 0));
+  const [estilo,  setEstilo]  = useState({});
+  const campoRef  = useRef(null);
+  const painelRef = useRef(null);
+
+  // Reabre sempre com o que está gravado.
+  const abrir = () => {
+    setAdultos(adultosAtuais.length);
+    setIdades(criancasAtuais.map((c) => calcAge(c.dataNascimento) ?? 0));
+    setAberto(true);
+  };
+  const sujo = aberto && (adultos !== adultosAtuais.length
+    || idades.length !== criancasAtuais.length
+    || idades.some((i, k) => i !== (calcAge(criancasAtuais[k]?.dataNascimento) ?? 0)));
+  useEffect(() => { onDraftChange?.(sujo); }, [sujo]); // eslint-disable-line
+
+  const posicionar = useCallback(() => {
+    const r = campoRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const w = Math.min(340, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    const abaixo = window.innerHeight - r.bottom;
+    const alto = 380;
+    setEstilo(abaixo < alto && r.top > alto
+      ? { position: 'fixed', zIndex: 9999, width: w, left, bottom: window.innerHeight - r.top + 6 }
+      : { position: 'fixed', zIndex: 9999, width: w, left, top: r.bottom + 6 });
+  }, []);
+  useEffect(() => {
+    if (!aberto) return undefined;
+    posicionar();
+    const fora = (e) => {
+      if (campoRef.current?.contains(e.target) || painelRef.current?.contains(e.target)) return;
+      if (e.target.closest?.('[role="listbox"], [data-select-menu]')) return;
+      setAberto(false);
+    };
+    document.addEventListener('mousedown', fora);
+    window.addEventListener('resize', posicionar);
+    window.addEventListener('scroll', posicionar, true);
+    return () => {
+      document.removeEventListener('mousedown', fora);
+      window.removeEventListener('resize', posicionar);
+      window.removeEventListener('scroll', posicionar, true);
+    };
+  }, [aberto, posicionar]);
+
+  // Mantém nomes já informados (ex.: orçamento em edição); completa com ADULTO n / CRIANÇA n.
+  const aplicar = () => {
+    const novosAdultos = Array.from({ length: adultos }, (_, i) => adultosAtuais[i]
+      ? { ...adultosAtuais[i], _adulto: true }
+      : { nome: `ADULTO ${i + 1}`, dataNascimento: nascPorIdade(18), _adulto: true });
+    const novasCriancas = idades.map((idade, i) => ({
+      nome: criancasAtuais[i]?.nome ?? `CRIANÇA ${i + 1}`,
+      dataNascimento: nascPorIdade(idade),
+      _adulto: false,
+    }));
+    onChange([...novosAdultos, ...novasCriancas]);
+    setAberto(false);
   };
 
-  const add = () => {
-    if (!canAdd) return;
-    const dataNascimento = isAdulto ? adulto18Date() : formatDate(dob);
-    onChange([...value, { nome: nome.trim(), dataNascimento, _adulto: isAdulto }]);
-    // próximo nome é atualizado pelo useEffect acima (value.length cresce)
-    setDob(null);
-  };
+  const tipoAtual = extra?.props?.value;
+  const nA = adultosAtuais.length;
+  const nC = criancasAtuais.length;
+  const resumo = [
+    nA > 0 && `${nA} ${nA === 1 ? tr('Adulto') : tr('Adultos')}`,
+    nC > 0 && `${nC} ${nC === 1 ? tr('Criança') : tr('Crianças')}`,
+  ].filter(Boolean).join(', ');
 
-  const rem = (i) => onChange(value.filter((_, j) => j !== i));
+  const contador = (titulo, sub, n, menos, mais, minimo = 0) => (
+    <div className={styles.hpLinha}>
+      <div className={styles.hpLinhaTxt}><b>{titulo}</b><span>{sub}</span></div>
+      <div className={styles.hpContador}>
+        <button type="button" className={styles.hpPasso} onClick={menos} disabled={n <= minimo} aria-label={tr('Diminuir')}>−</button>
+        <span className={styles.hpNum}>{n}</span>
+        <button type="button" className={styles.hpPasso} onClick={mais} disabled={n >= 20} aria-label={tr('Aumentar')}><Plus size={14} /></button>
+      </div>
+    </div>
+  );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div className={styles.semCadastroAddRow}>
-        <input
-          className={styles.formInput}
-          style={{ flex: 1, minWidth: 0 }}
-          type="text"
-          placeholder={tr('Nome do hóspede')}
-          value={nome}
-          onChange={(e) => setNome(e.target.value.toUpperCase())}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-        />
-        <label className={styles.empresaModeToggle}>
-          <input type="checkbox" checked={isAdulto} onChange={(e) => { setIsAdulto(e.target.checked); if (e.target.checked) setDob(null); }} />
-          <span>{tr('Adulto')}</span>
-        </label>
-        {!isAdulto && (
-          <div style={{ width: 150, flexShrink: 0 }}>
-            <DatePicker value={dob} onChange={setDob} placeholder={tr('Nascimento')} maxDate={new Date()} />
-          </div>
-        )}
-        <button type="button" className={styles.addOrcGuestBtn} onClick={add} disabled={!canAdd}>
-          <Plus size={13} /> {tr('Adicionar Hóspede')}
-        </button>
-      </div>
-      {value.length > 0 && (
-        <div className={styles.selectedChips}>
-          {value.map((p, i) => (
-            <div key={i} className={styles.hospedeChipRect}>
-              <span>{p.nome}</span>
-              {p._adulto
-                ? <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{tr('Adulto')}</span>
-                : p.dataNascimento && <span style={{ color: 'var(--text-2)', fontSize: 11 }}>{fmtDateBR(p.dataNascimento)}</span>
-              }
-              <button type="button" className={styles.chipRemove} onClick={() => rem(i)}><X size={10} /></button>
+    <>
+      <button type="button" ref={campoRef} className={[styles.hpCampo, aberto ? styles.hpCampoAberto : ''].join(' ')}
+        onClick={() => (aberto ? setAberto(false) : abrir())}>
+        <span className={styles.hpCampoRot}>{tr('Hóspedes e tipo de hospedagem')}</span>
+        <span className={[styles.hpCampoVal, resumo ? '' : styles.hpCampoVazio].join(' ')}>
+          {resumo || tr('Adicionar hóspedes')}{tipoAtual ? `, ${TIPO_HOSPEDAGEM_LABEL[tipoAtual] ?? tipoAtual}` : ''}
+        </span>
+        <ChevronDown size={15} className={styles.hpCampoSeta} />
+      </button>
+      {aberto && createPortal(
+        <div ref={painelRef} className={styles.hpPainel} style={estilo}>
+          {extra && (
+            <div className={styles.hpBloco}>
+              <b className={styles.hpBlocoTit}>{tr('Tipo de hospedagem')}</b>
+              <div className={styles.hpTipo}>{extra}</div>
             </div>
-          ))}
-        </div>
+          )}
+          {contador(tr('Adultos'), tr('Acima de 18 anos'), adultos,
+            () => setAdultos((n) => Math.max(0, n - 1)), () => setAdultos((n) => n + 1))}
+          {contador(tr('Crianças'), tr('De 0 a 17 anos'), idades.length,
+            () => setIdades((l) => l.slice(0, -1)), () => setIdades((l) => [...l, 0]))}
+          {idades.length > 0 && (
+            <div className={styles.hpIdades}>
+              {idades.map((idade, i) => (
+                <label key={i} className={styles.hpIdade}>
+                  <span>{tr('Idade da criança {{n}}', { n: i + 1 })}</span>
+                  <select className={styles.formInput} value={idade}
+                    onChange={(e) => setIdades((l) => l.map((x, k) => (k === i ? Number(e.target.value) : x)))}>
+                    {Array.from({ length: 18 }, (_, a) => (
+                      <option key={a} value={a}>{a === 0 ? tr('Menos de 1 ano') : `${a} ${a === 1 ? tr('ano') : tr('anos')}`}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
+          <button type="button" className={styles.hpAplicar} onClick={aplicar} disabled={adultos + idades.length === 0}>
+            {tr('Aplicar')}
+          </button>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
@@ -5771,12 +5884,15 @@ function RoomHospedesPicker({ value = [], onChange, extra = null, empresaMode })
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false, initialGrupo = null }) {
+export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false, initialGrupo = null, confirmar = null }) {
   const [hospEmpresa, setHospEmpresa] = useState(false);
   const isSolicitacao = forceSolicitacao;
 
   const [step,             setStep]             = useState((!isSolicitacao && initialRoom) ? 2 : 1);
-  const [tipo,             setTipo]             = useState('simples'); // 'simples' | 'grupo'
+  // confirmar: { reservas, grupoId, descricao } — aprovação de solicitação. Abre já com quartos/datas do
+  // orçamento; o salvar ativa as hospedagens existentes (hospedagem_id) em vez de criar novas.
+  const conf = confirmar?.reservas?.length ? confirmar : null;
+  const [tipo,             setTipo]             = useState(conf && conf.reservas.length > 1 ? 'grupo' : 'simples'); // 'simples' | 'grupo'
 
   // Passos opcionais — só aparecem quando a escolha faz diferença:
   //  · "Modo de Período": vários apartamentos podem ter períodos distintos
@@ -5810,9 +5926,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
   // Step 2: vincular a grupo existente (grupo_id) — opcional. Busca todos os grupos no backend
   // para não depender das reservas do mês visível.
-  const [grupoVinculado,    setGrupoVinculado]    = useState(initialGrupo);
+  const [grupoVinculado,    setGrupoVinculado]    = useState(conf?.grupoId ?? initialGrupo);
   // Responsável do grupo — vai para grupo_reserva.descricao ao criar um grupo novo.
-  const [grupoResponsavel,  setGrupoResponsavel]  = useState('');
+  const [grupoResponsavel,  setGrupoResponsavel]  = useState(conf?.descricao ?? '');
   const [gruposExistentes,  setGruposExistentes]  = useState([]);
   useEffect(() => {
     if (isOrcamento || isSolicitacao) return;
@@ -5944,11 +6060,13 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
   const availableRooms = useMemo(() => {
     if (!checkinStr || !checkoutStr) return initialAvailable || allRoomIds;
-    if (apiAvailability) return allRoomIds.filter((r) => apiAvailability.has(r));
+    // Reserva passa por cima de orçamento; orçamento não cobre outro orçamento.
+    const temOrc = (r) => isOrcamento && reservas.some((res) => res.status === 'orcamento' && res.quarto === r && res.dataInicio < checkoutStr && res.dataFim > checkinStr);
+    if (apiAvailability) return allRoomIds.filter((r) => apiAvailability.has(r) && !temOrc(r));
     return allRoomIds.filter(
-      (r) => !reservas.some((res) => res.quarto === r && res.dataInicio < checkoutStr && res.dataFim > checkinStr)
+      (r) => !temOrc(r) && !reservas.some((res) => res.status !== 'orcamento' && res.quarto === r && res.dataInicio < checkoutStr && res.dataFim > checkinStr)
     );
-  }, [checkinStr, checkoutStr, reservas, initialAvailable, allRoomIds, apiAvailability]);
+  }, [checkinStr, checkoutStr, reservas, initialAvailable, allRoomIds, apiAvailability, isOrcamento]);
 
   const mpAvailableRooms = useMemo(() => {
     if (!mpCheckin || !mpCheckout) return allRoomIds;
@@ -5960,11 +6078,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       if (pi < co && po > ci) return p.rooms.map((r) => parseInt(r));
       return [];
     });
+    const temOrc = (r) => isOrcamento && reservas.some((res) => res.status === 'orcamento' && res.quarto === r && res.dataInicio < co && res.dataFim > ci);
     const baseAvail = mpApiAvailability
-      ? allRoomIds.filter((r) => mpApiAvailability.has(r))
-      : allRoomIds.filter((r) => !reservas.some((res) => res.quarto === r && res.dataInicio < co && res.dataFim > ci));
+      ? allRoomIds.filter((r) => mpApiAvailability.has(r) && !temOrc(r))
+      : allRoomIds.filter((r) => !temOrc(r) && !reservas.some((res) => res.status !== 'orcamento' && res.quarto === r && res.dataInicio < co && res.dataFim > ci));
     return baseAvail.filter((r) => !alreadyPicked.includes(r));
-  }, [mpCheckin, mpCheckout, periodos, editingPeriodoIdx, reservas, allRoomIds, mpApiAvailability]);
+  }, [mpCheckin, mpCheckout, periodos, editingPeriodoIdx, reservas, allRoomIds, mpApiAvailability, isOrcamento]);
 
 
   const addPagamento = (payment) => {
@@ -5980,6 +6099,39 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
   // Orçamento/Solicitação é sempre sem cadastro (pessoas_orcamento com nome + data de nascimento)
   const isOrcSemCadastro = isOrcamento || isSolicitacao;
+
+  // Hospedagem do orçamento por quarto — vai como hospedagem_id no /reserva/ativar.
+  const confIdPorQuarto = useMemo(
+    () => Object.fromEntries((conf?.reservas ?? []).filter((r) => r.quarto != null).map((r) => [String(r.quarto), r.id])),
+    [conf]);
+  // Uma solicitação só (ex.: do site, sem quarto): o quarto escolhido fica com ela.
+  const hospedagemIdDe = (q) => confIdPorQuarto[String(q)] ?? (conf?.reservas.length === 1 ? conf.reservas[0].id : undefined);
+  useEffect(() => {
+    if (!conf) return;
+    const rs = conf.reservas;
+    const tipos = Object.fromEntries(rs.filter((r) => r.tipoHospedagem).map((r) => [String(r.quarto), r.tipoHospedagem]));
+    const faixas = [...new Set(rs.map((r) => `${r.dataInicio}|${r.dataFim}`))];
+    if (faixas.length === 1) {
+      setPeriodoMode('unico');
+      setQuartos(rs.filter((r) => r.quarto != null).map((r) => String(r.quarto)));
+      setCheckin(new Date(rs[0].dataInicio + 'T00:00:00'));
+      setCheckout(new Date(rs[0].dataFim + 'T00:00:00'));
+      setQuartosTipo(tipos);
+      setTipoManual(Object.fromEntries(Object.keys(tipos).map((q) => [q, true])));
+    } else {
+      setPeriodoMode('multiplos');
+      setPeriodos(faixas.map((f) => {
+        const [ci, co] = f.split('|');
+        const rooms = rs.filter((r) => `${r.dataInicio}|${r.dataFim}` === f).map((r) => String(r.quarto));
+        return {
+          rooms, checkin: new Date(ci + 'T00:00:00'), checkout: new Date(co + 'T00:00:00'),
+          roomHospedes: {}, roomHospedesOrc: {},
+          roomTipo: Object.fromEntries(rooms.filter((q) => tipos[q]).map((q) => [q, tipos[q]])),
+        };
+      }));
+    }
+    setStep(DADOS_STEP);
+  }, []); // eslint-disable-line
 
   const resetMpForm = () => {
     setMpRooms([]); setMpCheckin(null); setMpCheckout(null);
@@ -6310,19 +6462,20 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           };
         };
 
+        const bodies = [];
         if (periodoMode === 'multiplos') {
           for (const [pi, p] of periodos.entries()) {
             const ci = formatDate(p.checkin);
             const co = formatDate(p.checkout);
-            for (const q of p.rooms) {
-              await reservaApi.solicitar(buildSolBody(q, ci, co, p.roomHospedesOrc?.[q] || [], quartosObs[`${q}_${pi}`], pi));
-            }
+            for (const q of p.rooms) bodies.push(buildSolBody(q, ci, co, p.roomHospedesOrc?.[q] || [], quartosObs[`${q}_${pi}`], pi));
           }
         } else {
-          for (const q of quartos) {
-            await reservaApi.solicitar(buildSolBody(q, checkinStr, checkoutStr, quartoHospedesOrc[q] || [], quartosObs[`${q}_0`], 0));
-          }
+          for (const q of quartos) bodies.push(buildSolBody(q, checkinStr, checkoutStr, quartoHospedesOrc[q] || [], quartosObs[`${q}_0`], 0));
         }
+        // Responsável do grupo: o primeiro hóspede informado.
+        const responsavel = bodies.flatMap((b) => b.pessoas_orcamento).find((p) => p.nome?.trim())?.nome?.trim();
+        if (bodies.length > 1 && responsavel) bodies[0].grupo_descricao = responsavel;
+        await reservaApi.solicitarLote(bodies);
         await onSave?.({ _isSolicitacao: true });
         return;
       }
@@ -6413,7 +6566,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
         const horaMeia = (periodoMode === 'unico' && meiaDiaria && horaSaidaMeia > ct.checkout)
           ? horaSaidaMeia
           : null;
+        const hospedagemId = hospedagemIdDe(quartoId);
         return {
+          ...(hospedagemId ? { hospedagem_id: hospedagemId } : {}),
           quarto_id:          parseInt(quartoId),
           status:             forcePernoite ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA',
           data_hora_checkin:  `${toBrDate(dataEntrada)} ${ciHora}`,
@@ -6467,7 +6622,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     <JanelaGaveta open onClose={onClose} size="lg" criando={saving}
       criandoTxt={forceOrcamento ? tr('Criando orçamento…') : isSolicitacao ? tr('Criando solicitação…') : tr('Criando reserva…')}
       bodyStyle={{ padding: '16px 22px' }}
-      title={<><Plus size={15} /> {forcePernoite ? tr('Novo Pernoite') : isSolicitacao ? tr('Nova Solicitação') : forceOrcamento ? tr('Novo Orçamento') : tr('Nova Reserva')}</>}
+      title={<><Plus size={15} /> {conf ? tr('Aprovar solicitação') : forcePernoite ? tr('Novo Pernoite') : isSolicitacao ? tr('Nova Solicitação') : forceOrcamento ? tr('Novo Orçamento') : tr('Nova Reserva')}</>}
       footer={
         <div className={styles.footerRight}>
           <div className={styles.footerRight}>
@@ -6643,8 +6798,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <SemCadastroHospedesPicker
                     value={quartoHospedesOrc[q] || []}
                     onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
-                    onDraftChange={setSemCadastroDraft} />
-                  <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
+                    onDraftChange={setSemCadastroDraft}
+                      extra={<TipoHospedagemSelect compacto value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                 </div>
               ))}
             </>
@@ -6737,8 +6892,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     <SemCadastroHospedesPicker
                       value={mpRoomHospedesOrc[q] || []}
                       onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
-                      onDraftChange={setSemCadastroDraft} />
-                    <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />
+                      onDraftChange={setSemCadastroDraft}
+                      extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
@@ -6865,7 +7020,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     <SemCadastroHospedesPicker
                       value={quartoHospedesOrc[q] || []}
                       onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
-                      onDraftChange={setSemCadastroDraft} />
+                      onDraftChange={setSemCadastroDraft}
+                      extra={<TipoHospedagemSelect compacto value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                   ) : (
                     <RoomHospedesPicker
                       value={quartoHospedes[q] || []}
@@ -6873,7 +7029,6 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       empresaMode={hospEmpresa}
                       extra={<TipoHospedagemSelect compacto value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                   )}
-                  {isOrcSemCadastro && <TipoHospedagemSelect value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />}
                 </div>
               ))}
               {halfDailyMinCheckin && (
@@ -6990,7 +7145,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       <SemCadastroHospedesPicker
                         value={mpRoomHospedesOrc[q] || []}
                         onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
-                        onDraftChange={setSemCadastroDraft} />
+                        onDraftChange={setSemCadastroDraft}
+                      extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                     ) : (
                       <RoomHospedesPicker
                         value={mpRoomHospedes[q] || []}
@@ -6998,7 +7154,6 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         empresaMode={hospEmpresa}
                         extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                     )}
-                    {isOrcSemCadastro && <TipoHospedagemSelect value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />}
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
@@ -7591,11 +7746,6 @@ export default function BookingCalendar() {
     return flat.map(normalizeReserva).filter((r) => r.dataInicio);
   };
 
-  const mergeFlat = (a, b) => {
-    const seen = new Set(a.map((r) => r.id));
-    return [...a, ...b.filter((r) => !seen.has(r.id))];
-  };
-
   const flatAndNorm = (arr) => {
     const items = Array.isArray(arr) ? arr : [];
     const seen = new Set();
@@ -7607,19 +7757,19 @@ export default function BookingCalendar() {
   };
 
   const loadReservas = async () => {
-    const mes = viewDate.getMonth() + 1;
+    // Uma chamada só: tudo que cruza o mês exibido e o seguinte (inclui quem entrou no mês anterior).
     const ano = viewDate.getFullYear();
-    const nextMonthDate = new Date(ano, mes, 1);
-    const nextMes = nextMonthDate.getMonth() + 1;
-    const nextAno = nextMonthDate.getFullYear();
+    const mes = viewDate.getMonth();
+    const inicio = toBrDate(formatDate(new Date(ano, mes, 1)));
+    const fim    = toBrDate(formatDate(new Date(ano, mes + 2, 1)));
+    const hoje = new Date();
+    const desdeSolicitadas = toBrDate(formatDate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30)));
+    const solicitadasReq = hospedagemApi.calendario({ status: 'RESERVA_SOLICITADA', inicio: desdeSolicitadas });
 
     setLoading(true);
     try {
-      const [curr, next] = await Promise.all([
-        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], mes, ano }),
-        hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_FINALIZADO'], mes: nextMes, ano: nextAno }),
-      ]);
-      setReservas(mergeFlat(flatAndNorm(curr), flatAndNorm(next)));
+      const data = await hospedagemApi.calendario({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], inicio, fim });
+      setReservas(flatAndNorm(data));
       if (showGrupos) setGruposRefreshKey((k) => k + 1);
     } catch (_) {
       // ignore load failures here
@@ -7628,7 +7778,7 @@ export default function BookingCalendar() {
     }
 
     try {
-      const data = await hospedagemApi.buscar({ status: 'RESERVA_SOLICITADA' });
+      const data = await solicitadasReq;
       const flat = Array.isArray(data) ? data : [];
       const seen = new Set();
       const deduped = [];
@@ -7922,6 +8072,18 @@ export default function BookingCalendar() {
     return () => cancelAnimationFrame(id);
   }, [focoNova, loading]);
 
+  // Aprovar solicitação(ões): abre o assistente com quartos/datas já preenchidos. No grupo,
+  // aprova todas; na view de uma reserva, só ela (continua no grupo).
+  const [confirmarSol, setConfirmarSol] = useState(null); // { reservas, grupoId, descricao }
+  const abrirAprovacao = (lista, grupoId = null, descricao = '') => {
+    const pendentes = (lista ?? []).filter((r) => r.status === 'solicitada' && r.dataInicio);
+    if (!pendentes.length) { notify(tr('Nenhuma solicitação pendente para aprovar.'), 'error'); return; }
+    setShowSolicitacoes(false);
+    setShowGrupos(false);
+    setSelectedReserva(null);
+    setConfirmarSol({ reservas: pendentes, grupoId, descricao: descricao || pendentes[0].titularNome || '' });
+  };
+
   const handleSaveNew = async (bodyOrFlag) => {
     // Nova reserva pode criar ou entrar num grupo — a lista de grupos recarrega.
     setGruposRefreshKey((k) => k + 1);
@@ -7930,6 +8092,7 @@ export default function BookingCalendar() {
     if (bodyOrFlag?._isOrcamento) {
       notify(tr('Orçamento criado!'));
       setShowCreateModal(false);
+      loadReservas();
       return;
     }
 
@@ -7961,7 +8124,8 @@ export default function BookingCalendar() {
       } else {
         await loadReservas();
       }
-      notify(novas.length > 1 ? tr('{{length}} reservas criadas!', { length: novas.length }) : tr('Reserva criada!'));
+      const msgCriada = novas.length > 1 ? tr('{{length}} reservas criadas!', { length: novas.length }) : tr('Reserva criada!');
+      notify(msgCriada);
       setShowCreateModal(false);
       return;
     }
@@ -8084,10 +8248,10 @@ export default function BookingCalendar() {
     }
   };
 
-  const handleSyncReserva = (normalized) => {
+  const handleSyncReserva = (normalized, { silencioso = false } = {}) => {
     setReservas((rs) => rs.map((r) => r.id === normalized.id ? normalized : r));
     setSelectedReserva((prev) => prev?.id === normalized.id ? normalized : prev);
-    setGruposRefreshKey((k) => k + 1);
+    if (!silencioso) setGruposRefreshKey((k) => k + 1);
   };
 
   const exitSelectionMode = useCallback(() => {
@@ -8258,9 +8422,9 @@ export default function BookingCalendar() {
             className={startInView ? styles.barStatusTag : styles.barStatusTagInline}
             style={grupoCor ? { background: `color-mix(in srgb, ${grupoCor} 70%, #000)` } : undefined}
           >
-            {orig.status === 'confirmada' && (grupoCor ? <>{tr('Reserva em grupo #')}{orig.grupo_id}</> : orig.empresaNome ? <><Building2 size={9} strokeWidth={2.5} /> {tr('Reserva empresa')}</> : <><Check size={9} strokeWidth={3} /> {rotuloReservaTipo(orig.tipoHospedagem, totalPeople)}</>)}
+            {orig.status === 'confirmada' && (grupoCor ? <>{rotuloReservaTipo(orig.tipoHospedagem, totalPeople)} · {tr('Grupo')} {orig.grupo_id}</> : orig.empresaNome ? <><Building2 size={9} strokeWidth={2.5} /> {tr('Reserva empresa')}</> : <><Check size={9} strokeWidth={3} /> {rotuloReservaTipo(orig.tipoHospedagem, totalPeople)}</>)}
             {orig.status === 'solicitada' && <>{tr('Reserva solicitada')}</>}
-            {orig.status === 'hospedado'  && (grupoCor ? <>{tr('Hospedagem em grupo #')}{orig.grupo_id}</> : orig.empresaNome ? <><Building2 size={9} strokeWidth={2.5} /> {tr('Hospedagem empresa')}</> : <><Check size={9} strokeWidth={3} /> {tr('Hospedado')}</>)}
+            {orig.status === 'hospedado'  && (grupoCor ? <>{rotuloHospedagemTipo(orig.tipoHospedagem, totalPeople)} · {tr('Grupo')} {orig.grupo_id}</> : orig.empresaNome ? <><Building2 size={9} strokeWidth={2.5} /> {tr('Hospedagem empresa')}</> : <><Check size={9} strokeWidth={3} /> {rotuloHospedagemTipo(orig.tipoHospedagem, totalPeople)}</>)}
             {orig.status === 'finalizado' && <>{tr('Finalizado')}</>}
             {orig.status === 'cancelado'  && <>{tr('Cancelado')}</>}
             {orig.status === 'orcamento'  && <>{tr('Orçamento')}</>}
@@ -8492,12 +8656,12 @@ export default function BookingCalendar() {
                 {[
                   { k: 'grupos', ic: <Users size={16} />,    rot: tr('Grupos'),       sub: tr('Reservas em grupo e pagamentos'),  on: () => { setGrupoInicial(null); setShowGrupos(true); } },
                   { k: 'orc',    ic: <FileText size={16} />, rot: tr('Orçamentos'),   sub: tr('Propostas enviadas aos hóspedes'), on: () => setShowOrcamentos(true) },
-                  { k: 'sol',    ic: <Bell size={16} />,     rot: tr('Solicitações'), sub: tr('Pedidos aguardando aprovação'),    on: () => setShowSolicitacoes(true), n: solicitadasCount },
+                  { k: 'sol',    ic: <Inbox size={16} />,     rot: tr('Solicitações'), sub: tr('Pedidos aguardando aprovação'),    on: () => setShowSolicitacoes(true), n: solicitadasCount },
                 ].map((s) => (
                   <button key={s.k} type="button" className={[styles.hdrServico, styles["hdrServico_" + s.k]].join(" ")} onClick={s.on} title={s.sub}>
                     {s.ic}
                     <span>{s.rot}</span>
-                    {s.n > 0 && <span className={styles.sideBadge}>{s.n}</span>}
+                    {s.n > 0 && <SinoContagem n={s.n} />}
                   </button>
                 ))}
               </div>
@@ -8626,11 +8790,24 @@ export default function BookingCalendar() {
       </div>
       </div>
       {/* Modals */}
-      {selectedReserva && isDesktop && <ReservaModal inline saindo={fechandoReserva} key={selectedReserva.id} reserva={selectedReserva} onVoltar={reservaDoGrupo && showGrupos ? true : null} onClose={() => { setFechandoReserva(true); setTimeout(() => { setSelectedReserva(null); setReservaDoGrupo(false); setDragEditValues(null); setFechandoReserva(false); }, 200); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
+      {selectedReserva && isDesktop && <ReservaModal inline saindo={fechandoReserva} key={selectedReserva.id} reserva={selectedReserva} onVoltar={reservaDoGrupo && showGrupos ? true : null} onClose={() => { setFechandoReserva(true); setTimeout(() => { setSelectedReserva(null); setReservaDoGrupo(false); setDragEditValues(null); setFechandoReserva(false); }, 200); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} carregarDetalhes onAprovarSolicitacao={abrirAprovacao} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap}
           initialGrupo={createInit.grupo ?? null} />
+      )}
+      {confirmarSol && (
+        <CreateModal confirmar={confirmarSol}
+          reservas={allReservas.filter((r) => !confirmarSol.reservas.some((c) => c.id === r.id))}
+          onClose={() => setConfirmarSol(null)}
+          onSave={async () => {
+            const n = confirmarSol.reservas.length;
+            setConfirmarSol(null);
+            await loadReservas();
+            setGruposRefreshKey((k) => k + 1);
+            notify(n > 1 ? tr('Grupo aprovado — {{n}} reservas confirmadas!', { n }) : tr('Solicitação aprovada!'));
+          }}
+          onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} />
       )}
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {dayModal && (
@@ -8650,6 +8827,7 @@ export default function BookingCalendar() {
           tiposPagamento={tiposPagamento}
           onClose={() => { setShowGrupos(false); setGrupoInicial(null); }}
           onNotify={notify}
+          onAprovarGrupo={abrirAprovacao}
           onSelectReserva={(r) => { setSelectedReserva(r); setReservaDoGrupo(true); }}
           onNovaReservaGrupo={(grupoId, periodo) => {
             setShowGrupos(false);
@@ -8686,16 +8864,19 @@ export default function BookingCalendar() {
           roomDescMap={roomDescMap}
           onSave={handleSaveNew}
           onSelectReserva={(r) => setSelectedReserva(r)}
+          onNotify={notify}
+          onAlterado={loadReservas}
         />
       )}
       </JanelaCtx.Provider>
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {showSolicitacoes && (
         <SolicitacoesModal onClose={() => setShowSolicitacoes(false)}
-          onSelectReserva={(r) => setSelectedReserva(r)} />
+          onSelectReserva={(r) => setSelectedReserva(r)}
+          onAprovar={abrirAprovacao} />
       )}
       </JanelaCtx.Provider>
-      {selectedReserva && !isDesktop && <ReservaModal key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
+      {selectedReserva && !isDesktop && <ReservaModal key={selectedReserva.id} reserva={selectedReserva} onClose={() => { setSelectedReserva(null); setDragEditValues(null); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} carregarDetalhes onAprovarSolicitacao={abrirAprovacao} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
 
       {/* ── Multi-payment selection panel ── */}
       {pagamentoModoAtivo && (
@@ -8860,9 +9041,9 @@ export default function BookingCalendar() {
 
           <div className={styles.floatBtnWrap}>
             <button className={styles.floatBtn} onClick={() => setShowSolicitacoes(true)}>
-              <Bell size={15} />
+              <Inbox size={15} />
               <span>{tr('Solicitações')}</span>
-              {solicitadasCount > 0 && <span className={styles.floatBadge}>{solicitadasCount}</span>}
+              {solicitadasCount > 0 && <SinoContagem n={solicitadasCount} />}
             </button>
           </div>
         </div>
