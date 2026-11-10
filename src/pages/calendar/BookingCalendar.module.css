@@ -5273,3 +5273,52 @@ a.rvContato:hover span { text-decoration: underline; }
 }
 .hpAplicar:hover:not(:disabled) { filter: brightness(1.08); }
 .hpAplicar:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Padrão do site: estatísticas no fundo da página, coluna de quartos/categorias escura,
+   botões do calendário sem fundo e o dia atual destacado. */
+.page .sidePanel .lstStats,
+[data-theme='dark'] .page .sidePanel .lstStats { background: var(--l-bg); color: var(--l-fg); }
+.page .sidePanel .lstStat + .lstStat,
+[data-theme='dark'] .page .sidePanel .lstStat + .lstStat { box-shadow: inset 1px 0 0 var(--border); }
+
+.page .cornerCell { background: var(--surface); color: var(--text-2); border-right-color: var(--border); box-shadow: inset 0 -1px 0 var(--border); }
+.page .roomLabel { background: var(--surface); border-right-color: var(--border); box-shadow: inset 0 -1px 0 var(--border); }
+.page .roomLabel:hover { background: color-mix(in oklch, var(--l-accent) 60%, var(--surface)); }
+.page .roomLabel .roomNum { color: var(--text); }
+.page .roomLabel:hover .roomNum { color: var(--violet); }
+.page .roomLabel .roomPax, .page .roomLabel .roomDesc { color: var(--text-2); }
+.page .catRow, .page .catRow:hover,
+.page .catLabel, .page .catRow:hover .catLabel { background: var(--l-secondary); color: var(--text); box-shadow: inset 0 -1px 0 var(--border); }
+.page .catRow:hover, .page .catRow:hover .catLabel { background: var(--l-accent); }
+.page .catLabel .chevronIcon { color: var(--text-2); }
+
+.page .tableHeader .todayBtn,
+.page .hdrServico, .page .hdrServico.hdrServico_grupos, .page .hdrServico.hdrServico_orc, .page .hdrServico.hdrServico_sol,
+[data-theme='dark'] .page .hdrServico_grupos, [data-theme='dark'] .page .hdrServico_orc, [data-theme='dark'] .page .hdrServico_sol {
+  background: transparent; color: var(--l-fg); border: 1px solid transparent; box-shadow: none;
+}
+.page .tableHeader .todayBtn:hover,
+.page .hdrServico:hover, .page .hdrServico.hdrServico_grupos:hover, .page .hdrServico.hdrServico_orc:hover, .page .hdrServico.hdrServico_sol:hover {
+  background: color-mix(in oklch, var(--l-fg) 6%, transparent); color: var(--l-fg);
+}
+.page .hdrServico svg, .page .hdrServico.hdrServico_sol svg { color: var(--l-primary); }
+.page .hdrServico.hdrServico_orc svg { color: #ea580c; }
+.page .hdrServico .sideBadge, .page .hdrServico.hdrServico_sol .sideBadge { background: var(--l-primary); color: #fff; }
+
+.page .cellToday { background: color-mix(in oklch, var(--l-primary) 13%, transparent); }
+[data-theme='dark'] .page .cellToday { background: color-mix(in oklch, var(--l-primary) 20%, transparent); }
+.page .dayHeaderToday { background: color-mix(in oklch, var(--l-primary) 16%, var(--surface)); }
+[data-theme='dark'] .page .dayHeaderToday { background: color-mix(in oklch, var(--l-primary) 24%, var(--surface)); }
+
+/* Abas da reserva: sem título repetido; só a ação, à direita */
+.rcSectionHeadSemTit { justify-content: flex-end; }
+.rcSectionHeadSemTit:empty { display: none; }
+
+/* Resumo financeiro do apartamento (criar reserva): sem caixa, só uma linha separando das pessoas */
+.page .finResumoQuarto,
+.page .rvGavetaCriar .finResumoQuarto {
+  margin: 12px 0 6px; padding: 12px 0 0; gap: 10px;
+  background: none; border: none; border-top: 1px solid var(--border); border-radius: 0; box-shadow: none;
+}
+.page .finResumoQuarto .finCab { margin: 0; padding: 0; background: none; border: none; position: static; }
+.page .finResumoQuarto .finCab .finTit { color: var(--l-fg); font-size: 14px; }

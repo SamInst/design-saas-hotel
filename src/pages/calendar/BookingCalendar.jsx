@@ -3009,8 +3009,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           {/* ── Hóspedes ── */}
           {abaAtiva === 'hospedes' && (
           <div className={styles.rcSection}>
-            <div className={styles.rcSectionHead}>
-              <span className={styles.rcSectionLabel}>{tr('Hóspedes')}</span>
+            <div className={[styles.rcSectionHead, styles.rcSectionHeadSemTit].join(' ')}>
               {temOpcoes && (
                 <button type="button" className={styles.rvSecBtn} onClick={abreEdicaoPessoas}>
                   {tr('Editar pessoas')}
@@ -3031,8 +3030,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             const funcAjuste = reserva.novoPreco?.funcionario?.nome;
             return (
               <div className={styles.rcSection}>
-                <div className={styles.rcSectionHead}>
-                  <span className={styles.rcSectionLabel}>{tr('Diárias')}</span>
+                <div className={[styles.rcSectionHead, styles.rcSectionHeadSemTit].join(' ')}>
                   {temOpcoes && (
                     <button type="button" className={styles.rvSecBtn}
                       onClick={() => { setAcoesOpen(false); setEditActiveTab('dados'); setEditing(true); }}>
@@ -3084,8 +3082,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
           {/* ── Pagamentos ── */}
           {abaAtiva === 'pagamentos' && (
             <div className={styles.rcSection}>
-              <div className={styles.rcSectionHead}>
-                <span className={styles.rcSectionLabel}>{tr('Pagamentos')}</span>
+              <div className={[styles.rcSectionHead, styles.rcSectionHeadSemTit].join(' ')}>
                 {temOpcoes && (
                   <button type="button" className={styles.rvSecBtn}
                     onClick={() => { setAcoesOpen(false); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
@@ -3145,8 +3142,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             </div>
           ) : (reserva.observacao || temOpcoes) ? (
             <div className={styles.rcSection}>
-              <div className={styles.rcSectionHead}>
-                <span className={styles.rcSectionLabel}>{tr('Observação')}</span>
+              <div className={[styles.rcSectionHead, styles.rcSectionHeadSemTit].join(' ')}>
                 {temOpcoes && !obsAberta && (
                   <button type="button" className={styles.rvSecBtn}
                     onClick={() => { setAcoesOpen(false); setObsTexto(reserva.observacao ?? ''); setObsAberta(true); }}>
