@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  CalendarDays, Wallet, Package, Tag, LogOut, MoreVertical,
-  UserCog, Users, ShieldCheck, Building2, Settings, ChevronsLeft, ChevronsRight, Hotel, ChevronDown, Check, Loader2,
+  CalendarDays, Wallet, Package, Tag, LogOut,
+  UserCog, Users, ShieldCheck, Building2, Settings, Hotel, ChevronDown, Check, Loader2, Sun, Moon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import styles from './Sidebar.module.css';
@@ -23,7 +23,7 @@ const lerRecolhido = () => { try { return localStorage.getItem('sidebar:recolhid
 const gravarRecolhido = (v) => { try { localStorage.setItem('sidebar:recolhido', v ? '1' : '0'); } catch { /* sem storage */ } };
 
 
-export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
+export default function Sidebar({ currentPage, onNavigate, user, onLogout, isDark, onToggleTheme }) {
   const { t } = useTranslation();
   const { hasTela, loggedUser, contexto } = usePermissions();
   const hoteis = contexto?.hoteis ?? [];
@@ -69,7 +69,6 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
     return () => { document.removeEventListener('mousedown', fora); document.removeEventListener('keydown', tecla); };
   }, [contaAberta]);
 
-  const alterna = () => setRecolhido((v) => { gravarRecolhido(!v); return !v; });
 
   const rawNome = loggedUser?.pessoa?.nome ?? user?.name ?? '';
   const parts   = rawNome.trim().split(/\s+/).filter(Boolean);
@@ -78,7 +77,6 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
   const iniciais = parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : (nome.charAt(0) || 'U').toUpperCase();
 
   const permitidos = NAV_ITEMS.filter((i) => hasTela(i.tela));
-  const visiveis = [...permitidos.filter((i) => i.id === currentPage), ...permitidos.filter((i) => i.id !== currentPage)];
 
   const go = (id) => onNavigate(id);
 
@@ -94,9 +92,10 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
   );
 
   return (
-    <aside className={[styles.sidebar, recolhido ? styles.recolhido : ''].join(' ')} aria-label={t('nav.menu')} role="navigation">
+    <aside className={styles.sidebar} aria-label={t('nav.menu')} role="navigation">
+      <span className={styles.janelaPontos} aria-hidden="true"><i /><i /><i /></span>
+      {podeTrocar && (
       <div className={styles.topo}>
-        <span className={styles.logo}><Hotel size={18} strokeWidth={2} /></span>
         <div className={styles.hotel} ref={hotelRef}>
           {podeTrocar ? (
             <button type="button" className={[styles.marca, styles.marcaBotao].join(' ')}
@@ -105,9 +104,7 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
               <span className={styles.marcaTxt}>{hotelAtual?.nome}</span>
               <ChevronDown size={14} className={hoteisAberto ? styles.marcaSetaAberta : ''} />
             </button>
-          ) : (
-            <span className={styles.marca}>{hotelAtual?.nome ?? ''}</span>
-          )}
+          ) : null}
           {hoteisAberto && (
             <div className={styles.hoteisMenu} role="menu">
               {hoteis.map((h) => (
@@ -126,35 +123,30 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }) {
             </div>
           )}
         </div>
-        <button type="button" className={styles.recolher} onClick={alterna}
-          aria-label={recolhido ? t('nav.expand', 'Expandir menu') : t('nav.collapse', 'Recolher menu')}
-          title={recolhido ? t('nav.expand', 'Expandir menu') : t('nav.collapse', 'Recolher menu')}>
-          {recolhido ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-        </button>
       </div>
+      )}
 
       <nav className={styles.nav}>
         <ul className={styles.lista}>
-          {visiveis.map((i) => item({ id: i.id, label: t(i.label), icon: i.icon, ativo: currentPage === i.id, onClick: () => go(i.id) }))}
+          {permitidos.map((i) => item({ id: i.id, label: t(i.label), icon: i.icon, ativo: currentPage === i.id, onClick: () => go(i.id) }))}
         </ul>
       </nav>
 
       <ul className={[styles.lista, styles.rodape].join(' ')}>
-        {item({ id: 'settings', label: t('profile.settings'), icon: Settings, ativo: currentPage === 'settings', onClick: () => go('settings') })}
+        {onToggleTheme && item({ id: '_tema', label: isDark ? t('theme.light', 'Tema claro') : t('theme.dark', 'Tema escuro'), icon: isDark ? Moon : Sun, onClick: onToggleTheme })}
       </ul>
 
       <div className={styles.conta} ref={contaRef}>
-        <span className={styles.avatar} aria-hidden="true">{iniciais}</span>
-        <span className={styles.contaTxt}>
-          <b>{nome}</b>
-          <small>{cargo}</small>
-        </span>
-        <button type="button" className={styles.contaMais} onClick={() => setContaAberta((v) => !v)}
-          aria-haspopup="menu" aria-expanded={contaAberta} aria-label={t('nav.account', 'Conta')}>
-          <MoreVertical size={16} />
+        <button type="button" className={styles.contaBtn} onClick={() => setContaAberta((v) => !v)}
+          aria-haspopup="menu" aria-expanded={contaAberta} aria-label={`${t('nav.account', 'Conta')}: ${nome}, ${cargo}`} title={`${nome} · ${cargo}`}>
+          <span className={styles.avatar} aria-hidden="true">{iniciais.charAt(0)}</span>
+          <span className={styles.contaNome}>{parts[0] || nome}</span>
         </button>
         {contaAberta && (
           <div className={styles.contaMenu} role="menu">
+            <button type="button" role="menuitem" className={styles.contaOpcao} onClick={() => { setContaAberta(false); go('settings'); }}>
+              <Settings size={15} /> {t('profile.settings')}
+            </button>
             <button type="button" role="menuitem" className={styles.sair} onClick={() => { setContaAberta(false); onLogout(); }}>
               <LogOut size={15} /> {t('profile.logout')}
             </button>

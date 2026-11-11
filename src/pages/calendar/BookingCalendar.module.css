@@ -4692,7 +4692,7 @@ a.rvContato:hover span { text-decoration: underline; }
 .criarTipoHosp select { flex: 1; min-width: 0; max-width: 220px; margin-left: auto; }
 .criarTipoVazio { color: var(--l-muted-fg, var(--text-2)); }
 
-.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) {
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) {
   & .rcTitle          { font-size: 20px; }
   & .rcHeadMeta       { font-size: 12px; }
   & .rcChip           { font-size: 12px; }
@@ -5322,3 +5322,977 @@ a.rvContato:hover span { text-decoration: underline; }
 }
 .page .finResumoQuarto .finCab { margin: 0; padding: 0; background: none; border: none; position: static; }
 .page .finResumoQuarto .finCab .finTit { color: var(--l-fg); font-size: 14px; }
+
+/* ── Barra lateral: abas Reservas / Orçamentos / Solicitações ─────────────── */
+.page .sidePanel.lb {
+  --lb-saida: #B45309; --lb-chegada: #1D6B45; --lb-alerta: #B42318;
+  --lb-trilho: color-mix(in oklch, var(--l-muted-fg) 22%, transparent);
+  padding: 0; gap: 0; overflow: hidden;
+  background: var(--l-card); border: 1px solid var(--border); border-radius: var(--l-r-xl); box-shadow: var(--l-shadow);
+  color: var(--l-fg); font-size: 14px; line-height: 1.35; font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] .page .sidePanel.lb { --lb-saida: #F5A524; --lb-chegada: #3DD68C; --lb-alerta: #E5484D; }
+.page .sidePanel.lb > .lbAbas { margin: 6px 20px 0; }
+.page .sidePanel.lb > .lbAcoes { padding: 16px 20px 0; }
+.page .sidePanel.lb > .sideGrupo,
+.page .sidePanel.lb > .sideGrupo:has(> .sideResultados, > .sideVazio) {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0; padding: 0 20px 24px; gap: 0;
+  background: none; border: none; box-shadow: none; border-radius: 0;
+}
+.page .sidePanel.lb > .sideGrupo:has(> .sideResultados, > .sideVazio) { padding-top: 16px; }
+.page .sidePanel.lb .slotEsq:not(:empty) { margin: 0; padding: 0; background: none; border: none; box-shadow: none; border-radius: 0; }
+.page .sidePanel.lb .slotEsq:not(:empty) ~ .lbHoje { display: none; }
+.page .sidePanel.lb .slotEsq .janela:has(> .janelaCorpo > .lbAcoes) .janelaCorpo { padding: 0; }
+.page .sidePanel.lb .slotEsq:has(.diaTopo, .janelaHead) { padding-top: 16px; }
+.page .sidePanel.lb .slotEsq .lbAcoes {
+  position: sticky; top: 0; z-index: 3; padding: 16px 0 4px; background: var(--l-card);
+}
+
+.lbAbas { display: flex; gap: 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.lbAba {
+  display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0; margin-bottom: -1px;
+  border: 0; border-bottom: 2px solid transparent; background: none;
+  font: inherit; font-size: 15px; font-weight: 500; color: var(--l-muted-fg); white-space: nowrap; cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.lbAba:hover { color: var(--l-fg); }
+.lbAba:focus-visible { outline: 2px solid var(--l-primary); outline-offset: -2px; border-radius: 4px; }
+.lbAbaOn { border-bottom-color: var(--l-primary); color: var(--l-fg); font-weight: 600; }
+.lbAbaN { font-size: 13px; font-weight: 500; color: var(--l-muted-fg); }
+.lbAbaAlerta {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--lb-alerta); color: #fff; font-size: 12px; font-weight: 600;
+}
+
+.lbAcoes { display: flex; gap: 8px; flex-shrink: 0; }
+.lbBusca {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box;
+  padding: 0 4px 0 12px; border-radius: 10px; background: var(--l-secondary);
+  transition: box-shadow .15s;
+}
+.lbBusca:focus-within { box-shadow: inset 0 0 0 1.5px var(--l-primary); }
+.lbBuscaIco { flex-shrink: 0; color: var(--l-muted-fg); }
+.lbBusca input {
+  flex: 1; min-width: 0; height: 40px; padding: 0; border: 0; background: none; outline: none;
+  font: inherit; color: var(--l-fg);
+}
+.lbBusca input::placeholder { color: var(--l-muted-fg); }
+.lbBusca .sideFiltroBtn { width: 36px; height: 36px; border: 0; border-radius: 8px; background: none; color: var(--l-fg); }
+.lbBusca .sideFiltroBtn:hover { background: color-mix(in oklch, var(--l-muted-fg) 14%, transparent); }
+.lbBusca .sideFiltroBtnOn { color: var(--l-primary); }
+.lbNovo {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px;
+  border: 0; border-radius: 10px; background: var(--l-primary); color: var(--l-primary-fg);
+  font: inherit; font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color .15s;
+}
+.lbNovo:hover { background: color-mix(in oklch, var(--l-primary) 88%, black); }
+.lbNovo:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; }
+
+.lbHoje { display: flex; flex-direction: column; }
+.lbOcupacao { margin-top: 28px; display: flex; flex-direction: column; gap: 10px; }
+.lbOcupTopo { display: flex; align-items: baseline; gap: 8px; color: var(--l-muted-fg); }
+.lbOcupTopo b { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; color: var(--l-fg); }
+.lbBarra { display: grid; }
+.lbBarra i { height: 6px; border-radius: 2px; background: var(--lb-trilho); }
+.lbBarra .lbBarraOn { background: var(--l-primary); }
+.lbNums { display: flex; gap: 20px; font-size: 13px; color: var(--l-muted-fg); }
+.lbNums b { font-weight: 600; color: var(--l-fg); }
+
+.lbSecao { margin-top: 28px; display: flex; flex-direction: column; }
+.lbOcupacao + .lbSecao { margin-top: 32px; }
+.lbSecaoHead { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; font-size: 13px; color: var(--l-muted-fg); }
+.lbSecaoHead h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--l-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbSecaoHead svg { flex-shrink: 0; }
+.lbQtd { margin-left: auto; font-size: 13px; color: var(--l-muted-fg); }
+.lbTomSaida   .lbSecaoHead :is(svg, h2) { color: var(--lb-saida); }
+.lbTomChegada .lbSecaoHead :is(svg, h2) { color: var(--lb-chegada); }
+.lbTomFica    .lbSecaoHead svg { color: var(--l-fg); }
+.lbSecaoMuda  .lbSecaoHead h2 { color: var(--l-muted-fg); }
+.lbAprovar {
+  margin-left: auto; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 10px;
+  border: 0; border-radius: 6px; background: var(--l-primary); color: var(--l-primary-fg);
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+
+.lbRow, .lbOrc {
+  position: relative; display: grid; align-items: center; box-sizing: border-box;
+  width: calc(100% + 16px); margin: 0 -8px; padding: 8px; border: 0; border-radius: 8px;
+  background: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: background-color .15s;
+}
+.lbRow { grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 12px; min-height: 64px; }
+.lbOrc { grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; min-height: 60px; }
+.lbRow:hover, .lbOrc:hover { background: color-mix(in oklch, var(--l-muted-fg) 8%, transparent); }
+.lbRow:focus-visible, .lbOrc:focus-visible { outline: 2px solid var(--l-primary); outline-offset: -2px; }
+.lbRow + .lbRow::before, .lbOrc + .lbOrc::before {
+  content: ""; position: absolute; top: 0; right: 8px; left: 8px; height: 1px; background: var(--border);
+}
+.lbRow + .lbRow::before { left: 60px; }
+.lbRowAtivo, .lbRowAtivo:hover { background: color-mix(in oklch, var(--l-primary) 9%, transparent); }
+.lbRowFeito { opacity: .6; }
+
+.lbQuarto { display: flex; flex-direction: column; gap: 1px; }
+.lbQuarto b { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+.lbQuarto small { font-size: 11px; color: var(--l-muted-fg); }
+.lbInfo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.lbNome { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lbMeta { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 3px; font-size: 13px; color: var(--l-muted-fg); }
+.lbMetaLinha { flex-basis: 100%; }
+.lbMetaCorta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lbIco { display: inline-flex; align-items: center; gap: 4px; }
+.lbStatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+.lbStatus i { width: 6px; height: 6px; border-radius: 50%; background: var(--l-fg); }
+.lbStatus_cancelado i, .lbStatus_ausente i { background: var(--lb-alerta); }
+.lbStatus_finalizado i { background: var(--l-muted-fg); }
+.lbSeta { color: var(--l-muted-fg); }
+
+.lbValor { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; white-space: nowrap; }
+.lbValor b { font-weight: 600; }
+.lbValor small { font-size: 12px; color: var(--l-muted-fg); }
+.lbOrcFim { color: var(--l-muted-fg); }
+.lbOrcFim :is(.lbNome, .lbValor b) { font-weight: 500; }
+.lbRiscado { text-decoration: line-through; }
+.lbValor .lbVencido { font-weight: 500; color: var(--lb-saida); }
+.lbTempo { font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+
+/* Dia e apartamento abertos na aba Reservas: título claro, sem a faixa escura */
+.page .sidePanel.lb .slotEsq .janela:has(.lbTopo) .janelaCorpo { padding: 0; display: block; }
+.lbTopo { display: flex; align-items: center; gap: 12px; padding-top: 20px; }
+.lbTopoTxt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.lbTopoTxt b { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; color: var(--l-fg); white-space: nowrap; }
+.lbTopoTxt span { font-size: 13px; color: var(--l-muted-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbTopoFechar {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border: 0; border-radius: 8px; background: none; color: var(--l-muted-fg); cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.lbTopoFechar:hover { background: var(--l-secondary); color: var(--l-fg); }
+.lbTopoFechar:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+.lbHojeDia > .lbOcupacao { margin-top: 20px; }
+
+.lbAbasSub { margin-top: 12px; }
+.lbAbasSub .lbAba { font-size: 14px; height: 40px; }
+.lbMes { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 16px; }
+.lbMes b { font-size: 14px; font-weight: 600; color: var(--l-fg); text-transform: capitalize; }
+.lbMes button {
+  display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+  border: 0; border-radius: 10px; background: var(--l-secondary); color: var(--l-fg); cursor: pointer;
+  transition: background-color .15s;
+}
+.lbMes button:hover { background: color-mix(in oklch, var(--l-muted-fg) 18%, transparent); }
+.lbMes button:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+.lbMes + .lbSecao, .lbAbasSub + .lbSecao { margin-top: 20px; }
+.lbRowSemQuarto { grid-template-columns: minmax(0, 1fr) auto; }
+.lbRowSemQuarto + .lbRow::before, .lbRow + .lbRowSemQuarto::before { left: 8px; }
+
+/* Abas centralizadas; número do quarto mais para dentro */
+.lbAbas { justify-content: center; }
+.lbRow:not(.lbRowSemQuarto) { grid-template-columns: 48px minmax(0, 1fr) auto; padding-left: 12px; }
+.lbRow:not(.lbRowSemQuarto) + .lbRow:not(.lbRowSemQuarto)::before { left: 72px; }
+.lbQuarto { align-items: center; text-align: center; }
+
+/* Resumo do dia no desenho anterior (caixa grafite com 4 números) */
+.lbHoje > .lbResumo { margin-top: 20px; }
+.lbHojeDia > .lbResumo { margin-top: 16px; }
+
+/* Grupos do dia */
+.lbSecaoGrupo .lbSecaoHead svg { color: var(--grupo); }
+.lbSecaoGrupo .lbSecaoHead h2 { color: var(--l-fg); }
+
+/* Busca no desenho anterior, com o filtro dentro do campo */
+.page .sidePanel.lb .lbBuscaAntiga { flex: 1; min-width: 0; max-width: none; margin-left: 0; }
+.lbBuscaAntiga .searchInput { padding-right: 68px; text-overflow: ellipsis; }
+.lbBuscaAntiga .clearSearch { right: 42px; }
+.lbBuscaAntiga .sideFiltroWrap { position: absolute; top: 2px; right: 2px; z-index: 2; }
+.lbBuscaAntiga .sideFiltroBtn { width: 36px; height: 36px; border: 0; border-radius: var(--l-r-md); background: none; color: var(--l-muted-fg); }
+.lbBuscaAntiga .sideFiltroBtn:hover { background: var(--l-secondary); color: var(--l-fg); }
+.lbBuscaAntiga .sideFiltroBtnOn { color: var(--l-primary); }
+.page .sidePanel.lb > .lbAcoes .lbNovo { height: 40px; }
+
+/* Resumo do dia no desenho de referência: 4 números soltos, fio embaixo */
+.page .sidePanel.lb .lbResumo .lstStats {
+  gap: 8px; padding: 0 0 20px; border-radius: 0; overflow: visible;
+  background: none; color: var(--l-fg); border-bottom: 1px solid var(--border);
+}
+.page .sidePanel.lb .lbResumo .lstStat { align-items: flex-start; gap: 2px; padding: 0; box-shadow: none; }
+.page .sidePanel.lb .lbResumo .lstStat b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.page .sidePanel.lb .lbResumo .lstStat span { font-size: 12px; color: var(--l-muted-fg); }
+.page .sidePanel.lb .lbResumo + .lbSecao { margin-top: 24px; }
+
+/* ── Gaveta da reserva no desenho de referência ─────────────────────────────── */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) {
+  --gv-faixa: #F1F3F7; --gv-faixa-ln: #E1E5EB; --gv-abas: #F4F6F8; --gv-hosp: #1D6B45; --gv-pend: #B45309;
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] :is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) {
+  --gv-faixa: color-mix(in oklch, var(--l-card) 88%, white); --gv-faixa-ln: var(--border);
+  --gv-abas: color-mix(in oklch, var(--l-card) 94%, white); --gv-hosp: #2F8F5F; --gv-pend: #F5A524;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead {
+  align-items: flex-start; padding: 18px 12px 16px 24px;
+  background: var(--gv-faixa); border-bottom: 1px solid var(--gv-faixa-ln);
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcHeadLeft { gap: 2px; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcTitle { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcHeadMeta { white-space: normal; color: var(--l-muted-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcCloseBtn {
+  width: 44px; height: 44px; margin-top: -8px; color: var(--l-muted-fg);
+}
+
+/* Estadia: datas soltas, sem caixa escura */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSecao { padding: 20px 24px 0; border: none; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoCard {
+  display: flex; flex-direction: column; gap: 16px; border-radius: 0; overflow: visible; background: none; color: var(--l-fg);
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDatas {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); column-gap: 16px; padding: 0;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoRot { font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--l-muted-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--l-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSub { font-size: 13px; color: var(--l-muted-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSeta { width: auto; height: auto; background: none; color: var(--l-muted-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoInfos { gap: 20px; border: none; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoInfo {
+  flex: 0 1 auto; justify-content: flex-start; gap: 4px; padding: 0; border: none;
+  font-size: 13px; color: var(--l-muted-fg); white-space: nowrap;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoInfo span {
+  font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--l-fg);
+}
+
+/* Abas: faixa cinza, abas de largura igual, sublinhado azul */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabs {
+  margin-top: 16px; padding: 0; gap: 0;
+  background: var(--gv-abas); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTab {
+  flex: 1 1 0; min-width: max-content; height: 44px; padding: 0 10px; font-size: 13px; font-weight: 500; text-align: center;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabAtiva { font-weight: 600; color: var(--l-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabAtiva::after { border-radius: 0; background: var(--l-primary); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTab:focus-visible { outline-offset: -2px; }
+
+/* Conteúdo das abas */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabs ~ .rcSection { padding: 24px 24px 0; border: none; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .hospResTit,
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcSectionLabel { font-size: 13px; font-weight: 600; color: var(--l-fg); text-transform: none; letter-spacing: 0; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .hospResNome,
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvHospNome {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .hospResMeta,
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvHospMeta { font-size: 13px; color: var(--l-muted-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvHospItem { display: flex; flex-direction: column; justify-content: center; min-height: 64px; padding: 8px 0; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvSecBtn { font-weight: 600; color: var(--l-primary); }
+
+/* Resumo financeiro: sem caixa, linhas de 44px, pendente em destaque */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvResumoFin .finResumo,
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finResumoView {
+  margin: 24px 24px 24px; padding: 0; gap: 0; background: none; border: none; border-radius: 0; overflow: visible;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finCab { margin: 0 0 4px; padding: 0; background: none; border: none; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finCab .finTit { font-size: 13px; font-weight: 600; color: var(--l-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finLinha {
+  align-items: center; min-height: 44px; font-size: 14px; color: var(--l-fg);
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finLinha + .finLinha { border-top: 1px solid var(--border); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finTotal,
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finTotal b { font-size: 16px; font-weight: 600; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finTotal b { font-size: 17px; letter-spacing: -0.01em; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finPendGrande { align-items: baseline; margin-top: 4px; padding-top: 14px; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finPendGrande > span { font-size: 17px; font-weight: 600; color: var(--l-fg); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .finPendGrande > b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--gv-pend); }
+
+/* Rodapé: Opções à esquerda, Pagamento e Hospedar à direita */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPainelRodape { padding: 16px 24px; border-top: 1px solid var(--border); }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodape { align-items: center; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeMais { order: -1; margin-right: auto; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeMais > .rvRodapeBtn {
+  padding: 0 4px; border: 0; background: none; font-weight: 500;
+}
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeBtn { height: 44px; padding: 0 16px; border-radius: 4px; font-weight: 500; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeHospedar { padding: 0 22px; background: var(--gv-hosp); font-weight: 600; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeHospedar:hover:not(:disabled) { background: color-mix(in oklch, var(--gv-hosp) 88%, black); }
+
+/* ── Gaveta: abas Diárias e Pagamentos no desenho de referência ─────────────── */
+.gvAbaHead { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.gvAbaHead h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--l-fg); }
+.gvAbaHead > span { font-size: 13px; color: var(--l-muted-fg); }
+.gvAbaLink {
+  margin-left: auto; display: inline-flex; align-items: center; height: 44px; padding: 0;
+  border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--l-primary); cursor: pointer;
+}
+.gvAbaLink:hover { text-decoration: underline; }
+.gvAbaLink:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; border-radius: 3px; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabs ~ .rcSection:has(> .gvAbaHead) { padding-top: 12px; padding-bottom: 24px; }
+
+.rvGavetaReserva .dtScroll:has(> .gvTabela) { margin: 0; border: none; border-radius: 0; overflow-x: auto; }
+.rvGavetaReserva .gvTabela { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--l-fg); background: none; }
+.rvGavetaReserva .gvTabela thead th {
+  padding: 0 0 8px; height: auto; background: none; border: 0; border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 500; color: var(--l-muted-fg); text-transform: none; letter-spacing: 0; text-align: left;
+}
+.rvGavetaReserva .gvTabela thead th:first-child { width: 36px; }
+.rvGavetaReserva .gvTabela tbody td {
+  height: 52px; padding: 0 8px 0 0; background: none; border: 0; border-bottom: 1px solid var(--border); vertical-align: middle;
+}
+.rvGavetaReserva .gvTabela tbody td:last-child { padding-right: 0; }
+.rvGavetaReserva .gvTabela tbody tr:hover td { background: none; }
+.rvGavetaReserva .gvTabela :is(th, td).dtDir { text-align: right; }
+.rvGavetaReserva .gvTabela .dtNum { padding: 0; background: none; color: var(--l-fg); font-size: 14px; font-weight: 600; }
+.rvGavetaReserva .gvTabela td:nth-child(3) { color: var(--l-muted-fg); }
+.rvGavetaReserva .gvTabela .dtValor { font-weight: 400; }
+.gvTotal { display: flex; align-items: baseline; gap: 16px; padding-top: 14px; }
+.gvTotal span { flex: 1; font-size: 14px; font-weight: 600; color: var(--l-fg); }
+.gvTotal b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--l-fg); }
+
+.gvPagLista { display: flex; flex-direction: column; }
+.gvPag {
+  position: relative; display: flex; align-items: center; gap: 16px; width: calc(100% + 16px); min-height: 60px;
+  margin: 0 -8px; padding: 10px 8px; box-sizing: border-box;
+  border: 0; border-radius: 8px; background: none; font: inherit; color: var(--l-fg); text-align: left; cursor: pointer;
+  transition: background-color .15s;
+}
+.gvPag:hover { background: color-mix(in oklch, var(--l-muted-fg) 8%, transparent); }
+.gvPag:focus-visible { outline: 2px solid var(--l-primary); outline-offset: -2px; }
+.gvPag + .gvPag::before { content: ""; position: absolute; top: 0; left: 8px; right: 8px; height: 1px; background: var(--border); }
+.gvPagInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.gvPagInfo > b { font-size: 14px; font-weight: 600; }
+.gvPagInfo > span { font-size: 13px; color: var(--l-muted-fg); }
+.gvPagInfo > small { font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gvPagInfo > small b { font-weight: 600; color: var(--l-fg); }
+.gvPagValor { flex-shrink: 0; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.gvPagCancelado { color: var(--l-muted-fg); }
+.gvPagCancelado .gvPagValor { text-decoration: line-through; font-weight: 500; }
+.gvSaldo { display: flex; flex-direction: column; gap: 8px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.gvSaldo > div { display: flex; gap: 16px; font-size: 13px; color: var(--l-muted-fg); }
+.gvSaldo > div > span:first-child { flex: 1; }
+.gvSaldo > .gvSaldoFim { align-items: baseline; padding-top: 4px; font-size: 14px; color: var(--l-fg); }
+.gvSaldoFim span { font-weight: 600; }
+.gvSaldoFim b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+
+/* ── Edição: comparador Atual → Novo (substitui o resumo financeiro flutuante) ── */
+.cmp {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--l-card, #fff); overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 16px;
+}
+.cmpLinha {
+  display: grid; grid-template-columns: 76px minmax(0, .85fr) minmax(0, 1.6fr);
+  column-gap: 10px;
+  align-items: center; gap: 12px;
+  min-height: 48px; padding: 6px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px; color: var(--l-fg);
+}
+.cmpLinha:first-child { border-top: none; }
+.cmpCab {
+  min-height: 36px; background: var(--l-secondary, #F1F3F7);
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--l-muted-fg);
+}
+.cmpCab span:last-child { display: inline-flex; align-items: center; gap: 6px; color: var(--l-primary); }
+.cmpRot { font-size: 12px; color: var(--l-muted-fg); }
+.cmpAntes { color: var(--l-muted-fg); overflow-wrap: anywhere; }
+.cmpNovo { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+.cmpNovo > * { width: 100%; }
+.cmpMudou .cmpAntes { text-decoration: line-through; }
+.cmpMudou .cmpNovo { color: var(--l-primary); font-weight: 600; }
+.cmpMudou { background: color-mix(in srgb, var(--l-primary) 5%, transparent); }
+.cmpTotal .cmpAntes, .cmpTotal .cmpNovo { font-size: 15px; font-weight: 600; }
+.cmpTotal .cmpAntes { font-weight: 500; }
+.cmpDif {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 16px; border-top: 1px solid var(--border);
+  font-size: 13px; font-weight: 500;
+}
+.cmpDif b { font-size: 15px; font-weight: 600; }
+.cmpDifMais { color: #B45309; background: color-mix(in srgb, #F59E0B 10%, transparent); }
+.cmpDifMenos { color: #1D6B45; background: color-mix(in srgb, #10B981 10%, transparent); }
+:root[data-theme="dark"] .cmpDifMais { color: #FBBF24; }
+:root[data-theme="dark"] .cmpDifMenos { color: #6EE7B7; }
+.rvFlutuante { display: none !important; }
+
+/* ── Edição dentro da gaveta: Valor atual → Novo valor no lugar do período ── */
+.rvGavetaReserva .rvValorAntes { color: var(--l-muted-fg); font-weight: 500; }
+.rvGavetaReserva .rvPeriodoSub.rvValorMais { color: #B45309; font-weight: 500; }
+.rvGavetaReserva .rvPeriodoSub.rvValorMenos { color: #1D6B45; font-weight: 500; }
+:root[data-theme="dark"] .rvGavetaReserva .rvPeriodoSub.rvValorMais { color: #FBBF24; }
+:root[data-theme="dark"] .rvGavetaReserva .rvPeriodoSub.rvValorMenos { color: #6EE7B7; }
+
+.rvEdicaoEmbutida .edAba { display: flex; flex-direction: column; padding: 12px 24px 24px; min-width: 0; color: var(--l-fg); font-variant-numeric: tabular-nums; }
+.edDica { margin: -6px 0 12px; font-size: 12px; line-height: 1.45; color: var(--l-muted-fg); }
+.edRot { font-size: 12px; font-weight: 400; color: var(--l-muted-fg); letter-spacing: 0; text-transform: none; }
+.edCampo { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.edCampos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; margin-bottom: 16px; }
+.edCampos .dateCompact, .edCampos .dateCompact > div, .edCampos .comboTrigger { width: 100%; min-width: 0; }
+.edMeia { display: inline-flex; align-items: center; gap: 6px; font-size: 12px !important; font-weight: 500 !important; letter-spacing: 0 !important; color: var(--l-primary); cursor: pointer; }
+.edMeia input { margin: 0; }
+.edMeiaHora { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: -4px 0 16px; }
+.edMeiaHora small { flex-basis: 100%; font-size: 12px; }
+
+.rvGavetaReserva .edTabela thead th:nth-child(3) { width: 84px; }
+.rvGavetaReserva .edTabela thead th:last-child, .edLixoCel { width: 32px; text-align: right; }
+.rvGavetaReserva .edTabela td:nth-child(3) { color: var(--l-fg); }
+.edQuarto { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.edSub { display: block; margin-top: 2px; font-size: 12px; color: var(--l-muted-fg); }
+.edAntes { display: block; font-size: 11.5px; color: var(--l-muted-fg); text-decoration: line-through; }
+.edLixo {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0; border: none; border-radius: 7px;
+  background: none; color: #C2410C; cursor: pointer;
+}
+.edLixo:hover { background: color-mix(in srgb, #DC2626 10%, transparent); color: #DC2626; }
+.edLixo:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+:root[data-theme="dark"] .edLixo { color: #F87171; }
+
+.edAdd {
+  display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  height: 40px; padding: 0; border: none; background: none;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--l-primary); cursor: pointer;
+}
+.edAdd:hover:not(:disabled) { text-decoration: underline; }
+.edAdd:disabled { opacity: .45; cursor: not-allowed; }
+.edAdd:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; border-radius: 4px; }
+.edRodapeTab { display: flex; align-items: center; gap: 14px; margin-top: 6px; }
+.edRodapeTab .edAdd { margin-right: auto; }
+.edTotalRot { font-size: 13px; font-weight: 600; }
+.edTotal { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+
+.edPessoas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.edPessoa { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.edRadio {
+  flex-shrink: 0; width: 18px; height: 18px; padding: 0; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--l-muted-fg) 70%, transparent); background: var(--l-card); cursor: pointer;
+}
+.edRadio:hover:not(:disabled) { border-color: var(--l-primary); }
+.edRadio:disabled { cursor: default; }
+.edRadioOn { border: 5px solid var(--l-primary); }
+.edRadio:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; }
+.edPessoaInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.edPessoaInfo > b { font-size: 13px; font-weight: 600; text-transform: uppercase; overflow-wrap: anywhere; }
+.edPessoaInfo > small { font-size: 12px; color: var(--l-muted-fg); }
+.edTitular { margin-left: 8px; font-size: 12px; font-weight: 500; text-transform: none; color: var(--l-primary); }
+.rvEdicaoEmbutida .edAba .gpBusca { margin-top: 12px; padding: 0; }
+
+.edPag { padding-right: 0; }
+.edPagAbrir { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0; border: none; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.edPagAbrir:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; border-radius: 4px; }
+
+.edRodape { gap: 10px; }
+@container direita (max-width: 420px) { .edCampos { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .edCampos > .edCampo:last-child { grid-column: 1 / -1; } }
+
+/* ── Gaveta mais quadrada ── */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo),
+.rvGaveta.rvGavetaAcao { border-radius: 4px; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPainelRodape { border-radius: 0 0 4px 4px; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcHead { border-radius: 4px 4px 0 0; }
+.rvGavetaReserva .gvPag { border-radius: 2px; }
+.rvGavetaReserva :is(.rvEdicaoEmbutida, .edAba) :is(input:not([type='checkbox']):not([type='radio']), select, .comboTrigger, .dateCompact > div > div),
+.rvGavetaReserva .edQuarto { border-radius: 4px !important; }
+
+/* ── View: Resumo e Hóspedes ── */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcSection.vwAba { display: flex; flex-direction: column; gap: 0; padding-top: 16px; padding-bottom: 24px; }
+.vwTit { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--l-fg); }
+.vwAba .gvAbaHead { margin-bottom: 4px; }
+.vwAba .gvAbaLink { margin-left: auto; }
+.vwPessoa { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 0; }
+.vwPessoas .vwPessoa + .vwPessoa { border-top: 1px solid var(--border); }
+.vwPessoaInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.vwPessoaInfo > b { font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--l-fg); overflow-wrap: anywhere; }
+.vwPessoaInfo > span { font-size: 12px; color: var(--l-muted-fg); font-variant-numeric: tabular-nums; }
+.vwPapel { margin-left: 8px; font-size: 11.5px; font-weight: 400; text-transform: none; color: var(--l-muted-fg); }
+.vwPessoa .rvSecBtn {
+  height: auto; padding: 0; border: none; background: none; box-shadow: none;
+  font-size: 13px; font-weight: 500; color: var(--l-primary);
+}
+.vwPessoa .rvSecBtn:hover { background: none; text-decoration: underline; }
+
+.rf { display: flex; flex-direction: column; margin-top: 20px; font-variant-numeric: tabular-nums; color: var(--l-fg); }
+.rfLinha { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 44px; padding: 6px 0; font-size: 13px; }
+.rfTxt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rfTxt small { font-size: 12px; color: var(--l-muted-fg); }
+.rfVal { flex-shrink: 0; white-space: nowrap; font-weight: 500; }
+b.rfVal { font-weight: 600; }
+.rfTotal { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); margin: 4px 0; font-size: 15px; }
+.rfTotal span, .rfTotal b { font-weight: 600; }
+.rfTotal b { font-size: 17px; letter-spacing: -0.01em; }
+.rfPend { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--border); }
+.rfPend span { font-size: 15px; font-weight: 600; }
+.rfPend b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.rfPendAberto b { color: #C2410C; }
+.rfPendOk b { color: #1D6B45; }
+:root[data-theme="dark"] .rfPendAberto b { color: #FB923C; }
+:root[data-theme="dark"] .rfPendOk b { color: #6EE7B7; }
+.rfOk { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin: 2px 0 0; font-size: 12px; font-weight: 500; color: #1D6B45; }
+:root[data-theme="dark"] .rfOk { color: #6EE7B7; }
+
+.edAddAbaixo { margin-top: 12px; }
+.rfTotal + .rfPend { margin-top: 0; padding-top: 6px; border-top: none; }
+
+/* ── Gaveta: valores exatos do HTML de referência (Gaveta — Resumo) ─────────── */
+:root:not([data-theme="dark"]) .rvGaveta:is(:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo), .rvGavetaAcao) {
+  --l-fg: #16202E; --l-muted-fg: #5B6676; --border: #E6E9EE; --l-primary: #2563EB; --l-card: #FFFFFF;
+}
+.rvGaveta:is(:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo), .rvGavetaAcao) {
+  width: min(450px, 100%);
+  font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.35;
+  color: var(--l-fg); background: var(--l-card);
+}
+.rvGaveta:is(:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo), .rvGavetaAcao) :is(*, button, input, select, textarea) {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard { font-size: 14px; line-height: 1.35; color: var(--l-fg); }
+
+/* Cabeçalho */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead { gap: 12px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcTitle { line-height: 1.35; color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcCard > .rcHead .rcHeadMeta { font-size: 12px; font-weight: 400; line-height: 1.35; }
+
+/* Estadia */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoData { gap: 2px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia { line-height: 1.35; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSeta svg { width: 18px; height: 18px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoInfos { display: flex; align-items: center; padding: 0; margin: 0; }
+
+/* Abas */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabs { border-color: #E6E9EE; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTab { color: var(--l-muted-fg); letter-spacing: 0; text-transform: none; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTab:hover { color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabAtiva { color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvTabAtiva::after { height: 2px; bottom: -1px; left: 0; right: 0; }
+
+/* Resumo: seções com 24px de padding e 24px entre elas */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcSection.vwAba { padding: 24px; gap: 0; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwTit { margin: 0 0 8px; font-size: 13px; font-weight: 600; line-height: 1.35; color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwPessoa { min-height: 44px; padding: 0; gap: 12px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwPessoas .vwPessoa { min-height: 60px; padding: 8px 0; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwPessoaInfo > b {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwPessoaInfo > span { font-size: 13px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .vwPessoa .rvSecBtn {
+  display: flex; align-items: center; height: 44px; padding: 0; font-size: 14px; font-weight: 600; color: var(--l-primary); text-decoration: none;
+}
+
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rf { margin-top: 24px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rf > .vwTit { margin: 0 0 4px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfLinha { min-height: 44px; padding: 0; gap: 16px; font-size: 14px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTxt { flex: 1; font-weight: 400; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTxt small { font-size: 13px; color: var(--l-muted-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfVal { font-weight: 400; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal { margin: 0; font-size: 16px; border-color: #E6E9EE; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal span { font-size: 16px; font-weight: 600; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal + .rfLinha:not(.rfPend) { border-top: none; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag { min-height: 52px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag .rfTxt { gap: 3px; font-weight: 600; color: var(--l-muted-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag .rfTxt small { font-weight: 400; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag b.rfVal { font-weight: 600; color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPend { align-items: baseline; min-height: 0; margin-top: 0; padding-top: 14px; border-top: 1px solid #E6E9EE; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal + .rfPend { border-top: none; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPend span { flex: 1; font-size: 17px; font-weight: 600; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPend b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPendAberto b { color: var(--gv-pend); }
+
+/* Rodapé */
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPainelRodape { padding: 16px 24px; border-top: 1px solid #E6E9EE; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodape { gap: 8px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeBtn { font-size: 14px; box-shadow: none; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeBtn:not(.rvRodapeHospedar):not(.rvRodapeMais > .rvRodapeBtn) {
+  border: 1px solid #D5DAE1; background: #FFFFFF; color: #16202E;
+}
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeMais > .rvRodapeBtn { color: var(--l-fg); }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeHospedar { color: #FFFFFF; border: 0; }
+:root[data-theme="dark"] .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvRodapeBtn:not(.rvRodapeHospedar):not(.rvRodapeMais > .rvRodapeBtn) {
+  border-color: var(--border); background: var(--l-card); color: var(--l-fg);
+}
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal { border-top: none; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcSection.vwAba { padding-top: 12px; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rf { margin-top: 16px; }
+.vwAcaoFim { display: flex; justify-content: flex-end; align-items: center; min-height: 44px; margin-top: 4px; }
+.vwAcaoFim .gvAbaLink { margin-left: 0; }
+.edAddAbaixo { align-self: flex-end; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag .rfTxt { font-weight: 400; }
+.rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag b.rfVal { color: #4B5563; }
+:root[data-theme="dark"] .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfPag b.rfVal { color: #B8C0CC; }
+/* Editar diárias: Entrada e Saída na mesma linha, quarto abaixo */
+.rvEdicaoEmbutida .edCampos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rvEdicaoEmbutida .edCampos > .edCampo:last-child { grid-column: 1 / -1; }
+.rvGavetaReserva .edTabela thead th:nth-child(3) { width: auto; }
+.rvGavetaReserva .edTabela td:nth-child(3) { color: var(--l-fg); }
+
+/* Abas e resumo do dia distribuídos na largura; linha entre as movimentações */
+.page .sidePanel.lb > .lbAbas { gap: 0; justify-content: space-between; }
+.page .sidePanel.lb > .lbAbas .lbAba { flex: 1 1 0; justify-content: center; }
+.page .sidePanel.lb .lbResumo .lstStat { align-items: center; text-align: center; }
+.page .sidePanel.lb .lbSecao + .lbSecao { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* Busca e botão das abas Orçamentos/Solicitações iguais aos de Reservas */
+.page .sidePanel.lb .slotEsq .lbAcoes .lbNovo { height: 40px; }
+.lbBuscaAntiga:not(:has(.sideFiltroWrap)) .searchInput { padding-right: 30px; }
+.lbBuscaAntiga:not(:has(.sideFiltroWrap)) .clearSearch { right: 10px; }
+.page .sidePanel.lb .lbAcoes .lbNovo,
+.page .sidePanel.lb .lbAcoes .searchInput { border-radius: 4px; }
+
+/* Reservas do dia no desenho antigo (linha do tempo), número do quarto sem fundo */
+.lbListaAntiga { margin-top: 20px; }
+.lbListaAntiga .lstLinha .lstNum { background: none; color: var(--dot, var(--l-fg)); font-size: 15px; }
+
+/* ── Gaveta "Nova reserva" em etapas (desenho de referência) ─────────────── */
+.rvGavetaCriar:has(.nrEtapas) {
+  --nr-fg: #16202E; --nr-mut: #5B6676; --nr-pri: #2563EB; --nr-campo: #D5DAE1; --nr-ln: #E6E9EE;
+  --nr-cab: #F1F3F7; --nr-trilho: #E2E6EB; --nr-fundo: #FFFFFF;
+  width: min(450px, 100%); border-radius: 4px; background: var(--nr-fundo); color: var(--nr-fg);
+  font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.35; font-variant-numeric: tabular-nums;
+}
+:root[data-theme='dark'] .rvGavetaCriar:has(.nrEtapas) {
+  --nr-fg: var(--l-fg); --nr-mut: var(--l-muted-fg); --nr-pri: #3B82F6; --nr-campo: var(--border); --nr-ln: var(--border);
+  --nr-cab: color-mix(in oklch, var(--l-card) 88%, white); --nr-trilho: var(--border); --nr-fundo: var(--l-card);
+}
+.rvGavetaCriar:has(.nrEtapas) > .janelaHead {
+  align-items: flex-start; padding: 18px 12px 16px 24px; background: var(--nr-cab); border-bottom: 1px solid var(--nr-ln);
+}
+.rvGavetaCriar:has(.nrEtapas) > .janelaHead .rcCloseBtn { width: 44px; height: 44px; margin-top: -8px; color: var(--nr-mut); }
+.nrTitulo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nrTitulo b { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; color: var(--nr-fg); }
+.nrTitulo small { font-size: 12px; font-weight: 400; color: var(--nr-mut); }
+.rvGavetaCriar:has(.nrEtapas) .criarCorpo { padding: 0; gap: 0; overflow: hidden; }
+
+.nrEtapas { flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; padding: 16px 24px 0; }
+.nrBarra { display: flex; gap: 4px; }
+.nrBarra > span { flex: 1; height: 4px; border-radius: 2px; background: var(--nr-trilho); }
+.nrBarra > span.nrBarraOn { background: var(--nr-pri); }
+.nrEtapaTxt { display: flex; align-items: baseline; gap: 6px; font-size: 13px; }
+.nrEtapaTxt span { color: var(--nr-mut); }
+.nrEtapaTxt b { font-weight: 600; }
+
+.nrCorpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 10px; }
+.nrPasso { display: flex; flex-direction: column; gap: 10px; }
+.nrSecTit { display: flex; align-items: center; gap: 8px; min-height: 24px; margin: 0; font-size: 13px; font-weight: 600; color: var(--nr-fg); }
+.nrSecTitEspaco { margin-top: 18px; }
+.nrSecQtd { font-weight: 400; color: var(--nr-mut); }
+.nrDica { font-size: 13px; color: var(--nr-mut); }
+
+.nrOpcao {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; box-sizing: border-box; padding: 14px 16px;
+  border: 1px solid var(--nr-campo); border-radius: 6px; background: var(--nr-fundo); color: var(--nr-fg);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.nrOpcao:hover { border-color: #AEB6C2; }
+.nrOpcaoOn, .nrOpcaoOn:hover { padding: 13px 15px; border: 2px solid var(--nr-pri); }
+.nrOpcao:focus-visible { outline: 2px solid var(--nr-pri); outline-offset: 2px; }
+.nrRadio { flex: none; width: 20px; height: 20px; box-sizing: border-box; border-radius: 50%; border: 2px solid #8A93A0; background: var(--nr-fundo); }
+.nrOpcaoOn .nrRadio { border: 6px solid var(--nr-pri); }
+.nrOpcaoTxt { display: flex; flex-direction: column; gap: 3px; }
+.nrOpcaoTxt b { font-weight: 600; }
+.nrOpcaoTxt small { font-size: 13px; color: var(--nr-mut); }
+
+.nrRotulo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.nrRotulo > span { font-size: 12px; font-weight: 400; letter-spacing: 0; color: var(--nr-mut); }
+.nrDuas { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: 8px; }
+
+.rvGavetaCriar .nrCorpo :is(input:not([type='checkbox']):not([type='radio']), select, .nrCampo, .comboTrigger),
+.rvGavetaCriar .nrCorpo .dateCompact > div > div {
+  height: 44px; min-height: 44px; border: 1px solid var(--nr-campo); border-radius: 4px !important;
+  background-color: var(--nr-fundo); color: var(--nr-fg); font: inherit; font-weight: 600; font-size: 14px;
+}
+.rvGavetaCriar .nrCorpo .nrCampo { width: 100%; box-sizing: border-box; padding: 0 12px; }
+.rvGavetaCriar .nrCorpo .nrCampo::placeholder { font-weight: 400; color: var(--nr-mut); }
+
+/* Hóspedes: busca 70% e tipo 30%, pessoas em linhas */
+.nrHosp { display: flex; flex-direction: column; gap: 10px; }
+.nrBuscaTipo { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); gap: 8px; }
+.nrBuscaTipo select { width: 100%; }
+.nrBusca {
+  display: flex; align-items: center; gap: 8px; height: 44px; box-sizing: border-box; padding: 0 12px;
+  border: 1px solid var(--nr-campo); border-radius: 4px; background: var(--nr-fundo); color: var(--nr-mut);
+}
+.nrBusca:focus-within { border-color: var(--nr-pri); }
+.rvGavetaCriar .nrCorpo .nrBusca input { flex: 1; min-width: 0; height: 40px; min-height: 0; padding: 0; border: 0; background: none; font-weight: 400; outline: none; }
+.nrPessoas { display: flex; flex-direction: column; }
+.nrPessoa { display: flex; align-items: center; gap: 12px; min-height: 60px; }
+.nrPessoa + .nrPessoa { border-top: 1px solid var(--nr-ln); }
+.nrPessoaTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrPessoaTxt > span { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.nrPessoaTxt b { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrPessoaTxt em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: var(--nr-pri); }
+.nrPessoaTxt small { font-size: 13px; color: var(--nr-mut); }
+.nrLixo { width: 44px; height: 44px; margin-right: -12px; display: flex; align-items: center; justify-content: center; border: 0; background: none; color: #B42318; cursor: pointer; padding: 0; border-radius: 4px; }
+.nrLixo:hover { background: rgba(180, 35, 24, 0.08); }
+
+/* Caixa da sub-etapa (um apartamento por vez) */
+.nrSub { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin-bottom: 6px; border: 1px solid var(--nr-ln); border-radius: 6px; }
+.nrSubTopo { display: flex; align-items: center; gap: 8px; }
+.nrSubTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.nrSubTxt em { font-style: normal; color: var(--nr-mut); }
+.nrSubTxt b { font-weight: 600; }
+.nrSubTxt small { font-size: 12px; color: var(--nr-mut); }
+.nrSubVoltar {
+  flex: none; width: 40px; height: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--nr-campo); border-radius: 4px; background: var(--nr-fundo); color: var(--nr-fg); cursor: pointer;
+}
+.nrSubVoltar:disabled { border-color: var(--nr-ln); color: #C9CED6; cursor: default; }
+.nrSubProx {
+  flex: none; height: 40px; box-sizing: border-box; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 14px;
+  border: 0; border-radius: 4px; background: var(--nr-pri); color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.nrSubProx:disabled { background: var(--nr-ln); color: var(--nr-mut); cursor: default; }
+
+/* Resumo */
+.nrKv > div { display: flex; gap: 16px; min-height: 28px; align-items: center; font-size: 13px; }
+.nrKv span { flex: none; width: 104px; color: var(--nr-mut); }
+.nrKv b { font-weight: 600; min-width: 0; }
+.rvGavetaCriar:has(.nrEtapas) .step3Root { margin-top: 14px; }
+
+/* Rodapé */
+.rvGavetaCriar:has(.nrEtapas) .criarRodape { padding: 16px 24px; border-top: 1px solid var(--nr-ln); background: var(--nr-fundo); }
+.nrRodape { display: flex; align-items: center; gap: 8px; }
+.rvGavetaCriar .nrRodape button { min-height: 44px; height: 44px; border-radius: 4px; font: inherit; cursor: pointer; }
+.rvGavetaCriar .nrRodape .nrVoltar { padding: 0 16px; border: 1px solid var(--nr-campo); background: var(--nr-fundo); color: var(--nr-fg); font-weight: 500; }
+.rvGavetaCriar .nrRodape .nrVoltar:hover { background: var(--nr-cab); }
+.rvGavetaCriar .nrRodape .nrContinuar {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 0 22px;
+  border: 0; background: var(--nr-pri); color: #fff; font-weight: 600;
+}
+.rvGavetaCriar .nrRodape .nrContinuar:hover:not(:disabled) { background: color-mix(in oklch, var(--nr-pri) 88%, black); }
+.rvGavetaCriar .nrRodape .nrContinuar:disabled { background: var(--nr-ln); color: var(--nr-mut); cursor: default; }
+.nrFaltam { margin-left: auto; font-size: 12px; color: var(--nr-mut); }
+.rvGavetaCriar .nrRodape .nrFaltam + .nrContinuar { margin-left: 0; }
+
+/* Grupos do dia: atalho à direita, abaixo do resumo; número do quarto com borda na cor da seção */
+.lbGrupoAcao { display: flex; justify-content: flex-end; margin-top: 8px; }
+.lbGrupoAcao .gvAbaLink { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 32px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbGrupoAcao + .lbListaAntiga { margin-top: 8px; }
+.lbListaAntiga .lstLinha .lstNum { background: none; border: 1.5px solid var(--dot, var(--border)); box-sizing: border-box; }
+
+/* Hóspedes da nova reserva: tipo com altura de campo e busca sem borda interna */
+.rvGavetaCriar .nrBuscaTipo .tipoCompacto { flex: none; width: 100%; height: 44px; padding: 0 28px 0 12px; text-overflow: ellipsis; }
+.rvGavetaCriar .nrCorpo .nrBusca input[type='search'] { height: 40px; min-height: 0; padding: 0; border: 0 !important; border-radius: 0 !important; background: none; box-shadow: none; font-weight: 400; outline: none; }
+.rvGavetaCriar .nrCorpo .nrBusca input[type='search']::-webkit-search-cancel-button { cursor: pointer; }
+
+/* ── Resumo da reserva simples (desenho de referência) ── */
+.rvGavetaCriar:has(.nrResumo) .step3Root { margin-top: 0; }
+.nrResumo { display: flex; flex-direction: column; gap: 10px; color: var(--nr-fg); }
+.nrRsPeriodo { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; column-gap: 16px; }
+.nrRsPeriodo > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nrRsPeriodo > div > span { font-size: 12px; color: var(--nr-mut); }
+.nrRsPeriodo > div > b { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+.nrRsPeriodo > div > small { font-size: 13px; color: var(--nr-mut); }
+.nrRsPeriodo > .nrRsFim { text-align: right; }
+.nrRsPeriodo > .nrRsSeta { align-items: center; color: var(--nr-mut); }
+.nrRsPeriodo > .nrRsSeta > span { font-size: 12px; font-weight: 600; }
+.nrRsGrade { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--nr-ln); }
+.nrRsGrade > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nrRsGrade span { font-size: 12px; color: var(--nr-mut); }
+.nrRsGrade b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrRsHosp { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.nrRsHosp > span { font-size: 12px; color: var(--nr-mut); }
+.nrRsHosp ol { margin: 0; padding: 0; list-style: none; }
+.nrRsHosp li { display: flex; align-items: baseline; gap: 6px; min-height: 24px; min-width: 0; }
+.nrRsHosp li > span { flex: none; width: 16px; font-size: 13px; color: var(--nr-mut); }
+.nrRsHosp li > b { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nrRsHosp li > em { flex: none; font-style: normal; font-size: 12px; font-weight: 600; color: var(--nr-pri); }
+.nrRsTit { margin-top: 14px; }
+.nrRsTitPag { margin-top: 10px; }
+.nrRsLink, .nrRsAdd {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0;
+  border: 0; background: none; color: var(--nr-pri); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.nrRsLink { height: 24px; font-size: 13px; }
+.nrRsLink:disabled, .nrRsAdd:disabled { color: var(--nr-mut); cursor: default; }
+.nrRsLink:hover:not(:disabled), .nrRsAdd:hover:not(:disabled) { text-decoration: underline; }
+.nrRsLinha { display: flex; align-items: center; gap: 16px; min-height: 40px; }
+.nrRsLinha > span:first-child { flex: 1; }
+.nrRsSep { height: 1px; background: var(--nr-ln); }
+.nrRsSepPend { margin-top: 8px; }
+.nrRsTotal, .nrRsPend { display: flex; align-items: baseline; gap: 16px; padding-top: 12px; }
+.nrRsTotal > span { flex: 1; font-size: 16px; font-weight: 600; }
+.nrRsTotal > b { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+.nrRsPend > span { flex: 1; font-size: 17px; font-weight: 600; }
+.nrRsPend > b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: #B45309; }
+.nrRsPend > b.nrRsQuitado { color: #1D6B45; }
+.nrRsPag { display: flex; align-items: center; gap: 16px; min-height: 48px; }
+.nrRsPagTxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nrRsPagTxt b { font-weight: 600; color: var(--nr-mut); }
+.nrRsPagTxt small { font-size: 13px; color: var(--nr-mut); }
+.nrRsPag > b { font-weight: 600; }
+.nrRsPag .nrLixo { margin-left: -8px; }
+.nrRsObs { margin-top: 8px; }
+button.nrRsObs { margin-left: 0; align-self: flex-start; }
+
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia.rvValorPend { color: #B45309; }
+:root[data-theme='dark'] :is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia.rvValorPend { color: #F59E0B; }
+
+/* Quitado: valor verde e aviso de pagamento total */
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia.rvValorQuitado { color: #1D6B45; }
+:root[data-theme='dark'] :is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoDia.rvValorQuitado { color: #6EE7B7; }
+:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSub.rvQuitadoMsg { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 12px; font-weight: 500; color: #1D6B45; }
+:root[data-theme='dark'] :is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rvPeriodoSub.rvQuitadoMsg { color: #6EE7B7; }
+.gvSaldoFim.rfPendOk b { color: #1D6B45; }
+:root[data-theme='dark'] .gvSaldoFim.rfPendOk b { color: #6EE7B7; }
+
+/* Resumo do grupo: uma linha por apartamento */
+.nrRsApto { display: flex; align-items: flex-start; gap: 16px; min-height: 48px; padding: 6px 0; }
+.nrRsApto > b { font-weight: 600; padding-top: 1px; }
+.nrRsPagTxt b.nrRsAptoTit { color: var(--nr-fg); }
+.nrRsAptoAcoes { display: flex; gap: 14px; }
+.nrRsAptoAcoes .nrRsLink { margin-left: 0; height: 22px; font-size: 12px; }
+
+/* ── Gaveta do grupo no mesmo desenho da gaveta da reserva ── */
+.rvGaveta.rvGavetaGrupo.grpNovo:not(.rvGavetaAcao) { width: min(450px, 100%); }
+.slotDireita:has(.grpNovo):not(:has(.rvGavetaAcao:not(.rvGavetaDoGrupo))) .rvGavetaReserva:not(.rvGavetaAcao) { right: calc(min(450px, 100%) + 12px); }
+.grpNovo .rvPainelCorpo { padding: 0; }
+.grpNovo .rcCard { border: 0; border-radius: 0; box-shadow: none; background: none; }
+.grpNovo .rvPainelRodape { border-radius: 0; }
+.grpCorpo { display: flex; flex-direction: column; gap: 4px; padding: 16px 24px 24px; border: 0; }
+.grpBloco { display: flex; flex-direction: column; }
+.grpBloco + .grpBloco { margin-top: 12px; }
+.grpPeriodoTit { display: flex; align-items: baseline; gap: 8px; padding: 4px 0 6px; font-size: 13px; }
+.grpPeriodoTit b { font-weight: 600; color: var(--l-fg); }
+.grpPeriodoTit span { color: var(--l-muted-fg); }
+.grpLinha {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 8px 0;
+  border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--l-fg);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.grpLinha:hover .grpInfo b { color: var(--l-primary); }
+.grpLinha:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; border-radius: 4px; }
+.grpLinhaOff { opacity: .55; }
+.grpApto {
+  flex: none; min-width: 36px; height: 30px; padding: 0 6px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--border); border-radius: 4px; font-size: 14px; font-weight: 600; color: var(--l-fg);
+}
+.grpInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.grpInfo b { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grpInfo small { font-size: 13px; color: var(--l-muted-fg); }
+.grpInfo em { font-style: normal; font-weight: 500; }
+.grpValor { flex: none; font-weight: 600; }
+.grpSeta { flex: none; color: var(--l-muted-fg); }
+.grpPagLinha { width: 100%; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.grpPagLinha:hover .rfTxt { color: var(--l-primary); }
+.grpCorpo .rf { margin-top: 20px; }
+.grpCorpo .rfTotal { border-top: 0; }
+
+/* ── Gaveta do grupo: desenho de referência (período único / vários · pagamento único / por quarto) ── */
+.grpNovo {
+  --nr-fg: var(--l-fg); --nr-mut: var(--l-muted-fg); --nr-ln: var(--border); --nr-pri: var(--l-primary); --nr-campo: #D5DAE1;
+}
+:root[data-theme='dark'] .grpNovo { --nr-campo: var(--border); }
+.grpNovo .grpCorpo { display: flex; flex-direction: column; gap: 10px; padding: 20px 24px 24px; }
+.grpSepPeriodo { height: 1px; margin: 8px 0 6px; background: var(--border); }
+.grpFin { display: flex; flex-direction: column; }
+.grpFinTitLeve { font-weight: 400; color: var(--l-muted-fg); }
+.grpModo { margin-left: auto; font-size: 13px; font-weight: 400; color: var(--l-muted-fg); }
+.grpFinTotal { display: flex; align-items: center; gap: 16px; min-height: 44px; }
+.grpFinTotal span { flex: 1; font-size: 16px; font-weight: 600; }
+.grpFinTotal b { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.grpFin .rfOk { margin-top: 4px; }
+.grpResTit { margin-top: 14px; }
+.grpFin + .grpResTit { margin-top: 14px; }
+
+.grpPerCab { display: flex; align-items: baseline; gap: 8px; margin-top: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.grpPerCabPrimeiro { margin-top: 4px; }
+.grpPerCab span { font-size: 12px; font-weight: 600; color: var(--l-muted-fg); }
+.grpPerCab b { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.grpPerCab small { font-size: 13px; color: var(--l-muted-fg); }
+.grpPerCab em { margin-left: auto; font-style: normal; font-size: 13px; color: var(--l-muted-fg); }
+
+.grpQuarto {
+  display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: start; column-gap: 12px;
+  width: 100%; padding: 12px 0; border: 0; border-bottom: 1px solid var(--border); background: none;
+  color: var(--l-fg); font: inherit; text-align: left; cursor: pointer;
+}
+.grpQuarto:last-child { border-bottom: 0; }
+.grpQuarto:hover .grpNomes b { color: var(--l-primary); }
+.grpQuarto:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; border-radius: 4px; }
+.grpNum { display: flex; flex-direction: column; gap: 1px; }
+.grpNum b { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+.grpNum small { font-size: 11px; color: var(--l-muted-fg); }
+.grpNomes { margin: 0; padding: 0; list-style: none; min-width: 0; }
+.grpNomes li { display: flex; align-items: baseline; gap: 6px; min-height: 22px; min-width: 0; }
+.grpNomes li > span { flex: none; width: 16px; font-size: 13px; color: var(--l-muted-fg); }
+.grpNomes li > b { font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grpDir { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.grpDir > b { font-weight: 600; }
+.grpStatus { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+.grpStatus i { width: 6px; height: 6px; border-radius: 50%; background: #8A93A0; }
+.grpStatus i.grpDot_hospedado { background: #1D6B45; }
+.grpStatus i.grpDot_confirmada, .grpStatus i.grpDot_reservado { background: #2563EB; }
+.grpStatus i.grpDot_solicitada, .grpStatus i.grpDot_orcamento { background: #B45309; }
+.grpStatus i.grpDot_cancelado, .grpStatus i.grpDot_ausente { background: #B42318; }
+.grpPagQuarto {
+  grid-column: 2 / 4; display: flex; align-items: center; gap: 12px; min-height: 32px; margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed var(--nr-campo); font-size: 13px;
+}
+.grpPagQuarto > span { flex: 1; color: var(--l-muted-fg); }
+.grpPagQuarto .grpQuitado { font-weight: 600; color: #1D6B45; }
+.grpPagQuarto .grpPend { font-weight: 600; color: #B45309; }
+:root[data-theme='dark'] .grpPagQuarto .grpQuitado { color: #6EE7B7; }
+:root[data-theme='dark'] .grpPagQuarto .grpPend { color: #F59E0B; }
+.grpSoma { display: flex; align-items: baseline; gap: 16px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--l-muted-fg); }
+.grpSoma > span:first-child { flex: 1; }
+
+.grpRodape { display: flex; align-items: center; gap: 8px; width: 100%; }
+.grpPagBtn {
+  height: 44px; margin-left: auto; padding: 0 16px; border: 1px solid #D5DAE1; border-radius: 4px;
+  background: var(--l-card); color: var(--l-fg); font: inherit; font-weight: 500; cursor: pointer;
+}
+.grpPagBtn:hover { background: var(--gv-faixa, #F1F3F7); }
+.grpNovo .rvPainelRodape { padding: 16px 24px; border-top: 1px solid var(--border); }
+
+/* Gaveta do grupo 20% mais larga (540px) */
+.rvGaveta.rvGavetaGrupo.grpNovo:not(.rvGavetaAcao), .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo).grpNovo:not(.rvGavetaAcao) { width: min(540px, 100%); }
+.slotDireita:has(.grpNovo):not(:has(.rvGavetaAcao:not(.rvGavetaDoGrupo))) .rvGavetaReserva:not(.rvGavetaAcao) { right: calc(min(540px, 100%) + 12px); }
+
+/* Resumo financeiro do grupo abaixo das reservas, em fundo próprio */
+.grpNovo .grpFin { margin-top: 12px; padding: 12px 16px 16px; border-radius: 4px; background: #F4F6F8; }
+:root[data-theme='dark'] .grpNovo .grpFin { background: color-mix(in oklch, var(--l-card) 92%, white); }
+.grpNovo .grpFin .nrRsSep { background: #E1E5EB; }
+:root[data-theme='dark'] .grpNovo .grpFin .nrRsSep { background: var(--border); }
+.grpNovo .grpFin .grpFinTitLeve { font-weight: 600; color: var(--l-fg); }
+
+/* Linha entre os quartos começa na coluna das pessoas */
+.grpNovo .grpQuarto { position: relative; border-bottom: 0; }
+.grpNovo .grpQuarto + .grpQuarto::before { content: ''; position: absolute; top: 0; left: 52px; right: 0; height: 1px; background: var(--border); }
+
+.grpNovo .grpNum { align-self: center; align-items: center; text-align: center; }
+
+/* Valor de cada reserva no resumo financeiro do grupo */
+.grpFinApto { display: flex; align-items: center; gap: 16px; min-height: 40px; }
+.grpFinApto > span { flex: 1; display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.grpFinApto small { font-size: 13px; color: var(--l-muted-fg); }
+.grpFinApto + .grpFinTotal { margin-top: 4px; border-top: 1px solid #E1E5EB; }
+:root[data-theme='dark'] .grpFinApto + .grpFinTotal { border-top-color: var(--border); }
+
+/* Resumo do grupo: período em cima, quartos abaixo */
+.grpFinPer { display: flex; flex-direction: column; padding: 6px 0 2px; }
+.grpFinPer + .grpFinPer { border-top: 1px dashed #D5DAE1; }
+.grpFinPerTit { font-size: 12px; font-weight: 600; color: var(--l-muted-fg); padding-top: 4px; }
+.grpFinPer .grpFinApto { min-height: 32px; }
+.grpFinPer + .grpFinTotal { margin-top: 4px; border-top: 1px solid #E1E5EB; }
+:root[data-theme='dark'] .grpFinPer + .grpFinTotal { border-top-color: var(--border); }
+.grpFinPerTit { font-weight: 400; }
+
+/* Diárias de cada apartamento no resumo do grupo */
+.grpFinAptoBloco { display: flex; flex-direction: column; padding-bottom: 6px; }
+.grpFinAptoBloco + .grpFinAptoBloco { border-top: 1px dashed #D5DAE1; padding-top: 2px; }
+:root[data-theme='dark'] .grpFinAptoBloco + .grpFinAptoBloco { border-top-color: var(--border); }
+.grpFinDia { display: flex; align-items: flex-start; gap: 12px; padding: 2px 0 2px 12px; font-size: 12px; color: var(--l-muted-fg); }
+.grpFinDia > span:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.grpFinDia em { font-style: normal; font-weight: 500; color: var(--l-fg); }
+.grpFinDia small { font-size: 12px; color: var(--l-muted-fg); }
+.grpFinDia > span:last-child { flex: none; font-variant-numeric: tabular-nums; }
+
+/* Seleção múltipla de apartamentos: o campo cresce com as etiquetas */
+.rvGavetaCriar .nrCorpo .nrRotulo .comboTrigger.comboTrigger { height: auto; min-height: 44px; padding-top: 6px; padding-bottom: 6px; box-sizing: border-box; align-items: center; }
+
+/* Resumo do grupo na criação: período em cima, quartos abaixo */
+.nrRsSepGrupo { margin: 8px 0 4px; }
+.nrRsPerGrupo { display: flex; flex-direction: column; }
+.nrRsPerGrupo + .nrRsPerGrupo { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--nr-campo); }
+.nrRsPerTit { font-size: 12px; color: var(--nr-mut); padding-top: 6px; }

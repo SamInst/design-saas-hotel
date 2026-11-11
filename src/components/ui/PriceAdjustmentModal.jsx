@@ -130,7 +130,8 @@ const modeHint = (key) => {
  * @param initial      estado inicial (use novoPrecoToState para reconstruir de um snapshot).
  * @param onApply      (result, raw) => void  — result de computeAdjustedTotal.
  */
-export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = tr('Gerenciar Preços'), as: Wrap = Modal, lateral = null, wrapProps = {}, botaoAplicar = null }) {
+export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias = [], initial, onApply, allowDiaria = true, title = tr('Gerenciar Preços'), as: Wrap = Modal, lateral: lateralFn = null, comparador = null, wrapProps = {}, botaoAplicar = null }) {
+  const lateral = lateralFn || comparador;
   // Modos disponíveis. allowDiaria=false (ex.: ajuste de grupo) remove o "Por diária".
   const modeKeys = allowDiaria ? ['diaria', 'desconto', 'porcentagem'] : ['desconto', 'porcentagem'];
   const [sign, setSign] = useState(initial?.sign ?? 'desconto');
@@ -168,7 +169,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
       title={title}
       size="sm"
       {...wrapProps}
-      lateral={lateral ? lateral(result, { baseTotal, diff }) : undefined}
+      lateral={lateralFn ? lateralFn(result, { baseTotal, diff }) : undefined}
       footer={confirmando ? (
         <div className={styles.confirma}>
           <span>{tr('Aplicar o novo total de {{v}}?', { v: fmtBRL(result.valorTotal) })}</span>
@@ -192,6 +193,7 @@ export function PriceAdjustmentModal({ open, onClose, baseTotal = 0, baseDiarias
       )}
     >
       <div className={styles.stack}>
+        {comparador && comparador(result, { baseTotal, diff })}
         {/* Sinal: desconto / adicional — bloqueado no modo diária */}
         <div className={[styles.alcanceSeg, signBloqueado ? styles.alcanceSegOff : ''].join(' ')} role="tablist">
           {[['desconto', tr('Desconto (−)')], ['adicional', tr('Adicional (+)')]].map(([k, rot]) => (
