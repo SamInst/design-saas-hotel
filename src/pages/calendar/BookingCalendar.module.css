@@ -5914,6 +5914,12 @@ b.rfVal { font-weight: 600; }
 .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rfTotal { border-top: none; }
 .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rcSection.vwAba { padding-top: 12px; }
 .rvGaveta:is(.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista), .grpNovo) .rf { margin-top: 16px; }
+.rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rf { padding: 12px 16px 16px; border-radius: 4px; background: #F4F6F8; }
+:root[data-theme='dark'] .rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rf { background: color-mix(in oklch, var(--l-card) 92%, white); }
+.rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rfDia { padding: 8px 0; }
+.rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rfDia + .rfDia { border-top: 1px dashed #D5DAE1; }
+:root[data-theme='dark'] .rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rfDia + .rfDia { border-top-color: var(--border); }
+.rvGaveta.rvGavetaReserva:not(.rvGavetaGrupo):not(.rvGavetaLista) .rf :is(.rfTotal, .rfPend) { border-color: #E1E5EB; }
 .vwAcaoFim { display: flex; justify-content: flex-end; align-items: center; min-height: 44px; margin-top: 4px; }
 .vwAcaoFim .gvAbaLink { margin-left: 0; }
 .edAddAbaixo { align-self: flex-end; }
@@ -6287,6 +6293,7 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 .grpFinDia em { font-style: normal; font-weight: 500; color: var(--l-fg); }
 .grpFinDia small { font-size: 12px; color: var(--l-muted-fg); }
 .grpFinDia > span:last-child { flex: none; font-variant-numeric: tabular-nums; }
+.grpFinDia > span:only-child { flex: 1; overflow-wrap: anywhere; }
 
 /* Seleção múltipla de apartamentos: o campo cresce com as etiquetas */
 .rvGavetaCriar .nrCorpo .nrRotulo .comboTrigger.comboTrigger { height: auto; min-height: 44px; padding-top: 6px; padding-bottom: 6px; box-sizing: border-box; align-items: center; }
@@ -6296,3 +6303,20 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 .nrRsPerGrupo { display: flex; flex-direction: column; }
 .nrRsPerGrupo + .nrRsPerGrupo { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--nr-campo); }
 .nrRsPerTit { font-size: 12px; color: var(--nr-mut); padding-top: 6px; }
+
+/* Alterar período do grupo (gaveta lateral) */
+.gpCorpo { display: flex; flex-direction: column; gap: 12px; padding: 16px 20px 20px; }
+.gpModos { display: flex; gap: 4px; padding: 3px; border-radius: 6px; background: #F1F3F6; }
+:root[data-theme='dark'] .gpModos { background: color-mix(in oklch, var(--l-card) 90%, white); }
+.gpModo { flex: 1; min-height: 36px; padding: 0 10px; border: 0; border-radius: 4px; background: none; font-size: 13px; font-weight: 500; color: var(--l-muted-fg); cursor: pointer; }
+.gpModoAtivo { background: var(--l-card, #fff); color: var(--l-fg); box-shadow: 0 1px 2px rgb(0 0 0 / 0.08); }
+.gpBloco { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 0; border-radius: 4px; background: #F4F6F8; }
+:root[data-theme='dark'] .gpBloco { background: color-mix(in oklch, var(--l-card) 92%, white); }
+.gpBloco .edCampos { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
+.gpBlocoCab { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.gpBlocoCab b { font-weight: 600; color: var(--l-fg); }
+.gpBlocoCab span { font-size: 12px; color: var(--l-muted-fg); overflow-wrap: anywhere; }
+.gpAjuda { margin: 0; font-size: 12.5px; color: var(--l-muted-fg); }
+.gpAddPer { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: 1px dashed #C9D0D9; border-radius: 4px; background: none; font-size: 13px; font-weight: 500; color: var(--l-fg); cursor: pointer; }
+.gpAddPer:hover { background: #F4F6F8; }
+.gpAcoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }

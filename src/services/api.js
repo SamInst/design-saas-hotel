@@ -652,6 +652,11 @@ export const hospedagemApi = {
     return request(`/hospedagem/grupo/${grupoId}`);
   },
 
+  // PUT /hospedagem/grupo/{id}/periodo  [{ hospedagem_id, data_checkin, data_checkout }] (dd/MM/yyyy)
+  alterarPeriodoGrupo(grupoId, itens) {
+    return request(`/hospedagem/grupo/${grupoId}/periodo`, { method: 'PUT', body: itens });
+  },
+
   /** PATCH /hospedagem/grupo/{grupoId} — renomeia o responsável principal do grupo. */
   renomearGrupo(grupoId, descricao) {
     return request(`/hospedagem/grupo/${grupoId}`, { method: 'PATCH', body: { descricao } });

@@ -492,6 +492,18 @@ const diariaSubs = (g, guestLabel) => {
   return g.saz ? `${g.saz} - ${hospedes}` : hospedes;
 };
 
+const ocupComValorCriancas = (ocupacao, valorCriancas) => (
+  ocupacao && valorCriancas > 0
+    ? ocupacao.replace(/ \+ Crianças? de ([\d, ]+) anos(?! \(gratuidade\))/, (m, idades) => {
+      const lista = idades.split(',').map((s) => s.trim());
+      const det = lista.length > 1 && lista.every((x) => x === lista[0])
+        ? `${lista.length} × ${fmtBRL(valorCriancas / lista.length)} = ${fmtBRL(valorCriancas)}`
+        : fmtBRL(valorCriancas);
+      return `${m} (${det})`;
+    })
+    : ocupacao
+);
+
 /** Converts a guest list to { datas_nascimento } for /calcular-preco.
  *  One birth date per guest in dd/MM/yyyy — guests without a stored date get a default adult date (18 years ago). */
 const buildGuestCalcParams = (guests) => {
@@ -3061,13 +3073,18 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
             return (
               <section className={styles.rf}>
                 {grupos.map((g) => {
-                  const hospedes = diariaSubs({ ...g, saz: null });
+                  const hospedes = ocupComValorCriancas(g.hosp, g.criancas);
                   return (
-                    <div key={g.key} className={styles.rfLinha}>
+                    <div key={g.key} className={[styles.rfLinha, styles.rfDia].join(' ')}>
                       <span className={styles.rfTxt}>
                         {g.meia ? tr('Meia diária') : g.qtd > 1 ? tr('Diárias') : grupos.length > 1 ? tr('{{n}}ª Diária', { n: g.numeros[0] }) : tr('Diária')}
                         {hospedes && <small>{hospedes}</small>}
-                        {g.saz && <small>{tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}</small>}
+                        {g.saz && (
+                          <span className={styles.gdSaz}>
+                            <AlertTriangle size={14} className={styles.gdSazIco} />
+                            {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+                          </span>
+                        )}
                       </span>
                       <span className={styles.rfVal}>{g.qtd > 1 ? `${g.qtd} × ${fmtBRL(g.valor)}` : fmtBRL(g.valor)}</span>
                     </div>
@@ -4215,7 +4232,7 @@ function DetalhePagamento({ p, onVoltar }) {
   );
 }
 
-function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify, onAprovarGrupo }) {
+function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenomeado, onSelectReserva, onNovaReservaGrupo, onNotify, onAprovarGrupo, onPeriodoAlterado }) {
   const naDireita = !!useContext(JanelaCtx);
   const dir = useContext(JanelaDirCtx);
   const gid = grupo.grupo_id;
@@ -4294,6 +4311,79 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
       : null;
   }, [lista]);
 
+  // Alterar período: 'grupo' (um período para todas), 'periodo' (cada período do grupo) ou 'reserva'.
+  const [perAberto, setPerAberto] = useState(false);
+  const [perModo,   setPerModo]   = useState('grupo');
+  const [perUnico,  setPerUnico]  = useState({ ci: null, co: null });
+  const [perBlocos, setPerBlocos] = useState({});
+  const [perRes,    setPerRes]    = useState({});
+  const [perSalvando, setPerSalvando] = useState(false);
+  const editaveis = useMemo(() => lista.filter((r) => r.status === 'confirmada' || r.status === 'solicitada'), [lista]);
+  const blocosAtuais = useMemo(() => Object.values(editaveis.reduce((acc, r) => {
+    const k = `${r.dataInicio}|${r.dataFim}`;
+    (acc[k] ??= { k, inicio: r.dataInicio, fim: r.dataFim, itens: [] }).itens.push(r);
+    return acc;
+  }, {})).sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : a.fim < b.fim ? -1 : 1)), [editaveis]);
+  const isoData = (s) => (s ? new Date(`${s}T00:00:00`) : null);
+
+  const abrirPeriodo = () => {
+    const ci = editaveis.reduce((m, r) => (!m || r.dataInicio < m ? r.dataInicio : m), null);
+    const co = editaveis.reduce((m, r) => (!m || r.dataFim > m ? r.dataFim : m), null);
+    setPerUnico({ ci: isoData(ci), co: isoData(co) });
+    setPerBlocos(Object.fromEntries(blocosAtuais.map((b) => [b.k, { ci: isoData(b.inicio), co: isoData(b.fim) }])));
+    setPerRes(Object.fromEntries(editaveis.map((r) => [r.id, { ci: isoData(r.dataInicio), co: isoData(r.dataFim) }])));
+    setPerModo(blocosAtuais.length > 1 ? 'periodo' : 'grupo');
+    setPagAberto(false); setPagVer(null);
+    setPerAberto(true);
+  };
+
+  const perNovoDe = (r) => {
+    if (perModo === 'grupo') return perUnico;
+    if (perModo === 'periodo') return perBlocos[`${r.dataInicio}|${r.dataFim}`] ?? {};
+    return perRes[r.id] ?? {};
+  };
+  const perItens = editaveis.map((r) => {
+    const n = perNovoDe(r);
+    return { r, ci: n.ci ? formatDate(n.ci) : null, co: n.co ? formatDate(n.co) : null };
+  });
+  const perInvalido = perItens.some((x) => !x.ci || !x.co || x.co <= x.ci);
+  const perMudadas = perItens.filter((x) => x.ci !== x.r.dataInicio || x.co !== x.r.dataFim);
+
+  const salvarPeriodo = async () => {
+    setPerSalvando(true);
+    try {
+      await hospedagemApi.alterarPeriodoGrupo(gid, perMudadas.map((x) => ({
+        hospedagem_id: x.r.id, data_checkin: toBrDate(x.ci), data_checkout: toBrDate(x.co),
+      })));
+      onNotify?.(tr('Período do grupo alterado!'));
+      setPerAberto(false);
+      carregar();
+      onPeriodoAlterado?.();
+    } catch (e) {
+      onNotify?.(e?.message ?? tr('Erro ao alterar o período.'), 'error');
+    } finally { setPerSalvando(false); }
+  };
+
+  const camposData = (val, onChange) => (
+    <div className={styles.edCampos}>
+      <div className={styles.edCampo}>
+        <span className={styles.edRot}>{tr('Entrada')}</span>
+        <div className={styles.dateCompact}>
+          <DatePicker mode="single" value={val.ci} sobrio placeholder={tr('Data de check-in')}
+            onChange={(d) => onChange({ ...val, ci: d, co: val.co && d && val.co <= d ? null : val.co })} />
+        </div>
+      </div>
+      <div className={styles.edCampo}>
+        <span className={styles.edRot}>{tr('Saída')}</span>
+        <div className={styles.dateCompact}>
+          <DatePicker mode="single" value={val.co} sobrio minDate={val.ci ?? undefined} placeholder={tr('Data de check-out')}
+            onChange={(d) => onChange({ ...val, co: d })} />
+        </div>
+      </div>
+    </div>
+  );
+  const nomesRes = (r) => (r.hospedes?.length ? r.hospedes.map((h) => h.nome) : [r.titularNome]).filter(Boolean).join(', ');
+
   const titulo = grupo.descricao || (grupo.titulares || '').split(',')[0].trim() || `Grupo #${gid}`;
   const qtd    = grupo.count ?? grupo.quantidade ?? lista.length;
 
@@ -4346,6 +4436,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                   label: tr('Aprovar grupo'), icon: <Check size={15} />,
                   onClick: () => onAprovarGrupo(lista, gid, grupo.descricao ?? ''),
                 }] : []),
+                ...(editaveis.length > 0 ? [{ label: tr('Alterar período'), icon: <CalendarDays size={15} />, onClick: abrirPeriodo }] : []),
                 ...(!pagUnicoGrupo ? [{ label: tr('Pagamento do grupo'), icon: <DollarSign size={15} />, onClick: () => { setPagVer(null); setPagAberto(true); } }] : []),
                 { label: tr('Nova reserva'), icon: <Plus size={15} />, onClick: () => onNovaReservaGrupo(gid, periodoUnico),
                   title: periodoUnico ? tr('Já abre em {{v0}} → {{v1}}', { v0: fmtDateBR(periodoUnico.dataInicio), v1: fmtDateBR(periodoUnico.dataFim) }) : undefined },
@@ -4468,7 +4559,28 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                               <b>{fmtBRL(r.valorTotal ?? 0)}</b>
                             </div>
                             {/* Diárias iguais (mesma ocupação, sazonalidade e valor) viram uma linha só: "2x Diárias · 1 Adulto(s)" */}
-                            {(r.diarias ?? []).reduce((acc, d) => {
+                            {!porPeriodo ? (r.diarias ?? []).reduce((acc, d) => {
+                              const ocup = ocupComValorCriancas(d.ocupacao, d.valorCriancas);
+                              const porque = [d.meiaDiaria ? tr('Meia diária') : null, ocup].filter(Boolean).join(' · ');
+                              const valor = d.valor ?? 0;
+                              const igual = acc.find((g) => g.porque === porque && g.saz === d.sazonalidade && Math.abs(g.valor - valor) < 0.005);
+                              if (igual) igual.qtd += 1;
+                              else acc.push({ porque, saz: d.sazonalidade, valor, qtd: 1, id: d.id ?? acc.length });
+                              return acc;
+                            }, []).map((g, _i, todos) => (
+                              <div key={g.id} className={styles.grpFinDia}>
+                                <span>
+                                  <small>{[g.porque, diariasTxt(g.qtd)].filter(Boolean).join(' × ')}</small>
+                                  {g.saz && (
+                                    <span className={styles.gdSaz}>
+                                      <AlertTriangle size={14} className={styles.gdSazIco} />
+                                      {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+                                    </span>
+                                  )}
+                                </span>
+                                {todos.length > 1 && <span>{fmtBRL(g.valor * g.qtd)}</span>}
+                              </div>
+                            )) :(r.diarias ?? []).reduce((acc, d) => {
                               const porque = [d.meiaDiaria ? tr('Meia diária') : null, d.ocupacao, d.sazonalidade].filter(Boolean).join(' · ');
                               const chave = `${porque}|${(d.valor ?? 0).toFixed(2)}`;
                               const igual = acc.find((g) => g.chave === chave);
@@ -4514,6 +4626,82 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
         {pagVer && !pagAberto && createPortal(
           <div className={[styles.rvGaveta, styles.rvGavetaAcao, styles.rvGavetaPag, styles.rvGavetaDoGrupo, styles.rvGavetaSobre].join(' ')}>
             <div className={styles.rvPainelCorpo}><DetalhePagamento key={pagVer.id} p={pagVer} onVoltar={() => setPagVer(null)} /></div>
+          </div>,
+          dir,
+        )}
+
+        {perAberto && createPortal(
+          <div className={[styles.rvGaveta, styles.rvGavetaAcao, styles.rvGavetaPag, styles.rvGavetaDoGrupo].join(' ')}>
+            <header className={styles.janelaHead}>
+              <button type="button" className={styles.janelaVoltar} onClick={() => setPerAberto(false)}
+                title={tr('Voltar')} aria-label={tr('Voltar')}>
+                <ChevronLeft size={17} />
+              </button>
+              <div className={styles.janelaTit}><CalendarDays size={15} /> {tr('Alterar período')}</div>
+            </header>
+            <div className={[styles.rvPainelCorpo, styles.gpCorpo].join(' ')}>
+              <div className={styles.gpModos} role="tablist">
+                {[
+                  ['grupo', blocosAtuais.length > 1 ? tr('Unificar em um período') : tr('Todo o grupo')],
+                  ...(blocosAtuais.length > 1 ? [['periodo', tr('Por período')]] : []),
+                  ['reserva', tr('Por reserva')],
+                ].map(([m, rot]) => (
+                  <button key={m} type="button" role="tab" aria-selected={perModo === m}
+                    className={[styles.gpModo, perModo === m ? styles.gpModoAtivo : ''].join(' ')}
+                    onClick={() => setPerModo(m)}>{rot}</button>
+                ))}
+              </div>
+
+              {perModo === 'grupo' && (
+                <section className={styles.gpBloco}>
+                  <p className={styles.gpAjuda}>
+                    {blocosAtuais.length > 1
+                      ? tr('Todas as {{n}} reservas passam a ter o mesmo período.', { n: editaveis.length })
+                      : tr('O novo período vale para as {{n}} reservas do grupo.', { n: editaveis.length })}
+                  </p>
+                  {camposData(perUnico, setPerUnico)}
+                </section>
+              )}
+
+              {perModo === 'periodo' && blocosAtuais.map((b, i) => (
+                <section key={b.k} className={styles.gpBloco}>
+                  <div className={styles.gpBlocoCab}>
+                    <b>{tr('Período')} {i + 1}</b>
+                    <span>{fmtDiaMes(b.inicio)} → {fmtDiaMes(b.fim)} · {b.itens.map((r) => fmtRoom(r.quarto)).join(', ')}</span>
+                  </div>
+                  {camposData(perBlocos[b.k] ?? {}, (v) => setPerBlocos((p) => ({ ...p, [b.k]: v })))}
+                </section>
+              ))}
+
+              {perModo === 'reserva' && editaveis.map((r) => (
+                <section key={r.id} className={styles.gpBloco}>
+                  <div className={styles.gpBlocoCab}>
+                    <b>{tr('Apt.')} {fmtRoom(r.quarto)}</b>
+                    <span>{nomesRes(r)}</span>
+                  </div>
+                  {camposData(perRes[r.id] ?? {}, (v) => setPerRes((p) => ({ ...p, [r.id]: v })))}
+                </section>
+              ))}
+
+              {blocosAtuais.length > 1 && (
+                <button type="button" className={styles.gpAddPer}
+                  onClick={() => { setPerAberto(false); onNovaReservaGrupo(gid, null); }}>
+                  <Plus size={15} /> {tr('Adicionar período')}
+                </button>
+              )}
+
+              {perMudadas.length > 0 && !perInvalido && (
+                <p className={styles.gpAjuda}>
+                  {tr('{{n}} reserva(s) serão alteradas. As diárias e o valor são recalculados.', { n: perMudadas.length })}
+                </p>
+              )}
+              <div className={styles.gpAcoes}>
+                <Button variant="secondary" onClick={() => setPerAberto(false)}>{tr('Cancelar')}</Button>
+                <Button variant="primary" disabled={perSalvando || perInvalido || perMudadas.length === 0} onClick={salvarPeriodo}>
+                  {perSalvando ? tr('Salvando…') : tr('Salvar período')}
+                </Button>
+              </div>
+            </div>
           </div>,
           dir,
         )}
@@ -4714,7 +4902,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
 /** Reservas em grupo: lista os grupos em aberto (o back-end esconde os que tiveram
  *  a última reserva finalizada). Abrir um grupo empilha o modal de conteúdo por
  *  cima — esta listagem continua aberta atrás. */
-function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify, grupoInicial = null, onAprovarGrupo }) {
+function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify, grupoInicial = null, onAprovarGrupo, onPeriodoAlterado }) {
   const naDireita = !!useContext(JanelaCtx);
   const [grupos,  setGrupos]  = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4797,6 +4985,7 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
           onNovaReservaGrupo={onNovaReservaGrupo}
           onNotify={onNotify}
           onAprovarGrupo={onAprovarGrupo}
+          onPeriodoAlterado={onPeriodoAlterado}
         />
       )}
     </>
@@ -9833,6 +10022,7 @@ export default function BookingCalendar() {
           onClose={() => { setShowGrupos(false); setGrupoInicial(null); }}
           onNotify={notify}
           onAprovarGrupo={abrirAprovacao}
+          onPeriodoAlterado={loadReservas}
           onSelectReserva={(r) => { setSelectedReserva(r); setReservaDoGrupo(true); }}
           onNovaReservaGrupo={(grupoId, periodo) => {
             setShowGrupos(false);
