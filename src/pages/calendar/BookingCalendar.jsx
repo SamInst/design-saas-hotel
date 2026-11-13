@@ -539,6 +539,10 @@ const RESERVA_POR_TIPO = {
   INDIVIDUAL: tr('Reserva Individual'), CASAL: tr('Reserva Casal'), DUPLO: tr('Reserva Dupla'), TRIPLO: tr('Reserva Tripla'),
   QUADRUPLO: tr('Reserva Quádrupla'), QUINTUPLO: tr('Reserva Quíntupla'), SEXTUPLO: tr('Reserva Sêxtupla'),
 };
+const HOSP_POR_TIPO = {
+  INDIVIDUAL: tr('Hospedagem Individual'), CASAL: tr('Hospedagem Casal'), DUPLO: tr('Hospedagem Dupla'), TRIPLO: tr('Hospedagem Tripla'),
+  QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
+};
 const rotuloReservaTipo = (tipo, pessoas) =>
   RESERVA_POR_TIPO[tipo] ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
 const HOSPEDAGEM_POR_TIPO = {
@@ -3109,7 +3113,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     <b className={styles.rfVal}>− {fmtBRL(p.valor)}</b>
                   </div>
                 ))}
-                {!pagamentoDeGrupo && (
+                {!pagamentoDeGrupo && reserva.status !== 'orcamento' && (
                   <>
                     <div className={[styles.rfLinha, styles.rfPend, pagoIntegral ? styles.rfPendOk : pendente > 0.005 ? styles.rfPendAberto : ''].join(' ')}>
                       <span>{tr('Pendente')}</span><b>{fmtBRL(pagoIntegral ? 0 : pendente)}</b>
@@ -3177,7 +3181,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const abasView = [
     ['resumo', tr('Resumo')],
     ['hospedes', tr('Hóspedes')],
-    ...(!pagamentoDeGrupo || abaEdicao === 'pagamentos' ? [['pagamentos', tr('Pagamentos')]] : []),
+    ...(reserva.status !== 'orcamento' && (!pagamentoDeGrupo || abaEdicao === 'pagamentos') ? [['pagamentos', tr('Pagamentos')]] : []),
     ...(effectiveDetalhes.length > 0 || abaEdicao === 'diarias' ? [['diarias', tr('Diárias')]] : []),
     ...((reserva.status === 'cancelado' && reserva.motivoCancelamento) || reserva.observacao || temOpcoes
       ? [['observacao', reserva.status === 'cancelado' && reserva.motivoCancelamento ? tr('Cancelamento') : tr('Observação')]] : []),
@@ -4559,7 +4563,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                               <b>{fmtBRL(r.valorTotal ?? 0)}</b>
                             </div>
                             {/* Diárias iguais (mesma ocupação, sazonalidade e valor) viram uma linha só: "2x Diárias · 1 Adulto(s)" */}
-                            {!porPeriodo ? (r.diarias ?? []).reduce((acc, d) => {
+                            {(r.diarias ?? []).reduce((acc, d) => {
                               const ocup = ocupComValorCriancas(d.ocupacao, d.valorCriancas);
                               const porque = [d.meiaDiaria ? tr('Meia diária') : null, ocup].filter(Boolean).join(' · ');
                               const valor = d.valor ?? 0;
@@ -4579,20 +4583,6 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                                   )}
                                 </span>
                                 {todos.length > 1 && <span>{fmtBRL(g.valor * g.qtd)}</span>}
-                              </div>
-                            )) :(r.diarias ?? []).reduce((acc, d) => {
-                              const porque = [d.meiaDiaria ? tr('Meia diária') : null, d.ocupacao, d.sazonalidade].filter(Boolean).join(' · ');
-                              const chave = `${porque}|${(d.valor ?? 0).toFixed(2)}`;
-                              const igual = acc.find((g) => g.chave === chave);
-                              if (igual) igual.qtd += 1;
-                              else acc.push({ chave, porque, valor: d.valor ?? 0, qtd: 1, dia: (d.checkin || '').split(' ')[0].slice(0, 5), id: d.id ?? acc.length });
-                              return acc;
-                            }, []).map((g) => (
-                              <div key={g.id} className={styles.grpFinDia}>
-                                <span>
-                                  <em>{g.qtd > 1 ? tr('{{n}}x Diárias', { n: g.qtd }) : (g.dia || tr('Diária'))}{g.porque && <small> · {g.porque}</small>}</em>
-                                </span>
-                                <span>{fmtBRL(g.valor)}</span>
                               </div>
                             ))}
                           </div>
@@ -5459,7 +5449,14 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
 
   // Busca inicial
   useEffect(() => { fetchOrcamentos(); }, []); // eslint-disable-line
-  useEffect(() => { if (!loading && !search.trim()) onCount?.(orcamentos.length); }, [orcamentos, loading]); // eslint-disable-line
+  useEffect(() => { if (!loading && !search.trim()) {
+    const hoje = formatDate(new Date());
+    onCount?.(orcamentos.filter((o) => {
+      const hs = o.hospedagens ?? [];
+      const canc = o.status != null ? (o.status + '').toUpperCase() === 'ORCAMENTO_CANCELADO' : hs.length > 0 && hs.every((h) => mapStatus(h) === 'cancelado');
+      return !canc && !hs.some((h) => { const co = parseBrDate(h.data_hora_checkout); return co && co < hoje; });
+    }).length);
+  } }, [orcamentos, loading]); // eslint-disable-line
 
   const handleSearch = (val) => {
     setSearch(val);
@@ -5608,7 +5605,6 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
           return { orc, n: hospedagens.length, total, cancelado, vencido };
         });
         const abertos = itens.filter((i) => !i.cancelado && !i.vencido);
-        const encerrados = itens.filter((i) => i.cancelado || i.vencido);
         const linha = ({ orc, n, total, cancelado, vencido }) => (
           <button key={orc.id} type="button" data-orc={orc.id}
             className={[styles.lbOrc, cancelado || vencido ? styles.lbOrcFim : '', orcAberto === orc.id ? styles.lbRowAtivo : ''].join(' ')}
@@ -5629,16 +5625,10 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
         );
         return (
           <>
-            {abertos.length > 0 && (
+            {abertos.length === 0 ? <p className={styles.sideVazio}>{tr('Nenhum orçamento em aberto.')}</p> : (
               <section className={styles.lbSecao}>
                 <div className={styles.lbSecaoHead}><h2>{tr('Em aberto')}</h2><span className={styles.lbQtd}>{abertos.length}</span></div>
                 {abertos.map(linha)}
-              </section>
-            )}
-            {encerrados.length > 0 && (
-              <section className={[styles.lbSecao, styles.lbSecaoMuda].join(' ')}>
-                <div className={styles.lbSecaoHead}><h2>{tr('Encerrados')}</h2><span className={styles.lbQtd}>{encerrados.length}</span></div>
-                {encerrados.map(linha)}
               </section>
             )}
           </>
@@ -5862,107 +5852,106 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       const nPessoas  = hospedagens.reduce((s, h) => s + (h.pessoas_orcamento ?? []).length, 0);
       const ev = { stopPropagation() {} };
       return (
-        <GavetaDir classe={styles.rvGavetaComRodape} footer={isCancelado ? null : <RodapeOpcoes itens={[
+        <GavetaDir classe={[styles.rvGavetaComRodape, styles.rvGavetaGrupo, styles.grpNovo].join(' ')} footer={isCancelado ? null : <div className={styles.grpRodape}><RodapeOpcoes itens={[
           { label: tr('Editar'), icon: <Pencil size={15} />, onClick: () => openEditOrc(ev, orc) },
-          { label: tr('Gerar PDF'), icon: <FileDown size={15} />, onClick: () => handleVoucher(ev, orc) },
           { label: tr('Excluir'), icon: <Trash2 size={14} />, danger: true, divider: true, onClick: (_, anchor) => openCancelOrc(ev, orc, anchor) },
-        ]} />}>
+        ]} />
+          <button type="button" className={styles.grpPagBtn} onClick={() => handleVoucher(ev, orc)}><FileDown size={15} /> {tr('Gerar PDF')}</button>
+        </div>}>
           <div className={[styles.rcCard, isCancelado ? styles.rvCancelado : ''].join(' ')}>
-            <CabecalhoGaveta titulo={orc.nome_solicitante || tr('Orçamento')}
-              chips={[isCancelado && { txt: tr('Cancelado'), red: true }, isExpired && { txt: tr('Vencido'), red: true }]}
-              meta={[`${tr('Orçamento #')}${orc.id}`, orc.data_hora_registro].filter(Boolean).join(' · ')}
-              onClose={() => setOrcAberto(null)} />
             {(() => {
-              // Período no desenho da view da reserva: datas com dia da semana e hora, e as infos embaixo.
-              const ini = inicios[0];
-              const fim = fins[fins.length - 1];
-              const horaDe = (campo, alvo) => {
-                const h = hospedagens.find((x) => parseBrDate(x[campo]) === alvo);
-                return (h?.[campo] ?? '').split(' ')[1]?.slice(0, 5) ?? '';
-              };
-              const hIn  = ini ? horaDe('data_hora_checkin', ini) : '';
-              const hOut = fim ? horaDe('data_hora_checkout', fim) : '';
-              const periodoUnico = new Set(hospedagens.map((h) => `${h.data_hora_checkin}|${h.data_hora_checkout}`)).size <= 1;
-              const nApts = hospedagens.length;
+              const blocos = Object.values(hospedagens.reduce((acc, h) => {
+                const ci = parseBrDate(h.data_hora_checkin); const co = parseBrDate(h.data_hora_checkout);
+                const k = `${ci}|${co}`;
+                (acc[k] ??= { inicio: ci, fim: co, itens: [] }).itens.push(h);
+                return acc;
+              }, {})).sort((a, b) => (a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : a.fim < b.fim ? -1 : 1));
+              const multi = blocos.length > 1;
+              const ini = blocos[0]?.inicio; const fim = blocos[0]?.fim;
+              const ativos = hospedagens.filter((h) => mapStatus(h) !== 'cancelado');
+              const qid = (h) => h.quarto_id ?? h.quarto?.id ?? null;
               return (
-                <div className={[styles.rcSection, styles.rvPeriodoSecao].join(' ')}>
-                  <div className={styles.rvPeriodoCard}>
-                    <div className={styles.rvPeriodoDatas}>
-                      <div className={styles.rvPeriodoData}>
-                        <span className={styles.rvPeriodoRot}>{tr('Check-in')}</span>
-                        <b className={styles.rvPeriodoDia}>{ini ? toBrDate(ini) : '—'}</b>
-                        {ini && <span className={styles.rvPeriodoSub}>{diaSemana(ini)}{hIn ? ` · ${hIn}` : ''}</span>}
-                      </div>
-                      <span className={styles.rvPeriodoSeta}><ArrowRight size={16} /></span>
-                      <div className={[styles.rvPeriodoData, styles.rvPeriodoDataFim].join(' ')}>
-                        <span className={styles.rvPeriodoRot}>{tr('Check-out')}</span>
-                        <b className={styles.rvPeriodoDia}>{fim ? toBrDate(fim) : '—'}</b>
-                        {fim && <span className={styles.rvPeriodoSub}>{diaSemana(fim)}{hOut ? ` · ${hOut}` : ''}</span>}
-                      </div>
-                    </div>
-                    <div className={styles.rvPeriodoInfos}>
-                      {ini && fim && (
-                        <div className={styles.rvPeriodoInfo}><Moon size={14} /><span>{periodoUnico ? diariasTxt(diffDays(ini, fim)) : tr('Períodos variados')}</span></div>
-                      )}
-                      <div className={styles.rvPeriodoInfo}><BedDouble size={14} /><span>{nApts} {nApts === 1 ? tr('apartamento') : tr('apartamentos')}</span></div>
-                      <div className={styles.rvPeriodoInfo}><Users size={14} /><span>{nPessoas} {nPessoas === 1 ? tr('hóspede') : tr('hóspedes')}</span></div>
-                    </div>
+                <>
+                  <CabecalhoGaveta titulo={orc.nome_solicitante || tr('Orçamento')}
+                    chips={[isCancelado && { txt: tr('Cancelado'), red: true }, isExpired && { txt: tr('Vencido'), red: true }]}
+                    meta={[
+                      `${tr('Orçamento #')}${orc.id}`,
+                      multi ? tr('{{n}} períodos', { n: blocos.length }) : null,
+                      `${hospedagens.length} ${hospedagens.length === 1 ? tr('apartamento') : tr('apartamentos')}`,
+                      `${nPessoas} ${nPessoas === 1 ? tr('pessoa') : tr('pessoas')}`,
+                    ].filter(Boolean).join(' · ')}
+                    onClose={() => setOrcAberto(null)} />
+
+                  <div className={[styles.rcSection, styles.grpCorpo].join(' ')}>
+                    {!multi && ini && fim && (
+                      <>
+                        <section className={styles.nrRsPeriodo} aria-label={tr('Período')}>
+                          <div>
+                            <span>{tr('Check-in')}</span>
+                            <b>{toBrDate(ini)}</b>
+                            <small>{diaSemana(ini)}</small>
+                          </div>
+                          <div className={styles.nrRsSeta}>
+                            <ArrowRight size={18} />
+                            <span>{diariasTxt(diffDays(ini, fim))}</span>
+                          </div>
+                          <div className={styles.nrRsFim}>
+                            <span>{tr('Check-out')}</span>
+                            <b>{toBrDate(fim)}</b>
+                            <small>{diaSemana(fim)}</small>
+                          </div>
+                        </section>
+                        <div className={styles.grpSepPeriodo} />
+                      </>
+                    )}
+                    {hospedagens.length === 0 && <p className={styles.sideVazio}>{tr('Nenhuma hospedagem neste orçamento.')}</p>}
+
+                    {ativos.length > 0 && (
+                      <section className={styles.grpFin}>
+                        <h2 className={[styles.nrSecTit, !multi ? styles.grpFinTitLeve : ''].join(' ')}>{tr('Resumo financeiro')}</h2>
+                        {blocos.map((pr) => {
+                          const itens = pr.itens.filter((h) => mapStatus(h) !== 'cancelado');
+                          if (!itens.length) return null;
+                          const n = pr.inicio && pr.fim ? diffDays(pr.inicio, pr.fim) : 0;
+                          return (
+                            <div key={`${pr.inicio}|${pr.fim}`} className={styles.grpFinPer}>
+                              {multi && <span className={styles.grpFinPerTit}>{fmtDiaMes(pr.inicio)} → {fmtDiaMes(pr.fim)} · {diariasTxt(n)}</span>}
+                              {itens.map((h) => {
+                                const pes = h.pessoas_orcamento ?? [];
+                                const np = pes.length;
+                                const idadesCr = pes.map((x) => calcAge(x.data_nascimento)).filter((a) => a !== null && a < 18);
+                                const nAd = np - idadesCr.length;
+                                const ocupTxt = [
+                                  nAd > 0 ? `${nAd} ${nAd === 1 ? tr('Adulto') : tr('Adultos')}` : null,
+                                  idadesCr.length > 0 ? `${idadesCr.length} ${idadesCr.length === 1 ? tr('criança') : tr('crianças')} (${idadesCr.join(', ')} ${tr('anos')})` : null,
+                                ].filter(Boolean).join(' + ');
+                                return (
+                                  <div key={h.id} className={styles.grpFinAptoBloco}>
+                                    <div className={styles.grpFinApto}>
+                                      <span>{(() => {
+                                        const tp = h.tipo_hospedagem || TIPO_POR_PESSOAS[np] || null;
+                                        if (qid(h)) return <>{tr('Apt.')} {fmtRoom(qid(h))}{tp && TIPO_HOSPEDAGEM_LABEL[tp] ? ` · ${TIPO_HOSPEDAGEM_LABEL[tp]}` : ''}</>;
+                                        return HOSP_POR_TIPO[tp] ?? tr('Hospedagem');
+                                      })()}</span>
+                                      <b>{fmtBRL(h.valor_total ?? 0)}</b>
+                                    </div>
+                                    <div className={styles.grpFinDia}>
+                                      <span><small>{ocupTxt || '—'}</small></span>
+                                      {n > 0 && <span>{diariasTxt(n)} × {fmtBRL((h.valor_total ?? 0) / n)}</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                        <div className={styles.grpFinTotal}><span>{tr('Total')}</span><b>{fmtBRL(grandTotal)}</b></div>
+                      </section>
+                    )}
                   </div>
-                </div>
+                </>
               );
             })()}
-
-            <aside className={[styles.finResumo, styles.finResumoView].join(' ')}>
-              <div className={styles.finCab}><h4 className={styles.finTit}>{tr('Resumo financeiro')}</h4></div>
-              {hospedagens.map((h) => {
-                const qid = h.quarto_id ?? h.quarto?.id ?? null;
-                const ci = parseBrDate(h.data_hora_checkin);
-                const co = parseBrDate(h.data_hora_checkout);
-                return (
-                  <div key={h.id} className={[styles.finLinha, mapStatus(h) === 'cancelado' ? styles.dtCancelado : ''].join(' ')}>
-                    <span className={styles.finLinhaTxt}>
-                      {qid ? <>{tr('Apartamento')} {fmtRoom(qid)}</> : tr('Hospedagem')}
-                      {ci && co && <small className={styles.finSub}>{fmtDiaMes(ci)} → {fmtDiaMes(co)} · {diariasTxt(diffDays(ci, co))}</small>}
-                    </span>
-                    <b>{fmtBRL(h.valor_total ?? 0)}</b>
-                  </div>
-                );
-              })}
-              <hr className={styles.finSep} />
-              <div className={[styles.finLinha, styles.finTotal].join(' ')}><span>{tr('Total do orçamento')}</span><b>{fmtBRL(grandTotal)}</b></div>
-            </aside>
-
-            <SecaoTabela titulo={tr('Hospedagens')} temLinhas={hospedagens.length > 0} vazio={tr('Nenhuma hospedagem neste orçamento.')}
-              colunas={[[tr('Apto')], [tr('Período')], [tr('Hóspedes')], [tr('Valor'), true], ['']]}>
-              {hospedagens.map((h) => {
-                const ci = parseBrDate(h.data_hora_checkin);
-                const co = parseBrDate(h.data_hora_checkout);
-                const quartoId = h.quarto_id ?? h.quarto?.id ?? null;
-                const pessoas  = h.pessoas_orcamento ?? [];
-                const motivo   = h.motivo_cancelamento?.motivo_cancelamento ?? null;
-                return (
-                  <tr key={h.id} className={mapStatus(h) === 'cancelado' ? styles.dtCancelado : ''}>
-                    <td><span className={styles.dtNum}>{quartoId ? fmtRoom(quartoId) : '—'}</span></td>
-                    <td>
-                      <span className={styles.dtCelTit}>{fmtDiaMes(ci)} → {fmtDiaMes(co)}</span>
-                      <span className={styles.dtCelSub}>{ci && co ? diariasTxt(diffDays(ci, co)) : ''}</span>
-                    </td>
-                    <td className={styles.dtQuebra}>
-                      {pessoas.length ? pessoas.map((p) => p.nome).join(', ') : '—'}
-                      {(h.observacao || motivo) && <span className={styles.dtCelSub}>{motivo || h.observacao}</span>}
-                    </td>
-                    <td className={[styles.dtDir, styles.dtForte].join(' ')}>{fmtBRL(h.valor_total ?? 0)}</td>
-                    <td className={styles.dtSetaCel}>
-                      {pessoas.length > 0 && onSelectReserva && (
-                        <button type="button" className={styles.dtSeta} onClick={() => verHosp(orc, h)} title={tr('Ver reserva')} aria-label={tr('Ver reserva')}>
-                          <ChevronRight size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </SecaoTabela>
           </div>
         </GavetaDir>
       );
@@ -6802,7 +6791,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const stepDefs = [
     { id: 'tipo', label: tr('Tipo') },
     ...(isSolicitacao ? [{ id: 'dados', label: tr('Período e hóspedes') }]
-      : periodoMode === 'multiplos' ? [{ id: 'dados', label: tr('Grupo e períodos') }]
+      : periodoMode === 'multiplos' ? [
+          { id: 'mpPeriodos', label: tr('Grupo e períodos') },
+          { id: 'mpAptos',    label: tr('Apartamentos') },
+          { id: 'mpHospedes', label: tr('Hóspedes') },
+        ]
       : [
           { id: 'periodo',  label: tipo === 'grupo' ? tr('Período e apartamentos') : tr('Período e apartamento') },
           { id: 'hospedes', label: tr('Hóspedes') },
@@ -7079,7 +7072,57 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     : quartos;
 
   const [semCadastroDraft, setSemCadastroDraft] = useState(false);
-  const mpFormDirty = periodoMode === 'multiplos' && (mpRooms.length > 0 || !!mpCheckin || !!mpCheckout || editingPeriodoIdx !== null);
+  const mpFormDirty = isSolicitacao && periodoMode === 'multiplos' && (mpRooms.length > 0 || !!mpCheckin || !!mpCheckout || editingPeriodoIdx !== null);
+
+  // Períodos diferentes (fora da solicitação): datas, apartamentos e hóspedes em etapas próprias,
+  // editando a lista de períodos direto.
+  const novoPeriodo = (ci = null, co = null) => ({ checkin: ci, checkout: co, rooms: [], roomHospedes: {}, roomHospedesOrc: {}, roomTipo: {}, tipoManual: {} });
+  useEffect(() => {
+    if (periodoMode === 'multiplos' && !isSolicitacao && periodos.length === 0) setPeriodos([novoPeriodo(mpCheckin, mpCheckout)]);
+  }, [periodoMode]); // eslint-disable-line
+  const mudaPeriodo = (i, fn) => setPeriodos((ps) => ps.map((p, j) => (j === i ? fn(p) : p)));
+  const mudaDatasPeriodo = (i, campo, d) => mudaPeriodo(i, (p) => {
+    const n = { ...p, [campo]: d, rooms: [], roomHospedes: {}, roomHospedesOrc: {}, roomTipo: {}, tipoManual: {} };
+    if (campo === 'checkin' && n.checkout && d && n.checkout <= d) n.checkout = null;
+    return n;
+  });
+  const periodoValido = (p) => p.checkin && p.checkout && formatDate(p.checkout) > formatDate(p.checkin);
+  const chaveDatas = (p) => (periodoValido(p) ? `${formatDate(p.checkin)}|${formatDate(p.checkout)}` : null);
+  const [mpDisp, setMpDisp] = useState({}); // { 'ci|co': Set<roomId> | 'loading' }
+  const chavesPeriodos = periodos.map(chaveDatas).filter(Boolean).join(',');
+  useEffect(() => {
+    if (isSolicitacao || periodoMode !== 'multiplos') return;
+    [...new Set(chavesPeriodos.split(',').filter(Boolean))].forEach((k) => {
+      if (mpDisp[k]) return;
+      const [ci, co] = k.split('|');
+      setMpDisp((m) => ({ ...m, [k]: 'loading' }));
+      reservaApi.verificarDisponibilidade({ data_entrada: toBrDate(ci), data_saida: toBrDate(co) })
+        .then((res) => setMpDisp((m) => ({ ...m, [k]: new Set((Array.isArray(res) ? res : []).filter((r) => r.disponivel).map((r) => r.quarto_id ?? r.fk_quarto)) })))
+        .catch(() => setMpDisp((m) => ({ ...m, [k]: null })));
+    });
+  }, [chavesPeriodos, periodoMode]); // eslint-disable-line
+  const aptosLivresPeriodo = (i) => {
+    const p = periodos[i];
+    const k = chaveDatas(p);
+    if (!k) return [];
+    const [ci, co] = k.split('|');
+    const usados = periodos.flatMap((o, j) => {
+      if (j === i || !chaveDatas(o)) return [];
+      const [oi, oo] = chaveDatas(o).split('|');
+      return oi < co && oo > ci ? o.rooms.map((r) => parseInt(r)) : [];
+    });
+    const temOrc = (r) => isOrcamento && reservas.some((res) => res.status === 'orcamento' && res.quarto === r && res.dataInicio < co && res.dataFim > ci);
+    const disp = mpDisp[k];
+    const base = disp instanceof Set
+      ? allRoomIds.filter((r) => disp.has(r) && !temOrc(r))
+      : allRoomIds.filter((r) => !temOrc(r) && !reservas.some((res) => res.status !== 'orcamento' && res.quarto === r && res.dataInicio < co && res.dataFim > ci));
+    return base.filter((r) => !usados.includes(r));
+  };
+  const mpPares = periodos.flatMap((p, pi) => p.rooms.map((q) => ({ pi, q })));
+  const [mpHospIdx, setMpHospIdx] = useState(0);
+  useEffect(() => { setMpHospIdx((i) => Math.min(i, Math.max(mpPares.length - 1, 0))); }, [mpPares.length]);
+  const mpPessoas = (p, q) => (p.roomHospedes?.[q]?.length || 0) + (p.roomHospedesOrc?.[q]?.length || 0);
+  const mpAptosFaltando = mpPares.filter(({ pi, q }) => !mpPessoas(periodos[pi], q) || !periodos[pi].roomTipo?.[q]).length;
 
   const hasGuestsForAllRooms = periodoMode === 'unico'
     ? quartos.length > 0 && quartos.every((q) => (quartoHospedes[q]?.length || 0) + (quartoHospedesOrc[q]?.length || 0) > 0)
@@ -7528,7 +7571,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const aptosFaltando = quartos.filter((q) => !qtdPessoasQuarto(q) || !quartosTipo[q]).length;
   const podeAvancar = curId === 'tipo' ? tipo != null && !(forceOrcamento && !isSolicitacao && !nomeSolicitante.trim())
     : curId === 'periodo' ? !!(checkinStr && checkoutStr && dias > 0) && quartos.length > 0
-    : curId === 'hospedes' || curId === 'dados' ? canNext2
+    : curId === 'mpPeriodos' ? periodos.length > 0 && periodos.every(periodoValido)
+    : curId === 'mpAptos' ? periodos.every((p) => p.rooms.length > 0) && mpPares.length >= 2
+    : curId === 'hospedes' || curId === 'dados' || curId === 'mpHospedes' ? canNext2
     : true;
   const subtitulo = tipo == null ? tr('Escolha o tipo para começar')
     : [
@@ -7549,6 +7594,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
           {step > 1 && <button type="button" className={styles.nrVoltar} onClick={() => { setStep((s) => s - 1); if (step === SUMMARY_STEP) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>{tr('Voltar')}</button>}
           {curId === 'hospedes' && tipo === 'grupo' && aptosFaltando > 0 && (
             <span className={styles.nrFaltam}>{aptosFaltando === 1 ? tr('Falta 1 apartamento') : tr('Faltam {{n}} apartamentos', { n: aptosFaltando })}</span>
+          )}
+          {curId === 'mpHospedes' && mpAptosFaltando > 0 && (
+            <span className={styles.nrFaltam}>{mpAptosFaltando === 1 ? tr('Falta 1 apartamento') : tr('Faltam {{n}} apartamentos', { n: mpAptosFaltando })}</span>
           )}
           {step < STEPS.length ? (
             <button type="button" className={styles.nrContinuar} disabled={!podeAvancar}
@@ -7581,7 +7629,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       {/* ── Step content (scrollable) ── */}
       <div className={styles.nrCorpo}>
 
-      {step === SUMMARY_STEP && !resumoSimples && !resumoGrupo && (
+      {step === SUMMARY_STEP && !resumoSimples && !resumoGrupo && !isOrcamento && (
         <>
           <h2 className={styles.nrSecTit}>{tr('Reserva')}</h2>
           <div className={styles.nrKv}>
@@ -7801,11 +7849,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       )}
 
       {/* ── Step 2: Quarto & Período ───────────────────────────────────────── */}
-      {['dados', 'periodo', 'apto', 'hospedes'].includes(curId) && !isSolicitacao && (
+      {['dados', 'periodo', 'apto', 'hospedes', 'mpPeriodos', 'mpAptos', 'mpHospedes'].includes(curId) && !isSolicitacao && (
         <div className={styles.nrPasso}>
           {/* Vincular esta(s) reserva(s) a um grupo já existente (opcional).
               Aberto pelo painel de grupos, o grupo já vem definido e não muda. */}
-          {(curId === 'periodo' || curId === 'dados') && !isOrcamento && gruposExistentes.length > 0 && (
+          {(curId === 'periodo' || curId === 'dados' || curId === 'mpPeriodos') && !isOrcamento && gruposExistentes.length > 0 && (
             <>
               <h2 className={styles.nrSecTit}>{initialGrupo != null ? tr('Grupo da reserva') : tr('A reserva pertence a um grupo existente?')}</h2>
               <select
@@ -7934,7 +7982,28 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             </>
           )}
 
-          {periodoMode === 'unico' && curId === 'hospedes' && (() => {
+          {isOrcamento && periodoMode === 'unico' && curId === 'hospedes' && (
+            <>
+              <h2 className={styles.nrSecTit}>{tr('Apartamentos e hóspedes')}</h2>
+              <div className={styles.orcHospLista}>
+                {quartos.map((q) => (
+                  <div key={q} className={styles.orcHospLinha}>
+                    <b>{tr('Apt.')} {fmtRoom(parseInt(q))}</b>
+                    <div className={styles.orcHospCampo}>
+                      <SemCadastroHospedesPicker
+                        value={quartoHospedesOrc[q] || []}
+                        onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
+                        onDraftChange={setSemCadastroDraft}
+                        extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={quartosTipo[q]}
+                          onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {!isOrcamento && periodoMode === 'unico' && curId === 'hospedes' && (() => {
             const idx = Math.min(hospIdx, Math.max(quartos.length - 1, 0));
             const q = quartos[idx];
             if (q == null) return null;
@@ -7975,121 +8044,163 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
             );
           })()}
 
-          {periodoMode === 'multiplos' && (
+          {curId === 'mpPeriodos' && (
             <>
-              {periodos.length > 0 && (
-                <div className={styles.periodosList}>
-                  {periodos.map((p, i) => {
-                    const ci = formatDate(p.checkin); const co = formatDate(p.checkout);
-                    const isEditing = editingPeriodoIdx === i;
-                    return (
-                      <div key={i} className={[styles.periodoItem, isEditing ? styles.periodoItemEditing : ''].join(' ')}>
-                        <div className={styles.periodoItemInfo}>
-                          <span className={styles.periodoItemTit}>{tr('Período')} {i + 1}</span>
-                          <span className={styles.periodoItemDates}>{fmtDateBR(ci)} → {fmtDateBR(co)} · {diariasTxt(diffDays(ci, co))}</span>
-                          <div className={styles.periodoQuartos}>
-                            {p.rooms.map((q) => {
-                              const hosp = isOrcSemCadastro ? (p.roomHospedesOrc?.[q] || []) : (p.roomHospedes?.[q] || []);
-                              return (
-                                <div key={q} className={styles.periodoQuarto}>
-                                  <span className={styles.periodoItemRoomNum}>{fmtRoom(parseInt(q))}</span>
-                                  <span className={styles.periodoNomes}>
-                                  {hosp.length > 0
-                                    ? hosp.map((h, hi) => (
-                                        <span key={isOrcSemCadastro ? hi : h.id} style={{ fontSize: 12, color: 'var(--text)', fontWeight: 400 }}>
-                                          {h.nome}
-                                        </span>
-                                      ))
-                                    : <span style={{ fontSize: 11, color: 'var(--text-2)' }}>{tr('sem hóspedes')}</span>
-                                  }
-                                  </span>
-                                </div>
-                              );
-                            })}
+              <h2 className={[styles.nrSecTit, !isOrcamento && gruposExistentes.length > 0 ? styles.nrSecTitEspaco : ''].join(' ')}>{tr('Períodos')}</h2>
+              <div className={styles.mpPerLista}>
+                {periodos.map((p, i) => {
+                  const ci = p.checkin ? formatDate(p.checkin) : '';
+                  const co = p.checkout ? formatDate(p.checkout) : '';
+                  const n = ci && co ? diffDays(ci, co) : 0;
+                  return (
+                    <div key={i} className={styles.mpPer}>
+                      <b className={styles.mpPerTit}>{tr('Período')} {i + 1}</b>
+                      <div className={styles.mpPerLinha}>
+                        <div className={styles.nrRotulo}>
+                          <span>{tr('Check-in')}</span>
+                          <div className={styles.dateCompact}>
+                            <DatePicker sobrio mode="single" value={p.checkin}
+                              onChange={(d) => mudaDatasPeriodo(i, 'checkin', d)}
+                              placeholder={tr('Data de check-in')} minDate={new Date()} />
                           </div>
                         </div>
-                        <div className={styles.periodoItemAcoes}>
-                          {isEditing ? <span className={styles.periodoItemEditando}>{tr('Editando')}</span> : (
-                            <button type="button" className={styles.rvSecBtn} onClick={() => startEditPeriodo(i)}>{tr('Editar')}</button>
-                          )}
-                          <button type="button" className={[styles.rvSecBtn, styles.rvSecBtnPerigo].join(' ')}
-                            onClick={() => { if (isEditing) resetMpForm(); setPeriodos((ps) => ps.filter((_, j) => j !== i)); }}>
-                            {tr('Remover')}
-                          </button>
+                        <div className={styles.nrRotulo}>
+                          <span>{tr('Check-out')}</span>
+                          <div className={styles.dateCompact}>
+                            <DatePicker sobrio mode="single" value={p.checkout}
+                              onChange={(d) => mudaDatasPeriodo(i, 'checkout', d)}
+                              placeholder={p.checkin ? tr('Data de check-out') : tr('Defina o check-in primeiro')}
+                              disabled={!p.checkin}
+                              minDate={p.checkin ? new Date(p.checkin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
+                              markedDate={p.checkin} />
+                          </div>
                         </div>
+                        <button type="button" className={styles.mpPerLixo} disabled={periodos.length <= 1}
+                          onClick={() => setPeriodos((ps) => ps.filter((_, j) => j !== i))}
+                          title={tr('Remover período')} aria-label={tr('Remover período {{n}}', { n: i + 1 })}>
+                          <Trash2 size={16} />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-              <div className={styles.mpForm}>
-                <div className={styles.step2Grid}>
-                  <FormField label={tr('Check-in')}>
-                    <div className={styles.dateCompact}>
-                      <DatePicker sobrio mode="single" value={mpCheckin}
-                        onChange={(d) => {
-                          setMpCheckin(d);
-                          setMpRooms([]); setMpRoomHospedes({}); setMpRoomHospedesOrc({});
-                          // check-out anterior/igual ao novo check-in deixa de ser válido
-                          if (mpCheckout && d && mpCheckout <= d) setMpCheckout(null);
-                        }}
-                        placeholder={tr('Data de check-in')} minDate={new Date()} />
+                      {n > 0 && <span className={styles.nrDica}>{diariasTxt(n)} · {diaSemanaLonga(ci)} a {diaSemanaLonga(co)}</span>}
                     </div>
-                  </FormField>
-                  <FormField label={<>{tr('Check-out')}{mpCheckin && mpCheckout && <span style={{ fontWeight: 400, color: 'var(--text-2)', marginLeft: 6 }}>· {diariasTxt(diffDays(formatDate(mpCheckin), formatDate(mpCheckout)))}</span>}</>}>
-                    <div className={styles.dateCompact}>
-                      <DatePicker sobrio mode="single" value={mpCheckout}
-                        onChange={(d) => { setMpCheckout(d); setMpRooms([]); setMpRoomHospedes({}); setMpRoomHospedesOrc({}); }}
-                        placeholder={mpCheckin ? tr('Data de check-out') : tr('Defina o check-in primeiro')}
-                        disabled={!mpCheckin}
-                        minDate={mpCheckin ? new Date(mpCheckin.getTime() + 86400000) : new Date(Date.now() + 86400000)}
-                        markedDate={mpCheckin} />
-                    </div>
-                  </FormField>
-                </div>
-                <FormField label={tr('Apartamentos para este período')}>
-                  <RoomCombobox value={mpRooms}
-                    onChange={(v) => { setMpRooms(v); setMpRoomHospedes((prev) => { const n = {}; v.forEach((q) => { n[q] = prev[q] || []; }); return n; }); }}
-                    availableRooms={mpAvailableRooms} categorias={categorias} roomDescMap={roomDescMap}
-                    disabled={!mpCheckin || !mpCheckout}
-                    loading={mpAvailLoading} />
-                </FormField>
-                {!isOrcSemCadastro && (
-                  <label className={[styles.empresaModeToggle, styles.empresaHospedar].join(' ')}>
-                    <input type="checkbox" checked={hospEmpresa} onChange={(e) => setHospEmpresa(e.target.checked)} />
-                    <span>{tr('Hospedar como empresa')}</span>
-                  </label>
-                )}
-                {/* Per-room hospedes for this period */}
-                {mpRooms.map((q) => (
-                  <div key={q} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                    <div className={styles.kvSectionDivider} style={{ margin: 0 }}>{tr('Apartamento')} {fmtRoom(parseInt(q))}{roomDescMap[q] ? ` — ${roomDescMap[q]}` : ''}</div>
-                    {isOrcSemCadastro ? (
-                      <SemCadastroHospedesPicker
-                        value={mpRoomHospedesOrc[q] || []}
-                        onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
-                        onDraftChange={setSemCadastroDraft}
-                      extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
-                    ) : (
-                      <RoomHospedesPicker
-                        value={mpRoomHospedes[q] || []}
-                        onChange={(v) => setMpRoomHospedes((prev) => ({ ...prev, [q]: v }))}
-                        empresaMode={hospEmpresa}
-                        extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
-                    )}
-                  </div>
-                ))}
-                <div className={styles.mpAcoes}>
-                  {editingPeriodoIdx !== null && (
-                    <Button variant="secondary" onClick={resetMpForm}>{tr('Cancelar')}</Button>
-                  )}
-                  <Button variant="primary" disabled={!mpRooms.length || !mpCheckin || !mpCheckout || mpRooms.some((q) => !mpRoomTipo[q] || (isOrcSemCadastro ? !(mpRoomHospedesOrc[q]?.length > 0) : !(mpRoomHospedes[q]?.length > 0)))} onClick={addPeriodo}>
-                    {editingPeriodoIdx !== null ? <><Check size={13} /> {tr('Salvar Alterações')}</> : <><Plus size={13} /> {tr('Adicionar Período')}</>}
-                  </Button>
-                </div>
+                  );
+                })}
               </div>
+              <button type="button" className={styles.mpPerAdd} onClick={() => setPeriodos((ps) => [...ps, novoPeriodo()])}>
+                <Plus size={15} /> {tr('Adicionar período')}
+              </button>
             </>
           )}
+
+          {curId === 'mpAptos' && (
+            <>
+              {periodos.map((p, i) => {
+                const ci = formatDate(p.checkin); const co = formatDate(p.checkout);
+                return (
+                  <div key={i} className={styles.mpApt}>
+                    <div className={styles.mpAptCab}>
+                      <b>{tr('Período')} {i + 1} · {fmtDiaMes(ci)} → {fmtDiaMes(co)}</b>
+                      <span>{p.rooms.length === 1 ? tr('1 selecionado') : tr('{{n}} selecionados', { n: p.rooms.length })}</span>
+                    </div>
+                    <div className={styles.nrRotulo}>
+                      <span>{tr('Apartamentos')}</span>
+                      <RoomCombobox value={p.rooms}
+                        onChange={(v) => mudaPeriodo(i, (o) => ({
+                          ...o, rooms: v,
+                          roomHospedes:    Object.fromEntries(v.map((q) => [q, o.roomHospedes?.[q] || []])),
+                          roomHospedesOrc: Object.fromEntries(v.map((q) => [q, o.roomHospedesOrc?.[q] || []])),
+                        }))}
+                        availableRooms={aptosLivresPeriodo(i)}
+                        categorias={categorias} roomDescMap={roomDescMap}
+                        loading={mpDisp[chaveDatas(p)] === 'loading'} />
+                    </div>
+                  </div>
+                );
+              })}
+              <span className={styles.nrDica}>{tr('Cada campo abre a lista de apartamentos livres no período. Um grupo precisa de 2 ou mais no total.')}</span>
+              {!isOrcSemCadastro && (
+                <label className={[styles.empresaModeToggle, styles.empresaHospedar].join(' ')}>
+                  <input type="checkbox" checked={hospEmpresa} onChange={(e) => setHospEmpresa(e.target.checked)} />
+                  <span>{tr('Hospedar como empresa')}</span>
+                </label>
+              )}
+            </>
+          )}
+
+          {isOrcamento && curId === 'mpHospedes' && (
+            <>
+              <h2 className={styles.nrSecTit}>{tr('Apartamentos e hóspedes')}</h2>
+              {periodos.map((p, pi) => (
+                <div key={pi} className={styles.orcHospLista}>
+                  <span className={styles.orcHospPer}>{tr('Período')} {pi + 1} · {fmtDiaMes(formatDate(p.checkin))} → {fmtDiaMes(formatDate(p.checkout))}</span>
+                  {p.rooms.map((q) => (
+                    <div key={q} className={styles.orcHospLinha}>
+                      <b>{tr('Apt.')} {fmtRoom(parseInt(q))}</b>
+                      <div className={styles.orcHospCampo}>
+                        <SemCadastroHospedesPicker
+                          value={p.roomHospedesOrc?.[q] || []}
+                          onChange={(v) => mudaPeriodo(pi, (o) => {
+                            const n = { ...o, roomHospedesOrc: { ...(o.roomHospedesOrc || {}), [q]: v } };
+                            if (!o.tipoManual?.[q]) n.roomTipo = { ...(o.roomTipo || {}), [q]: sugerirTipo(v.length) };
+                            return n;
+                          })}
+                          onDraftChange={setSemCadastroDraft}
+                          extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]}
+                            onChange={(v) => mudaPeriodo(pi, (o) => ({ ...o, roomTipo: { ...(o.roomTipo || {}), [q]: v }, tipoManual: { ...(o.tipoManual || {}), [q]: !!v } }))} />} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
+
+          {!isOrcamento && curId === 'mpHospedes' && (() => {
+            const idx = Math.min(mpHospIdx, Math.max(mpPares.length - 1, 0));
+            const par = mpPares[idx];
+            if (!par) return null;
+            const { pi, q } = par;
+            const p = periodos[pi];
+            const setHosp = (campo, v) => mudaPeriodo(pi, (o) => {
+              const n = { ...o, [campo]: { ...(o[campo] || {}), [q]: v } };
+              if (!o.tipoManual?.[q]) n.roomTipo = { ...(o.roomTipo || {}), [q]: sugerirTipo((n.roomHospedes?.[q]?.length || 0) + (n.roomHospedesOrc?.[q]?.length || 0)) };
+              return n;
+            });
+            const setTipoQ = (v) => mudaPeriodo(pi, (o) => ({ ...o, roomTipo: { ...(o.roomTipo || {}), [q]: v }, tipoManual: { ...(o.tipoManual || {}), [q]: !!v } }));
+            return (
+              <>
+                <div className={styles.nrSub}>
+                  <div className={styles.nrSubTopo}>
+                    <span className={styles.nrSubTxt}>
+                      <b>{tr('Apt.')} {fmtRoom(parseInt(q))}</b>
+                      <small>{tr('Período')} {pi + 1} · {fmtDiaMes(formatDate(p.checkin))} → {fmtDiaMes(formatDate(p.checkout))}</small>
+                    </span>
+                    <button type="button" className={styles.nrSubVoltar} disabled={idx === 0}
+                      onClick={() => setMpHospIdx(idx - 1)} aria-label={tr('Apartamento anterior')}><ChevronLeft size={14} strokeWidth={2.5} /></button>
+                    <button type="button" className={styles.nrSubProx} disabled={idx >= mpPares.length - 1}
+                      onClick={() => setMpHospIdx(idx + 1)}>{tr('Próximo quarto')}<ChevronRight size={14} strokeWidth={2.5} /></button>
+                  </div>
+                  <div className={styles.nrBarra} role="img" aria-label={tr('Apartamento {{a}} de {{b}}', { a: idx + 1, b: mpPares.length })}>
+                    {mpPares.map((_, i) => <span key={i} className={i <= idx ? styles.nrBarraOn : ''} />)}
+                  </div>
+                </div>
+                <h2 className={styles.nrSecTit}>{tr('Hóspedes')}</h2>
+                {isOrcSemCadastro ? (
+                  <SemCadastroHospedesPicker key={`${pi}_${q}`}
+                    value={p.roomHospedesOrc?.[q] || []}
+                    onChange={(v) => setHosp('roomHospedesOrc', v)}
+                    onDraftChange={setSemCadastroDraft}
+                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
+                ) : (
+                  <RoomHospedesPicker key={`${pi}_${q}`} lista
+                    value={p.roomHospedes?.[q] || []}
+                    onChange={(v) => setHosp('roomHospedes', v)}
+                    empresaMode={hospEmpresa}
+                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
+                )}
+              </>
+            );
+          })()}
 
         </div>
       )}
@@ -8433,6 +8544,105 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       <b className={quitadoG ? styles.nrRsQuitado : ''}>{carregandoG ? sk(120, 22) : fmtBRL(pendG)}</b>
                     </div>
                     {quitadoG && <p className={styles.rfOk}><CheckCircle2 size={14} /> {tr('Pagamento total efetuado')}</p>}
+                  </div>
+                </div>
+              );
+            })() : isOrcamento ? (() => {
+              const sk = (w, h = 14) => <span className={styles.sk} style={{ width: w, height: h, display: 'inline-block' }} />;
+              const aptos = displayPeriodos.flatMap((p, pi) => p.rooms.map((q) => {
+                const ci = p.checkin ? formatDate(p.checkin) : checkinStr;
+                const co = p.checkout ? formatDate(p.checkout) : checkoutStr;
+                const rKey = `${q}_${pi}`;
+                const pes = ((p.roomHospedesOrc || {})[q] || []);
+                const nAd = pes.filter((h) => h._adulto || (calcAge(h.dataNascimento) ?? 18) >= 18).length;
+                const nCr = pes.length - nAd;
+                const pessoasTxt = [
+                  nAd ? `${nAd} ${nAd === 1 ? tr('adulto') : tr('adultos')}` : '',
+                  nCr ? `${nCr} ${nCr === 1 ? tr('criança') : tr('crianças')}` : '',
+                ].filter(Boolean).join(' + ') || tr('Sem hóspedes');
+                return { q, rKey, ci, co, calc: precosCalc[rKey], pessoasTxt, tipoTxt: TIPO_HOSPEDAGEM_LABEL[tipoDe(q, pi)] ?? '—' };
+              }));
+              const blocos = Object.values(aptos.reduce((acc, a) => {
+                const k = `${a.ci}|${a.co}`;
+                (acc[k] ??= { ci: a.ci, co: a.co, itens: [] }).itens.push(a);
+                return acc;
+              }, {}));
+              const multi = blocos.length > 1;
+              const carregando = calcLoading && Object.keys(precosCalc).length === 0;
+              return (
+                <div className={styles.nrResumo}>
+                  {!multi && blocos[0] && (
+                    <section className={styles.nrRsPeriodo} aria-label={tr('Período')}>
+                      <div>
+                        <span>{tr('Check-in')}</span>
+                        <b>{fmtDateBR(blocos[0].ci)}</b>
+                        <small>{diaSemana(blocos[0].ci)}</small>
+                      </div>
+                      <div className={styles.nrRsSeta}>
+                        <ArrowRight size={18} />
+                        <span>{diariasTxt(diffDays(blocos[0].ci, blocos[0].co))}</span>
+                      </div>
+                      <div className={styles.nrRsFim}>
+                        <span>{tr('Check-out')}</span>
+                        <b>{fmtDateBR(blocos[0].co)}</b>
+                        <small>{diaSemana(blocos[0].co)}</small>
+                      </div>
+                    </section>
+                  )}
+                  {!multi && blocos[0] && <div className={styles.grpSepPeriodo} />}
+                  <div>
+                    {blocos.map((pr) => (
+                      <div key={`${pr.ci}|${pr.co}`} className={styles.nrRsPerGrupo}>
+                        {multi && <span className={styles.nrRsPerTit}>{fmtDiaMes(pr.ci)} → {fmtDiaMes(pr.co)} · {diariasTxt(diffDays(pr.ci, pr.co))}</span>}
+                        {pr.itens.map((a) => {
+                          const adj = priceAdj[a.rKey];
+                          const isDiariaAdj = adj?.mode === 'diaria';
+                          const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
+                          const base = (a.calc?.detalhes || []).reduce((s2, d) => s2 + (d.valor_final ?? 0), 0);
+                          const diff = (a.calc?.valor_total ?? 0) - base;
+                          return (
+                            <div key={a.rKey} className={styles.orcRsApto}>
+                              <b className={styles.orcRsTit}>{tr('Apt.')} {fmtRoom(parseInt(a.q))} · {a.tipoTxt}</b>
+                              <div className={styles.orcRsLinha}>
+                                <span>{a.pessoasTxt}</span>
+                                <b>{calcLoading && !a.calc ? sk(80) : fmtBRL(a.calc?.valor_total ?? 0)}</b>
+                              </div>
+                              {a.calc && groupDiarias(a.calc.detalhes, isDiariaAdj ? () => novoValor : null).map((g) => (
+                                <div key={g.key} className={styles.orcRsDia}>
+                                  <span>{g.meia ? tr('Meia diária') : diariasTxt(g.qtd)} × {fmtBRL(g.valor)}</span>
+                                  {g.criancas > 0 && (
+                                    <small className={styles.orcRsCriancas}>
+                                      {[g.valorAdultos > 0 ? `${tr('Adultos')} ${fmtBRL(g.valorAdultos)}` : null,
+                                        (ocupComValorCriancas(g.hosp, g.criancas) || '').match(/Crianças? de .*$/)?.[0] ?? `${tr('Crianças')} (${fmtBRL(g.criancas)})`,
+                                      ].filter(Boolean).join(' + ')}
+                                    </small>
+                                  )}
+                                  {g.saz && (
+                                    <span className={styles.gdSaz}>
+                                      <AlertTriangle size={14} className={styles.gdSazIco} />
+                                      {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                              {a.calc && adj && !isDiariaAdj && Math.abs(diff) >= 0.005 && (
+                                <div className={styles.orcRsDia}>
+                                  <span>{describeAdjustment(adj)}: {diff < 0 ? '− ' : '+ '}{fmtBRL(Math.abs(diff))}</span>
+                                </div>
+                              )}
+                              <button type="button" className={[styles.nrRsLink, styles.orcRsDesc].join(' ')} disabled={!a.calc} onClick={() => setAdjModalKey(a.rKey)}>
+                                {adj ? tr('Alterar desconto') : tr('Desconto')}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    <div className={styles.nrRsSep} />
+                    <div className={styles.nrRsTotal}>
+                      <span>{tr('Total')}</span>
+                      <b>{carregando ? sk(100, 18) : fmtBRL(grandTotal)}</b>
+                    </div>
                   </div>
                 </div>
               );
@@ -9984,7 +10194,7 @@ export default function BookingCalendar() {
       </div>
       </div>
       {/* Modals */}
-      {selectedReserva && isDesktop && <ReservaModal inline saindo={fechandoReserva} key={selectedReserva.id} reserva={selectedReserva} onVoltar={reservaDoGrupo && showGrupos ? true : null} onClose={() => { setFechandoReserva(true); setTimeout(() => { setSelectedReserva(null); setReservaDoGrupo(false); setDragEditValues(null); setFechandoReserva(false); }, 200); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} carregarDetalhes onAprovarSolicitacao={abrirAprovacao} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
+      {selectedReserva && isDesktop && <ReservaModal inline saindo={fechandoReserva} key={selectedReserva.id} reserva={selectedReserva} onVoltar={reservaDoGrupo && (showGrupos || showOrcamentos) ? true : null} onClose={() => { setFechandoReserva(true); setTimeout(() => { setSelectedReserva(null); setReservaDoGrupo(false); setDragEditValues(null); setFechandoReserva(false); }, 200); }} onCancel={handleCancelReserva} onActivate={handleActivateReserva} onMoverPernoite={handleMoverPernoite} onUpdate={handleUpdateReserva} onSync={handleSyncReserva} carregarDetalhes onAprovarSolicitacao={abrirAprovacao} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap} dragValues={dragEditValues} onApprove={handleApproveSolicitacao} onReject={handleRejectSolicitacao} onAusente={handleMarcarAusente} reservas={allReservas} />}
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap}
@@ -10058,7 +10268,7 @@ export default function BookingCalendar() {
           reservas={allReservas}
           roomDescMap={roomDescMap}
           onSave={handleSaveNew}
-          onSelectReserva={(r) => setSelectedReserva(r)}
+          onSelectReserva={(r) => { setSelectedReserva(r); setReservaDoGrupo(true); }}
           onNotify={notify}
           onAlterado={loadReservas}
           naAba={isDesktop}

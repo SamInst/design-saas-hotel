@@ -6320,3 +6320,47 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 .gpAddPer { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; border: 1px dashed #C9D0D9; border-radius: 4px; background: none; font-size: 13px; font-weight: 500; color: var(--l-fg); cursor: pointer; }
 .gpAddPer:hover { background: #F4F6F8; }
 .gpAcoes { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* Nova reserva · períodos diferentes: datas, apartamentos por período */
+.mpPerLista { display: flex; flex-direction: column; }
+.mpPer { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; }
+.mpPer + .mpPer { border-top: 1px solid var(--border); }
+.mpPer:first-child { padding-top: 4px; }
+.mpPerTit { font-size: 13px; font-weight: 600; color: var(--l-fg); }
+.mpPerLinha { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px; gap: 10px; align-items: end; }
+.mpPerLixo { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 40px; border: 0; background: none; color: #DC2626; cursor: pointer; border-radius: 4px; }
+.mpPerLixo:hover:not(:disabled) { background: color-mix(in oklch, #DC2626 10%, transparent); }
+.mpPerLixo:disabled { color: var(--l-muted-fg); opacity: 0.4; cursor: default; }
+.mpPerAdd { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px; border: 0; background: none; font-size: 13px; font-weight: 600; color: var(--primary, #2563EB); cursor: pointer; }
+.mpPerAdd:hover { text-decoration: underline; }
+.mpApt { display: flex; flex-direction: column; gap: 8px; }
+.mpApt + .mpApt { margin-top: 20px; }
+.mpAptCab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; }
+.mpAptCab b { font-weight: 600; color: var(--l-fg); }
+.mpAptCab span { font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+.mpApt ~ .nrDica { margin-top: 12px; }
+
+.grpQuarto:disabled { cursor: default; opacity: 1; color: inherit; }
+.grpQuarto:disabled:hover .grpNomes b { color: inherit; }
+.grpPagBtn { display: inline-flex; align-items: center; gap: 6px; }
+
+.orcRsApto + .orcRsApto { border-top: 1px dashed var(--border); }
+.orcRsApto .nrRsApto { min-height: 0; }
+.orcRsDias { display: flex; flex-direction: column; gap: 2px; padding: 0 0 10px; }
+.orcRsDias .grpFinDia { padding-left: 0; }
+
+.orcHospLista { display: flex; flex-direction: column; }
+.orcHospLista + .orcHospLista { margin-top: 12px; }
+.orcHospPer { font-size: 12px; font-weight: 600; color: var(--l-muted-fg); text-transform: uppercase; letter-spacing: .04em; padding: 4px 0; }
+.orcHospLinha { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px dashed var(--border); }
+.orcHospLinha:last-child { border-bottom: 0; }
+.orcHospLinha > b { flex: none; min-width: 64px; font-weight: 600; }
+.orcHospCampo { flex: 1; min-width: 0; max-width: 300px; margin-left: auto; }
+
+.orcRsApto { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; }
+.orcRsTit { font-weight: 600; }
+.orcRsLinha { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; color: var(--l-muted-fg); font-size: 13px; }
+.orcRsLinha > b { color: var(--l-fg); font-size: 14px; font-variant-numeric: tabular-nums; }
+.orcRsDia { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; color: var(--l-muted-fg); font-variant-numeric: tabular-nums; }
+.orcRsDesc { align-self: flex-start; margin-top: 4px; }
+.orcRsCriancas { font-size: 12px; color: var(--l-muted-fg); text-align: right; }
