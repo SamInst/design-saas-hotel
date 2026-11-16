@@ -4479,3 +4479,145 @@
   flex-shrink: 0; color: transparent; transition: all 0.12s; background: var(--surface);
 }
 .qcCheckSel { background: var(--violet); border-color: var(--violet); color: #fff; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Recepção no desenho do calendário de reservas: mesmos tokens, gavetas à
+   direita e cards no formato das listas de reservas (número em caixa,
+   titular, linha de apoio e status com ponto).
+   ══════════════════════════════════════════════════════════════════════════ */
+.recRaiz { overflow: hidden; }
+.recArea { flex: 1 1 auto; min-height: 0; }
+.recArea > .page { flex: 1 1 auto; min-height: 0; overflow-y: auto; gap: 14px; }
+
+.recArea .card {
+  border: 1px solid var(--border); border-radius: var(--l-r-xl, 14px);
+  background: var(--l-card); box-shadow: var(--l-shadow); overflow: visible;
+}
+
+/* Cabeçalho: busca, data e ações */
+.recArea .tableHeader { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.recArea .tableHeaderActions { gap: 10px; width: 100%; }
+.recArea .searchWrap { flex: 1 1 260px; width: auto; max-width: 420px; }
+.recArea .searchInput,
+.recArea .headerControlField {
+  min-height: 44px; border-radius: 10px !important;
+  border-color: var(--border) !important; background: var(--l-card) !important;
+  font-size: 14px;
+}
+.recArea .searchInput:focus,
+.recArea .headerControlField:focus-within,
+.recArea .headerControlField:hover { border-color: var(--l-primary) !important; }
+.recArea .headerControlBtn {
+  min-height: 44px; padding: 0 16px; gap: 6px; border-radius: 10px !important;
+  border: 0 !important; background: var(--l-secondary) !important; color: var(--l-secondary-fg) !important;
+  font-size: 14px; font-weight: 600;
+}
+.recArea .headerControlBtn:hover { background: var(--l-accent) !important; color: var(--l-accent-fg) !important; }
+.recArea .headerControlBtn.btnPurple { margin-left: auto; background: var(--l-primary) !important; color: var(--l-primary-fg) !important; }
+.recArea .headerControlBtn.btnPurple:hover { background: color-mix(in oklch, var(--l-primary) 88%, black) !important; }
+.recArea .headerControlBtn:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; }
+
+/* Filtros */
+.recArea .filterTabs { padding: 12px 20px; gap: 10px; background: none; align-items: center; }
+.recArea .filterSelectBar { min-height: 40px; border-radius: 10px; }
+.recArea .filterSelectActive { border-color: var(--l-primary) !important; background: color-mix(in oklch, var(--l-primary) 7%, var(--l-card)) !important; }
+.recArea .filterToggleBtn {
+  height: 40px; padding: 0 14px; border-radius: 10px; border-color: var(--border);
+  background: var(--l-card); color: var(--l-muted-fg); font-weight: 500;
+}
+.recArea .filterToggleBtn:hover { color: var(--l-fg); border-color: color-mix(in oklch, var(--l-fg) 25%, var(--border)); }
+.recArea .filterToggleBtnActive { background: var(--l-secondary); border-color: transparent; color: var(--l-fg); font-weight: 600; }
+
+/* Seções (categoria, data, grupo) */
+.recArea .catSection { border-bottom: 1px solid var(--border); }
+.recArea .catHeader { padding: 18px 20px 10px; background: none; }
+.recArea .catHeader:hover { background: none; }
+.recArea .catHeader:hover .catName { color: var(--l-primary); }
+.recArea .catName { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; transition: color .15s; }
+.recArea .catDesc { font-size: 13px; color: var(--l-muted-fg); }
+.recArea .catBody { padding: 4px 20px 20px; }
+.recArea .roomGrid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+
+/* ── Card do quarto ─────────────────────────────────────────────────────── */
+.rc {
+  --rc-cor: var(--accent-strong);
+  position: relative; display: flex; flex-direction: column; gap: 12px; min-height: 132px;
+  padding: 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--l-card); color: var(--l-fg); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .15s, background-color .15s;
+}
+:root[data-theme="dark"] .rc { --rc-cor: var(--accent); }
+.rc.roomCard_reservado { --accent-strong: #64748b; }
+.rc:hover { border-color: color-mix(in oklch, var(--rc-cor) 55%, var(--border)); background: color-mix(in oklch, var(--rc-cor) 4%, var(--l-card)); }
+.rc:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 2px; }
+
+.rcTopo { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 12px; align-items: center; }
+.rcNum {
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 44px; height: 44px; border: 1.5px solid var(--rc-cor); border-radius: 8px;
+  color: var(--rc-cor); font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.rcInfo { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rcTitulo {
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rcTituloMudo { font-size: 14px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--l-fg); }
+.rcSub { font-size: 13px; color: var(--l-muted-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcIco, .rcTimer { display: inline-flex; align-items: center; gap: 4px; }
+.rcTimer { color: var(--rc-cor); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+.rcStatusLinha { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.rcStatus { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--l-muted-fg); white-space: nowrap; }
+.rcStatus i { width: 7px; height: 7px; border-radius: 50%; background: var(--rc-cor); }
+.rcStatusLimpeza i { background: #2563eb; }
+
+.rcRodape {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: auto; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.rcChips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.rcChip {
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; border-radius: 6px;
+  background: var(--l-secondary); color: var(--l-secondary-fg); font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.rcChip svg { color: var(--l-muted-fg); }
+.rcPendente { flex-shrink: 0; font-size: 13px; font-weight: 600; color: #B45309; white-space: nowrap; }
+.rcPendente small { font-size: 11px; font-weight: 500; color: var(--l-muted-fg); }
+:root[data-theme="dark"] .rcPendente { color: #F5A524; }
+
+/* Cards em cor sólida, tons escuros por status, texto claro */
+.rc.roomCard_disponivel { --rc-bg: #166534; }
+.rc.roomCard_ocupado    { --rc-bg: #991B1B; }
+.rc.roomCard_reservado  { --rc-bg: #475569; }
+.rc.roomCard_limpeza    { --rc-bg: #1E40AF; }
+.rc.roomCard_manutencao { --rc-bg: #5B21B6; }
+.rc.roomCard_fora       { --rc-bg: #334155; }
+.rc, :root[data-theme="dark"] .rc {
+  --rc-cor: #FFFFFF;
+  border-color: transparent; background: var(--rc-bg, #334155); color: #FFFFFF;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .08);
+}
+.rc:hover { border-color: transparent; background: color-mix(in oklch, var(--rc-bg, #334155) 88%, black); }
+/* Em limpeza: o card mantém a cor do status; só a faixa de baixo fica azul com quem está limpando */
+.rc.rcLimpando { overflow: hidden; }
+.rcLimpezaFaixa {
+  display: flex; align-items: center; gap: 6px; margin: auto -14px -14px; padding: 10px 14px;
+  background: #1E40AF; color: #FFFFFF; font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.rcLimpezaFaixa svg { flex-shrink: 0; color: rgb(255 255 255 / .8); }
+.rc .rcNum { border-color: rgb(255 255 255 / .55); color: #FFFFFF; }
+.rc .rcTituloMudo { color: #FFFFFF; }
+.rc .rcSub, .rc .rcStatus, .rc .rcPendente small { color: rgb(255 255 255 / .78); }
+.rc .rcStatus svg { color: rgb(255 255 255 / .78); }
+.rc .rcStatus i { background: #FFFFFF; }
+.rc .rcStatusLimpeza i { background: #93C5FD; }
+.rc .rcTimer { color: #FFFFFF; }
+.rc .rcRodape { border-top-color: rgb(255 255 255 / .18); }
+.rc .rcChip { background: rgb(255 255 255 / .14); color: #FFFFFF; }
+.rc .rcChip svg { color: rgb(255 255 255 / .8); }
+.rc .rcPendente, :root[data-theme="dark"] .rc .rcPendente { color: #FCD34D; }
+.rc:focus-visible { outline-color: var(--l-fg); }
+.rcDatas { display: flex; flex-direction: column; gap: 2px; }
+.rcDatas .rcStatus b { font-weight: 500; color: #FFFFFF; font-variant-numeric: tabular-nums; }

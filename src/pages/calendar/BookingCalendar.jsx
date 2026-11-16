@@ -504,6 +504,23 @@ const ocupComValorCriancas = (ocupacao, valorCriancas) => (
     : ocupacao
 );
 
+function LinhasDiarias({ grupos }) {
+  return grupos.map((g, _i, todos) => (
+    <div key={g.key} className={styles.grpFinDia}>
+      <span>
+        <small>{[[g.meia ? tr('Meia diária') : null, ocupComValorCriancas(g.hosp, g.criancas)].filter(Boolean).join(' · '), diariasTxt(g.qtd)].filter(Boolean).join(' × ')}</small>
+        {g.saz && (
+          <span className={styles.gdSaz}>
+            <AlertTriangle size={14} className={styles.gdSazIco} />
+            {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+          </span>
+        )}
+      </span>
+      {todos.length > 1 && <span>{fmtBRL(g.valor * g.qtd)}</span>}
+    </div>
+  ));
+}
+
 /** Converts a guest list to { datas_nascimento } for /calcular-preco.
  *  One birth date per guest in dd/MM/yyyy — guests without a stored date get a default adult date (18 years ago). */
 const buildGuestCalcParams = (guests) => {
@@ -889,12 +906,13 @@ function MenuOpcoes({ itens }) {
   );
 }
 
-function LinhaReserva({ r, onClick, mostrarQuarto = true }) {
+function LinhaReserva({ r, onClick, mostrarQuarto = true, corGrupo = null }) {
   const dias     = diffDays(r.dataInicio, r.dataFim);
   const nPessoas = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0));
   return (
     <button type="button" className={[styles.lstRow, r.status === 'finalizado' ? styles.lstRowFeito : ''].join(' ')} onClick={onClick}>
-      {mostrarQuarto && <span className={styles.lstNum}>{fmtRoom(r.quarto)}</span>}
+      {corGrupo && <i className={styles.lstGrpDot} style={{ background: corGrupo }} aria-hidden="true" />}
+      {mostrarQuarto && <span className={styles.lstNum} style={corGrupo ? { color: corGrupo, borderColor: corGrupo } : undefined}>{fmtRoom(r.quarto)}</span>}
       <span className={styles.lstTxt}>
         <b>{r.titularNome}</b>
         <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</small>
@@ -3844,11 +3862,12 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 function useReservasDoDia(dateStr, refreshKey) {
   const [lista,   setLista]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const dataCarregada = useRef(null);
 
   useEffect(() => {
     if (!dateStr) return;
     let vivo = true;
-    setLoading(true);
+    if (dataCarregada.current !== dateStr) setLoading(true);
     hospedagemApi.buscar({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], data: toBrDate(dateStr) })
       .then((data) => {
         if (!vivo) return;
@@ -3859,6 +3878,7 @@ function useReservasDoDia(dateStr, refreshKey) {
           if (!seen.has(r.id)) { seen.add(r.id); out.push(normalizeReserva(r)); }
         }
         setLista(out.filter((r) => r.dataInicio).sort((a, b) => a.quarto - b.quarto));
+        dataCarregada.current = dateStr;
       })
       .catch(() => { if (vivo) setLista([]); })
       .finally(() => { if (vivo) setLoading(false); });
@@ -3905,7 +3925,7 @@ function ResumoDia({ itens, loading, rotulo = null, compacto = false }) {
   );
 }
 
-function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
+function ListaDia({ dateStr, lista, loading, onSelectReserva, grupoNomes = {}, onAbrirGrupo }) {
   if (loading) return <Esqueleto />;
   if (lista.length === 0) return <p className={styles.sideVazio}>{tr('Nenhuma reserva para este dia.')}</p>;
 
@@ -3926,11 +3946,36 @@ function ListaDia({ dateStr, lista, loading, onSelectReserva }) {
             <span className={styles.lstSecaoSub}>{sec.sub}</span>
             <span className={styles.lstQtd}>{sec.list.length}</span>
           </div>
-          {sec.list.map((r) => (
-            <div key={r.id} className={styles.lstItem}>
-              <LinhaReserva r={r} onClick={() => onSelectReserva(r)} />
-            </div>
-          ))}
+          {(() => {
+            const blocos = [];
+            const porGrupo = new Map();
+            sec.list.forEach((r) => {
+              if (r.grupo_id == null) { blocos.push({ itens: [r] }); return; }
+              if (porGrupo.has(r.grupo_id)) { porGrupo.get(r.grupo_id).itens.push(r); return; }
+              const b = { gid: r.grupo_id, itens: [r] };
+              porGrupo.set(r.grupo_id, b);
+              blocos.push(b);
+            });
+            return blocos.map((b) => {
+              const cor = b.gid != null ? grupoColor(b.gid) : null;
+              return (
+                <div key={b.gid != null ? `g${b.gid}` : b.itens[0].id} className={cor ? styles.lstGrp : styles.lstGrpSolto}
+                  style={cor ? { '--grp': cor } : undefined}>
+                  {cor && (
+                    <button type="button" className={styles.lstGrpTag} style={{ color: cor }} disabled={!onAbrirGrupo}
+                      onClick={() => onAbrirGrupo?.(b.gid)} title={tr('Ver grupo')}>
+                      #{(grupoNomes[b.gid] || `${tr('Grupo')} ${b.gid}`).toUpperCase()}
+                    </button>
+                  )}
+                  {b.itens.map((r) => (
+                    <div key={r.id} className={styles.lstItem}>
+                      <LinhaReserva r={r} corGrupo={cor} onClick={() => onSelectReserva(r)} />
+                    </div>
+                  ))}
+                </div>
+              );
+            });
+          })()}
         </div>
       ))}
     </div>
@@ -3978,24 +4023,27 @@ function LbLinhaReserva({ r, onClick, semQuarto = false }) {
 }
 
 // Aba Reservas da barra lateral: ocupação de hoje e as movimentações do dia.
-function HojeLateral({ dateStr, lista, loading, categorias, onSelectReserva, onAbrirGrupo }) {
+function HojeLateral({ dateStr, lista, loading, categorias, onSelectReserva, onAbrirGrupo, grupoNomes, topo = null }) {
 
   return (
     <>
-      <div className={styles.lbResumo}>
-        <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
+      <div className={styles.lbFixo}>
+        {topo}
+        <div className={styles.lbResumo}>
+          <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
+        </div>
+
+        {!loading && onAbrirGrupo && (
+          <div className={styles.lbGrupoAcao}>
+            <button type="button" className={styles.gvAbaLink} onClick={() => onAbrirGrupo(null)}>
+              <Users size={14} /> {tr('Visualizar grupos')}
+            </button>
+          </div>
+        )}
       </div>
 
-      {!loading && onAbrirGrupo && (
-        <div className={styles.lbGrupoAcao}>
-          <button type="button" className={styles.gvAbaLink} onClick={() => onAbrirGrupo(null)}>
-            <Users size={14} /> {tr('Visualizar grupos')}
-          </button>
-        </div>
-      )}
-
       <div className={styles.lbListaAntiga}>
-        <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} />
+        <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} grupoNomes={grupoNomes} onAbrirGrupo={onAbrirGrupo} />
       </div>
     </>
   );
@@ -4082,7 +4130,7 @@ function TopoDiscreto({ titulo, sub, onClose }) {
   );
 }
 
-function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserva, onAbrirGrupo }) {
+function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserva, onAbrirGrupo, grupoNomes }) {
   const naEsquerda = !!useContext(JanelaCtx);
   const dayObj  = new Date(dateStr + 'T00:00:00');
   const weekday = dayObj.toLocaleDateString(locale(), { weekday: 'long' });
@@ -4090,9 +4138,8 @@ function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserv
   if (naEsquerda) {
     return (
       <Janela open onClose={onClose} hideHeader>
-        <LbTopo titulo={fmtDateBR(dateStr)} sub={cap} onClose={onClose} />
         <div className={styles.lbHojeDia}>
-          <HojeLateral dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} onAbrirGrupo={onAbrirGrupo} />
+          <HojeLateral topo={<LbTopo titulo={fmtDateBR(dateStr)} sub={cap} onClose={onClose} />} dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} onAbrirGrupo={onAbrirGrupo} grupoNomes={grupoNomes} />
         </div>
       </Janela>
     );
@@ -4106,7 +4153,7 @@ function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserv
         <span className={styles.lstDiaSemana}>{cap}</span>
       </div>
       <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
-      <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} />
+      <ListaDia dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} grupoNomes={grupoNomes} onAbrirGrupo={onAbrirGrupo} />
     </Janela>
   );
 }
@@ -4894,6 +4941,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
  *  cima — esta listagem continua aberta atrás. */
 function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onNovaReservaGrupo, onNotify, grupoInicial = null, onAprovarGrupo, onPeriodoAlterado }) {
   const naDireita = !!useContext(JanelaCtx);
+  const dir = useContext(JanelaDirCtx);
   const [grupos,  setGrupos]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [detalhe, setDetalhe] = useState(grupoInicial != null ? { grupo_id: grupoInicial } : null);
@@ -4914,6 +4962,54 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
     setGrupos((prev) => prev.map((g) => (g.grupo_id === gid ? { ...g, descricao: nome } : g)));
     setDetalhe((prev) => (prev && prev.grupo_id === gid ? { ...prev, descricao: nome } : prev));
   };
+
+  const listaGrupos = loading ? (
+    <Esqueleto />
+  ) : grupos.length === 0 ? (
+    <div className={styles.emptyState}>{tr('Nenhum grupo em aberto.')}</div>
+  ) : (
+    <div className={styles.dayRoomList}>
+      {grupos.map((g) => {
+        const qtd  = g.count ?? g.quantidade ?? 0;
+        const nome = g.descricao || (g.titulares || '').split(',')[0].trim() || `Grupo #${g.grupo_id}`;
+        return (
+          <div key={g.grupo_id} className={styles.dayRoomRow} onClick={() => setDetalhe(g)}>
+            <span className={styles.grpListaDot} style={{ background: grupoColor(g.grupo_id) }} aria-hidden="true" />
+            <div className={styles.searchDropInfo}>
+              <div className={styles.searchDropName}>{nome}</div>
+              <div className={styles.searchDropMeta}>{tr('Grupo #')}{g.grupo_id} · {qtd} {tr('apartamento')}{qtd !== 1 ? 's' : ''}</div>
+            </div>
+            <ChevronRight size={15} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (naDireita && dir) {
+    return detalhe ? (
+      <GrupoDetalheModal key={detalhe.grupo_id}
+        grupo={detalhe}
+        refreshKey={refreshKey}
+        tiposPagamento={tiposPagamento}
+        onClose={() => (grupoInicial != null ? onClose() : setDetalhe(null))}
+        onRenomeado={aplicarNome}
+        onSelectReserva={onSelectReserva}
+        onNovaReservaGrupo={onNovaReservaGrupo}
+        onNotify={onNotify}
+        onAprovarGrupo={onAprovarGrupo}
+        onPeriodoAlterado={onPeriodoAlterado}
+      />
+    ) : (
+      <GavetaDir classe={styles.rvGavetaGrupo}>
+        <div className={styles.rcCard}>
+          <CabecalhoGaveta titulo={tr('Reservas em grupo')}
+            meta={!loading && grupos.length > 0 ? `${grupos.length} ${tr('em aberto')}` : null} onClose={onClose} />
+          {listaGrupos}
+        </div>
+      </GavetaDir>
+    );
+  }
 
   return (
     <>
@@ -5022,6 +5118,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
   if (naEsquerda) {
     return (
       <Janela open onClose={onClose} hideHeader>
+        <div className={styles.lbFixo}>
         <LbTopo titulo={<>{tr('Apartamento')} {fmtRoom(room)}</>} sub={cat?.nome} onClose={onClose} />
         <nav className={[styles.lbAbas, styles.lbAbasSub].join(' ')} role="tablist" aria-label={tr('Período')}>
           {FILTROS.map(([id, label]) => (
@@ -5038,6 +5135,7 @@ function RoomModal({ room, onClose, categorias, onSelectReserva }) {
             <button type="button" onClick={() => shiftMonth(1)} title={tr('Próximo mês')} aria-label={tr('Próximo mês')}><ChevronRight size={16} /></button>
           </div>
         )}
+        </div>
         {loading ? <Esqueleto /> : (
           <section className={styles.lbSecao}>
             <div className={styles.lbSecaoHead}>
@@ -5123,7 +5221,7 @@ const STATUS_FILTER_OPTIONS = [
 ];
 const STATUS_PAGE_SIZE = 10;
 
-function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
+function StatusFilterModal({ status, label, onClose, onSelectReserva, busca = '' }) {
   const [page,    setPage]    = useState(1);
   const [list,    setList]    = useState([]);
   const [loading, setLoading] = useState(true);
@@ -5137,10 +5235,14 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
     pernoite_cancelado: 'PERNOITE_CANCELADO',
     pagamento_pendente: 'PERNOITE_FINALIZADO_PAGAMENTO_PENDENTE',
   };
+  const termo = busca.trim().length >= 2 ? busca.trim() : '';
   useEffect(() => {
+    let vivo = true;
     setLoading(true);
-    hospedagemApi.buscar({ status: API_STATUS[status] ?? status.toUpperCase() })
+    setPage(1);
+    const t = setTimeout(() => hospedagemApi.buscar({ status: API_STATUS[status] ?? status.toUpperCase(), nomeTitular: termo || undefined })
       .then((data) => {
+        if (!vivo) return;
         const flat = Array.isArray(data) ? data : [];
         const seen = new Set();
         const deduped = [];
@@ -5149,9 +5251,10 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
         }
         setList(deduped.filter((r) => r.dataInicio));
       })
-      .catch(() => setList([]))
-      .finally(() => setLoading(false));
-  }, [status]);
+      .catch(() => { if (vivo) setList([]); })
+      .finally(() => { if (vivo) setLoading(false); }), termo ? 300 : 0);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [status, termo]); // eslint-disable-line
 
   const total = list.length;
   const pages = Math.max(1, Math.ceil(total / STATUS_PAGE_SIZE));
@@ -5162,6 +5265,24 @@ function StatusFilterModal({ status, label, onClose, onSelectReserva }) {
   const paginacao = !loading && pages > 1 && (
     <Paginacao pagina={safePage - 1} total={pages} onIr={(p) => setPage(p + 1)} />
   );
+
+  if (naEsquerda) {
+    return (
+      <Janela open onClose={onClose} hideHeader>
+        <div className={styles.lbFixo}>
+          <LbTopo titulo={label} sub={loading ? '…' : `${total} ${total === 1 ? tr('reserva') : tr('reservas')}${termo ? ` ${tr('para')} "${termo}"` : ''}`} onClose={onClose} />
+        </div>
+        {loading ? <Esqueleto linhas={6} /> : (
+          <section className={[styles.lbSecao, styles.lbSecaoTopo].join(' ')}>
+            {total === 0 ? (
+              <p className={styles.sideVazio}>{termo ? tr('Nenhuma reserva "{{label}}" para "{{termo}}".', { label, termo }) : tr('Nenhuma reserva com status "{{label}}".', { label })}</p>
+            ) : slice.map((r) => <LbLinhaReserva key={r.id} r={r} onClick={() => onSelectReserva(r)} />)}
+            {paginacao}
+          </section>
+        )}
+      </Janela>
+    );
+  }
 
   return (
     <Janela open onClose={onClose} size="md" hideHeader={naEsquerda}
@@ -5429,6 +5550,25 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
   const dirOrc = useContext(JanelaDirCtx);
   const timerRef  = useRef(null);
   const menuRef   = useRef(null);
+  const [orcCalcs, setOrcCalcs] = useState({});
+
+  useEffect(() => {
+    const orc = orcamentos.find((o) => o.id === orcAberto);
+    const hosp = (orc?.hospedagens ?? []).filter((h) => (h.quarto_id ?? h.quarto?.id) && h.data_hora_checkin && h.data_hora_checkout);
+    if (!dirOrc || !hosp.length) { setOrcCalcs({}); return; }
+    let cancelled = false;
+    orcamentoApi.calcularPreco(hosp.map((h) => ({
+      fk_quarto:    h.quarto_id ?? h.quarto?.id,
+      data_entrada: toBrDate(parseBrDate(h.data_hora_checkin)),
+      data_saida:   toBrDate(parseBrDate(h.data_hora_checkout)),
+      ...buildGuestCalcParams((h.pessoas_orcamento ?? []).map((p) => ({ dataNascimento: p.data_nascimento }))),
+    }))).then((res) => {
+      if (cancelled) return;
+      const lista = Array.isArray(res) ? res : [res];
+      setOrcCalcs(Object.fromEntries(hosp.map((h, i) => [h.id, lista[i]]).filter(([, c]) => c)));
+    }).catch(() => { if (!cancelled) setOrcCalcs({}); });
+    return () => { cancelled = true; };
+  }, [dirOrc, orcAberto, orcamentos]);
 
   // Fecha o menu ao clicar fora
   useEffect(() => {
@@ -5935,10 +6075,25 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                                       })()}</span>
                                       <b>{fmtBRL(h.valor_total ?? 0)}</b>
                                     </div>
-                                    <div className={styles.grpFinDia}>
-                                      <span><small>{ocupTxt || '—'}</small></span>
-                                      {n > 0 && <span>{diariasTxt(n)} × {fmtBRL((h.valor_total ?? 0) / n)}</span>}
-                                    </div>
+                                    {orcCalcs[h.id] ? (() => {
+                                      const calc = orcCalcs[h.id];
+                                      const base = (calc.detalhes || []).reduce((s2, d) => s2 + (d.valor_final ?? 0), 0);
+                                      const dif = (h.valor_total ?? 0) - base;
+                                      return (<>
+                                        <LinhasDiarias grupos={groupDiarias(calc.detalhes)} />
+                                        {Math.abs(dif) >= 0.005 && (
+                                          <div className={styles.grpFinDia}>
+                                            <span><small>{dif < 0 ? tr('Desconto') : tr('Acréscimo')}</small></span>
+                                            <span>{dif < 0 ? '− ' : '+ '}{fmtBRL(Math.abs(dif))}</span>
+                                          </div>
+                                        )}
+                                      </>);
+                                    })() : (
+                                      <div className={styles.grpFinDia}>
+                                        <span><small>{ocupTxt || '—'}</small></span>
+                                        {n > 0 && <span>{diariasTxt(n)} × {fmtBRL((h.valor_total ?? 0) / n)}</span>}
+                                      </div>
+                                    )}
                                   </div>
                                 );
                               })}
@@ -7088,6 +7243,11 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   });
   const periodoValido = (p) => p.checkin && p.checkout && formatDate(p.checkout) > formatDate(p.checkin);
   const chaveDatas = (p) => (periodoValido(p) ? `${formatDate(p.checkin)}|${formatDate(p.checkout)}` : null);
+  // Índice do período anterior com as mesmas datas (-1 se não repete).
+  const periodoRepetido = (i) => {
+    const k = chaveDatas(periodos[i]);
+    return k ? periodos.findIndex((p, j) => j < i && chaveDatas(p) === k) : -1;
+  };
   const [mpDisp, setMpDisp] = useState({}); // { 'ci|co': Set<roomId> | 'loading' }
   const chavesPeriodos = periodos.map(chaveDatas).filter(Boolean).join(',');
   useEffect(() => {
@@ -7571,7 +7731,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const aptosFaltando = quartos.filter((q) => !qtdPessoasQuarto(q) || !quartosTipo[q]).length;
   const podeAvancar = curId === 'tipo' ? tipo != null && !(forceOrcamento && !isSolicitacao && !nomeSolicitante.trim())
     : curId === 'periodo' ? !!(checkinStr && checkoutStr && dias > 0) && quartos.length > 0
-    : curId === 'mpPeriodos' ? periodos.length > 0 && periodos.every(periodoValido)
+    : curId === 'mpPeriodos' ? periodos.length > 0 && periodos.every((p, i) => periodoValido(p) && periodoRepetido(i) < 0)
     : curId === 'mpAptos' ? periodos.every((p) => p.rooms.length > 0) && mpPares.length >= 2
     : curId === 'hospedes' || curId === 'dados' || curId === 'mpHospedes' ? canNext2
     : true;
@@ -8081,7 +8241,9 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           <Trash2 size={16} />
                         </button>
                       </div>
-                      {n > 0 && <span className={styles.nrDica}>{diariasTxt(n)} · {diaSemanaLonga(ci)} a {diaSemanaLonga(co)}</span>}
+                      {periodoRepetido(i) >= 0 ? (
+                        <span className={styles.mpPerErro}>{tr('Mesmas datas do período {{n}}. Escolha outras datas ou adicione os apartamentos ao período {{n}}.', { n: periodoRepetido(i) + 1 })}</span>
+                      ) : n > 0 && <span className={styles.nrDica}>{diariasTxt(n)} · {diaSemanaLonga(ci)} a {diaSemanaLonga(co)}</span>}
                     </div>
                   );
                 })}
@@ -8468,22 +8630,28 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       const k = `${a.ci}|${a.co}`;
                       (acc[k] ??= { ci: a.ci, co: a.co, itens: [] }).itens.push(a);
                       return acc;
-                    }, {})).map((pr) => (
+                    }, {})).map((pr, _pi, todosPer) => (
                       <div key={`${pr.ci}|${pr.co}`} className={styles.nrRsPerGrupo}>
-                        <span className={styles.nrRsPerTit}>{fmtDiaMes(pr.ci)} → {fmtDiaMes(pr.co)}</span>
+                        {todosPer.length > 1 && <span className={styles.nrRsPerTit}>{fmtDiaMes(pr.ci)} → {fmtDiaMes(pr.co)} · {diariasTxt(diffDays(pr.ci, pr.co))}</span>}
                         {pr.itens.map((a) => {
-                          const noites = diffDays(a.ci, a.co);
                           const tipoTxt = TIPO_HOSPEDAGEM_LABEL[a.tipoQ] ?? '—';
+                          const adj = priceAdj[a.rKey];
+                          const isDiariaAdj = adj?.mode === 'diaria';
+                          const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
+                          const diff = (a.calc?.valor_total ?? 0) - a.vals.reduce((s2, v) => s2 + v, 0);
                           return (
-                            <div key={a.rKey} className={styles.nrRsApto}>
-                              <span className={styles.nrRsPagTxt}>
-                                <b className={styles.nrRsAptoTit}>
-                                  {tr('Apt.')} {fmtRoom(parseInt(a.q))}
-                                  {noites > 1
-                                    ? (a.calc && (a.iguais ? ` · ${a.vals.length} × ${fmtBRL(a.vals[0])}` : ` · ${diariasTxt(noites)}`))
-                                    : ` · ${tipoTxt}`}
-                                </b>
-                                {noites > 1 && <small>{tipoTxt}</small>}
+                            <div key={a.rKey} className={[styles.orcRsApto, styles.grpFinAptoBloco].join(' ')}>
+                              <div className={styles.grpFinApto}>
+                                <span>{tr('Apt.')} {fmtRoom(parseInt(a.q))} · {tipoTxt}</span>
+                                <b>{calcLoading && !a.calc ? sk(80) : fmtBRL(a.calc?.valor_total ?? 0)}</b>
+                              </div>
+                              {a.calc && <LinhasDiarias grupos={groupDiarias(a.calc.detalhes, isDiariaAdj ? () => novoValor : null)} />}
+                              {a.calc && adj && !isDiariaAdj && Math.abs(diff) >= 0.005 && (
+                                <div className={styles.grpFinDia}>
+                                  <span><small>{describeAdjustment(adj)}</small></span>
+                                  <span>{diff < 0 ? '− ' : '+ '}{fmtBRL(Math.abs(diff))}</span>
+                                </div>
+                              )}
                                 <span className={styles.nrRsAptoAcoes}>
                                   <button type="button" className={styles.nrRsLink} disabled={!a.calc} onClick={() => setAdjModalKey(a.rKey)}>
                                     {priceAdj[a.rKey] ? tr('Alterar desconto') : tr('Desconto')}
@@ -8495,8 +8663,6 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                                     </button>
                                   )}
                                 </span>
-                              </span>
-                              <b>{calcLoading && !a.calc ? sk(80) : fmtBRL(a.calc?.valor_total ?? 0)}</b>
                             </div>
                           );
                         })}
@@ -8601,33 +8767,16 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                           const base = (a.calc?.detalhes || []).reduce((s2, d) => s2 + (d.valor_final ?? 0), 0);
                           const diff = (a.calc?.valor_total ?? 0) - base;
                           return (
-                            <div key={a.rKey} className={styles.orcRsApto}>
-                              <b className={styles.orcRsTit}>{tr('Apt.')} {fmtRoom(parseInt(a.q))} · {a.tipoTxt}</b>
-                              <div className={styles.orcRsLinha}>
-                                <span>{a.pessoasTxt}</span>
+                            <div key={a.rKey} className={[styles.orcRsApto, styles.grpFinAptoBloco].join(' ')}>
+                              <div className={styles.grpFinApto}>
+                                <span>{tr('Apt.')} {fmtRoom(parseInt(a.q))} · {a.tipoTxt}</span>
                                 <b>{calcLoading && !a.calc ? sk(80) : fmtBRL(a.calc?.valor_total ?? 0)}</b>
                               </div>
-                              {a.calc && groupDiarias(a.calc.detalhes, isDiariaAdj ? () => novoValor : null).map((g) => (
-                                <div key={g.key} className={styles.orcRsDia}>
-                                  <span>{g.meia ? tr('Meia diária') : diariasTxt(g.qtd)} × {fmtBRL(g.valor)}</span>
-                                  {g.criancas > 0 && (
-                                    <small className={styles.orcRsCriancas}>
-                                      {[g.valorAdultos > 0 ? `${tr('Adultos')} ${fmtBRL(g.valorAdultos)}` : null,
-                                        (ocupComValorCriancas(g.hosp, g.criancas) || '').match(/Crianças? de .*$/)?.[0] ?? `${tr('Crianças')} (${fmtBRL(g.criancas)})`,
-                                      ].filter(Boolean).join(' + ')}
-                                    </small>
-                                  )}
-                                  {g.saz && (
-                                    <span className={styles.gdSaz}>
-                                      <AlertTriangle size={14} className={styles.gdSazIco} />
-                                      {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
+                              {a.calc && <LinhasDiarias grupos={groupDiarias(a.calc.detalhes, isDiariaAdj ? () => novoValor : null)} />}
                               {a.calc && adj && !isDiariaAdj && Math.abs(diff) >= 0.005 && (
-                                <div className={styles.orcRsDia}>
-                                  <span>{describeAdjustment(adj)}: {diff < 0 ? '− ' : '+ '}{fmtBRL(Math.abs(diff))}</span>
+                                <div className={styles.grpFinDia}>
+                                  <span><small>{describeAdjustment(adj)}</small></span>
+                                  <span>{diff < 0 ? '− ' : '+ '}{fmtBRL(Math.abs(diff))}</span>
                                 </div>
                               )}
                               <button type="button" className={[styles.nrRsLink, styles.orcRsDesc].join(' ')} disabled={!a.calc} onClick={() => setAdjModalKey(a.rKey)}>
@@ -9180,7 +9329,9 @@ export default function BookingCalendar() {
 
   // Sempre que as reservas mudam (qualquer ação: ativar, hospedar, pagar, cancelar…),
   // sinaliza o DayModal aberto para recarregar sua própria lista.
+  const pularRefreshDia = useRef(false);
   useEffect(() => {
+    if (pularRefreshDia.current) { pularRefreshDia.current = false; return; }
     setDayRefreshKey((v) => v + 1);
   }, [reservas]);
 
@@ -9261,7 +9412,14 @@ export default function BookingCalendar() {
     });
   };
 
-  const goToToday = () => { const d = new Date(today); d.setDate(d.getDate() - 1); setViewDate(d); };
+  const goToToday = () => {
+    const d = new Date(today); d.setDate(d.getDate() - 1); setViewDate(d);
+    // A box esquerda volta para as reservas de hoje, recarregadas.
+    setDayModal(null); setRoomModal(null); setStatusModalFilter(null); setShowGrupos(false); setGrupoInicial(null);
+    setShowOrcamentos(false); setShowSolicitacoes(false);
+    setSearchTerm(''); setRemoteSearchResults([]);
+    setDayRefreshKey((v) => v + 1);
+  };
 
   const shiftDay = (delta) => { setViewDate((d) => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; }); };
 
@@ -9636,6 +9794,7 @@ export default function BookingCalendar() {
   };
 
   const handleSyncReserva = (normalized, { silencioso = false } = {}) => {
+    if (silencioso) pularRefreshDia.current = true;
     setReservas((rs) => rs.map((r) => r.id === normalized.id ? normalized : r));
     setSelectedReserva((prev) => prev?.id === normalized.id ? normalized : prev);
     if (!silencioso) setGruposRefreshKey((k) => k + 1);
@@ -9915,6 +10074,29 @@ export default function BookingCalendar() {
               ))}
     </>
   );
+  const buscaItensLb = (
+    <>
+      {searchResults.length > 0 && (
+        <section className={styles.lbSecao}>
+          <div className={styles.lbSecaoHead}>
+            <h2>{tr('No calendário')}</h2>
+            <span className={styles.lbQtd}>{searchResults.length}</span>
+          </div>
+          {searchResults.map((r) => <LbLinhaReserva key={r.id} r={r} onClick={() => navigateToReserva(r)} />)}
+        </section>
+      )}
+      {remoteSearchLoading && <Esqueleto linhas={2} />}
+      {!remoteSearchLoading && remoteSearchByMonth.map((group) => (
+        <section key={group.key} className={styles.lbSecao}>
+          <div className={styles.lbSecaoHead}>
+            <h2>{group.label}</h2>
+            <span className={styles.lbQtd}>{group.items.length}</span>
+          </div>
+          {group.items.map((r) => <LbLinhaReserva key={r.id} r={r} onClick={() => navigateToReserva(r)} />)}
+        </section>
+      ))}
+    </>
+  );
   const buscando = searchTerm.trim().length >= 2;
   const abaLateral = showSolicitacoes ? 'sol' : showOrcamentos ? 'orc' : 'res';
   const trocarAbaLateral = (k) => {
@@ -9954,7 +10136,11 @@ export default function BookingCalendar() {
                 <div className={[styles.searchWrap, styles.lbBuscaAntiga].join(' ')} ref={searchRef}>
                   <Search size={13} className={styles.searchIcon} />
                   <input className={styles.searchInput} value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); if (!e.target.value) setRemoteSearchResults([]); }}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (!e.target.value) setRemoteSearchResults([]);
+                      else if (e.target.value.trim().length >= 2) { setDayModal(null); setRoomModal(null); }
+                    }}
                     placeholder={tr('Buscar Reservas e Hospedes...')} aria-label={tr('Buscar Reservas e Hospedes...')} />
                   {searchTerm && (
                     <button type="button" className={styles.clearSearch} aria-label={tr('Limpar busca')}
@@ -9987,27 +10173,21 @@ export default function BookingCalendar() {
                 </button>
                 </div>
                 )}
-                {abaLateral === 'res' && buscando ? (
-                  <div className={styles.sideGrupo}>
-                    <span className={[styles.sideGrupoTit, styles.sideGrupoTitEscuro].join(' ')}>{tr('Resultados da busca')}</span>
-                    {(searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) ? (
-                      <div className={styles.sideResultados}>{buscaItens}</div>
-                    ) : (
-                      <p className={styles.sideVazio}>{tr('Nenhum hóspede encontrado.')}</p>
-                    )}
-                  </div>
-                ) : (
                 <div className={styles.sideGrupo}>
                   <div ref={setSlotEsq} className={styles.slotEsq} />
-                  {abaLateral === 'res' && (
+                  {abaLateral === 'res' && buscando && ((searchResults.length > 0 || remoteSearchResults.length > 0 || remoteSearchLoading) ? (
+                    <div className={[styles.sideResultados, styles.lbBuscaRes].join(' ')}>{buscaItensLb}</div>
+                  ) : (
+                    <p className={styles.sideVazio}>{tr('Nenhum hóspede encontrado.')}</p>
+                  ))}
+                  {abaLateral === 'res' && !buscando && (
                   <div className={styles.lbHoje}>
                     <HojeLateral dateStr={todayStr} lista={diaHoje.lista} loading={diaHoje.loading}
-                      onSelectReserva={(r) => setSelectedReserva(r)} categorias={categorias}
+                      onSelectReserva={(r) => setSelectedReserva(r)} categorias={categorias} grupoNomes={grupoNomes}
                       onAbrirGrupo={(gid) => { setGrupoInicial(gid); setShowGrupos(true); }} />
                   </div>
                   )}
                 </div>
-                )}
           </aside>
         )}
       <div className={styles.direita}>
@@ -10215,7 +10395,7 @@ export default function BookingCalendar() {
       )}
       <JanelaCtx.Provider value={isDesktop ? slotEsq : null}>
       {dayModal && (
-        <DayModal dateStr={dayModal.dateStr} lista={diaSel.lista} loading={diaSel.loading} onClose={() => setDayModal(null)} categorias={categorias} onAbrirGrupo={(gid) => { setGrupoInicial(gid); setShowGrupos(true); }}
+        <DayModal dateStr={dayModal.dateStr} lista={diaSel.lista} loading={diaSel.loading} onClose={() => setDayModal(null)} categorias={categorias} grupoNomes={grupoNomes} onAbrirGrupo={(gid) => { setGrupoInicial(gid); setShowGrupos(true); }}
           onSelectReserva={(r) => setSelectedReserva(r)} />
       )}
       </JanelaCtx.Provider>
@@ -10254,6 +10434,7 @@ export default function BookingCalendar() {
         <StatusFilterModal
           status={statusModalFilter.key}
           label={statusModalFilter.label}
+          busca={isDesktop ? searchTerm : ''}
           onClose={() => setStatusModalFilter(null)}
           onSelectReserva={(r) => setSelectedReserva(r)}
         />
@@ -10460,3 +10641,6 @@ export default function BookingCalendar() {
     </JanelaDirCtx.Provider>
   );
 }
+
+// Recepção e outras telas montam as gavetas na mesma área da direita do calendário.
+export { styles as calendarStyles, JanelaDirCtx, JanelaCtx };

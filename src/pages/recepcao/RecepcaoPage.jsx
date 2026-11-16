@@ -8,7 +8,7 @@ import {
   RefreshCw, ArrowLeftRight, Minus, RotateCcw, Users, X,
   Percent, Tag, ChevronRight, ChevronLeft, Check, FileText, Pencil,
 } from 'lucide-react';
-import { Modal }                    from '../../components/ui/Modal';
+import { Modal, ModalGavetaCtx }    from '../../components/ui/Modal';
 import { Button }                   from '../../components/ui/Button';
 import { Input, Select, FormField } from '../../components/ui/Input';
 import { DatePicker }               from '../../components/ui/DatePicker';
@@ -26,7 +26,7 @@ import {
 import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
 import { gerarVoucherReserva } from '../calendar/gerarVoucherReserva';
-import { ReservaModal, normalizeReserva, CreateModal } from '../calendar/BookingCalendar';
+import { ReservaModal, normalizeReserva, CreateModal, calendarStyles as cal, JanelaDirCtx, JanelaCtx } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -504,7 +504,23 @@ function NhHospedesPicker({ value = [], onChange }) {
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
+// Gavetas na direita só com espaço para elas; no celular continuam como janelas.
+const useDesktop = () => {
+  const q = '(min-width: 1024px)';
+  const [ok, setOk] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const h = () => setOk(m.matches);
+    m.addEventListener('change', h);
+    return () => m.removeEventListener('change', h);
+  }, []);
+  return ok;
+};
+
 export default function RecepcaoPage() {
+  const isDesktop = useDesktop();
+  const [slotDir, setSlotDir] = useState(null);
+  const gavetaSlot = isDesktop ? slotDir : null;
   const [quartos, setQuartos]           = useState([]);
   const [loading, setLoading]           = useState(true);
   const [search, setSearch]             = useState('');
@@ -3190,134 +3206,99 @@ export default function RecepcaoPage() {
         ].filter(({ key }) => (room.camas?.[key] || 0) > 0)
       : [];
 
+    const descontoTxt = hasDesconto ? (sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)) : null;
+    const parseBr = (x) => { const [d, t] = (x || '').split(' '); const [dd, mm, yyyy] = (d || '').split('/'); return yyyy ? new Date(`${yyyy}-${mm}-${dd}T${t || '00:00'}`) : null; };
+
+    // Título, linha de apoio e rodapé por situação do quarto — mesmo desenho das listas de reservas.
+    let titulo = null; let sub = null; let rodape = null; let titMudo = false;
+    // Ocupado: a cor do card já diz o status, então o período ocupa o lugar dele.
+    let dataNoStatus = null;
+    if (sv?.tipo === 'pernoite') {
+      titulo = sv.titularNome || '—';
+      dataNoStatus = sv.periodo || null;
+      rodape = (<>
+        {guestCount > 0 && <span className={styles.rcChip}><Users size={12} /> {guestCount}</span>}
+        {sv.totalDiarias > 0 && <span className={styles.rcChip}><Calendar size={12} /> {tr('Diária {{a}}/{{b}}', { a: sv.diariaAtual, b: sv.totalDiarias })}</span>}
+        {descontoTxt && <span className={styles.rcChip}><Tag size={12} /> {descontoTxt}</span>}
+      </>);
+    } else if (sv?.tipo === 'dayuse') {
+      titulo = sv.titularNome || (sv.status === DAYUSE_STATUS.ENCERRADO ? tr('Day use encerrado') : sv.status === DAYUSE_STATUS.FINALIZADO ? tr('Day use finalizado') : tr('Day Use'));
+      titMudo = !sv.titularNome;
+      sub = isDuAtivo
+        ? <span className={styles.rcTimer}><Clock size={12} /> {sv.horaEntrada} · {fmtElapsed(elapsed)}</span>
+        : <span className={styles.rcIco}><Clock size={12} /> {sv.horaEntrada}{sv.horaSaida ? ` → ${sv.horaSaida}` : ''}</span>;
+      rodape = (<>
+        <span className={styles.rcChip}>{tr('Day Use')}</span>
+        {guestCount > 0 && <span className={styles.rcChip}><Users size={12} /> {guestCount}</span>}
+        {descontoTxt && <span className={styles.rcChip}><Tag size={12} /> {descontoTxt}</span>}
+      </>);
+    } else if (sv?.tipo === 'reserva') {
+      const cin = parseBr(sv.chegadaPrevista); const cout = parseBr(sv.saidaPrevista);
+      const noites = cin && cout ? Math.round((cout - cin) / 86400000) : null;
+      const nPessoas = (sv.hospedes || []).length;
+      titulo = sv.titularNome || '—';
+      if (sv.chegadaPrevista) {
+        const [dia, horaTxt] = sv.chegadaPrevista.split(' ');
+        const hora = (horaTxt || '12:00').slice(0, 5);
+        const h = new Date();
+        const hojeBr = `${String(h.getDate()).padStart(2, '0')}/${String(h.getMonth() + 1).padStart(2, '0')}/${h.getFullYear()}`;
+        sub = dia === hojeBr
+          ? tr('Chega hoje às {{hora}}', { hora })
+          : tr('Chega em {{data}} às {{hora}}', { data: dia.slice(0, 5), hora });
+      }
+      rodape = (<>
+        {nPessoas > 0 && <span className={styles.rcChip}><Users size={12} /> {nPessoas}</span>}
+        {noites > 0 && <span className={styles.rcChip}><Calendar size={12} /> {noites} {noites === 1 ? tr('diária') : tr('diárias')}</span>}
+      </>);
+    } else if (room.status === ROOM_STATUS.LIMPEZA) {
+      titulo = tr('Em limpeza'); titMudo = true;
+      sub = room.limpeza?.responsavel ? <span className={styles.rcIco}><User size={12} /> {room.limpeza.responsavel}</span> : null;
+    } else if (room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) {
+      titulo = room.status === ROOM_STATUS.MANUTENCAO ? tr('Manutenção') : tr('Fora de serviço'); titMudo = true;
+      sub = [room.manutencao?.responsavel, room.manutencao?.descricao?.slice(0, 60)].filter(Boolean).join(' · ') || null;
+    } else {
+      titulo = tr('Livre'); titMudo = true;
+      sub = room.tipoOcupacao || room.categoria || null;
+      rodape = bedTags.length > 0 ? bedTags.map(({ key, Icon }) => (
+        <span key={key} className={styles.rcChip} title={tr(key)}><Icon size={12} /> {room.camas[key]}</span>
+      )) : null;
+    }
+    const pendente = (sv?.tipo === 'pernoite' || sv?.tipo === 'dayuse') && sv.pagamentoPendente > 0 ? sv.pagamentoPendente : 0;
+    const limpezaResp = splitClean && room.limpeza?.responsavel ? room.limpeza.responsavel : null;
+
     return (
-      <div
-        className={[
-          styles.roomCard,
-          styles[`roomCard_${sk}`],
-          splitClean ? styles.roomCardSplitClean : '',
-          splitClean && sk === 'reservado' ? styles.roomCardSplitClean_reservado : '',
-        ].join(' ')}
-        onClick={() => openDetail(room)}
-      >
-        {/* Top row: number + status badge */}
-        <div className={styles.roomCardTop}>
-          <span className={[styles.roomCardNum, styles[`roomCardNum_${sk}`]].join(' ')}>{room.numero}</span>
-          {splitClean ? (
-            <span className={styles.statusBadgeSplit}>
-              <span className={[styles.statusSeg, sk === 'reservado' ? styles.statusSegReservado : styles.statusSegOcupado].join(' ')}>{tr(room.status)}</span>
-              <span className={[styles.statusSeg, styles.statusSegLimpeza].join(' ')}>{tr('Em Limpeza')}</span>
-            </span>
-          ) : (
-            <span className={[styles.statusBadge, styles[`badge_${sk}`]].join(' ')}>{tr(room.status)}</span>
-          )}
-        </div>
-
-        {/* Content by status */}
-        <div className={styles.roomCardBody}>
-          {room.status === ROOM_STATUS.DISPONIVEL && (
-            <div className={styles.bedGrid}>
-              {[
-                { key: 'casal',    Icon: BedDouble, label: tr('Casal')    },
-                { key: 'solteiro', Icon: BedSingle, label: tr('Solteiro') },
-                { key: 'beliche',  Icon: Layers,    label: tr('Beliche')  },
-                { key: 'rede',     Icon: Waves,     label: tr('Rede')     },
-              ].map(({ key, Icon, label }) => {
-                const qty = room.camas?.[key] || 0;
-                return (
-                  <div key={key} title={label} className={[styles.bedGridCell, qty > 0 ? styles.bedGridCellActive : ''].join(' ')}>
-                    <Icon size={12} />
-                    <span className={styles.bedGridQty}>{qty}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {room.status === ROOM_STATUS.LIMPEZA && (
-            <>
-              <span className={styles.roomCardLabel}>{tr('Em Limpeza')}</span>
-              {room.limpeza?.responsavel && <span className={styles.roomCardMeta}><User size={10} /> {room.limpeza.responsavel}</span>}
-            </>
-          )}
-
-          {(room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) && (
-            <>
-              <span className={styles.roomCardLabel}>{room.status === ROOM_STATUS.MANUTENCAO ? tr('Manutenção') : tr('Fora de Serviço')}</span>
-              {room.manutencao?.responsavel && <span className={styles.roomCardMeta}><Wrench size={10} /> {room.manutencao.responsavel}</span>}
-              {room.manutencao?.descricao   && <span className={styles.roomCardDesc}>{room.manutencao.descricao.slice(0, 50)}</span>}
-            </>
-          )}
-
-          {sv?.tipo === 'pernoite' && (
-            <>
-              <span className={styles.roomCardGuest}>{sv.titularNome || '—'}</span>
-              {sv.periodo && (
-                <span className={styles.roomCardPeriod}><Calendar size={10} /> {sv.periodo}</span>
-              )}
-              <div className={styles.roomCardBadges}>
-                {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
-                {sv.totalDiarias > 0 && <span className={styles.diariaBadge}><Calendar size={9} />{sv.diariaAtual}/{sv.totalDiarias}</span>}
-                <span className={styles.pernoiteBadge}>{tr('Pernoite')}</span>
-                {hasDesconto && (
-                  <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
-                )}
-              </div>
-              {sv.pagamentoPendente > 0 && (
-                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} {tr('pendente')}</span>
-              )}
-              {splitClean && room.limpeza?.responsavel && (
-                <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> {tr('Limpeza:')} {room.limpeza.responsavel}</span>
-              )}
-            </>
-          )}
-
-          {sv?.tipo === 'dayuse' && (
-            <>
-              <span className={styles.roomCardGuest}>
-                {sv.titularNome || (sv.status === DAYUSE_STATUS.ENCERRADO ? tr('Day use encerrado') : sv.status === DAYUSE_STATUS.FINALIZADO ? tr('Day use finalizado') : tr('Day Use'))}
+      <button type="button"
+        className={[styles.rc, styles[`roomCard_${sk}`], splitClean ? styles.rcLimpando : ''].join(' ')}
+        onClick={() => openDetail(room)}>
+        <span className={styles.rcTopo}>
+          <span className={styles.rcNum}>{room.numero}</span>
+          <span className={styles.rcInfo}>
+            <span className={[styles.rcTitulo, titMudo ? styles.rcTituloMudo : ''].join(' ')}>{titulo}</span>
+            {sub && <span className={styles.rcSub}>{sub}</span>}
+          </span>
+        </span>
+        <span className={styles.rcStatusLinha}>
+          {dataNoStatus
+            ? (
+              <span className={styles.rcDatas}>
+                {dataNoStatus.split(' - ').map((d, i) => (
+                  <span key={i} className={styles.rcStatus}>{i === 0 ? tr('Entrada') : tr('Saída')} <b>{d}</b></span>
+                ))}
               </span>
-              <span className={styles.roomCardPeriod}>
-                {isDuAtivo
-                  ? <><Clock size={10} /> <span className={styles.timerLive}>{sv.horaEntrada} · {fmtElapsed(elapsed)}</span></>
-                  : <><Clock size={10} /> {sv.horaEntrada}{sv.horaSaida ? ` → ${sv.horaSaida}` : ''}</>
-                }
-              </span>
-              <div className={styles.roomCardBadges}>
-                {guestCount > 0 && <span className={styles.guestCountBadge}><Users size={10} />{guestCount}</span>}
-                <span className={styles.dayuseBadge}>{tr('Day Use')}</span>
-                {hasDesconto && (
-                  <span className={styles.descontoBadge}><Tag size={9} />{sv.desconto.tipo === 'percentual' ? `${sv.desconto.valor}%` : fmtBRL(sv.desconto.valor)}</span>
-                )}
-              </div>
-              {sv.pagamentoPendente > 0 && (
-                <span className={styles.roomCardPendente}>{fmtBRL(sv.pagamentoPendente)} {tr('pendente')}</span>
-              )}
-            </>
-          )}
-
-          {sv?.tipo === 'reserva' && (() => {
-            const parseBrDate = (s) => { const [d, t] = (s || '').split(' '); const [dd, mm, yyyy] = (d || '').split('/'); return yyyy ? new Date(`${yyyy}-${mm}-${dd}T${t || '00:00'}`) : null; };
-            const cin  = parseBrDate(sv.chegadaPrevista);
-            const cout = parseBrDate(sv.saidaPrevista);
-            const noites = cin && cout ? Math.round((cout - cin) / 86400000) : null;
-            const nPessoas = (sv.hospedes || []).length;
-            return (
-              <>
-                <span className={styles.roomCardGuest} style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'unset', lineHeight: 1.25 }}>{sv.titularNome || '—'}</span>
-                {sv.chegadaPrevista && <span className={styles.roomCardPeriod}><Calendar size={10} /> {tr('Check-in:')} {sv.chegadaPrevista}</span>}
-                <div className={styles.roomCardBadges} style={{ marginTop: 2 }}>
-                  {nPessoas > 0 && <span className={styles.guestCountBadge}><Users size={10} /> {nPessoas}</span>}
-                  {noites > 0   && <span className={styles.guestCountBadge}><Calendar size={10} /> {noites}</span>}
-                </div>
-                {splitClean && room.limpeza?.responsavel && (
-                  <span className={styles.roomCardMeta} style={{ color: '#2563eb' }}><User size={10} /> {tr('Limpeza:')} {room.limpeza.responsavel}</span>
-                )}
-              </>
-            );
-          })()}
-        </div>
-      </div>
+            )
+            : <span className={styles.rcStatus}><i />{tr(room.status)}</span>}
+        </span>
+        {splitClean ? (
+          <span className={styles.rcLimpezaFaixa}>
+            <User size={13} /> {limpezaResp ? tr('Em limpeza · {{nome}}', { nome: limpezaResp }) : tr('Em limpeza')}
+          </span>
+        ) : (rodape || pendente > 0) && (
+          <span className={styles.rcRodape}>
+            <span className={styles.rcChips}>{rodape}</span>
+            {pendente > 0 && <span className={styles.rcPendente}>{fmtBRL(pendente)} <small>{tr('pendente')}</small></span>}
+          </span>
+        )}
+      </button>
     );
   }, [openDetail]);
 
@@ -3336,6 +3317,11 @@ export default function RecepcaoPage() {
 
   // ── Main render ───────────────────────────────────────────────────────────────
   return (
+    <JanelaDirCtx.Provider value={gavetaSlot}>
+    <JanelaCtx.Provider value={gavetaSlot}>
+    <ModalGavetaCtx.Provider value={gavetaSlot}>
+    <div className={[cal.page, styles.recRaiz].join(' ')}>
+    <div className={[cal.direita, styles.recArea].join(' ')}>
     <div className={styles.page}>
       <Notification notification={notif} />
 
@@ -3600,6 +3586,7 @@ export default function RecepcaoPage() {
         const diariasDetalhes = stayDiarias(sv);
         return (
           <ReservaModal
+            inline={isDesktop}
             key={`ov-${sv.id}`}
             reserva={reservaAdapter}
             groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
@@ -3631,6 +3618,7 @@ export default function RecepcaoPage() {
       {selectedRoom && selectedRoom.servico?.tipo === 'reserva' && (
         reservaFull ? (
           <ReservaModal
+            inline={isDesktop}
             key={`rv-${reservaFull.id}`}
             reserva={reservaFull}
             groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
@@ -4512,5 +4500,11 @@ export default function RecepcaoPage() {
         handleCancelar={handleCancelar}
       />
     </div>
+    <div ref={setSlotDir} className={cal.slotDireita} />
+    </div>
+    </div>
+    </ModalGavetaCtx.Provider>
+    </JanelaCtx.Provider>
+    </JanelaDirCtx.Provider>
   );
 }

@@ -143,6 +143,15 @@ export function DatePicker({
     setViewMonth(d.getMonth());
   }, [inline, readOnly, value, startDate]);
 
+  // Ao abrir, mostra o mês da data escolhida; sem ela, o da data mínima (ex.: check-out
+  // abre no mês do check-in) ou o da data marcada, em vez de sempre o mês atual.
+  useEffect(() => {
+    if (!open || inline) return;
+    const base = value || startDate || (minDate && sod(minDate) > sod(today) ? minDate : null) || markedDate || today;
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+  }, [open]); // eslint-disable-line
+
   // Notify parent of the currently-visible month so it can load occupancy on demand.
   useEffect(() => {
     onMonthChange?.(viewYear, viewMonth);
