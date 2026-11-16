@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, CheckCircle2, Moon, DoorOpen, DoorClosed, Inbox,
+  CalendarCheck2, Sparkles, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, CheckCircle2, Moon, DoorOpen, DoorClosed, Inbox,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -1086,7 +1086,7 @@ const PainelAcaoReserva = (props) => <PainelReserva inline acao {...props} />;
 //   { diariasDetalhes, onAdicionarConsumo, onGerenciarDiarias, onFinalizar,
 //     onAcionarLimpeza, onGerenciarPagamentos, onGerenciarPessoas, onGerenciarPreco,
 //     onVoucher, onCancelar }
-export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null, inline = false, saindo = false, onVoltar = null, carregarDetalhes = false, onAprovarSolicitacao = null }) {
+export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPernoite, onUpdate, onSync, onNotify, categorias, tiposPagamento, roomDescMap = {}, dragValues = null, onApprove, onReject, onAusente, reservas = [], overnight = null, limpeza = null, allowHospedarAnytime = false, groupInfo = null, onVoucherGrupo = null, inline = false, saindo = false, onVoltar = null, carregarDetalhes = false, onAprovarSolicitacao = null, pernoite = null }) {
   const isOvernight = !!overnight;
   // Botão "Finalizar Limpeza" — compartilhado entre pernoite (overnight) e reserva.
   // Em pernoite vem de overnight.hasLimpeza; em reserva vem da prop `limpeza`.
@@ -2315,7 +2315,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
               <div className={styles.edCampo}>
                 <span className={styles.edRot}>{tr('Entrada')}</span>
                 <div className={styles.dateCompact}>
-                  <DatePicker mode="single" value={editCheckin} sobrio onChange={mudaCheckin}
+                  <DatePicker mode="single" value={editCheckin} sobrio onChange={mudaCheckin} readOnly={!!pernoite}
                     minDate={new Date()} disabledDates={checkinBloqueados} placeholder={tr('Data de check-in')} />
                 </div>
               </div>
@@ -2434,7 +2434,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   linhaCmp(tr('Check-in'), fmtDateBR(reserva.dataInicio), (
                     <div className={styles.dateCompact}>
                       <DatePicker mode="single" value={editCheckin} sobrio
-                        onChange={mudaCheckin}
+                        onChange={mudaCheckin} readOnly={!!pernoite}
                         minDate={new Date()}
                         disabledDates={checkinBloqueados}
                         placeholder={tr('Data de check-in')} />
@@ -3016,9 +3016,76 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   // Reserva em aberto: as opções (Hospedar, Voucher, edição…) ficam no período, ao lado das pessoas.
   const temOpcoes = !isOvernight && !['orcamento', 'solicitada', 'hospedado', 'finalizado', 'cancelado', 'ausente'].includes(reserva.status);
   // Hospedado/finalizado: sobra só o Voucher, que ocupa o mesmo lugar das opções.
-  const soVoucher = !isOvernight && ['hospedado', 'finalizado', 'ausente'].includes(reserva.status);
+  const soVoucher = !isOvernight && !pernoite && ['hospedado', 'finalizado', 'ausente'].includes(reserva.status);
   // Botões fixos no rodapé da view: pagamento, hospedar e o menu com as demais opções.
-  const rodapeEl = temOpcoes ? (
+  const rodapeEl = pernoite ? (
+    <div className={styles.rvRodape}>
+      <button type="button" className={styles.rvRodapeBtn} disabled={pagamentoDeGrupo}
+        title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
+        onClick={() => { setAcoesOpen(false); setAbaView('pagamentos'); setEditActiveTab('pagamentos'); setEditing(true); setShowPayModal(true); }}>
+        {tr('Pagamento')}
+      </button>
+      {pernoite.onFinalizar && (
+        <button type="button" className={[styles.rvRodapeBtn, styles.rvRodapeHospedar].join(' ')}
+          onClick={() => { setAcoesOpen(false); pernoite.onFinalizar(); }}>
+          {tr('Finalizar')}
+        </button>
+      )}
+      <div className={styles.rvRodapeMais}>
+        {acoesOpen && (
+          <>
+            <div className={styles.rvAcoesBackdrop} onClick={() => setAcoesOpen(false)} />
+            <div className={styles.rvRodapeMenu} role="menu">
+              <button className={styles.rvAcoesItem} disabled={voucherLoading}
+                onClick={() => { setAcoesOpen(false); handleVoucherClick(setaRef.current); }}>
+                <FileDown size={15}/> {tr('Voucher')}
+              </button>
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('diarias'); setEditActiveTab('dados'); setEditing(true); }}>
+                <Pencil size={15}/> {tr('Editar diárias')}
+              </button>
+              <div className={styles.rvAcoesDiv} />
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('hospedes'); setEditActiveTab('pessoas'); setEditing(true); }}>
+                <Users size={15}/> {tr('Editar pessoas')}
+              </button>
+              <button className={styles.rvAcoesItem}
+                disabled={pagamentoDeGrupo}
+                title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
+                onClick={() => { setAcoesOpen(false); setAbaView('pagamentos'); setEditActiveTab('pagamentos'); setEditing(true); }}>
+                <DollarSign size={15}/> {tr('Editar pagamentos')}
+              </button>
+              <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); setAbaView('resumo'); openGerenciarPreco(); }}>
+                <Tag size={15}/> {tr('Editar preços')}
+              </button>
+              {(pernoite.onAdicionarConsumo || pernoite.onAcionarLimpeza) && <div className={styles.rvAcoesDiv} />}
+              {pernoite.onAdicionarConsumo && (
+                <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); pernoite.onAdicionarConsumo(); }}>
+                  <Plus size={15}/> {tr('Adicionar consumo')}
+                </button>
+              )}
+              {pernoite.onAcionarLimpeza && (
+                <button className={styles.rvAcoesItem} onClick={() => { setAcoesOpen(false); pernoite.onAcionarLimpeza(); }}>
+                  <Sparkles size={15}/> {tr('Acionar limpeza')}
+                </button>
+              )}
+              {pernoite.onCancelar && (
+                <>
+                  <div className={styles.rvAcoesDiv} />
+                  <button className={[styles.rvAcoesItem, styles.rvAcoesItemDanger].join(' ')}
+                    onClick={() => { setAcoesOpen(false); pernoite.onCancelar(); }}>
+                    <Trash2 size={14}/> {tr('Cancelar pernoite')}
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+        <button ref={setaRef} type="button" className={styles.rvRodapeBtn}
+          onClick={() => setAcoesOpen((v) => !v)} aria-haspopup="menu" aria-expanded={acoesOpen}>
+          {tr('Opções')} {voucherLoading ? <Loader2 size={15} className={styles.spin}/> : <ChevronDown size={15} className={acoesOpen ? styles.rvAcoesBtnChevronOpen : styles.rvAcoesBtnChevron} />}
+        </button>
+      </div>
+    </div>
+  ) : temOpcoes ? (
     <div className={styles.rvRodape}>
       <button type="button" className={styles.rvRodapeBtn} disabled={pagamentoDeGrupo}
         title={pagamentoDeGrupo ? tr('Pagamento único do grupo — acerte por "Grupos"') : undefined}
@@ -3529,7 +3596,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
 
         {/* ── Ações — fora do card, no rodapé do modal. Cancelada não tem ação
                própria: sem voucher e sem limpeza a faixa nem aparece. ── */}
-        {!(reserva.status === 'cancelado' && !limpezaBtnInfo && !isOvernight) && !((temOpcoes || soVoucher) && !limpezaBtnInfo) && (
+        {!(reserva.status === 'cancelado' && !limpezaBtnInfo && !isOvernight) && !((temOpcoes || soVoucher || pernoite) && !limpezaBtnInfo) && (
         <div className={[styles.rcActions, styles.rcActionsCenter].join(' ')}>
           {limpezaBtnInfo && (
             <button className={styles.rvBtn} style={{ color: '#2563eb', borderColor: 'rgba(37,99,235,0.35)' }}
@@ -3578,7 +3645,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 </button>
               </div>
             );
-          })() : reserva.status === 'orcamento' ? (
+          })() : pernoite ? null : reserva.status === 'orcamento' ? (
             <>
                             <button className={[styles.rvBtn, styles.rvBtnDanger, styles.rvBtnSm].join(' ')} onClick={(e) => { setCancelMotivRes(''); setBalao({ tipo: 'cancelar', anchor: e.currentTarget }); }}>{tr('Cancelar')}</button>
             </>
@@ -6930,7 +6997,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   // confirmar: { reservas, grupoId, descricao } — aprovação de solicitação. Abre já com quartos/datas do
   // orçamento; o salvar ativa as hospedagens existentes (hospedagem_id) em vez de criar novas.
   const conf = confirmar?.reservas?.length ? confirmar : null;
-  const escolheTipo = !conf && !initialRoom && !isSolicitacao && !forceOrcamento && !forcePernoite && initialGrupo == null;
+  const escolheTipo = !conf && !initialRoom && !isSolicitacao && !forceOrcamento && initialGrupo == null;
+  const quartoFixo = forcePernoite && !!initialRoom;
   const [tipo,             setTipo]             = useState(conf && conf.reservas.length > 1 ? 'grupo' : escolheTipo ? null : 'simples'); // 'simples' | 'grupo'
 
   // Passos opcionais — só aparecem quando a escolha faz diferença:
@@ -7729,15 +7797,16 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
   const resumoGrupo = tipo === 'grupo' && !isSolicitacao && !isOrcamento;
   const qtdPessoasQuarto = (q) => (quartoHospedes[q]?.length || 0) + (quartoHospedesOrc[q]?.length || 0);
   const aptosFaltando = quartos.filter((q) => !qtdPessoasQuarto(q) || !quartosTipo[q]).length;
+  const quartoFixoOcupado = quartoFixo && !!(checkinStr && checkoutStr) && !availLoading && !availableRooms.some((r) => String(r) === String(initialRoom));
   const podeAvancar = curId === 'tipo' ? tipo != null && !(forceOrcamento && !isSolicitacao && !nomeSolicitante.trim())
-    : curId === 'periodo' ? !!(checkinStr && checkoutStr && dias > 0) && quartos.length > 0
+    : curId === 'periodo' ? !!(checkinStr && checkoutStr && dias > 0) && quartos.length > 0 && !quartoFixoOcupado
     : curId === 'mpPeriodos' ? periodos.length > 0 && periodos.every((p, i) => periodoValido(p) && periodoRepetido(i) < 0)
     : curId === 'mpAptos' ? periodos.every((p) => p.rooms.length > 0) && mpPares.length >= 2
     : curId === 'hospedes' || curId === 'dados' || curId === 'mpHospedes' ? canNext2
     : true;
   const subtitulo = tipo == null ? tr('Escolha o tipo para começar')
     : [
-        tipo === 'grupo' ? tr('Reserva em grupo') : tr('Reserva simples'),
+        forcePernoite ? (tipo === 'grupo' ? tr('Pernoite em grupo') : tr('Pernoite simples')) : tipo === 'grupo' ? tr('Reserva em grupo') : tr('Reserva simples'),
         tipo === 'grupo' && periodoMode === 'multiplos' ? (periodos.length > 1 ? tr('{{n}} períodos', { n: periodos.length }) : tr('períodos diferentes')) : null,
         step > stepNo('periodo') && stepNo('periodo') && quartos.length ? (quartos.length === 1 ? `${tr('Apt.')} ${fmtRoom(parseInt(quartos[0]))}` : tr('{{n}} apartamentos', { n: quartos.length })) : null,
         step > stepNo('periodo') && stepNo('periodo') && checkinStr && checkoutStr ? `${fmtDiaMes(checkinStr)} → ${fmtDiaMes(checkoutStr)}` : null,
@@ -7751,7 +7820,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       title={<span className={styles.nrTitulo}><b>{tituloGaveta}</b><small>{subtitulo}</small></span>}
       footer={
         <div className={styles.nrRodape}>
-          {step > 1 && <button type="button" className={styles.nrVoltar} onClick={() => { setStep((s) => s - 1); if (step === SUMMARY_STEP) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>{tr('Voltar')}</button>}
+          {step > (quartoFixo ? 2 : 1) && <button type="button" className={styles.nrVoltar} onClick={() => { setStep((s) => s - 1); if (step === SUMMARY_STEP) { setPrecosCalc({}); setObsOpen({}); setPriceAdj({}); setAdjModalKey(null); } }}>{tr('Voltar')}</button>}
           {curId === 'hospedes' && tipo === 'grupo' && aptosFaltando > 0 && (
             <span className={styles.nrFaltam}>{aptosFaltando === 1 ? tr('Falta 1 apartamento') : tr('Faltam {{n}} apartamentos', { n: aptosFaltando })}</span>
           )}
@@ -7803,11 +7872,14 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
       {/* ── Etapa 1: tipo (e, no grupo, como são as datas) ── */}
       {curId === 'tipo' && (
         <div className={styles.nrPasso}>
-          <h2 className={styles.nrSecTit}>{tr('Que tipo de reserva é esta?')}</h2>
-          {[
+          <h2 className={styles.nrSecTit}>{forcePernoite ? tr('Que tipo de pernoite é este?') : tr('Que tipo de reserva é esta?')}</h2>
+          {(forcePernoite ? [
+            { v: 'simples', titulo: tr('Pernoite simples'), desc: tr('Um apartamento, entrando hoje, com uma ou várias pessoas.') },
+            { v: 'grupo',   titulo: tr('Pernoite em grupo'), desc: tr('Dois ou mais apartamentos entrando hoje, com a mesma saída.') },
+          ] : [
             { v: 'simples', titulo: tr('Reserva simples'), desc: tr('Um apartamento, um período, com uma ou várias pessoas.') },
             { v: 'grupo',   titulo: tr('Reserva em grupo'), desc: tr('Dois ou mais apartamentos, com período único ou períodos diferentes.') },
-          ].map((o) => (
+          ]).map((o) => (
             <button key={o.v} type="button" aria-pressed={tipo === o.v}
               className={[styles.nrOpcao, tipo === o.v ? styles.nrOpcaoOn : ''].join(' ')}
               onClick={() => { setTipo(o.v); if (o.v !== 'grupo') { setPeriodoMode('unico'); setPagModo('por_quarto'); } if (o.v !== 'grupo' && !isSolicitacao) setQuartos((q) => q.slice(0, 1)); }}>
@@ -8059,7 +8131,8 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     <DatePicker sobrio mode="single" value={checkout}
                       onChange={(d) => {
                         if (forcePernoite) setCheckin(new Date());
-                        setCheckout(d); setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({});
+                        setCheckout(d);
+                        if (!quartoFixo) { setQuartos([]); setQuartoHospedes({}); setQuartoHospedesOrc({}); }
                         setMeiaDiaria(false); setHoraSaidaMeia('');
                       }}
                       placeholder={checkin ? tr('Data de check-out') : tr('Defina o check-in primeiro')}
@@ -8114,9 +8187,12 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   availableRooms={availableRooms}
                   categorias={categorias} roomDescMap={roomDescMap}
                   singleSelect={tipo !== 'grupo'}
-                  disabled={!checkinStr || !checkoutStr}
+                  disabled={!checkinStr || !checkoutStr || quartoFixo}
                   loading={availLoading} />
               </div>
+              {quartoFixoOcupado && (
+                <span className={styles.mpPerErro}><AlertTriangle size={13} /> {tr('O Apt. {{n}} não está livre até {{d}}. Escolha outra data de saída.', { n: fmtRoom(parseInt(initialRoom)), d: fmtDiaMes(checkoutStr) })}</span>
+              )}
               {!isOrcSemCadastro && (
                 <label className={[styles.empresaModeToggle, styles.empresaHospedar].join(' ')}>
                   <input type="checkbox" checked={hospEmpresa} onChange={(e) => setHospEmpresa(e.target.checked)} />
@@ -10643,4 +10719,4 @@ export default function BookingCalendar() {
 }
 
 // Recepção e outras telas montam as gavetas na mesma área da direita do calendário.
-export { styles as calendarStyles, JanelaDirCtx, JanelaCtx };
+export { styles as calendarStyles, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma };

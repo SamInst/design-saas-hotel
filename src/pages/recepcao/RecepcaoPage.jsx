@@ -26,7 +26,7 @@ import {
 import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
 import { gerarVoucherReserva } from '../calendar/gerarVoucherReserva';
-import { ReservaModal, normalizeReserva, CreateModal, calendarStyles as cal, JanelaDirCtx, JanelaCtx } from '../calendar/BookingCalendar';
+import { ReservaModal, normalizeReserva, CreateModal, calendarStyles as cal, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -157,7 +157,18 @@ const MOCK_ITENS_QUARTO = [
 const blankNpForm  = () => ({ chegadaDate: new Date(), chegadaHora: '14:00', saidaDate: null, saidaHora: '12:00', tipoAcomodacao: 'Casal', hospedes: [], hospedeSearch: '' });
 const blankNduForm = () => ({ horaEntrada: nowTime(), hospedes: [], hospedeSearch: '' });
 const blankPagForm = () => ({ descricao: '', formaPagamento: 'PIX', valor: '' });
-const blankSvcForm = () => ({ responsavel: '', descricao: '', previsaoFim: '', dataHoraInicio: '', dataHoraFim: '' });
+const blankSvcForm = () => {
+  const n = new Date();
+  return { responsavel: '', descricao: '', previsaoFim: '', iniData: new Date(n.getFullYear(), n.getMonth(), n.getDate()), iniHora: `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`, fimData: null, fimHora: '' };
+};
+const dataHoraBr = (d, h) => d ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${h || '00:00'}` : undefined;
+const curtoDataHora = (s) => {
+  if (!s) return null;
+  let m = /(\d{2})\/(\d{2})\/\d{4}[ T]?(\d{2}:\d{2})?/.exec(s);
+  if (m) return `${m[1]}/${m[2]}${m[3] ? ' ' + m[3] : ''}`;
+  m = /\d{4}-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2}))?/.exec(s);
+  return m ? `${m[2]}/${m[1]}${m[3] ? ' ' + m[3] : ''}` : null;
+};
 
 // ── QuartoCombobox ────────────────────────────────────────────────────────────
 function QuartoCombobox({ value, onChange, quartos = [], categorias = [], currentNumero = null }) {
@@ -533,6 +544,7 @@ export default function RecepcaoPage() {
   const [filterTipoOcupacao, setFilterTipoOcupacao] = useState('');
   const [groupByGroup, setGroupByGroup] = useState(false);
   const [showNovoPernoite, setShowNovoPernoite] = useState(false);
+  const [npQuarto, setNpQuarto] = useState(null);
   const [filterDateStart, setFilterDateStart]       = useState(null);
   const [filterDateEnd, setFilterDateEnd]           = useState(null);
   const [dateGroupCollapsed, setDateGroupCollapsed] = useState({});
@@ -1062,7 +1074,7 @@ export default function RecepcaoPage() {
   // objeto/comportamento do modal de reserva do calendário.
   useEffect(() => {
     const sv = selectedRoom?.servico;
-    if (!selectedRoom || sv?.tipo !== 'reserva' || !sv?.id) { setReservaFull(null); return; }
+    if (!selectedRoom || !['reserva', 'pernoite'].includes(sv?.tipo) || !sv?.id) { setReservaFull(null); return; }
     let cancelled = false;
     setReservaFull(null);
     const roomId = selectedRoom.id;
@@ -1073,7 +1085,7 @@ export default function RecepcaoPage() {
         if (norm.quarto == null) { norm.quarto = roomId; norm.quartoId = roomId; }
         setReservaFull(norm);
       })
-      .catch(() => { if (!cancelled) notify(tr('Erro ao carregar reserva.'), 'error'); });
+      .catch(() => { if (!cancelled) notify(sv.tipo === 'pernoite' ? tr('Erro ao carregar pernoite.') : tr('Erro ao carregar reserva.'), 'error'); });
     return () => { cancelled = true; };
   }, [selectedRoom?.id, selectedRoom?.servico?.id, selectedRoom?.servico?.tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1366,15 +1378,6 @@ export default function RecepcaoPage() {
     finally { setSaving(false); }
   };
 
-  // datetime-local "2026-06-19T14:00" → "19/06/2026 14:00" (formato do back-end)
-  const dtLocalToBr = (s) => {
-    if (!s) return undefined;
-    const [date, time] = s.split('T');
-    if (!date) return undefined;
-    const [y, m, d] = date.split('-');
-    return `${d}/${m}/${y} ${time || '00:00'}`;
-  };
-
   const handleService = async () => {
     if (!serviceModal) return;
     const { type, room } = serviceModal;
@@ -1384,8 +1387,8 @@ export default function RecepcaoPage() {
       if (type === 'limpeza')     updated = await overviewApi.marcarLimpeza(room.id, svcForm);
       else if (type === 'manutencao') updated = await overviewApi.marcarManutencao(room.id, {
         ...svcForm,
-        dataHoraInicio: dtLocalToBr(svcForm.dataHoraInicio),
-        dataHoraFim:    dtLocalToBr(svcForm.dataHoraFim),
+        dataHoraInicio: dataHoraBr(svcForm.iniData, svcForm.iniHora),
+        dataHoraFim:    dataHoraBr(svcForm.fimData, svcForm.fimHora),
       });
       else                         updated = await overviewApi.marcarForaDeServico(room.id, svcForm);
       setQuartos((prev) => prev.map((q) => q.id === updated.id ? updated : q));
@@ -3020,7 +3023,7 @@ export default function RecepcaoPage() {
                     <Wrench size={14} /> {tr('Manutenção')}
                   </button>
                   <div className={styles.ovAcoesDiv} />
-                  <button className={styles.ovAcoesItem} style={{ color: 'var(--violet)' }} onClick={() => { closeAcoes(); openNovoServico('pernoite', s); }}>
+                  <button className={styles.ovAcoesItem} style={{ color: 'var(--violet)' }} onClick={() => { closeAcoes(); setNpQuarto(s.id); setShowNovoPernoite(true); }}>
                     <BedDouble size={14} /> {tr('Novo Pernoite')}
                   </button>
                   <button className={styles.ovAcoesItem} style={{ color: 'var(--text-2)', opacity: 0.5, cursor: 'not-allowed' }} disabled title={tr('Em breve')}>
@@ -3187,6 +3190,8 @@ export default function RecepcaoPage() {
   // useCallback dá ao componente uma identidade estável entre renders; sem isso,
   // por ser definido dentro do componente, todos os cards REMONTAM (recriam o DOM)
   // a cada ação/render da página, causando o "piscar"/atualização constante.
+  const acoesCardRef = useRef({});
+  acoesCardRef.current = { limpeza: handleFinalizarLimpeza, manutencao: handleFinalizarManutencao, hospedar: (room) => { setNpQuarto(room.id); setShowNovoPernoite(true); } };
   const RoomCard = useCallback(({ room }) => {
     const sk        = roomStatusKey(room.status);
     const sv        = room.servico;
@@ -3213,9 +3218,12 @@ export default function RecepcaoPage() {
     let titulo = null; let sub = null; let rodape = null; let titMudo = false;
     // Ocupado: a cor do card já diz o status, então o período ocupa o lugar dele.
     let dataNoStatus = null;
+    let descNoStatus = null; let periodoMn = null; let livre = false;
+    let chegaNoStatus = null;
     if (sv?.tipo === 'pernoite') {
       titulo = sv.titularNome || '—';
       dataNoStatus = sv.periodo || null;
+      sub = rotuloHospedagemTipo(sv.tipoHospedagem, guestCount);
       rodape = (<>
         {guestCount > 0 && <span className={styles.rcChip}><Users size={12} /> {guestCount}</span>}
         {sv.totalDiarias > 0 && <span className={styles.rcChip}><Calendar size={12} /> {tr('Diária {{a}}/{{b}}', { a: sv.diariaAtual, b: sv.totalDiarias })}</span>}
@@ -3242,22 +3250,32 @@ export default function RecepcaoPage() {
         const hora = (horaTxt || '12:00').slice(0, 5);
         const h = new Date();
         const hojeBr = `${String(h.getDate()).padStart(2, '0')}/${String(h.getMonth() + 1).padStart(2, '0')}/${h.getFullYear()}`;
-        sub = dia === hojeBr
+        chegaNoStatus = dia === hojeBr
           ? tr('Chega hoje às {{hora}}', { hora })
           : tr('Chega em {{data}} às {{hora}}', { data: dia.slice(0, 5), hora });
       }
+      sub = rotuloReservaTipo(sv.tipoHospedagem, nPessoas);
       rodape = (<>
         {nPessoas > 0 && <span className={styles.rcChip}><Users size={12} /> {nPessoas}</span>}
         {noites > 0 && <span className={styles.rcChip}><Calendar size={12} /> {noites} {noites === 1 ? tr('diária') : tr('diárias')}</span>}
       </>);
     } else if (room.status === ROOM_STATUS.LIMPEZA) {
-      titulo = tr('Em limpeza'); titMudo = true;
-      sub = room.limpeza?.responsavel ? <span className={styles.rcIco}><User size={12} /> {room.limpeza.responsavel}</span> : null;
+      titulo = tr('Limpeza em andamento'); titMudo = true;
+      sub = room.limpeza?.responsavel || tr('Responsável não informado');
     } else if (room.status === ROOM_STATUS.MANUTENCAO || room.status === ROOM_STATUS.FORA_DE_SERVICO) {
       titulo = room.status === ROOM_STATUS.MANUTENCAO ? tr('Manutenção') : tr('Fora de serviço'); titMudo = true;
-      sub = [room.manutencao?.responsavel, room.manutencao?.descricao?.slice(0, 60)].filter(Boolean).join(' · ') || null;
+      if (room.status === ROOM_STATUS.MANUTENCAO) {
+        sub = room.manutencao?.responsavel
+          ? tr('Responsável: {{nome}}', { nome: room.manutencao.responsavel.toUpperCase() })
+          : tr('Responsável não informado');
+        descNoStatus = room.manutencao?.descricao?.trim().toUpperCase() || null;
+        const ini = curtoDataHora(room.manutencao?.inicio); const fim = curtoDataHora(room.manutencao?.previsaoFim);
+        periodoMn = ini || fim ? `${ini || '—'} → ${fim || tr('sem previsão')}` : null;
+      } else {
+        sub = [room.manutencao?.responsavel, room.manutencao?.descricao?.slice(0, 60)].filter(Boolean).join(' · ') || null;
+      }
     } else {
-      titulo = tr('Livre'); titMudo = true;
+      titulo = tr('Livre'); titMudo = true; livre = true;
       sub = room.tipoOcupacao || room.categoria || null;
       rodape = bedTags.length > 0 ? bedTags.map(({ key, Icon }) => (
         <span key={key} className={styles.rcChip} title={tr(key)}><Icon size={12} /> {room.camas[key]}</span>
@@ -3267,38 +3285,80 @@ export default function RecepcaoPage() {
     const limpezaResp = splitClean && room.limpeza?.responsavel ? room.limpeza.responsavel : null;
 
     return (
-      <button type="button"
+      <div role="button" tabIndex={0}
         className={[styles.rc, styles[`roomCard_${sk}`], splitClean ? styles.rcLimpando : ''].join(' ')}
-        onClick={() => openDetail(room)}>
+        onClick={() => openDetail(room)}
+        onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openDetail(room); } }}>
         <span className={styles.rcTopo}>
           <span className={styles.rcNum}>{room.numero}</span>
           <span className={styles.rcInfo}>
-            <span className={[styles.rcTitulo, titMudo ? styles.rcTituloMudo : ''].join(' ')}>{titulo}</span>
+            <span className={[styles.rcTitulo, titMudo ? styles.rcTituloMudo : ''].join(' ')}>
+              {room.status === ROOM_STATUS.LIMPEZA && !sv && <Sparkles size={18} className={styles.rcAlerta} aria-hidden="true" />}
+              {room.status === ROOM_STATUS.MANUTENCAO && <AlertTriangle size={22} strokeWidth={2.25} className={styles.rcAlerta} aria-hidden="true" />}
+              {titulo}
+            </span>
             {sub && <span className={styles.rcSub}>{sub}</span>}
           </span>
         </span>
-        <span className={styles.rcStatusLinha}>
-          {dataNoStatus
+        {!(room.status === ROOM_STATUS.LIMPEZA && !sv) && <span className={styles.rcStatusLinha}>
+          {chegaNoStatus ? (
+            <span className={[styles.rcStatus, styles.rcDatas].join(' ')}><Clock size={13} /> <b>{chegaNoStatus}</b></span>
+          ) : descNoStatus || periodoMn ? (
+            <span className={styles.rcStatusData}>
+              {descNoStatus && <span className={[styles.rcStatus, styles.rcDesc].join(' ')} title={descNoStatus}>{descNoStatus}</span>}
+              {periodoMn && <span className={[styles.rcStatus, styles.rcDatas].join(' ')}><Calendar size={13} /> <b>{periodoMn}</b></span>}
+            </span>
+          ) : dataNoStatus
             ? (
-              <span className={styles.rcDatas}>
-                {dataNoStatus.split(' - ').map((d, i) => (
-                  <span key={i} className={styles.rcStatus}>{i === 0 ? tr('Entrada') : tr('Saída')} <b>{d}</b></span>
-                ))}
+              <span className={styles.rcStatusData}>
+              <span className={styles.rcStatus}><i />{tr(room.status)}</span>
+              <span className={[styles.rcStatus, styles.rcDatas].join(' ')}>
+                <Calendar size={13} /> <b>{dataNoStatus.split(' - ').map((d) => d.trim().slice(0, 5)).join(' → ')}</b>
+              </span>
               </span>
             )
             : <span className={styles.rcStatus}><i />{tr(room.status)}</span>}
-        </span>
+        </span>}
         {splitClean ? (
           <span className={styles.rcLimpezaFaixa}>
-            <User size={13} /> {limpezaResp ? tr('Em limpeza · {{nome}}', { nome: limpezaResp }) : tr('Em limpeza')}
+            <span className={styles.rcLimpezaIco}><Sparkles size={15} /></span>
+            <span className={styles.rcLimpezaTxt}>
+              <b>{tr('Limpeza em andamento')}</b>
+              <small>
+                {[limpezaResp || tr('Responsável não informado'),
+                  (() => { const h = /(\d{2}:\d{2})/.exec(room.limpeza?.inicio || ''); return h ? tr('desde {{hora}}', { hora: h[1] }) : null; })(),
+                ].filter(Boolean).join(' · ')}
+              </small>
+            </span>
           </span>
-        ) : (rodape || pendente > 0) && (
+        ) : (rodape || pendente > 0 || livre) && (
           <span className={styles.rcRodape}>
             <span className={styles.rcChips}>{rodape}</span>
             {pendente > 0 && <span className={styles.rcPendente}>{fmtBRL(pendente)} <small>{tr('pendente')}</small></span>}
+            {livre && (
+              <button type="button" className={styles.rcFinalizar}
+                onClick={(e) => { e.stopPropagation(); acoesCardRef.current.hospedar(room); }}
+                onKeyDown={(e) => e.stopPropagation()}>
+                <BedDouble size={14} /> {tr('Hospedar')}
+              </button>
+            )}
           </span>
         )}
-      </button>
+        {((room.status === ROOM_STATUS.LIMPEZA && !sv) || room.status === ROOM_STATUS.MANUTENCAO) && (
+          <span className={styles.rcRodape}>
+            <span className={styles.rcChips} />
+            <span onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <BalaoConfirma className={styles.rcFinalizar}
+                label={<><Check size={14} strokeWidth={2.5} /> {tr('Finalizar')}</>}
+                mensagem={room.status === ROOM_STATUS.MANUTENCAO
+                  ? tr('Finalizar a manutenção do Apt. {{n}}?', { n: room.numero })
+                  : tr('Finalizar a limpeza do Apt. {{n}}?', { n: room.numero })}
+                confirmar={tr('Finalizar')}
+                onConfirm={() => (room.status === ROOM_STATUS.MANUTENCAO ? acoesCardRef.current.manutencao : acoesCardRef.current.limpeza)(room)} />
+            </span>
+          </span>
+        )}
+      </div>
     );
   }, [openDetail]);
 
@@ -3357,7 +3417,7 @@ export default function RecepcaoPage() {
             <Button variant="primary" className={styles.headerControlBtn} onClick={openAddQuarto}>
               <Plus size={14} /> {tr('Adicionar Quarto')}
             </Button>
-            <Button variant="primary" className={[styles.headerControlBtn, styles.btnPurple].join(' ')} onClick={() => setShowNovoPernoite(true)}>
+            <Button variant="primary" className={[styles.headerControlBtn, styles.btnPurple].join(' ')} onClick={() => { setNpQuarto(null); setShowNovoPernoite(true); }}>
               <BedDouble size={14} /> {tr('Novo Pernoite')}
             </Button>
           </div>
@@ -3579,40 +3639,45 @@ export default function RecepcaoPage() {
       {/* ═══════════════════════════════════════════════════════
           MODAL — Detalhe do Quarto
       ═══════════════════════════════════════════════════════ */}
-      {/* Pernoite (overnight) usa o mesmo modal das reservas, mudando só os botões de Ações. */}
-      {selectedRoom && selectedRoom.servico?.tipo === 'pernoite' && (() => {
-        const sv = selectedRoom.servico;
-        const reservaAdapter = buildStayReserva(selectedRoom, 'hospedado');
-        const diariasDetalhes = stayDiarias(sv);
-        return (
+      {/* Pernoite: mesma gaveta da reserva (voucher, pessoas, preços, pagamentos e diárias);
+          consumo e limpeza seguem pelos fluxos da Recepção. */}
+      {selectedRoom && selectedRoom.servico?.tipo === 'pernoite' && (
+        reservaFull ? (
           <ReservaModal
             inline={isDesktop}
-            key={`ov-${sv.id}`}
-            reserva={reservaAdapter}
+            key={`pn-${reservaFull.id}`}
+            reserva={reservaFull}
             groupInfo={groupResumo ?? buildGroupInfo(selectedRoom)}
-            onClose={closeDetail}
+            onVoucherGrupo={() => gerarVoucherGrupoReserva(selectedRoom)}
+            limpeza={selectedRoom.limpeza ? { responsavel: selectedRoom.limpeza.responsavel, onFinalizar: () => handleFinalizarLimpeza(selectedRoom) } : null}
+            onClose={() => { setReservaFull(null); closeDetail(); }}
             onNotify={notify}
-            categorias={[]}
-            tiposPagamento={tiposPagamentoOv}
-            roomDescMap={{}}
-            overnight={{
-              diariasDetalhes,
-              hasLimpeza:           !!selectedRoom.limpeza,
-              limpezaResponsavel:   selectedRoom.limpeza?.responsavel ?? '',
-              onFinalizarLimpeza:   () => handleFinalizarLimpeza(selectedRoom),
-              onAcionarLimpeza:     () => { closeDetail(); openService('limpeza', selectedRoom); },
-              onGerenciarDiarias:   () => openGerenciarDiarias(),
-              onAdicionarConsumo:   () => setShowGerenciarConsumo(true),
-              onGerenciarPagamentos:() => setShowGerenciarPag(true),
-              onGerenciarPreco:     () => setShowGerenciarPreco(true),
-              onGerenciarPessoas:   () => { setApDiariaIdx((sv.diariaAtual ?? 1) - 1); setApComboOpen(false); setApSearch(''); setApSearchResults([]); setShowAlterarPessoas(true); },
-              onVoucher:            () => gerarVoucherHospedagem({ quarto: selectedRoom, servico: sv, incluirConsumo: false }),
-              onFinalizar:          () => handleClickFinalizar(),
-              onCancelar:           () => setConfirmModal({ action: 'cancelar' }),
+            categorias={categoriasFull}
+            roomDescMap={roomDescMapFull}
+            tiposPagamento={tiposPagamentoReais}
+            reservas={[]}
+            onUpdate={async (id, body) => {
+              const upd = await reservaApi.editar(id, body);
+              setReservaFull(normalizeReserva(upd ?? { ...body, id }));
+              await load();
+              notify(tr('Pernoite atualizado!'));
+            }}
+            onSync={(norm) => { setReservaFull(norm); load(); }}
+            pernoite={{
+              onAdicionarConsumo: () => setShowGerenciarConsumo(true),
+              onAcionarLimpeza:   selectedRoom.limpeza ? null : () => { closeDetail(); openService('limpeza', selectedRoom); },
+              onFinalizar:        () => handleClickFinalizar(),
+              onCancelar:         () => setConfirmModal({ action: 'cancelar' }),
             }}
           />
-        );
-      })()}
+        ) : (
+          <Modal open onClose={closeDetail} size="sm" title={tr('Pernoite')}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 24, color: 'var(--text-2)' }}>
+              <Loader2 size={16} className={styles.spin} /> {tr('Carregando pernoite...')}
+            </div>
+          </Modal>
+        )
+      )}
 
       {/* Reservado: modal de reserva completo (idêntico ao do calendário). */}
       {selectedRoom && selectedRoom.servico?.tipo === 'reserva' && (
@@ -3705,13 +3770,14 @@ export default function RecepcaoPage() {
       {showNovoPernoite && (
         <CreateModal
           forcePernoite
+          initialRoom={npQuarto}
           reservas={[]}
           categorias={categoriasFull}
           tiposPagamento={tiposPagamentoReais}
           roomDescMap={roomDescMapFull}
-          onClose={() => setShowNovoPernoite(false)}
+          onClose={() => { setShowNovoPernoite(false); setNpQuarto(null); }}
           onNotify={notify}
-          onSave={async () => { setShowNovoPernoite(false); await load(); notify(tr('Pernoite(s) criado(s)!')); }}
+          onSave={async () => { setShowNovoPernoite(false); setNpQuarto(null); await load(); notify(tr('Pernoite(s) criado(s)!')); }}
         />
       )}
 
@@ -3886,14 +3952,15 @@ export default function RecepcaoPage() {
             serviceModal.type === 'limpeza'
               ? <><Sparkles size={15} /> {tr('Acionar Limpeza — Apt.')} {serviceModal.room.numero}</>
               : serviceModal.type === 'manutencao'
-              ? <><Wrench size={15} /> {tr('Acionar Manutenção — Apt.')} {serviceModal.room.numero}</>
+              ? <><Wrench size={15} /> {tr('Manutenção · Apt. {{n}}', { n: serviceModal.room.numero })}</>
               : <><AlertTriangle size={15} /> {tr('Fora de Serviço — Apt.')} {serviceModal.room.numero}</>
           }
           footer={
             <div className={styles.footerRight}>
-              <Button variant="primary" onClick={handleService} disabled={saving}>
+              <Button variant="secondary" onClick={() => setServiceModal(null)} disabled={saving}>{tr('Cancelar')}</Button>
+              <Button variant="primary" onClick={handleService} disabled={saving || (serviceModal.type === 'manutencao' && !svcForm.iniData)}>
                 {saving && <Loader2 size={14} className={styles.spin} />}
-                {tr('Confirmar')}
+                {serviceModal.type === 'manutencao' ? tr('Iniciar manutenção') : tr('Confirmar')}
               </Button>
             </div>
           }
@@ -3925,24 +3992,32 @@ export default function RecepcaoPage() {
                 )}
               </div>
             ) : (<>
-              <FormField label={tr('Responsável')}>
-                <Input className={styles.modalInput} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder={tr('Nome do responsável (opcional)')} />
-              </FormField>
+              <section className={styles.svcSec}>
+                <h4 className={styles.svcSecTit}><User size={14} /> {tr('Responsável')}</h4>
+                <Input className={styles.svcCampo} value={svcForm.responsavel} onChange={(e) => setSvcForm((f) => ({ ...f, responsavel: e.target.value }))} placeholder={tr('Nome do responsável (opcional)')} />
+              </section>
               {serviceModal.type === 'manutencao' && (
-                <div className={styles.grid2}>
-                  <FormField label={tr('Início (data e hora)')}>
-                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraInicio}
-                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraInicio: e.target.value }))} />
-                  </FormField>
-                  <FormField label={tr('Término (data e hora)')}>
-                    <Input className={styles.modalInput} type="datetime-local" value={svcForm.dataHoraFim}
-                      onChange={(e) => setSvcForm((f) => ({ ...f, dataHoraFim: e.target.value }))} />
-                  </FormField>
-                </div>
+                <section className={styles.svcSec}>
+                  <h4 className={styles.svcSecTit}><Calendar size={14} /> {tr('Período')}</h4>
+                  <div className={styles.svcPeriodo}>
+                    <span className={styles.svcPerRot}>{tr('Início')}</span>
+                    <DatePicker sobrio mode="single" value={svcForm.iniData}
+                      onChange={(d) => setSvcForm((f) => ({ ...f, iniData: d, fimData: f.fimData && d && f.fimData < d ? null : f.fimData }))}
+                      placeholder={tr('Data de início')} />
+                    <TimeInput value={svcForm.iniHora} onChange={(v) => setSvcForm((f) => ({ ...f, iniHora: v }))} />
+                    <span className={styles.svcPerRot}>{tr('Término')}</span>
+                    <DatePicker sobrio mode="single" value={svcForm.fimData}
+                      onChange={(d) => setSvcForm((f) => ({ ...f, fimData: d }))}
+                      minDate={svcForm.iniData} markedDate={svcForm.iniData}
+                      placeholder={tr('Sem previsão')} />
+                    <TimeInput value={svcForm.fimHora} onChange={(v) => setSvcForm((f) => ({ ...f, fimHora: v }))} disabled={!svcForm.fimData} />
+                  </div>
+                </section>
               )}
-              <FormField label={tr('Descrição')}>
-                <textarea className={styles.modalInput} style={{ width: '100%', minHeight: 120, padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 13, color: 'var(--text)', fontFamily: 'inherit' }} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder={tr('Descreva o serviço a ser realizado')} />
-              </FormField>
+              <section className={styles.svcSec}>
+                <h4 className={styles.svcSecTit}><FileText size={14} /> {tr('Descrição')}</h4>
+                <textarea className={styles.svcTexto} value={svcForm.descricao} onChange={(e) => setSvcForm((f) => ({ ...f, descricao: e.target.value }))} placeholder={tr('Descreva o serviço a ser realizado')} />
+              </section>
             </>)}
           </div>
         </Modal>

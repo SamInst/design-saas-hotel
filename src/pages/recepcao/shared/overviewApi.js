@@ -237,6 +237,7 @@ function _normalizeServico(h, q) {
     id: h.id,
     titularNome: titular?.nome ?? null,
     tipoAcomodacao: q?.descricao ?? '',
+    tipoHospedagem: h.tipo_hospedagem ?? null,
     periodo: `${checkin} - ${checkout}`,
     chegadaPrevista: checkin,
     saidaPrevista:   checkout,
@@ -279,6 +280,7 @@ function _normalizeHospedagem(item, cat) {
     responsavel: mn.nome_responsavel ?? mn.responsavel ?? mn.funcionario?.nome ?? '',
     descricao: mn.descricao ?? '',
     previsaoFim: mn.data_hora_fim ?? mn.previsao_fim ?? '',
+    inicio: mn.data_hora_inicio ?? '',
   } : null;
 
   return {
