@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import {
   BedDouble, ChevronLeft, ChevronRight, Plus, Pencil, Trash2,
   ChevronDown, Loader2, X, XCircle, Users, Search, CalendarDays, Bell, Check, FileDown, FileText, SlidersHorizontal, DollarSign, MoreVertical, UserX,
-  CalendarCheck2, Sparkles, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, CheckCircle2, Moon, DoorOpen, DoorClosed, Inbox,
+  CalendarCheck2, CopyPlus, Sparkles, Tag, Clock, Crown, AlertTriangle, Building2, ArrowRight, CheckCircle2, Moon, DoorOpen, DoorClosed, Inbox,
 } from 'lucide-react';
 import { Button }        from '../../components/ui/Button';
 import { Modal }         from '../../components/ui/Modal';
@@ -152,6 +152,7 @@ export const normalizeReserva = (r) => {
       // "1 Adulto(s) + Criança de 5 anos (gratuidade)" e quanto do valor saiu das crianças
       ocupacao:      d.ocupacao?.descricao ?? null,
       valorCriancas: d.ocupacao?.valor_criancas ?? null,
+      acrescimoSaz:  d.ocupacao?.acrescimo_sazonalidade ?? null,
     })),
     status:                  mapStatus(r),
     hospedes: pessoas.map((p) => ({
@@ -302,6 +303,7 @@ const detalhesDasDiarias = (diarias, hospedes, dataInicioIso) => {
     sazonalidade: d.sazonalidade ? { descricao: d.sazonalidade } : null,
     valor_final: d.valor ?? 0,
     valor_criancas: d.valorCriancas ?? null,
+    acrescimo_sazonalidade: d.acrescimoSaz ?? null,
     meia_diaria: !!d.meiaDiaria,
   }));
 };
@@ -454,18 +456,28 @@ const groupDiarias = (detalhes, valorDe) => {
     const saz      = d.sazonalidade?.descricao ?? '';
     const criancas = d.valor_criancas > 0 ? d.valor_criancas : 0;
     const anterior = d._valorAnterior ?? null;
+    const acr      = d.sazonalidade && Math.abs(d.acrescimo_sazonalidade ?? 0) >= 0.005 ? d.acrescimo_sazonalidade : null;
     const hosp     = descricaoHospedes(d.descricao);
     // Meia diária (saída tardia) nunca se junta a uma diária inteira, nem que o valor coincida.
     const meia     = d.meia_diaria === true;
-    const key      = [valor, original, saz, criancas, anterior ?? '', hosp, meia ? 'M' : 'F'].join('|');
+    const key      = [valor, original, saz, acr ?? '', criancas, anterior ?? '', hosp, meia ? 'M' : 'F'].join('|');
     const atual    = porChave.get(key);
     if (atual) { atual.qtd += 1; atual.numeros.push(i + 1); return; }
-    const g = { key, qtd: 1, numeros: [i + 1], valor, valorOriginal: original, saz, criancas, anterior, hosp, meia,
+    const g = { key, qtd: 1, numeros: [i + 1], valor, valorOriginal: original, saz, acr, criancas, anterior, hosp, meia,
       valorAdultos: original - criancas };
     porChave.set(key, g);
     grupos.push(g);
   });
   return grupos;
+};
+
+/** Sazonalidade com o valor de antes: "Natal · R$ 150,00 → R$ 190,00 (+R$ 40,00)". */
+const sazTexto = (saz, valor, acr) => {
+  if (!saz) return '';
+  if (acr == null || valor == null) return tr('Sazonalidade aplicada: {{saz}}', { saz });
+  return tr('Sazonalidade aplicada: {{saz}} · {{antes}} → {{depois}} ({{dif}})', {
+    saz, antes: fmtBRL(valor - acr), depois: fmtBRL(valor), dif: `${acr > 0 ? '+' : '−'}${fmtBRL(Math.abs(acr))}`,
+  });
 };
 
 /** "2 Adulto(s)" → "2 Adultos"; "1 Adulto(s)" → "1 Adulto". */
@@ -513,10 +525,16 @@ function LinhasDiarias({ grupos }) {
           <span className={styles.gdSaz}>
             <AlertTriangle size={14} className={styles.gdSazIco} />
             {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+            {g.acr != null && ` (${g.acr > 0 ? '+' : '−'}${fmtBRL(Math.abs(g.acr * g.qtd))})`}
           </span>
         )}
       </span>
-      {todos.length > 1 && <span>{fmtBRL(g.valor * g.qtd)}</span>}
+      {(todos.length > 1 || g.acr != null) && (
+        <span>
+          {g.acr != null && <s className={styles.rcDiariaOld}>{fmtBRL((g.valorOriginal - g.acr) * g.qtd)}</s>}
+          {fmtBRL(g.valor * g.qtd)}
+        </span>
+      )}
     </div>
   ));
 }
@@ -549,6 +567,11 @@ const TIPOS_HOSPEDAGEM = [
   ['QUADRUPLO', tr('Quádruplo')], ['QUINTUPLO', tr('Quíntuplo')], ['SEXTUPLO', tr('Sêxtuplo')],
 ];
 const TIPO_HOSPEDAGEM_LABEL = Object.fromEntries(TIPOS_HOSPEDAGEM);
+// Tipo gravado: código básico (rótulo traduzido) ou nome livre definido pelo hotel.
+const rotuloTipo = (t, vazio = '—') => (t ? TIPO_HOSPEDAGEM_LABEL[t] ?? t : vazio);
+// Tipos com preço na categoria do quarto (vazio = categoria sem preço por tipo → lista padrão).
+const tiposDoQuarto = (categorias, q) =>
+  (categorias ?? []).find((c) => (c.quartos ?? []).map(String).includes(String(q)))?.tipos ?? [];
 const PESSOAS_POR_TIPO = { INDIVIDUAL: 1, CASAL: 2, DUPLO: 2, TRIPLO: 3, QUADRUPLO: 4, QUINTUPLO: 5, SEXTUPLO: 6 };
 const TIPO_POR_PESSOAS = [null, 'INDIVIDUAL', 'DUPLO', 'TRIPLO', 'QUADRUPLO', 'QUINTUPLO', 'SEXTUPLO'];
 // Rótulo do ticket: o tipo gravado na reserva ou, sem ele, o sugerido pelo número de pessoas.
@@ -561,23 +584,36 @@ const HOSP_POR_TIPO = {
   QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
 };
 const rotuloReservaTipo = (tipo, pessoas) =>
-  RESERVA_POR_TIPO[tipo] ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
+  RESERVA_POR_TIPO[tipo] ?? (tipo ? tr('Reserva {{tipo}}', { tipo }) : null) ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
 const HOSPEDAGEM_POR_TIPO = {
   INDIVIDUAL: tr('Hospedagem Individual'), CASAL: tr('Hospedagem Casal'), DUPLO: tr('Hospedagem Dupla'), TRIPLO: tr('Hospedagem Tripla'),
   QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
 };
 const rotuloHospedagemTipo = (tipo, pessoas) =>
-  HOSPEDAGEM_POR_TIPO[tipo] ?? HOSPEDAGEM_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Hospedagem Individual');
+  HOSPEDAGEM_POR_TIPO[tipo] ?? (tipo ? tr('Hospedagem {{tipo}}', { tipo }) : null) ?? HOSPEDAGEM_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Hospedagem Individual');
 const sugerirTipo = (n) => (n > 0 ? TIPO_POR_PESSOAS[Math.min(n, 6)] : undefined);
 
-function TipoHospedagemSelect({ value, onChange, compacto = false, vazio = null }) {
+/** Tipos com preço base na categoria (linhas antigas sem tipo viram o tipo da capacidade). */
+const tiposDaCategoria = (c) => [...new Set((c?.modelos_ocupacao ?? [])
+  .filter((m) => !m.sazonalidade)
+  .map((m) => m.tipo ?? TIPO_POR_PESSOAS[m.quantidade])
+  .filter(Boolean))];
+
+/** Opções do select: os tipos com preço na categoria (ou todos os básicos) + o valor atual. */
+const opcoesTipo = (opcoes, atual) => {
+  const base = opcoes?.length ? opcoes.map((t) => [t, rotuloTipo(t)]) : TIPOS_HOSPEDAGEM;
+  return atual && !base.some(([v]) => v === atual) ? [...base, [atual, rotuloTipo(atual)]] : base;
+};
+
+function TipoHospedagemSelect({ value, onChange, compacto = false, vazio = null, opcoes = null }) {
+  const lista = opcoesTipo(opcoes, value);
   if (compacto) {
     return (
       <Select value={value ?? ''} title={tr('Tipo de hospedagem')} aria-label={tr('Tipo de hospedagem')}
         className={[styles.tipoCompacto, !value ? styles.criarTipoVazio : ''].join(' ')}
         onChange={(e) => onChange(e.target.value || undefined)}>
         <option value="">{vazio ?? tr('Tipo de hospedagem')}</option>
-        {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        {lista.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </Select>
     );
   }
@@ -585,7 +621,7 @@ function TipoHospedagemSelect({ value, onChange, compacto = false, vazio = null 
     <FormField label={tr('Tipo de hospedagem')}>
       <Select value={value ?? ''} className={!value ? styles.criarTipoVazio : ''} onChange={(e) => onChange(e.target.value || undefined)}>
         <option value="">{tr('Selecione...')}</option>
-        {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        {lista.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </Select>
     </FormField>
   );
@@ -915,7 +951,7 @@ function LinhaReserva({ r, onClick, mostrarQuarto = true, corGrupo = null }) {
       {mostrarQuarto && <span className={styles.lstNum} style={corGrupo ? { color: corGrupo, borderColor: corGrupo } : undefined}>{fmtRoom(r.quarto)}</span>}
       <span className={styles.lstTxt}>
         <b>{r.titularNome}</b>
-        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {nPessoas} {tr('pessoa')}{nPessoas !== 1 ? 's' : ''}</small>
+        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>
       </span>
       {r.status !== 'confirmada' && <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>}
       <ChevronRight size={15} className={styles.sideSeta} />
@@ -1008,6 +1044,32 @@ function Balao({ anchor, onClose, children }) {
   return createPortal(
     <div ref={balaoRef} role="dialog" className={[styles.balao, pos.abaixo ? styles.balaoAbaixo : ''].join(' ')}
       style={{ right: pos.right, top: pos.top, bottom: pos.bottom }}>
+      {children}
+    </div>,
+    document.body,
+  );
+}
+
+// Balão informativo preso a uma célula (sem fechar ao clicar fora): centralizado acima dela,
+// ou abaixo quando não há espaço em cima. Acompanha a rolagem da grade.
+function BalaoCelula({ anchor, children, interativo = false }) {
+  const [pos, setPos] = useState(null);
+  useEffect(() => {
+    if (!anchor) return undefined;
+    const place = () => {
+      const r = anchor.getBoundingClientRect();
+      const cx = Math.min(Math.max(r.left + r.width / 2, 130), window.innerWidth - 130);
+      setPos(r.top < 120 ? { left: cx, top: r.bottom + 8, abaixo: true } : { left: cx, bottom: window.innerHeight - r.top + 8, abaixo: false });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [anchor]);
+  if (!anchor || !pos) return null;
+  return createPortal(
+    <div role={interativo ? 'dialog' : 'status'} className={[styles.balao, styles.balaoCelula, interativo ? styles.balaoCelulaAcao : '', pos.abaixo ? styles.balaoAbaixo : ''].join(' ')}
+      style={{ left: pos.left, top: pos.top, bottom: pos.bottom }}>
       {children}
     </div>,
     document.body,
@@ -1108,9 +1170,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
   const [pendingOps,   setPendingOps]   = useState([]);
   const [edAddPessoa,  setEdAddPessoa]  = useState(false);
   const [editTipo,     setEditTipo]     = useState(reserva.tipoHospedagem ?? '');
-  const [editTipoManual, setEditTipoManual] = useState(
-    !!reserva.tipoHospedagem && reserva.tipoHospedagem !== sugerirTipo(reserva.hospedes?.length ?? 0),
-  );
+  const [editTipoManual, setEditTipoManual] = useState(!!reserva.tipoHospedagem);
   const [pagRegistrado, setPagRegistrado] = useState(null);
   const [hasChanges,   setHasChanges]   = useState(false);
   const [showDiscard,  setShowDiscard]  = useState(false);
@@ -1291,6 +1351,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
         data_entrada: toBrDate(reserva.dataInicio),
         data_saida:   toBrDate(reserva.dataFim),
         ...buildGuestCalcParams(pessoas),
+        ...(reserva.tipoHospedagem ? { tipo_hospedagem: reserva.tipoHospedagem } : {}),
       }]);
       setAdjCalc(Array.isArray(res) ? res[0] : res);
     } catch (e) {
@@ -1316,6 +1377,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       data_entrada: toBrDate(reserva.dataInicio),
       data_saida:   toBrDate(reserva.dataFim),
       ...buildGuestCalcParams(pessoas),
+      ...(reserva.tipoHospedagem ? { tipo_hospedagem: reserva.tipoHospedagem } : {}),
     }]).then((res) => { if (!cancelled) setInfoCalc(Array.isArray(res) ? res[0] : res); })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -1520,7 +1582,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setPessoas(reserva.hospedes ?? []);
     setPagamentos(reserva.pagamentos ?? []);
     setEditTipo(reserva.tipoHospedagem ?? '');
-    setEditTipoManual(!!reserva.tipoHospedagem && reserva.tipoHospedagem !== sugerirTipo(reserva.hospedes?.length ?? 0));
+    setEditTipoManual(!!reserva.tipoHospedagem);
   };
 
   const handleSetTipo = (tipo) => {
@@ -1545,7 +1607,18 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       if (titularOp) await hospedagemApi.definirTitular(reserva.id, titularOp.pessoaId);
 
       const tipoMudou = editActiveTab === 'pessoas' && editTipo && editTipo !== reserva.tipoHospedagem;
-      if (tipoMudou) await reservaApi.editar(reserva.id, { tipo_hospedagem: editTipo });
+      if (tipoMudou) {
+        const cat   = categorias.find((c) => (c.quartos || []).map(String).includes(String(reserva.quarto)));
+        const hIn   = (reserva.chegadaPrevista || '').split(' ')[1]?.slice(0, 5) || cat?.checkin || '14:00';
+        const hMeia = reserva.meiaDiaria ? (reserva.saidaPrevista || '').split(' ')[1]?.slice(0, 5) : null;
+        await reservaApi.editar(reserva.id, {
+          tipo_hospedagem:    editTipo,
+          quarto_id:          parseInt(reserva.quarto),
+          data_hora_checkin:  `${toBrDate(reserva.dataInicio)} ${hIn}`,
+          data_hora_checkout: `${toBrDate(reserva.dataFim)} ${cat?.checkout || '12:00'}`,
+          ...(hMeia ? { hora_saida_meia_diaria: hMeia } : {}),
+        });
+      }
 
       // Payment ops (one at a time)
       const statusBackend = reserva.status === 'hospedado' ? 'PERNOITE_ATIVO' : 'RESERVA_ATIVA';
@@ -1748,6 +1821,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       data_entrada: toBrDate(reserva.dataInicio),
       data_saida:   toBrDate(reserva.dataFim),
       ...buildGuestCalcParams(pessoas),
+      ...(reserva.tipoHospedagem ? { tipo_hospedagem: reserva.tipoHospedagem } : {}),
     }]).then((res) => { if (!cancelled) setOrigCalc(Array.isArray(res) ? res[0] : res); })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -1771,11 +1845,13 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
     setEditCalcLoading(true);
     setEditCalc(null);
     const brDate = (d) => toBrDate(formatDate(d));
+    const tipoCalc = editTipo || reserva.tipoHospedagem;
     const itens = [{
       fk_quarto:    parseInt(editQuarto[0]),
       data_entrada: brDate(editCheckin),
       data_saida:   brDate(editCheckout),
       ...buildGuestCalcParams(pessoas),
+      ...(tipoCalc ? { tipo_hospedagem: tipoCalc } : {}),
     }];
     // Mesma regra da criação: a meia diária é metade da noite do dia do check-out.
     if (temMeiaEdit) {
@@ -1804,7 +1880,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
       .catch(() => {})
       .finally(() => { if (!cancelled) setEditCalcLoading(false); });
     return () => { cancelled = true; };
-  }, [editing, editQuarto[0], editCheckin, editCheckout, pessoas, temMeiaEdit, editHoraMeia]); // eslint-disable-line
+  }, [editing, editQuarto[0], editCheckin, editCheckout, pessoas, temMeiaEdit, editHoraMeia, editTipo]); // eslint-disable-line
 
   // ── Edit save (quarto/datas/obs) ──────────────────────────────────────────
   const [editSaving,    setEditSaving]    = useState(false);
@@ -2179,7 +2255,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   ? tr('{{qtd}} diárias × {{valor}}', { qtd: g.qtd, valor: fmtBRL(g.valor) })
                   : g.meia ? tr('Meia diária') : valGrupos.length > 1 ? tr('{{n}}ª Diária', { n: g.numeros[0] }) : tr('Diária')}
                 {hospedes && <small className={styles.finSub}>{hospedes}</small>}
-                {g.saz && <small className={styles.finSub}>{tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}</small>}
+                {g.saz && <small className={styles.finSub}>{sazTexto(g.saz, g.valorOriginal, g.acr)}</small>}
                 {mudou && (
                   <small className={g.valor > anterior ? styles.finDifMais : styles.finDifMenos}>
                     {tr('{{v}} por diária', { v: `${g.valor > anterior ? '+' : ''}${fmtBRL(g.valor - anterior)}` })}
@@ -2621,7 +2697,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                     <span className={styles.edRot}>{tr('Tipo de hospedagem')}</span>
                     <Select value={editTipo} className={!editTipo ? styles.criarTipoVazio : ''} onChange={(e) => handleSetTipo(e.target.value)}>
                       <option value="">{tr('Selecione...')}</option>
-                      {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      {opcoesTipo(tiposDoQuarto(categorias, reserva.quarto), editTipo).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </Select>
                   </div>
                 )}
@@ -2656,7 +2732,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                   <span className={styles.rcSectionLabel}>{tr('Tipo de hospedagem')}</span>
                   <Select value={editTipo} className={!editTipo ? styles.criarTipoVazio : ''} onChange={(e) => handleSetTipo(e.target.value)}>
                     <option value="">{tr('Selecione...')}</option>
-                    {TIPOS_HOSPEDAGEM.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    {opcoesTipo(tiposDoQuarto(categorias, reserva.quarto), editTipo).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </Select>
                 </div>
               )}
@@ -3171,7 +3247,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                         {g.saz && (
                           <span className={styles.gdSaz}>
                             <AlertTriangle size={14} className={styles.gdSazIco} />
-                            {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+                            {sazTexto(g.saz, g.valorOriginal, g.acr)}
                           </span>
                         )}
                       </span>
@@ -3383,7 +3459,7 @@ export function ReservaModal({ reserva, onClose, onCancel, onActivate, onMoverPe
                 <div className={styles.rvPeriodoInfo}>{tr('Diárias')}: <span>{dias}</span></div>
                 <div className={styles.rvPeriodoInfo}>{tr('Hóspedes')}: <span>{guestList.length || 1 + (reserva.quantidadeAcompanhantes ?? 0)}</span></div>
                 {(reserva.tipoHospedagem || headChip) && (
-                  <div className={styles.rvPeriodoInfo}>{tr('Tipo')}: <span>{TIPO_HOSPEDAGEM_LABEL[reserva.tipoHospedagem] ?? headChip}</span></div>
+                  <div className={styles.rvPeriodoInfo}>{tr('Tipo')}: <span>{reserva.tipoHospedagem ? rotuloTipo(reserva.tipoHospedagem) : headChip}</span></div>
                 )}
               </div>
             </div>
@@ -4681,9 +4757,9 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                               const ocup = ocupComValorCriancas(d.ocupacao, d.valorCriancas);
                               const porque = [d.meiaDiaria ? tr('Meia diária') : null, ocup].filter(Boolean).join(' · ');
                               const valor = d.valor ?? 0;
-                              const igual = acc.find((g) => g.porque === porque && g.saz === d.sazonalidade && Math.abs(g.valor - valor) < 0.005);
+                              const igual = acc.find((g) => g.porque === porque && g.saz === d.sazonalidade && g.acr === (d.acrescimoSaz ?? null) && Math.abs(g.valor - valor) < 0.005);
                               if (igual) igual.qtd += 1;
-                              else acc.push({ porque, saz: d.sazonalidade, valor, qtd: 1, id: d.id ?? acc.length });
+                              else acc.push({ porque, saz: d.sazonalidade, acr: d.acrescimoSaz ?? null, valor, qtd: 1, id: d.id ?? acc.length });
                               return acc;
                             }, []).map((g, _i, todos) => (
                               <div key={g.id} className={styles.grpFinDia}>
@@ -4692,7 +4768,7 @@ function GrupoDetalheModal({ grupo, refreshKey, tiposPagamento, onClose, onRenom
                                   {g.saz && (
                                     <span className={styles.gdSaz}>
                                       <AlertTriangle size={14} className={styles.gdSazIco} />
-                                      {tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}
+                                      {sazTexto(g.saz, g.valor, g.acr)}
                                     </span>
                                   )}
                                 </span>
@@ -5629,6 +5705,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
       data_entrada: toBrDate(parseBrDate(h.data_hora_checkin)),
       data_saida:   toBrDate(parseBrDate(h.data_hora_checkout)),
       ...buildGuestCalcParams((h.pessoas_orcamento ?? []).map((p) => ({ dataNascimento: p.data_nascimento }))),
+      ...(h.tipo_hospedagem ? { tipo_hospedagem: h.tipo_hospedagem } : {}),
     }))).then((res) => {
       if (cancelled) return;
       const lista = Array.isArray(res) ? res : [res];
@@ -6137,7 +6214,7 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                                     <div className={styles.grpFinApto}>
                                       <span>{(() => {
                                         const tp = h.tipo_hospedagem || TIPO_POR_PESSOAS[np] || null;
-                                        if (qid(h)) return <>{tr('Apt.')} {fmtRoom(qid(h))}{tp && TIPO_HOSPEDAGEM_LABEL[tp] ? ` · ${TIPO_HOSPEDAGEM_LABEL[tp]}` : ''}</>;
+                                        if (qid(h)) return <>{tr('Apt.')} {fmtRoom(qid(h))}{tp ? ` · ${rotuloTipo(tp)}` : ''}</>;
                                         return HOSP_POR_TIPO[tp] ?? tr('Hospedagem');
                                       })()}</span>
                                       <b>{fmtBRL(h.valor_total ?? 0)}</b>
@@ -6989,17 +7066,18 @@ function RoomHospedesPicker({ value = [], onChange, extra = null, empresaMode, l
 }
 
 // ─── Create Reservation Modal ─────────────────────────────────────────────────
-export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false, initialGrupo = null, confirmar = null }) {
+export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvailable, reservas, onClose, onSave, onNotify, categorias, tiposPagamento, roomDescMap = {}, forceOrcamento = false, forceSolicitacao = false, forcePernoite = false, initialGrupo = null, confirmar = null, initialSelecoes = null }) {
   const [hospEmpresa, setHospEmpresa] = useState(false);
+  const selIni = initialSelecoes?.length ? initialSelecoes : null;
   const isSolicitacao = forceSolicitacao;
 
   const [step,             setStep]             = useState((!isSolicitacao && initialRoom) ? 2 : 1);
   // confirmar: { reservas, grupoId, descricao } — aprovação de solicitação. Abre já com quartos/datas do
   // orçamento; o salvar ativa as hospedagens existentes (hospedagem_id) em vez de criar novas.
   const conf = confirmar?.reservas?.length ? confirmar : null;
-  const escolheTipo = !conf && !initialRoom && !isSolicitacao && !forceOrcamento && initialGrupo == null;
+  const escolheTipo = !conf && !selIni && !initialRoom && !isSolicitacao && !forceOrcamento && initialGrupo == null;
   const quartoFixo = forcePernoite && !!initialRoom;
-  const [tipo,             setTipo]             = useState(conf && conf.reservas.length > 1 ? 'grupo' : escolheTipo ? null : 'simples'); // 'simples' | 'grupo'
+  const [tipo,             setTipo]             = useState((conf && conf.reservas.length > 1) || selIni ? 'grupo' : escolheTipo ? null : 'simples'); // 'simples' | 'grupo'
 
   // Passos opcionais — só aparecem quando a escolha faz diferença:
   //  · "Modo de Período": vários apartamentos podem ter períodos distintos
@@ -7249,6 +7327,30 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
     setStep(faixas.length === 1 ? 3 : 2); // hóspedes (período único) ou períodos
   }, []); // eslint-disable-line
 
+  // Seleção múltipla no calendário: cada célula escolhida vira um apartamento com seu período.
+  // Mesmas datas para todos → período único; datas diferentes → um período por faixa.
+  useEffect(() => {
+    if (!selIni) return;
+    const faixas = [...new Set(selIni.map((x) => `${x.start}|${x.end}`))];
+    if (faixas.length === 1) {
+      setPeriodoMode('unico');
+      setQuartos([...new Set(selIni.map((x) => String(x.room)))]);
+      setCheckin(new Date(selIni[0].start + 'T00:00:00'));
+      setCheckout(new Date(selIni[0].end + 'T00:00:00'));
+    } else {
+      setPeriodoMode('multiplos');
+      setPeriodos(faixas.map((fx) => {
+        const [ci, co] = fx.split('|');
+        return {
+          rooms: [...new Set(selIni.filter((x) => `${x.start}|${x.end}` === fx).map((x) => String(x.room)))],
+          checkin: new Date(ci + 'T00:00:00'), checkout: new Date(co + 'T00:00:00'),
+          roomHospedes: {}, roomHospedesOrc: {}, roomTipo: {}, tipoManual: {},
+        };
+      }));
+    }
+    setStep(2);
+  }, []); // eslint-disable-line
+
   // Hóspedes do grupo: um apartamento por vez.
   const [hospIdx, setHospIdx] = useState(0);
   useEffect(() => { setHospIdx((i) => Math.min(i, Math.max(quartos.length - 1, 0))); }, [quartos.length]);
@@ -7423,6 +7525,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
               data_entrada: toBrDate(p.checkin),
               data_saida:   toBrDate(p.checkout),
               ...buildGuestCalcParams(guests),
+              ...(tipoDe(quartoId, pi) ? { tipo_hospedagem: tipoDe(quartoId, pi) } : {}),
             },
           });
           // Saída tardia: o back-end precifica a meia diária pela noite do dia do check-out
@@ -7438,6 +7541,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                 data_entrada: toBrDate(p.checkout),
                 data_saida:   toBrDate(addDays(p.checkout, 1)),
                 ...buildGuestCalcParams(guests),
+                ...(tipoDe(quartoId, pi) ? { tipo_hospedagem: tipoDe(quartoId, pi) } : {}),
               },
             });
           }
@@ -7576,7 +7680,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   ? tr('{{qtd}} diárias × {{valor}}', { qtd: g.qtd, valor: fmtBRL(g.valor) })
                   : g.meia ? tr('Meia diária') : grupos.length > 1 ? tr('{{n}}ª Diária', { n: g.numeros[0] }) : tr('Diária')}
                 {subs && <small className={styles.finSub}>{subs}</small>}
-                {g.saz && <small className={styles.finSub}>{tr('Sazonalidade aplicada: {{saz}}', { saz: g.saz })}</small>}
+                {g.saz && <small className={styles.finSub}>{sazTexto(g.saz, g.valorOriginal, g.acr)}</small>}
               </span>
               <b>{fmtBRL(g.valor * g.qtd)}</b>
             </div>
@@ -7967,7 +8071,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     value={quartoHospedesOrc[q] || []}
                     onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                     onDraftChange={setSemCadastroDraft}
-                      extra={<TipoHospedagemSelect compacto value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
+                      extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} value={quartosTipo[q]} onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                 </div>
               ))}
             </>
@@ -8061,7 +8165,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       value={mpRoomHospedesOrc[q] || []}
                       onChange={(v) => setMpRoomHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                       onDraftChange={setSemCadastroDraft}
-                      extra={<TipoHospedagemSelect compacto value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
+                      extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} value={mpRoomTipo[q]} onChange={(v) => { setMpRoomTipo((prev) => ({ ...prev, [q]: v })); setMpTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                   </div>
                 ))}
                 <div className={styles.mpAcoes}>
@@ -8230,7 +8334,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                         value={quartoHospedesOrc[q] || []}
                         onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                         onDraftChange={setSemCadastroDraft}
-                        extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={quartosTipo[q]}
+                        extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={quartosTipo[q]}
                           onChange={(v) => { setQuartosTipo((prev) => ({ ...prev, [q]: v })); setTipoManual((prev) => ({ ...prev, [q]: !!v })); }} />} />
                     </div>
                   </div>
@@ -8268,13 +8372,13 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     value={quartoHospedesOrc[q] || []}
                     onChange={(v) => setQuartoHospedesOrc((prev) => ({ ...prev, [q]: v }))}
                     onDraftChange={setSemCadastroDraft}
-                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={quartosTipo[q]} onChange={setTipoQ} />} />
+                    extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={quartosTipo[q]} onChange={setTipoQ} />} />
                 ) : (
                   <RoomHospedesPicker key={q} lista
                     value={quartoHospedes[q] || []}
                     onChange={(v) => setQuartoHospedes((prev) => ({ ...prev, [q]: v }))}
                     empresaMode={hospEmpresa}
-                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={quartosTipo[q]} onChange={setTipoQ} />} />
+                    extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={quartosTipo[q]} onChange={setTipoQ} />} />
                 )}
               </>
             );
@@ -8383,7 +8487,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                             return n;
                           })}
                           onDraftChange={setSemCadastroDraft}
-                          extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]}
+                          extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={p.roomTipo?.[q]}
                             onChange={(v) => mudaPeriodo(pi, (o) => ({ ...o, roomTipo: { ...(o.roomTipo || {}), [q]: v }, tipoManual: { ...(o.tipoManual || {}), [q]: !!v } }))} />} />
                       </div>
                     </div>
@@ -8428,13 +8532,13 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                     value={p.roomHospedesOrc?.[q] || []}
                     onChange={(v) => setHosp('roomHospedesOrc', v)}
                     onDraftChange={setSemCadastroDraft}
-                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
+                    extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
                 ) : (
                   <RoomHospedesPicker key={`${pi}_${q}`} lista
                     value={p.roomHospedes?.[q] || []}
                     onChange={(v) => setHosp('roomHospedes', v)}
                     empresaMode={hospEmpresa}
-                    extra={<TipoHospedagemSelect compacto vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
+                    extra={<TipoHospedagemSelect compacto opcoes={tiposDoQuarto(categorias, q)} vazio={tr('Selecionar')} value={p.roomTipo?.[q]} onChange={setTipoQ} />} />
                 )}
               </>
             );
@@ -8567,7 +8671,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
 
                   <div className={styles.nrRsGrade}>
                     <div><span>{tr('Apartamento')}</span><b>{tr('Apt.')} {fmtRoom(parseInt(q))}</b></div>
-                    <div><span>{tr('Hospedagem')}</span><b>{TIPO_HOSPEDAGEM_LABEL[quartosTipo[q]] ?? '—'}</b></div>
+                    <div><span>{tr('Hospedagem')}</span><b>{rotuloTipo(quartosTipo[q])}</b></div>
                     <div><span>{tr('Tipo')}</span><b>{forcePernoite ? tr('Pernoite') : tr('Reserva simples')}</b></div>
                     <div><span>{tr('Grupo')}</span><b>{grupoNome}</b></div>
                   </div>
@@ -8594,8 +8698,15 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   <div>
                     <div className={styles.nrRsLinha}>
                       <span>{tr('Diárias')}</span>
-                      <span>{carregando ? sk(96) : iguais ? `${valores.length} × ${fmtBRL(valores[0])}` : fmtBRL(base)}</span>
+                      <span>{carregando ? sk(96) : (() => {
+                        const antes = det.map((d) => (d.valor_final ?? 0) - (d.sazonalidade && Math.abs(d.acrescimo_sazonalidade ?? 0) >= 0.005 ? d.acrescimo_sazonalidade : 0));
+                        const temSaz = antes.some((v, i) => Math.abs(v - valores[i]) >= 0.005);
+                        const antesIguais = antes.every((v) => Math.abs(v - antes[0]) < 0.005);
+                        if (iguais) return <>{valores.length} × {temSaz && antesIguais && <s className={styles.rcDiariaOld}>{fmtBRL(antes[0])}</s>}{fmtBRL(valores[0])}</>;
+                        return <>{temSaz && <s className={styles.rcDiariaOld}>{fmtBRL(base - valores.reduce((a, v) => a + v, 0) + antes.reduce((a, v) => a + v, 0))}</s>}{fmtBRL(base)}</>;
+                      })()}</span>
                     </div>
+                    {!carregando && det.some((d) => d.sazonalidade) && <LinhasDiarias grupos={groupDiarias(det)} />}
                     {Math.abs(ajuste) >= 0.005 && (
                       <div className={styles.nrRsLinha}>
                         <span>{ajuste < 0 ? tr('Desconto') : tr('Acréscimo')}</span>
@@ -8710,7 +8821,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                       <div key={`${pr.ci}|${pr.co}`} className={styles.nrRsPerGrupo}>
                         {todosPer.length > 1 && <span className={styles.nrRsPerTit}>{fmtDiaMes(pr.ci)} → {fmtDiaMes(pr.co)} · {diariasTxt(diffDays(pr.ci, pr.co))}</span>}
                         {pr.itens.map((a) => {
-                          const tipoTxt = TIPO_HOSPEDAGEM_LABEL[a.tipoQ] ?? '—';
+                          const tipoTxt = rotuloTipo(a.tipoQ);
                           const adj = priceAdj[a.rKey];
                           const isDiariaAdj = adj?.mode === 'diaria';
                           const novoValor = isDiariaAdj ? Math.max(0, Math.round((Number(adj.value) || 0) * 100) / 100) : null;
@@ -8802,7 +8913,7 @@ export function CreateModal({ initialRoom, initialStart, initialEnd, initialAvai
                   nAd ? `${nAd} ${nAd === 1 ? tr('adulto') : tr('adultos')}` : '',
                   nCr ? `${nCr} ${nCr === 1 ? tr('criança') : tr('crianças')}` : '',
                 ].filter(Boolean).join(' + ') || tr('Sem hóspedes');
-                return { q, rKey, ci, co, calc: precosCalc[rKey], pessoasTxt, tipoTxt: TIPO_HOSPEDAGEM_LABEL[tipoDe(q, pi)] ?? '—' };
+                return { q, rKey, ci, co, calc: precosCalc[rKey], pessoasTxt, tipoTxt: rotuloTipo(tipoDe(q, pi)) };
               }));
               const blocos = Object.values(aptos.reduce((acc, a) => {
                 const k = `${a.ci}|${a.co}`;
@@ -9286,6 +9397,29 @@ export default function BookingCalendar() {
   const [selRoom,   setSelRoom]   = useState(null);
   const [selStart,  setSelStart]  = useState(null);
   const [selHover,  setSelHover]  = useState(null);
+  // Seleção múltipla: cada par de cliques (entrada → saída) vira um quarto/período da reserva em grupo.
+  const [multiSel,  setMultiSel]  = useState(false);
+  const [selAncora, setSelAncora] = useState(null);
+  const [multiAncora, setMultiAncora] = useState(null);
+  const sairMulti = () => { limparSel(); setSelecoes([]); setMultiSel(false); };
+  const [selecoes,  setSelecoes]  = useState([]); // [{ room, start, end }]
+  const limparSel = () => { setSelRoom(null); setSelStart(null); setSelHover(null); };
+  const alternarMulti = () => { limparSel(); setSelecoes([]); setMultiSel((v) => !v); };
+  const criarGrupoSelecao = () => {
+    if (selecoes.length < 2) return;
+    limparSel();
+    setCreateInit({ room: null, start: null, end: null, available: null, selecoes: [...selecoes] });
+    setShowCreateModal(true);
+  };
+  // Clique fora da gaveta da direita: fecha a de cima (o calendário ao fundo não recebe o clique).
+  const fecharGavetaPorFora = (e) => {
+    if (e.target !== e.currentTarget) return;
+    const topo = e.currentTarget.lastElementChild;
+    const sel = '.' + styles.rcCloseBtn;
+    const btn = topo?.querySelector(sel) ?? e.currentTarget.querySelector(sel);
+    if (btn) btn.click();
+    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  };
   const [dragState, setDragState] = useState(null);
   const [ghostDrag, setGhostDrag] = useState(null);
   const [notif,       setNotif]       = useState(null);
@@ -9339,6 +9473,7 @@ export default function BookingCalendar() {
               quartos,
               checkin:  c.hora_checkin  ?? c.checkin  ?? null,
               checkout: c.hora_checkout ?? c.checkout ?? null,
+              tipos:    tiposDaCategoria(c),
             };
           })
           .filter((c) => c.quartos.length > 0),
@@ -9368,7 +9503,9 @@ export default function BookingCalendar() {
     return out.filter((r) => r.dataInicio);
   };
 
-  const loadReservas = async () => {
+  // Só a troca de mês mostra o esqueleto; as demais recargas (WebSocket, ações) trocam os
+  // dados no lugar, sem desmontar a grade — o calendário não perde a posição de rolagem.
+  const loadReservas = async ({ esqueleto = false } = {}) => {
     // Uma chamada só: tudo que cruza o mês exibido e o seguinte (inclui quem entrou no mês anterior).
     const ano = viewDate.getFullYear();
     const mes = viewDate.getMonth();
@@ -9378,7 +9515,7 @@ export default function BookingCalendar() {
     const desdeSolicitadas = toBrDate(formatDate(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30)));
     const solicitadasReq = hospedagemApi.calendario({ status: 'RESERVA_SOLICITADA', inicio: desdeSolicitadas });
 
-    setLoading(true);
+    if (esqueleto) setLoading(true);
     try {
       const data = await hospedagemApi.calendario({ status: ['RESERVA_ATIVA', 'PERNOITE_ATIVO', 'PERNOITE_FINALIZADO'], inicio, fim });
       setReservas(flatAndNorm(data));
@@ -9422,7 +9559,7 @@ export default function BookingCalendar() {
     const nextAno = nextMonthDate.getFullYear();
 
     // Main calendar: RESERVA_ATIVA por mês/ano
-    loadReservas();
+    loadReservas({ esqueleto: true });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewDate.getMonth(), viewDate.getFullYear()]);
 
@@ -9595,15 +9732,24 @@ export default function BookingCalendar() {
     if (dragState) return;
     if (dateStr < todayStr) return;
     if (selRoom === room && selStart !== null) {
-      if (dateStr === selStart) { setSelRoom(null); setSelStart(null); setSelHover(null); return; }
+      if (dateStr === selStart) { limparSel(); return; }
       const start = dateStr < selStart ? dateStr : selStart;
       const end   = dateStr < selStart ? selStart : dateStr;
+      if (multiSel) {
+        if (selecoes.some((x) => x.room === room && x.start < end && x.end > start)) {
+          notify(tr('Esse período se sobrepõe a outra seleção do mesmo apartamento.'), 'error');
+        } else {
+          setSelecoes((p) => [...p, { room, start, end }]);
+        }
+        limparSel(); return;
+      }
       setCreateInit({ room, start, end, available: null });
       setShowCreateModal(true);
       setSelRoom(null); setSelStart(null); setSelHover(null); return;
     }
     const occupied = filteredReservas.some((r) => r.quarto === room && r.dataInicio <= dateStr && r.dataFim > dateStr);
     if (occupied) return;
+    if (multiSel && selecoes.some((x) => x.room === room && dateStr >= x.start && dateStr <= x.end)) return;
     setSelRoom(room); setSelStart(dateStr); setSelHover(dateStr);
   };
 
@@ -9620,6 +9766,7 @@ export default function BookingCalendar() {
   };
 
   const isCellSelected = (room, dateStr) => {
+    if (multiSel && selecoes.some((x) => x.room === room && dateStr >= x.start && dateStr <= x.end)) return true;
     if (selRoom !== room || !selStart) return false;
     const hov = selHover || selStart;
     const lo  = selStart < hov ? selStart : hov;
@@ -9731,20 +9878,16 @@ export default function BookingCalendar() {
         .map(normalizeReserva)
         .filter((r) => r.dataInicio);
       if (novas.length > 0) {
-        setReservas((rs) => [...rs, ...novas]);
-        // leva o calendário até a nova reserva e a destaca por alguns segundos
-        const prim = [...novas].sort((a, b) => a.dataInicio.localeCompare(b.dataInicio))[0];
-        const cat  = categorias.find((c) => c.quartos.includes(prim.quarto));
-        if (cat) setCollapsedCats((prev) => ({ ...prev, [cat.id]: false }));
-        const d = new Date(prim.dataInicio + 'T00:00:00');
-        d.setDate(d.getDate() - 1);
-        setViewDate(d);
+        // Entra no lugar, sem recarregar nem mover o calendário; a faixa nova pisca para sinalizar.
+        setReservas((rs) => [...rs.filter((r) => !novas.some((n) => n.id === r.id)), ...novas]);
+        const cats = new Set(novas.map((n) => categorias.find((c) => c.quartos.includes(n.quarto))?.id).filter((x) => x != null));
+        if (cats.size) setCollapsedCats((prev) => { const n = { ...prev }; cats.forEach((id) => { n[id] = false; }); return n; });
         setNovasIds(new Set(novas.map((n) => n.id)));
-        setFocoNova({ quarto: prim.quarto, t: Date.now() });
-        setTimeout(() => setNovasIds(new Set()), 5000);
+        setTimeout(() => setNovasIds(new Set()), 6000);
       } else {
         await loadReservas();
       }
+      if (multiSel) { setMultiSel(false); setSelecoes([]); }
       const msgCriada = novas.length > 1 ? tr('{{length}} reservas criadas!', { length: novas.length }) : tr('Reserva criada!');
       notify(msgCriada);
       setShowCreateModal(false);
@@ -10316,9 +10459,9 @@ export default function BookingCalendar() {
             {isDesktop && (
               <div className={styles.hdrServicos}>
                 {[
-                  { k: 'grupos', ic: <Users size={16} />,    rot: tr('Grupos'),       sub: tr('Reservas em grupo e pagamentos'),  on: () => { setGrupoInicial(null); setShowGrupos(true); } },
+                  { k: 'multi', ic: <CopyPlus size={16} />, rot: tr('Seleção múltipla'), sub: tr('Selecione entrada e saída em vários apartamentos para criar uma reserva em grupo'), on: alternarMulti, ativo: multiSel },
                 ].map((s) => (
-                  <button key={s.k} type="button" className={[styles.hdrServico, styles["hdrServico_" + s.k]].join(" ")} onClick={s.on} title={s.sub}>
+                  <button key={s.k} type="button" className={[styles.hdrServico, styles["hdrServico_" + s.k], s.ativo ? styles.hdrServicoOn : ''].join(" ")} onClick={s.on} title={s.sub} aria-pressed={!!s.ativo}>
                     {s.ic}
                     <span>{s.rot}</span>
                     {s.n > 0 && <SinoContagem n={s.n} />}
@@ -10331,11 +10474,47 @@ export default function BookingCalendar() {
         </div>
 
         {/* Selection hint */}
-        {selStart && (
-          <div className={styles.selHint}>
-            <span>{tr('Apartamento')} <strong>{fmtRoom(selRoom)}</strong> {tr('· a partir de')} <strong>{selStart}</strong> {tr('— clique outra data para definir fim')}</span>
-            <button className={styles.selHintClose} onClick={() => { setSelRoom(null); setSelStart(null); setSelHover(null); }}><X size={12} /></button>
+        {selStart && !showCreateModal && !selectedReserva && (
+          <BalaoCelula anchor={selAncora}>
+            <p className={styles.balaoMsg}>
+              {tr('Apartamento')} <b>{fmtRoom(selRoom)}</b> · {tr('a partir de')} <b>{fmtDateBR(selStart)}</b>
+              <br />{tr('Clique em outra data para definir a saída.')}
+            </p>
+          </BalaoCelula>
+        )}
+        {multiSel && selecoes.length === 0 && !selStart && (
+          <div className={[styles.selHint, styles.selHintMulti].join(' ')}>
+            <CopyPlus size={15} className={styles.selHintIco} aria-hidden="true" />
+            <span><strong>{tr('Seleção múltipla')}</strong> <span className={styles.selHintSub}>{tr('Clique na entrada e na saída de cada apartamento')}</span></span>
+            <button type="button" className={styles.selHintCancelar} title={tr('Sair da seleção múltipla')} onClick={sairMulti}>{tr('Cancelar')}</button>
           </div>
+        )}
+        {multiSel && selecoes.length > 0 && !selStart && !showCreateModal && !selectedReserva && (
+          <BalaoCelula anchor={multiAncora} interativo>
+            <p className={styles.balaoMsg}>
+              <b>{tr('Seleção múltipla')}</b> · {selecoes.length === 1 ? tr('1 apartamento selecionado') : tr('{{n}} apartamentos selecionados', { n: selecoes.length })}
+              {selecoes.length < 2 && <><br />{tr('Selecione pelo menos mais um.')}</>}
+            </p>
+            {(() => {
+              const porPeriodo = [];
+              selecoes.forEach((x) => {
+                const p = porPeriodo.find((y) => y.start === x.start && y.end === x.end);
+                if (p) p.n += 1; else porPeriodo.push({ start: x.start, end: x.end, n: 1 });
+              });
+              porPeriodo.sort((a, b) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end));
+              return (
+                <ul className={styles.balaoPeriodos}>
+                  {porPeriodo.map((p) => (
+                    <li key={p.start + p.end}>
+                      <span>{fmtDiaMes(p.start)} → {fmtDiaMes(p.end)} · {diariasTxt(diffDays(p.start, p.end))}</span>
+                      {porPeriodo.length > 1 && <b>{p.n === 1 ? tr('1 apto') : tr('{{n}} aptos', { n: p.n })}</b>}
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+            <BalaoAcoes onCancelar={sairMulti} confirmar={tr('Criar grupo')} disabled={selecoes.length < 2} onConfirmar={criarGrupoSelecao} />
+          </BalaoCelula>
         )}
 
         {visao === 'mes' ? (
@@ -10423,12 +10602,24 @@ export default function BookingCalendar() {
                             const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                             const isToday   = dStr === todayStr;
                             const isSel     = isCellSelected(room, dStr);
+                            const selIni    = selRoom === room && selStart === dStr;
+                            const multiIdx  = multiSel ? selecoes.findIndex((x) => x.room === room && x.start === dStr) : -1;
                             return (
                               <div key={idx}
-                                className={[styles.cell, isWeekend ? styles.cellWeekend : '', isToday ? styles.cellToday : '', isSel ? styles.cellSelected : '', dStr < todayStr ? styles.cellPassado : styles.cellClickable].join(' ')}
+                                className={[styles.cell, isWeekend ? styles.cellWeekend : '', isToday ? styles.cellToday : '', isSel ? styles.cellSelected : '', (selIni || multiIdx >= 0) ? styles.cellSelIni : '', dStr < todayStr ? styles.cellPassado : styles.cellClickable].join(' ')}
                                 style={{ width: DAY_CELL_W, height: ROOM_H, flexShrink: 0 }}
                                 onClick={() => handleCellClick(room, dStr)}
-                              />
+                              >
+                                {selIni && <span ref={setSelAncora} className={styles.selAncora} aria-hidden="true" />}
+                                {multiSel && selecoes.length > 0 && selecoes[selecoes.length - 1].room === room && selecoes[selecoes.length - 1].end === dStr && <span ref={setMultiAncora} className={styles.selAncora} aria-hidden="true" />}
+                                {(selIni || multiIdx >= 0) && (
+                                  <button type="button" className={styles.cellCancelar}
+                                    title={tr('Cancelar seleção')} aria-label={tr('Cancelar seleção')}
+                                    onClick={(e) => { e.stopPropagation(); if (selIni) limparSel(); else setSelecoes((p) => p.filter((_, i) => i !== multiIdx)); }}>
+                                    {tr('Cancelar')}
+                                  </button>
+                                )}
+                              </div>
                             );
                           })}
                           <div className={styles.barsLayer}>{renderBars(room)}</div>
@@ -10446,7 +10637,7 @@ export default function BookingCalendar() {
 
       </div>
 
-      <div ref={setSlotDir} className={styles.slotDireita} />
+      <div ref={setSlotDir} className={[styles.slotDireita, styles.slotFechaFora].join(" ")} onMouseDown={fecharGavetaPorFora} />
       </div>
       </div>
       {/* Modals */}
@@ -10454,7 +10645,7 @@ export default function BookingCalendar() {
       {showCreateModal && (
         <CreateModal initialRoom={createInit.room} initialStart={createInit.start} initialEnd={createInit.end} initialAvailable={createInit.available}
           reservas={allReservas} onClose={() => setShowCreateModal(false)} onSave={handleSaveNew} onNotify={notify} categorias={categorias} tiposPagamento={tiposPagamento} roomDescMap={roomDescMap}
-          initialGrupo={createInit.grupo ?? null} />
+          initialGrupo={createInit.grupo ?? null} initialSelecoes={createInit.selecoes ?? null} />
       )}
       {confirmarSol && (
         <CreateModal confirmar={confirmarSol}
@@ -10719,4 +10910,4 @@ export default function BookingCalendar() {
 }
 
 // Recepção e outras telas montam as gavetas na mesma área da direita do calendário.
-export { styles as calendarStyles, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma };
+export { styles as calendarStyles, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma, tiposDaCategoria };

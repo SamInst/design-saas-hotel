@@ -43,8 +43,10 @@ function catFromBackend(cat) {
   const isFixo   = baseFixo.length > 0;
 
   const precosOcupacao = {};
-  baseOcc.forEach(m => { precosOcupacao[m.quantidade] = m.valor; });
-  const maxPessoas = baseOcc.length ? Math.max(...baseOcc.map(m => m.quantidade)) : 5;
+  baseOcc.forEach(m => { if (m.quantidade != null) precosOcupacao[m.quantidade] = m.valor; });
+  const capacidades = baseOcc.map(m => m.quantidade).filter((q) => q != null);
+  const maxPessoas = capacidades.length ? Math.max(...capacidades) : 5;
+  const tiposPreco = tiposFromModelos(baseOcc);
 
   const baseDu = (cat.day_use ?? []).find(d => !d.sazonalidade);
   const du = baseDu ? {
@@ -95,6 +97,7 @@ function catFromBackend(cat) {
     modeloCobranca: isFixo ? 'Por quarto (tarifa fixa)' : 'Por ocupação',
     precoFixo:      isFixo ? baseFixo[0].valor : null,
     precosOcupacao,
+    tiposPreco,
     dayUse: du,
     quartosObj:     (cat.quartos     ?? []),
     quartos:        (cat.quartos     ?? []).map(q => q.id),
@@ -141,8 +144,10 @@ function seaFromBackend(s) {
   const isFixo   = baseFixo.length > 0;
 
   const precosOcupacao = {};
-  baseOcc.forEach((m) => { precosOcupacao[m.quantidade] = m.valor; });
-  const maxPessoas = baseOcc.length ? Math.max(...baseOcc.map((m) => m.quantidade)) : 5;
+  baseOcc.forEach((m) => { if (m.quantidade != null) precosOcupacao[m.quantidade] = m.valor; });
+  const capacidades = baseOcc.map((m) => m.quantidade).filter((q) => q != null);
+  const maxPessoas = capacidades.length ? Math.max(...capacidades) : 5;
+  const tiposPreco = tiposFromModelos(baseOcc);
 
   // ── Day Use ──────────────────────────────────────────────────────────────────
   const baseDu = (s.day_use ?? [])[0] ?? null;
@@ -197,6 +202,7 @@ function seaFromBackend(s) {
     modeloCobranca:  isFixo ? 'Por quarto (tarifa fixa)' : 'Por ocupação',
     precoFixo:       isFixo ? baseFixo[0].valor : null,
     precosOcupacao,
+    tiposPreco,
     maxPessoas,
     dayUse:          du,
     criancas,
@@ -272,7 +278,7 @@ const blankCat = () => ({
   nome: '', descricao: '', maxPessoas: 5,
   hora_checkin: '14:00', hora_checkout: '12:00',
   modeloCobranca: 'Por ocupação',
-  precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' },
+  precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, tiposPreco: tiposParaForm([]),
   quartos: [], sazonaisAtivas: [],
   dayUse: { ativo: false, modo: 'padrao', precoFixo: '', horasBase: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
   criancas: blankCriancas(),
@@ -286,7 +292,7 @@ const blankSea = () => ({
   horaCheckin: '14:00', horaCheckout: '12:00',
   diasSemana: [], diasMes: [], meses: [],
   modeloCobranca: 'Por ocupação', maxPessoas: 5,
-  precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' },
+  precoFixo: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, tiposPreco: tiposParaForm([]),
   dayUse: { ativo: false, modo: 'padrao', precoFixo: '', horasBase: '', precoAdicional: '', precosOcupacao: { 1: '', 2: '', 3: '', 4: '', 5: '' }, horaAdicionalPorPessoa: '' },
   criancas: blankCriancas(),
   categoriasIds: [],
@@ -298,11 +304,57 @@ function normOcc(occ, max) {
   return n;
 }
 
+// ── Preço por tipo de hospedagem ──────────────────────────────────────────────
+// Os básicos aparecem sempre; o hotel pode criar tipos com nome livre (ex.: "Família 8 pessoas").
+const TIPOS_BASICOS = [
+  ['INDIVIDUAL', tr('Individual'), 1], ['CASAL', tr('Casal'), 2], ['DUPLO', tr('Duplo'), 2],
+  ['TRIPLO', tr('Triplo'), 3], ['QUADRUPLO', tr('Quádruplo'), 4], ['QUINTUPLO', tr('Quíntuplo'), 5],
+  ['SEXTUPLO', tr('Sêxtuplo'), 6],
+];
+const CODIGOS_BASICOS = new Set(TIPOS_BASICOS.map(([c]) => c));
+// Linhas antigas (preço por quantidade de pessoas) ainda sem tipo.
+const TIPO_POR_QTD = { 1: 'INDIVIDUAL', 2: 'DUPLO', 3: 'TRIPLO', 4: 'QUADRUPLO', 5: 'QUINTUPLO', 6: 'SEXTUPLO' };
+const rotuloTipoPreco = (t) => TIPOS_BASICOS.find(([c]) => c === t)?.[1] ?? t;
+const mascaraValor = (v) => (v != null && v !== '' ? maskBRL(String(Math.round(Number(v) * 100))) : '');
+
+/** modelos_ocupacao do back-end → [{ tipo, quantidade, valor }] (valores numéricos). */
+function tiposFromModelos(modelos) {
+  return (modelos ?? []).map((m) => ({
+    tipo: m.tipo ?? TIPO_POR_QTD[m.quantidade] ?? tr('{{n}} pessoas', { n: m.quantidade }),
+    quantidade: m.quantidade ?? null,
+    valor: m.valor,
+  }));
+}
+
+/** Linhas do formulário: os 7 básicos (vazios quando sem preço) + os tipos livres. */
+function tiposParaForm(lista) {
+  const basicos = TIPOS_BASICOS.map(([codigo, , capacidade]) => {
+    const m = (lista ?? []).find((x) => x.tipo === codigo);
+    return { tipo: codigo, quantidade: capacidade, valor: m ? mascaraValor(m.valor) : '', livre: false };
+  });
+  const livres = (lista ?? [])
+    .filter((x) => !CODIGOS_BASICOS.has(x.tipo))
+    .map((x) => ({ tipo: x.tipo, quantidade: x.quantidade ?? '', valor: mascaraValor(x.valor), livre: true }));
+  return [...basicos, ...livres];
+}
+
+/** Só os tipos com valor vão para o back-end. */
+function tiposPayload(rows) {
+  return (rows ?? [])
+    .filter((r) => r.valor && (!r.livre || r.tipo.trim()))
+    .map((r) => ({
+      tipo: r.livre ? r.tipo.trim() : r.tipo,
+      quantidade: r.quantidade === '' || r.quantidade == null ? null : Number(r.quantidade),
+      valor: parseBRL(r.valor),
+    }));
+}
+const temTipoComValor = (rows) => (rows ?? []).some((r) => r.valor && (!r.livre || r.tipo.trim()));
+
 // ── Validation ────────────────────────────────────────────────────────────────
 function isCatValid(f) {
   if (!f.nome.trim()) return false;
   if (f.modeloCobranca === 'Por quarto (tarifa fixa)') return !!f.precoFixo;
-  return !!f.precosOcupacao[1]; // ao menos 1 pessoa preenchida
+  return temTipoComValor(f.tiposPreco); // ao menos um tipo com valor
 }
 
 function isSeaValid(f) {
@@ -323,7 +375,7 @@ function isSeaValid(f) {
     default: break;
   }
   if (f.modeloCobranca === 'Por quarto (tarifa fixa)') return !!f.precoFixo;
-  return !!f.precosOcupacao[1];
+  return temTipoComValor(f.tiposPreco);
 }
 
 // ── Resumo curto do agendamento — cabe no subtítulo da lista ─────────────────
@@ -395,6 +447,67 @@ function OccTable({ label, occ, maxPessoas }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+/** Tabela de leitura: tipo de hospedagem e preço da noite. */
+function TiposTable({ label, tipos }) {
+  const lista = tiposParaForm((tipos ?? []).map((t) => ({ ...t, valor: t.valor })))
+    .filter((r) => r.valor);
+  return (
+    <table className={styles.miniTable}>
+      <thead><tr><th>{tr('Tipo de hospedagem')}</th><th>{label}</th></tr></thead>
+      <tbody>
+        {lista.length === 0 && <tr><td colSpan={2}>—</td></tr>}
+        {lista.map((r) => (
+          <tr key={r.tipo}>
+            <td>{rotuloTipoPreco(r.tipo)}{r.livre && r.quantidade ? ` · ${r.quantidade} ${Number(r.quantidade) === 1 ? tr('pessoa') : tr('pessoas')}` : ''}</td>
+            <td className={styles.miniPrice}>{r.valor}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Edição: um campo de valor por tipo básico e linhas livres (nome, capacidade, valor). */
+function TiposInputs({ rows, onChange }) {
+  const muda = (i, campo, v) => onChange(rows.map((r, j) => (j === i ? { ...r, [campo]: v } : r)));
+  const remove = (i) => onChange(rows.filter((_, j) => j !== i));
+  const adiciona = () => onChange([...rows, { tipo: '', quantidade: '', valor: '', livre: true }]);
+  return (
+    <>
+      <div className={styles.inputGrid}>
+        {rows.map((r, i) => !r.livre && (
+          <div key={r.tipo} className={styles.fieldCard}>
+            <span className={styles.fieldCardLabel}>{rotuloTipoPreco(r.tipo)}</span>
+            <Input placeholder={tr('R$ 0,00')} value={r.valor} onChange={(e) => muda(i, 'valor', maskBRL(e.target.value))} />
+          </div>
+        ))}
+      </div>
+      {rows.some((r) => r.livre) && (
+        <>
+          <div className={styles.sectionTitle}>{tr('Outros tipos')}</div>
+          <div className={styles.tiposLivres}>
+            {rows.map((r, i) => r.livre && (
+              <div key={i} className={styles.tipoLivre}>
+                <Input placeholder={tr('Descrição (ex.: Família 8 pessoas)')} value={r.tipo} maxLength={80}
+                  onChange={(e) => muda(i, 'tipo', e.target.value)} />
+                <Input type="number" min="1" placeholder={tr('Pessoas')} value={r.quantidade}
+                  onChange={(e) => muda(i, 'quantidade', e.target.value)} aria-label={tr('Capacidade (opcional)')} />
+                <Input placeholder={tr('R$ 0,00')} value={r.valor} onChange={(e) => muda(i, 'valor', maskBRL(e.target.value))} />
+                <button type="button" className={styles.childRemoveBtn} onClick={() => remove(i)} aria-label={tr('Remover tipo')}>
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      <Button className={[styles.btnSolid, styles.btnAdd].join(' ')} onClick={adiciona}>
+        <Plus size={13} /> {tr('Adicionar tipo')}
+      </Button>
+    </>
   );
 }
 
@@ -532,8 +645,8 @@ function PricingFields({ form, setField, setOcc }) {
       </div>
       {modelo !== 'Por quarto (tarifa fixa)' && (
         <>
-          <div className={styles.sectionTitle}>{tr('Preço por número de hóspedes *')}</div>
-          <OccInputs occ={occ} maxPessoas={maxPessoas} onChange={(q, v) => setOcc(q, v)} />
+          <div className={styles.sectionTitle}>{tr('Preço por tipo de hospedagem *')}</div>
+          <TiposInputs rows={form.tiposPreco ?? tiposParaForm([])} onChange={(rows) => setField('tiposPreco', rows)} />
         </>
       )}
     </>
@@ -972,6 +1085,7 @@ export default function PricingManagement() {
       modeloCobranca: cat.modeloCobranca,
       precoFixo:      cat.precoFixo != null ? maskBRL(String(Math.round(cat.precoFixo * 100))) : '',
       precosOcupacao: Object.fromEntries(Object.entries(occ).map(([k, v]) => [k, v != null ? maskBRL(String(Math.round(v * 100))) : ''])),
+      tiposPreco:     tiposParaForm(cat.tiposPreco),
       quartos:        cat.quartos ?? [],
       sazonaisAtivas: cat.sazonaisAtivas ?? [],
       criancas: cat.criancas ? {
@@ -1019,11 +1133,8 @@ export default function PricingManagement() {
       const isFixo = f.modeloCobranca === 'Por quarto (tarifa fixa)';
       const maxPax = Number(f.maxPessoas) || 5;
 
-      const modelos_ocupacao = isFixo ? [] :
-        Array.from({ length: maxPax }, (_, i) => ({
-          quantidade: i + 1,
-          valor: parseBRL(f.precosOcupacao[i + 1] ?? ''),
-        }));
+      void maxPax;
+      const modelos_ocupacao = isFixo ? [] : tiposPayload(f.tiposPreco);
 
       const modelos_fixo = isFixo ? [{ valor: parseBRL(f.precoFixo) }] : [];
 
@@ -1123,6 +1234,7 @@ export default function PricingManagement() {
       modeloCobranca:  s.modeloCobranca, maxPessoas: s.maxPessoas,
       precoFixo:       s.precoFixo != null ? maskBRL(String(Math.round(s.precoFixo * 100))) : '',
       precosOcupacao:  Object.fromEntries(Object.entries(occ).map(([k, v]) => [k, v != null ? maskBRL(String(Math.round(v * 100))) : ''])),
+      tiposPreco:      tiposParaForm(s.tiposPreco),
       dayUse: {
         ativo:                du.ativo ?? false, modo: du.modo ?? 'padrao',
         precoFixo:            du.precoFixo != null ? maskBRL(String(Math.round(du.precoFixo * 100))) : '',
@@ -1166,6 +1278,7 @@ export default function PricingManagement() {
       modeloCobranca: cat.modeloCobranca,
       maxPessoas:     max,
       precoFixo:      cat.precoFixo != null ? maskBRL(String(Math.round(cat.precoFixo * 100))) : '',
+      tiposPreco:     tiposParaForm(cat.tiposPreco),
       precosOcupacao: Object.fromEntries(
         Array.from({ length: max }, (_, i) => i + 1).map((k) => [
           k, cat.precosOcupacao?.[k] != null ? maskBRL(String(Math.round(cat.precosOcupacao[k] * 100))) : '',
@@ -1223,11 +1336,8 @@ export default function PricingManagement() {
       }
 
       // ── Pricing ─────────────────────────────────────────────────────────────
-      const modelos_ocupacao = isFixo ? [] :
-        Array.from({ length: maxPax }, (_, i) => ({
-          quantidade: i + 1,
-          valor: parseBRL(f.precosOcupacao[i + 1] ?? ''),
-        }));
+      void maxPax;
+      const modelos_ocupacao = isFixo ? [] : tiposPayload(f.tiposPreco);
       const modelos_fixo = isFixo ? [{ valor: parseBRL(f.precoFixo) }] : [];
 
       // ── Day Use ─────────────────────────────────────────────────────────────
@@ -1339,7 +1449,7 @@ export default function PricingManagement() {
         </div>
         {fixo
           ? <Field label={tr('Tarifa fixa')} value={fmtBRL(item.precoFixo)} lg />
-          : <OccTable label={tr('Preço/noite')} occ={item.precosOcupacao} maxPessoas={item.maxPessoas} />}
+          : <TiposTable label={tr('Preço/noite')} tipos={item.tiposPreco} />}
       </>
     );
   };

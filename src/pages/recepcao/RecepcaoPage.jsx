@@ -23,10 +23,10 @@ import {
   HOSPEDES_CADASTRADOS, DAY_USE_PRICING, STAY_PRICING,
   calcPrecoDiaria, diffDays, CATEGORIAS_CONSUMO,
 } from './shared/overviewApi';
-import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi } from '../../services/api';
+import { cadastroApi, reservaApi, funcionarioApi, itemApi, quartoApi, recepcaoApi, hospedagemApi, enumApi, quartoCategoriApi } from '../../services/api';
 import { gerarVoucherHospedagem } from './shared/gerarVoucherHospedagem';
 import { gerarVoucherReserva } from '../calendar/gerarVoucherReserva';
-import { ReservaModal, normalizeReserva, CreateModal, calendarStyles as cal, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma } from '../calendar/BookingCalendar';
+import { ReservaModal, normalizeReserva, CreateModal, calendarStyles as cal, JanelaDirCtx, JanelaCtx, rotuloHospedagemTipo, rotuloReservaTipo, BalaoConfirma, tiposDaCategoria } from '../calendar/BookingCalendar';
 import styles from './recepcao.module.css';
 import NovoServicoModal     from './quartos/modals/NovoServicoModal';
 import TrocaQuartoModal     from './quartos/modals/TrocaQuartoModal';
@@ -938,14 +938,26 @@ export default function RecepcaoPage() {
   }, [quartos]);
 
   // Categorias com a lista de quartos (formato exigido pelo ReservaModal em modo reserva).
+  // Tipos de hospedagem com preço em cada categoria (o select da criação mostra só esses).
+  const [tiposPorCategoria, setTiposPorCategoria] = useState({});
+  useEffect(() => {
+    let vivo = true;
+    quartoCategoriApi.listar({ size: 900 })
+      .then((res) => {
+        const lista = Array.isArray(res) ? res : (res?.content ?? []);
+        if (vivo) setTiposPorCategoria(Object.fromEntries(lista.map((c) => [c.id, tiposDaCategoria(c)])));
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
   const categoriasFull = useMemo(() => {
     const m = new Map();
     quartos.forEach((q) => {
-      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, checkin: q.categoriaCheckin ?? null, checkout: q.categoriaCheckout ?? null, quartos: [] });
+      if (!m.has(q.categoriaId)) m.set(q.categoriaId, { id: q.categoriaId, nome: q.categoria, checkin: q.categoriaCheckin ?? null, checkout: q.categoriaCheckout ?? null, quartos: [], tipos: tiposPorCategoria[q.categoriaId] ?? [] });
       m.get(q.categoriaId).quartos.push(q.id);
     });
     return [...m.values()];
-  }, [quartos]);
+  }, [quartos, tiposPorCategoria]);
   const roomDescMapFull = useMemo(() => {
     const d = {};
     quartos.forEach((q) => { d[q.id] = q.tipoOcupacao ?? q.descricao ?? ''; });

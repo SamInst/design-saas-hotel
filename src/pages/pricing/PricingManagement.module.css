@@ -719,3 +719,11 @@
   --l-slate-bg: oklch(0.324 0.006 286);
   --l-slate-fg: oklch(0.78 0.006 286);
 }
+
+/* Tipos de hospedagem livres: descrição, capacidade (opcional) e valor */
+.tiposLivres { display: flex; flex-direction: column; gap: 8px; }
+.tipoLivre { display: grid; grid-template-columns: minmax(0, 1fr) 96px 140px auto; align-items: center; gap: 8px; }
+@media (max-width: 560px) {
+  .tipoLivre { grid-template-columns: minmax(0, 1fr) 80px; }
+  .tipoLivre > :first-child { grid-column: 1 / -1; }
+}
