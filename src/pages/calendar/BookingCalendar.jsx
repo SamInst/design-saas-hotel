@@ -574,23 +574,11 @@ const tiposDoQuarto = (categorias, q) =>
   (categorias ?? []).find((c) => (c.quartos ?? []).map(String).includes(String(q)))?.tipos ?? [];
 const PESSOAS_POR_TIPO = { INDIVIDUAL: 1, CASAL: 2, DUPLO: 2, TRIPLO: 3, QUADRUPLO: 4, QUINTUPLO: 5, SEXTUPLO: 6 };
 const TIPO_POR_PESSOAS = [null, 'INDIVIDUAL', 'DUPLO', 'TRIPLO', 'QUADRUPLO', 'QUINTUPLO', 'SEXTUPLO'];
-// Rótulo do ticket: o tipo gravado na reserva ou, sem ele, o sugerido pelo número de pessoas.
-const RESERVA_POR_TIPO = {
-  INDIVIDUAL: tr('Reserva Individual'), CASAL: tr('Reserva Casal'), DUPLO: tr('Reserva Dupla'), TRIPLO: tr('Reserva Tripla'),
-  QUADRUPLO: tr('Reserva Quádrupla'), QUINTUPLO: tr('Reserva Quíntupla'), SEXTUPLO: tr('Reserva Sêxtupla'),
-};
-const HOSP_POR_TIPO = {
-  INDIVIDUAL: tr('Hospedagem Individual'), CASAL: tr('Hospedagem Casal'), DUPLO: tr('Hospedagem Dupla'), TRIPLO: tr('Hospedagem Tripla'),
-  QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
-};
-const rotuloReservaTipo = (tipo, pessoas) =>
-  RESERVA_POR_TIPO[tipo] ?? (tipo ? tr('Reserva {{tipo}}', { tipo }) : null) ?? RESERVA_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Reserva Individual');
-const HOSPEDAGEM_POR_TIPO = {
-  INDIVIDUAL: tr('Hospedagem Individual'), CASAL: tr('Hospedagem Casal'), DUPLO: tr('Hospedagem Dupla'), TRIPLO: tr('Hospedagem Tripla'),
-  QUADRUPLO: tr('Hospedagem Quádrupla'), QUINTUPLO: tr('Hospedagem Quíntupla'), SEXTUPLO: tr('Hospedagem Sêxtupla'),
-};
-const rotuloHospedagemTipo = (tipo, pessoas) =>
-  HOSPEDAGEM_POR_TIPO[tipo] ?? (tipo ? tr('Hospedagem {{tipo}}', { tipo }) : null) ?? HOSPEDAGEM_POR_TIPO[TIPO_POR_PESSOAS[Math.min(pessoas, TIPO_POR_PESSOAS.length - 1)]] ?? tr('Hospedagem Individual');
+// Rótulo do ticket: o tipo gravado ou, sem ele, o sugerido pelo número de pessoas (em maiúsculas).
+const rotuloTipoUpper = (tipo, pessoas) =>
+  rotuloTipo(tipo || TIPO_POR_PESSOAS[Math.min(Math.max(pessoas || 1, 1), TIPO_POR_PESSOAS.length - 1)]).toUpperCase();
+const rotuloReservaTipo = rotuloTipoUpper;
+const rotuloHospedagemTipo = rotuloTipoUpper;
 const sugerirTipo = (n) => (n > 0 ? TIPO_POR_PESSOAS[Math.min(n, 6)] : undefined);
 
 /** Tipos com preço base na categoria (linhas antigas sem tipo viram o tipo da capacidade). */
@@ -6214,8 +6202,8 @@ function OrcamentosModal({ onClose, categorias = [], tiposPagamento = [], reserv
                                     <div className={styles.grpFinApto}>
                                       <span>{(() => {
                                         const tp = h.tipo_hospedagem || TIPO_POR_PESSOAS[np] || null;
-                                        if (qid(h)) return <>{tr('Apt.')} {fmtRoom(qid(h))}{tp ? ` · ${rotuloTipo(tp)}` : ''}</>;
-                                        return HOSP_POR_TIPO[tp] ?? tr('Hospedagem');
+                                        if (qid(h)) return <>{tr('Apt.')} {fmtRoom(qid(h))}{tp ? ` · ${rotuloTipoUpper(tp)}` : ''}</>;
+                                        return tp ? rotuloTipoUpper(tp) : tr('Hospedagem');
                                       })()}</span>
                                       <b>{fmtBRL(h.valor_total ?? 0)}</b>
                                     </div>
