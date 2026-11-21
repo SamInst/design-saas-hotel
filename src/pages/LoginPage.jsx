@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { Eye, EyeOff, AlertCircle, KeyRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '../services/api';
+import { AnimatedSpinner } from '../components/ui/AnimatedSpinner';
 import styles from './LoginPage.module.css';
 
-// Fotos 4K (Unsplash) do carrossel de fundo — ordem = ordem de exibição.
 const SLIDES = Object.values(
   import.meta.glob('../assets/login/*.jpg', { eager: true, import: 'default' })
 );
@@ -16,8 +16,6 @@ const SLIDES_READY = Promise.all(SLIDES.map(src => {
   return img.decode().catch(() => {});
 }));
 
-// "+" da marca: duas barras arredondadas em gradiente dourado→terra,
-// com um brilho no cruzamento — lê como "mais" e como uma estrela/cruz de guia.
 function PlusMark({ className }) {
   return (
     <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
@@ -27,27 +25,22 @@ function PlusMark({ className }) {
           <stop offset="0.45" stopColor="#e3ac6b" />
           <stop offset="1"    stopColor="#c25a36" />
         </linearGradient>
-        <radialGradient id="plusGlow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="#fff6e6" stopOpacity="0.95" />
-          <stop offset="1" stopColor="#fff6e6" stopOpacity="0" />
-        </radialGradient>
       </defs>
       <rect x="39" y="8"  width="22" height="84" rx="11" fill="url(#plusGold)" />
       <rect x="8"  y="39" width="84" height="22" rx="11" fill="url(#plusGold)" />
-      <circle cx="50" cy="50" r="17" fill="url(#plusGlow)" />
     </svg>
   );
 }
 
 export default function LoginPage({ onLogin }) {
   const { t } = useTranslation();
+  const id = useId();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState('');
   const [slide,    setSlide]    = useState(0);
-
   const [ready,    setReady]    = useState(false);
 
   useEffect(() => {
@@ -58,8 +51,8 @@ export default function LoginPage({ onLogin }) {
 
   useEffect(() => {
     if (!ready) return;
-    const t = setInterval(() => setSlide(i => (i + 1) % SLIDES.length), SLIDE_MS);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setSlide(i => (i + 1) % SLIDES.length), SLIDE_MS);
+    return () => clearInterval(timer);
   }, [ready]);
 
   const handleSubmit = async (e) => {
@@ -100,58 +93,23 @@ export default function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className={styles.page}>
-
-      {/* ── BACKGROUND CAROUSEL ─────────────────────────────────────── */}
-      <div className={styles.carousel} aria-hidden="true">
-        {SLIDES.map((src, i) => (
-          <div
-            key={src}
-            className={`${styles.slide} ${i === slide ? styles.slideActive : ''}`}
-            style={{ backgroundImage: `url(${src})` }}
-          />
-        ))}
-        <div className={styles.shade} />
-        <div className={styles.grain} />
-      </div>
-
-      {/* ── IMMERSIVE STAGE ─────────────────────────────────────────── */}
-      <aside className={styles.stage} aria-hidden="true">
-        <div className={styles.stageBody}>
-          <span className={styles.kicker}>{t('login.kicker')}</span>
-          <h2 className={styles.wordmark}>
-            <PlusMark className={styles.plus} /><em>hospedagem</em>
-          </h2>
-          <p className={styles.features}>{t('login.features')}</p>
-          <div className={styles.dots}>
-            {SLIDES.map((src, i) => (
-              <span
-                key={src}
-                className={`${styles.dot} ${i === slide && ready ? styles.dotActive : ''}`}
-                style={i === slide ? { animationDuration: `${SLIDE_MS}ms` } : undefined}
-              />
-            ))}
-          </div>
-          {/*<p className={styles.lede}>*/}
-          {/*  Onde cada reserva vira uma estadia, e cada estadia, uma história*/}
-          {/*  à beira-mar.*/}
-          {/*</p>*/}
-        </div>
-      </aside>
-
-      {/* ── FORM ────────────────────────────────────────────────────── */}
-      <main className={styles.panel}>
-        <div className={styles.glass}>
-          <span className={styles.glassSheen} aria-hidden="true" />
-          <div className={styles.panelInner}>
-
-          <div className={styles.intro}>
+    <main className={styles.page} aria-label={t('login.submit')}>
+      <section className={styles.formSide}>
+        <div className={`${styles.formWrap} ${loading ? styles.isLoading : ''}`} aria-busy={loading}>
+          <div className={styles.collapse}>
+          <div className={styles.collapseInner}>
+          <div className={styles.head}>
+            <div className={styles.badge}>
+              <span className={styles.badgeGlow} aria-hidden="true" />
+              <span className={styles.badgeCore}>
+                <KeyRound size={22} strokeWidth={1.8} aria-hidden="true" />
+              </span>
+            </div>
             <h1 className={styles.title}>{t('login.welcome')}</h1>
-            {/*<p className={styles.sub}>Entre para gerenciar a operação da hospedagem.</p>*/}
+            <p className={styles.sub}>{t('login.subtitle')}</p>
           </div>
 
           <form onSubmit={handleSubmit} className={styles.form} noValidate>
-
             {error && (
               <div className={styles.error} role="alert">
                 <AlertCircle size={15} strokeWidth={2.2} />
@@ -160,57 +118,49 @@ export default function LoginPage({ onLogin }) {
             )}
 
             <div className={styles.field}>
+              <label className={styles.label} htmlFor={`${id}-user`}>{t('login.username')}</label>
               <input
-                id="username"
+                id={`${id}-user`}
                 className={styles.input}
                 type="text"
                 autoComplete="username"
-                placeholder=" "
                 value={username}
                 onChange={(e) => { setUsername(e.target.value); setError(''); }}
                 disabled={loading}
                 required
               />
-              <label className={styles.label} htmlFor="username">{t('login.username')}</label>
-              <span className={styles.underline} />
             </div>
 
             <div className={styles.field}>
-              <input
-                id="password"
-                className={styles.input}
-                type={showPass ? 'text' : 'password'}
-                autoComplete="current-password"
-                placeholder=" "
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                disabled={loading}
-                required
-              />
-              <label className={styles.label} htmlFor="password">{t('login.password')}</label>
-              <span className={styles.underline} />
-              <button
-                type="button"
-                className={styles.eye}
-                onClick={() => setShowPass(v => !v)}
-                aria-label={showPass ? t('login.hidePassword') : t('login.showPassword')}
-                tabIndex={-1}
-              >
-                {showPass ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-            </div>
-
-            <div className={styles.forgotRow}>
-              <button type="button" className={styles.forgot}>{t('login.forgot')}</button>
+              <div className={styles.labelRow}>
+                <label className={styles.label} htmlFor={`${id}-pass`}>{t('login.password')}</label>
+                <button type="button" className={styles.link}>{t('login.forgot')}</button>
+              </div>
+              <div className={styles.inputGroup}>
+                <input
+                  id={`${id}-pass`}
+                  className={styles.input}
+                  type={showPass ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  placeholder="••••••••••"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                  disabled={loading}
+                  required
+                />
+                <button
+                  type="button"
+                  className={styles.eye}
+                  onClick={() => setShowPass(v => !v)}
+                  aria-label={showPass ? t('login.hidePassword') : t('login.showPassword')}
+                >
+                  {showPass ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+                </button>
+              </div>
             </div>
 
             <button className={styles.submit} disabled={loading} type="submit">
-              <span className={styles.submitLabel}>
-                {loading ? t('login.submitting') : t('login.submit')}
-              </span>
-              {loading
-                ? <Loader2 size={17} className={styles.spinner} />
-                : <ArrowRight size={17} className={styles.submitArrow} />}
+              <span>{loading ? t('login.submitting') : t('login.submit')}</span>
             </button>
           </form>
 
@@ -218,8 +168,33 @@ export default function LoginPage({ onLogin }) {
             +hospedagem © {new Date().getFullYear()} · {t('login.footer')}
           </footer>
           </div>
+          </div>
+
+          <div className={styles.loader}>
+            <div className={styles.loaderInner}>
+              <AnimatedSpinner size="7rem" lineWidth="0.9rem" />
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      </section>
+
+      <aside className={styles.visual} aria-hidden="true">
+        {SLIDES.map((src, i) => (
+          <div
+            key={src}
+            className={`${styles.slide} ${i === slide ? styles.slideActive : ''}`}
+            style={{ backgroundImage: `url(${src})` }}
+          />
+        ))}
+        <div className={styles.shade} />
+
+        <div className={styles.visualBody}>
+          <p className={styles.wordmark}>
+            <PlusMark className={styles.plus} /><span>hospedagem</span>
+          </p>
+          <p className={styles.kicker}>{t('login.kicker')}</p>
+        </div>
+      </aside>
+    </main>
   );
 }

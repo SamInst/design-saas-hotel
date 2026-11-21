@@ -213,9 +213,9 @@ export const normalizeReserva = (r) => {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DAY_CELL_W   = 185;
-const ROOM_H       = 72;
+const ROOM_H       = 52;
 const CAT_H        = 30;
-const HDR_H        = 64;
+const HDR_H        = 54;
 const LEFT_W       = 86;
 const LEFT_W_NARROW = 86;
 const LEFT_W_MOBILE = 80;  // celular: só "Apt. 11" e a lotação
@@ -939,7 +939,7 @@ function LinhaReserva({ r, onClick, mostrarQuarto = true, corGrupo = null }) {
       {mostrarQuarto && <span className={styles.lstNum} style={corGrupo ? { color: corGrupo, borderColor: corGrupo } : undefined}>{fmtRoom(r.quarto)}</span>}
       <span className={styles.lstTxt}>
         <b>{r.titularNome}</b>
-        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · {diariasTxt(dias)} · {['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>
+        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · <span className={styles.lstDiarias} title={diariasTxt(dias)}><CalendarDays size={12} strokeWidth={2} aria-hidden="true" />{dias}</span> · {['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>
       </span>
       {r.status !== 'confirmada' && <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>}
       <ChevronRight size={15} className={styles.sideSeta} />
@@ -4133,6 +4133,31 @@ function LbTopo({ titulo, sub, onClose }) {
   );
 }
 
+function LbDataChip({ dateStr, onClose }) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const mes = d.toLocaleDateString(locale(), { month: 'short' }).replace('.', '');
+  const semana = d.toLocaleDateString(locale(), { weekday: 'long' }).split('-')[0];
+  return (
+    <>
+      <span className={styles.lbDataWrap}>
+      <span className={styles.lbDataCard}>
+        <span className={styles.lbDataBarra} aria-hidden="true" />
+        <span className={styles.lbDataMes}>{mes} • {d.getFullYear()}</span>
+        <b className={styles.lbDataDia}>{d.getDate()}</b>
+        <span className={styles.lbDataSemana}>{semana.charAt(0).toUpperCase() + semana.slice(1)}</span>
+      </span>
+        {onClose && (
+          <button type="button" className={styles.lbDataFechar} onClick={onClose}
+            title={tr('Fechar')} aria-label={tr('Fechar')}>
+            <X size={11} strokeWidth={2.5} />
+          </button>
+        )}
+      </span>
+      <span className={styles.lbDataDiv} aria-hidden="true" />
+    </>
+  );
+}
+
 function LbLinhaReserva({ r, onClick, semQuarto = false }) {
   const mostraStatus = r.status !== 'confirmada';
   return (
@@ -4154,23 +4179,15 @@ function LbLinhaReserva({ r, onClick, semQuarto = false }) {
 }
 
 // Aba Reservas da barra lateral: ocupação de hoje e as movimentações do dia.
-function HojeLateral({ dateStr, lista, loading, categorias, onSelectReserva, onAbrirGrupo, grupoNomes, topo = null }) {
+function HojeLateral({ dateStr, lista, loading, categorias, onSelectReserva, onAbrirGrupo, grupoNomes, onFechar = null }) {
 
   return (
     <>
       <div className={styles.lbFixo}>
-        {topo}
-        <div className={styles.lbResumo}>
-          <ResumoDia itens={resumoDoDia(lista, categorias)} loading={loading} />
+        <div className={[styles.lbResumo, styles.lbResumoData].join(' ')}>
+          <LbDataChip dateStr={dateStr} onClose={onFechar} />
+          <ResumoDia itens={resumoDoDia(lista, categorias).filter((_, i) => i !== 1 && i !== 3)} loading={loading} />
         </div>
-
-        {!loading && onAbrirGrupo && (
-          <div className={styles.lbGrupoAcao}>
-            <button type="button" className={styles.gvAbaLink} onClick={() => onAbrirGrupo(null)}>
-              <Users size={14} /> {tr('Visualizar grupos')}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className={styles.lbListaAntiga}>
@@ -4189,13 +4206,10 @@ function LbAbas({ aba, onAba, nRes, nOrc, nSol }) {
   ];
   return (
     <nav className={styles.lbAbas} aria-label={tr('Listas')} role="tablist">
-      {abas.map(([k, rot, n]) => (
+      {abas.map(([k, rot]) => (
         <button key={k} type="button" role="tab" aria-selected={aba === k}
           className={[styles.lbAba, aba === k ? styles.lbAbaOn : ''].join(' ')} onClick={() => onAba(k)}>
           {rot}
-          {n != null && (k === 'sol'
-            ? (n > 0 && <span className={styles.lbAbaAlerta}>{n > 99 ? '99+' : n}</span>)
-            : <span className={styles.lbAbaN}>{n}</span>)}
         </button>
       ))}
     </nav>
@@ -4270,7 +4284,7 @@ function DayModal({ dateStr, lista, loading, onClose, categorias, onSelectReserv
     return (
       <Janela open onClose={onClose} hideHeader>
         <div className={styles.lbHojeDia}>
-          <HojeLateral topo={<LbTopo titulo={fmtDateBR(dateStr)} sub={cap} onClose={onClose} />} dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} onAbrirGrupo={onAbrirGrupo} grupoNomes={grupoNomes} />
+          <HojeLateral onFechar={onClose} dateStr={dateStr} lista={lista} loading={loading} onSelectReserva={onSelectReserva} categorias={categorias} onAbrirGrupo={onAbrirGrupo} grupoNomes={grupoNomes} />
         </div>
       </Janela>
     );
@@ -10187,24 +10201,10 @@ export default function BookingCalendar() {
         {startInView && !isGhost && !pagamentoModoAtivo && (
           <div className={styles.resizeHandle} onMouseDown={(e) => handleResizeMouseDown(e, orig, 'resize-l')} />
         )}
-        {/* Pessoas e diárias dentro da faixa, no começo */}
-        {!isGhost && (
-          <span className={[styles.barInfo, styles.barInfoInline].join(' ')}
-            style={grupoCor ? { background: `color-mix(in srgb, ${grupoCor} 70%, #000)` } : undefined}>
-            <span><Users size={11} /> {totalPeople}</span>
-            <span><CalendarDays size={11} /> {currentDiaria !== null ? `${currentDiaria}/${dias}` : dias}</span>
-          </span>
-        )}
         <div className={[styles.barContent, isGhost ? '' : styles.barContentInfoInline].join(' ')}>
           {isGhost && <span className={styles.barAvatar}>{initials(orig.titularNome)}</span>}
           <div className={styles.barText}>
             <span className={styles.barName}>{orig.titularNome}</span>
-            {(() => {
-              if (orig.empresaNome) return <span className={[styles.barSub, styles.barEmpresa].join(' ')}><Building2 size={11} /> {orig.empresaNome}</span>;
-              const resp = orig.grupo_id != null ? grupoNomes[orig.grupo_id] : null;
-              const sub = resp && resp.toUpperCase() !== String(orig.titularNome).toUpperCase() ? resp : null;
-              return sub ? <span className={styles.barSub}>{sub}</span> : null;
-            })()}
             {isGhost && (
               <span className={styles.barDateLabel}>{fmtDateBR(display.dataInicio)} → {fmtDateBR(display.dataFim)} · {diariasTxt(diffDays(display.dataInicio, display.dataFim))}</span>
             )}
@@ -10395,6 +10395,13 @@ export default function BookingCalendar() {
                   </div>
                   )}
                 </div>
+                {abaLateral === 'res' && !buscando && !diaHoje.loading && (
+                  <div className={styles.lbRodapeGrupos}>
+                    <button type="button" className={styles.gvAbaLink} onClick={() => { setGrupoInicial(null); setShowGrupos(true); }}>
+                      <Users size={14} /> {tr('Visualizar grupos')}
+                    </button>
+                  </div>
+                )}
           </aside>
         )}
       <div className={styles.direita}>
@@ -10540,7 +10547,7 @@ export default function BookingCalendar() {
                   const dStr      = daysStr[idx];
                   const isWeekend = day.getDay() === 0 || day.getDay() === 6;
                   const isToday   = dStr === todayStr;
-                  const weekday   = day.toLocaleDateString(locale(), { weekday: 'long' });
+                  const weekday   = isToday ? tr('Hoje') : day.toLocaleDateString(locale(), { weekday: 'short' }).replace('.', '');
                   return (
                     <div key={idx}
                       className={[styles.dayHeader, isWeekend ? styles.dayHeaderWeekend : '', isToday ? styles.dayHeaderToday : ''].join(' ')}
@@ -10548,11 +10555,11 @@ export default function BookingCalendar() {
                       onClick={() => setDayModal({ dateStr: dStr })}
                       title={tr('Ver reservas — {{v0}}', { v0: fmtDateBR(dStr) })}
                     >
+                      <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
+                        {day.getDate()}
+                      </span>
                       <span className={[styles.dayWeekday, isToday ? styles.dayWeekdayToday : ''].join(' ')}>
                         {weekday.charAt(0).toUpperCase() + weekday.slice(1)}
-                      </span>
-                      <span className={[styles.dayNum, isToday ? styles.dayNumToday : ''].join(' ')}>
-                        {day.getDate()}{isToday ? tr(' · Hoje') : ''}
                       </span>
                     </div>
                   );
@@ -10577,12 +10584,7 @@ export default function BookingCalendar() {
                         <button className={styles.roomLabel} style={{ width: leftW, height: ROOM_H }}
                           onClick={() => setRoomModal({ room })}
                           title={tr('Histórico quarto {{v0}}{{v1}}', { v0: fmtRoom(room), v1: roomDescMap[room] ? ` – ${roomDescMap[room]}` : '' })}>
-                          <span className={styles.roomTitle}>
-                            <span className={styles.roomNum}>{tr('Apt.')} {fmtRoom(room)}</span>
-                          </span>
-                          {roomPaxMap[room] != null && (
-                            <span className={styles.roomPax}><Users size={14} /> {roomPaxMap[room]}</span>
-                          )}
+                          <span className={styles.roomNum}>{fmtRoom(room)}</span>
                         </button>
                         <div className={styles.roomCells} onMouseMove={(e) => handleRoomMouseMove(e, room)}>
                           {days.map((day, idx) => {

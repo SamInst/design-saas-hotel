@@ -6380,10 +6380,12 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 /* Abas da box esquerda em estilo pasta: a aba selecionada e o topo da lista (busca, números do dia,
    grupos) formam uma só peça num tom suave do azul, como a orelha e o corpo de uma pasta. */
 .page .sidePanel.lb {
-  --pasta: color-mix(in oklch, var(--l-fg) 4%, var(--l-card));
+  --pasta: var(--l-card);
+  --pasta-off: var(--l-bg);
+  background: transparent; border: 0; box-shadow: none;
   --pasta-fg: var(--l-fg);
 }
-.page .sidePanel.lb > .lbAbas { margin: 10px 20px 0; gap: 0; border-bottom: 0; }
+.page .sidePanel.lb > .lbAbas { margin: 0; padding: 0; gap: 0; border-bottom: 0; background: none; }
 .page .sidePanel.lb > .lbAbas .lbAba {
   position: relative; height: 42px; margin-bottom: 0; border: 0;
   border-radius: 12px 12px 0 0; background-color: transparent; color: var(--l-muted-fg);
@@ -6402,7 +6404,7 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 .page .sidePanel.lb > .lbAbas .lbAba.lbAbaOn::before,
 .page .sidePanel.lb > .lbAbas .lbAba.lbAbaOn::after { opacity: 1; }
 .page .sidePanel.lb > .lbAbas .lbAba.lbAbaOn .lbAbaN { color: var(--pasta-fg); }
-.page .sidePanel.lb > .lbAbas .lbAba:not(.lbAbaOn):hover { color: var(--l-fg); background-color: color-mix(in oklch, var(--pasta) 50%, transparent); }
+.page .sidePanel.lb > .lbAbas .lbAba:not(.lbAbaOn):hover { color: var(--l-fg); background-color: color-mix(in oklch, var(--l-card) 55%, transparent); }
 .page .sidePanel.lb > .lbAbas .lbAba:focus-visible { outline-offset: -4px; border-radius: 12px 12px 0 0; }
 
 /* Corpo da pasta: a busca + o topo fixo da lista do dia */
@@ -6435,6 +6437,22 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 .page .sidePanel.lb:has(> .lbAbas > .lbAba:last-child.lbAbaOn) .slotEsq .lbAcoes::before { border-top-right-radius: 0; }
 .page .sidePanel.lb:has(> .lbAbas > .lbAba:first-child.lbAbaOn) .slotEsq .lbAcoes::before { border-top-left-radius: 0; }
 .page .sidePanel.lb .slotEsq .lbAcoes .searchInput { background: var(--l-card); }
+/* Faixa separando o topo (abas, ações e números) da lista de baixo */
+.page .sidePanel.lb :is(.lbHoje, .slotEsq) .lbFixo::after,
+.page .sidePanel.lb .slotEsq .lbAcoes::after {
+  content: ''; position: absolute; left: -20px; right: -20px; bottom: 4px; height: 10px; z-index: -1;
+  background: var(--pasta-off);
+}
+.page .sidePanel.lb .lbListaAntiga > .lbGrupoAcao { margin: 0 0 8px; }
+/* Box sem fundo próprio: só a aba ativa, o topo e a lista são brancos */
+.page .sidePanel.lb > .lbAcoes { margin: 0; padding: 16px 36px 4px; border-radius: 0 14px 0 0; }
+.page .sidePanel.lb:has(.sideResultados, .sideGrupo > .sideVazio, .slotEsq:not(:empty):not(:has(.lbFixo))) > .lbAcoes { border-radius: 0 14px 0 0; }
+.page .sidePanel.lb > .sideGrupo,
+.page .sidePanel.lb > .sideGrupo:has(> .sideResultados, > .sideVazio) { background: var(--l-card); }
+.page .sidePanel.lb:not(:has(> .lbAcoes)) > .sideGrupo { border-radius: 14px 14px 0 0; }
+.page .sidePanel.lb:not(:has(> .lbAcoes)):has(> .lbAbas > .lbAba:first-child.lbAbaOn) > .sideGrupo { border-top-left-radius: 0; }
+.page .sidePanel.lb:not(:has(> .lbAcoes)):has(> .lbAbas > .lbAba:last-child.lbAbaOn) > .sideGrupo { border-top-right-radius: 0; }
+.page .sidePanel.lb .lbResumo .lstStats { border-bottom: 0; }
 @media (prefers-reduced-motion: reduce) {
   .page .sidePanel.lb > .lbAbas .lbAba, .page .sidePanel.lb > .lbAbas .lbAba::before, .page .sidePanel.lb > .lbAbas .lbAba::after { transition: none; }
 }
@@ -6538,3 +6556,209 @@ button.nrRsObs { margin-left: 0; align-self: flex-start; }
 }
 .selHintCancelar:hover { color: #b91c1c; }
 .selHintCancelar:focus-visible { outline: 2px solid #dc2626; outline-offset: 1px; }
+
+.page .cellWeekend, .page .cellToday,
+[data-theme='dark'] .page .cellToday { background: transparent; }
+.page .dayHeaderWeekend, .page .dayHeaderToday,
+[data-theme='dark'] .page .dayHeaderToday { background: var(--surface); }
+.page .dayHeaderWeekend:hover, .page .dayHeaderToday:hover { background: color-mix(in oklch, var(--l-accent) 60%, var(--surface)); }
+.page .cellWeekend:not(.cellSelected), .page .dayHeaderWeekend { box-shadow: inset 1px 0 0 #dc2626, inset -1px 0 0 #dc2626; }
+.page .cellToday:not(.cellSelected), .page .dayHeaderToday { box-shadow: inset 1px 0 0 #2563eb, inset -1px 0 0 #2563eb; }
+
+.page .cornerCell { justify-content: center; padding: 0 8px; }
+.page .roomLabel { align-items: center; padding: 0 8px; }
+.page .roomLabel .roomNum { font-size: 15px; font-weight: 400; }
+.page .dayHeader { flex-direction: row; align-items: center; justify-content: center; gap: 10px; padding: 0 8px; }
+.page .dayHeader .dayNum { font-size: 30px; font-weight: 400; line-height: 1; color: var(--text); }
+.page .dayHeader .dayWeekday { font-size: 14px; font-weight: 400; width: auto; }
+.page .dayHeader .dayNumToday, .page .dayHeader .dayWeekdayToday { color: #2563eb; }
+.page .dayHeader:hover .dayNum { color: var(--violet); }
+
+/* Ações da box esquerda empilhadas: botão de criar em largura total acima da busca */
+.page .sidePanel.lb .lbAcoes { flex-direction: column; gap: 12px; }
+.page .sidePanel.lb .lbAcoes > * { flex: none; width: 100%; }
+.page .sidePanel.lb .lbAcoes .lbNovo { order: -1; height: 44px; justify-content: center; gap: 8px; border-radius: 8px; font-size: 15px; font-weight: 600; }
+.page .sidePanel.lb .lbAcoes .searchInput { height: 44px; border-radius: 8px; padding-left: 40px; font-size: 14.5px; }
+.page .sidePanel.lb .lbAcoes .searchIcon { left: 14px; width: 16px; height: 16px; }
+.page .sidePanel.lb .lbAcoes .lbBuscaAntiga .sideFiltroWrap { top: 4px; right: 4px; }
+.page .sidePanel.lb .lbResumo .lstStat b { font-size: 28px; }
+.page .sidePanel.lb .lbResumo .lstStat span { font-size: 14px; }
+
+/* Visualizar grupos: rodapé fixo da box, separado da lista */
+.page .sidePanel.lb > .sideGrupo { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+.page .sidePanel.lb > .lbRodapeGrupos {
+  flex-shrink: 0; display: flex; justify-content: center; margin-top: 10px; padding: 8px 20px;
+  background: var(--l-card); border-radius: 14px;
+}
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink { display: inline-flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 36px; }
+.page .sidePanel.lb:has(.slotEsq:not(:empty)) > .lbRodapeGrupos { display: none; }
+.page .sidePanel.lb .lbFixo + .lbListaAntiga { padding-top: 14px; }
+.page .sidePanel.lb > .lbRodapeGrupos { padding: 12px 20px; }
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink {
+  height: 44px; padding: 0 16px; border: 0; border-radius: 0;
+  background: var(--l-fg); color: var(--l-card); font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink:hover { background: color-mix(in oklch, var(--l-fg) 85%, var(--l-card)); color: var(--l-card); text-decoration: none; }
+.page .sidePanel.lb { border-radius: 0; }
+.page .sidePanel.lb > .lbRodapeGrupos { border-radius: 0; }
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink { border-radius: 6px; }
+.page .sidePanel.lb > .sideGrupo { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.page .sidePanel.lb .lstSecaoHead .lstQtd { display: none; }
+
+/* Linha da data selecionada: título à esquerda e a data num chip */
+.lbTopoData { gap: 10px; }
+.lbTopoDataTit {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: 'Fraunces', Georgia, serif; font-size: 22px; font-weight: 500; letter-spacing: -0.01em; color: var(--l-fg);
+}
+.lbTopoDataChip {
+  display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
+  height: 36px; padding: 0 12px; border-radius: 6px;
+  background: color-mix(in oklch, var(--l-fg) 5%, var(--l-card));
+  color: var(--l-fg); font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.lbTopoDataChip svg { color: var(--l-muted-fg); }
+
+/* Data num chip à esquerda dos números do dia */
+.page .sidePanel.lb .lbResumoData { display: flex; align-items: center; gap: 12px; }
+.page .sidePanel.lb .lbResumoData > .lstStats { flex: 1; min-width: 0; padding: 0; gap: 4px; }
+.page .sidePanel.lb .lbResumoData .lbTopoDataChip {
+  position: relative; flex-direction: column; justify-content: center; gap: 4px;
+  width: 64px; height: auto; padding: 10px 6px; text-align: center; white-space: normal; line-height: 1.2; font-size: 12.5px;
+}
+.page .sidePanel.lb .lbResumoData .lstStat b { font-size: 24px; }
+.page .sidePanel.lb .lbResumoData .lstStat span { font-size: 12.5px; }
+.lbDataFechar {
+  position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+  background: var(--l-fg); color: var(--l-card);
+}
+.lbDataFechar:hover { background: var(--danger); }
+.lbDataFechar:focus-visible { outline: 2px solid var(--l-primary); outline-offset: 1px; }
+.page .sidePanel.lb .lbResumoData > .lstStats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.page .sidePanel.lb .lbResumoData .lbTopoDataChip { width: 84px; gap: 2px; padding: 10px 6px; font-size: 13px; }
+.lbDataDia { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; color: var(--l-fg); }
+.page .sidePanel.lb .lbResumoData .lbTopoDataChip { flex-direction: row; align-items: center; gap: 8px; width: auto; padding: 10px 12px 10px 10px; }
+.lbDataTxt { display: flex; flex-direction: column; align-items: center; gap: 2px; white-space: nowrap; }
+.lbDataDia { font-size: 36px; }
+.page .sidePanel.lb .lbResumoData { align-items: stretch; gap: 14px; }
+.page .sidePanel.lb .lbResumoData > .lstStats { align-items: center; gap: 6px; }
+.page .sidePanel.lb .lbResumoData .lstStat b { font-size: 30px; line-height: 1.15; }
+.page .sidePanel.lb .lbResumoData .lstStat span { font-size: 14px; }
+
+/* Cartão da data do dia */
+.page .sidePanel.lb .lbResumoData { align-items: center; gap: 0; }
+.lbDataCard {
+  --dc-acento: #2563eb; --dc-fundo: rgb(239 246 255 / .7); --dc-borda: #dbeafe;
+  --dc-forte: #0f172a; --dc-mudo: #64748b;
+  position: relative; flex-shrink: 0; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 96px; box-sizing: border-box; padding: 10px 12px;
+  border: 1px solid var(--dc-borda); border-radius: 12px; background: var(--dc-fundo);
+}
+:root[data-theme="dark"] .lbDataCard, [data-theme='dark'] .lbDataCard {
+  --dc-acento: #60a5fa; --dc-fundo: rgb(37 99 235 / .12); --dc-borda: rgb(96 165 250 / .25);
+  --dc-forte: #f1f5f9; --dc-mudo: #94a3b8;
+}
+.lbDataBarra { position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--dc-acento); }
+.lbDataMes { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--dc-acento); white-space: nowrap; }
+.lbDataCard .lbDataDia { margin: 2px 0; font-size: 30px; font-weight: 800; line-height: 1.25; letter-spacing: 0; color: var(--dc-forte); }
+.lbDataSemana { font-size: 11px; font-weight: 500; color: var(--dc-mudo); white-space: nowrap; }
+.lbDataDiv { flex-shrink: 0; width: 1px; height: 48px; margin: 0 20px; background: #e2e8f0; }
+[data-theme='dark'] .lbDataDiv { background: var(--border); }
+.lbDataCard .lbDataFechar { top: 6px; right: 4px; width: 18px; height: 18px; }
+.page .sidePanel.lb .lbResumoData > .lstStats { gap: 4px; }
+.lbDataWrap { position: relative; flex-shrink: 0; display: flex; }
+.lbDataWrap > .lbDataFechar {
+  top: -8px; right: -8px; z-index: 1; width: 22px; height: 22px;
+  background: #991b1b; color: #fff; box-shadow: 0 0 0 2px var(--l-card);
+}
+.lbDataWrap > .lbDataFechar:hover { background: #7f1d1d; }
+.lbDataCard { border-radius: 0; }
+
+/* Só a lista do dia rola: o topo (data e números) fica fora da área de rolagem */
+.page .sidePanel.lb > .sideGrupo:has(.lbListaAntiga) { overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0; }
+.page .sidePanel.lb > .sideGrupo:has(.lbListaAntiga) :is(.slotEsq, .janela, .janelaCorpo, .lbHoje, .lbHojeDia):has(.lbListaAntiga) {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+}
+.page .sidePanel.lb .lbFixo:has(+ .lbListaAntiga) { flex-shrink: 0; }
+.page .sidePanel.lb .lbFixo + .lbListaAntiga {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  margin: 0 -20px; padding: 14px 20px 24px;
+}
+.page .sidePanel.lb .lbResumoData .lstStat b { color: color-mix(in oklch, var(--l-fg) 62%, var(--l-card)); }
+
+/* ── Lateral no estilo de referência: fundo bege, verde escuro como cor principal ── */
+.page .sidePanel.lb {
+  --lt-fundo: #F4F4EF; --lt-principal: #12402F; --lt-principal-hover: #0c3022;
+  --lt-borda: #e4e4db;
+  --l-primary: var(--lt-principal); --l-primary-fg: #fff;
+  --pasta-off: var(--lt-fundo);
+  background: transparent;
+}
+/* Fundo da página na mesma cor */
+.page { --l-bg: #F4F4EF; }
+[data-theme='dark'] .page, :root[data-theme="dark"] .page { --l-bg: oklch(0.129 0.042 264.695); }
+[data-theme='dark'] .page .sidePanel.lb, :root[data-theme="dark"] .page .sidePanel.lb {
+  --lt-fundo: var(--l-bg); --lt-principal: #3f8f6e; --lt-principal-hover: #4fa07e; --lt-borda: var(--border);
+}
+
+/* Aba ativa com a cor principal */
+.page .sidePanel.lb > .lbAbas .lbAba.lbAbaOn,
+.page .sidePanel.lb > .lbAbas .lbAba.lbAbaOn .lbAbaN { color: var(--lt-principal); }
+
+/* Botões principais em verde escuro */
+.page .sidePanel.lb .lbNovo { background: var(--lt-principal); color: #fff; }
+.page .sidePanel.lb .lbNovo:hover { background: var(--lt-principal-hover); }
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink { background: var(--lt-principal); color: #fff; }
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink:hover { background: var(--lt-principal-hover); color: #fff; }
+.page .sidePanel.lb .lbAcoes .searchInput { border-color: var(--lt-borda); }
+.page .sidePanel.lb .lbAcoes .searchInput:focus { border-color: var(--lt-principal); }
+
+/* Cartão da data nas mesmas cores */
+.page .sidePanel.lb .lbDataCard {
+  --dc-acento: var(--lt-principal); --dc-fundo: var(--lt-fundo); --dc-borda: var(--lt-borda);
+}
+.page .sidePanel.lb .lbDataDiv { background: var(--lt-borda); }
+.page .sidePanel.lb .lbAcoes .lbNovo,
+.page .sidePanel.lb .lbAcoes .searchInput { border-radius: 4px; }
+.page .sidePanel.lb .lbBuscaAntiga .sideFiltroBtn { border-radius: 3px; }
+.page .sidePanel.lb > .lbRodapeGrupos .gvAbaLink { border-radius: 4px; }
+:root:not([data-theme="dark"]) .page .sidePanel.lb { --l-fg: var(--lt-principal); --text: var(--lt-principal); }
+.page .sidePanel.lb .lbDataCard { --dc-forte: var(--l-fg); }
+.page .sidePanel.lb .lbResumoData > .lstStats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Lista de reservas da esquerda um pouco maior; diárias como ícone + número */
+.page .sidePanel.lb .lbListaAntiga > .lstLinha { zoom: 1.12; }
+.lstDiarias { display: inline-flex; align-items: center; gap: 3px; vertical-align: -1px; }
+.lstDiarias svg { flex-shrink: 0; }
+@media (min-width: 1024px) { .split { grid-template-columns: 400px minmax(0, 1fr); } }
+
+/* Topo da box esquerda usando a largura toda (mesma margem da lista) */
+.page .sidePanel.lb > .lbAcoes { padding-left: 20px; padding-right: 20px; }
+.page .sidePanel.lb :is(.lbHoje, .slotEsq) .lbFixo { padding-left: 0; padding-right: 0; }
+.page .sidePanel.lb .slotEsq .lbAcoes { padding-left: 0; padding-right: 0; }
+
+
+/* Linhas dos apartamentos mais baixas; faixa só com o nome */
+.page .bar { top: 13px; bottom: 5px; }
+.skGradeLinha { height: 52px; }
+.page .sidePanel.lb > .sideGrupo > .slotEsq:not(:empty) ~ .lbHoje { display: none; }
+
+/* Cabeçalho dos dias no estilo de referência: número + dia curto, hoje com linha e fundo */
+.page .dayHeader { justify-content: flex-start; align-items: baseline; gap: 8px; padding: 0 18px; padding-top: 18px; }
+.page .dayHeader .dayNum { font-size: 24px; font-weight: 600; color: var(--lt-principal, #12402F); letter-spacing: -0.01em; }
+.page .dayHeader .dayWeekday { font-size: 13px; color: var(--l-muted-fg); }
+.page .dayHeaderWeekend .dayNum { color: var(--l-muted-fg); }
+.page .dayHeaderWeekend, .page .cellWeekend:not(.cellSelected) { box-shadow: none; }
+.page .dayHeader.dayHeaderToday {
+  background: #F4F4EF; box-shadow: inset 0 -2px 0 #12402F;
+}
+.page .dayHeader .dayNumToday { color: #12402F; }
+.page .dayHeader .dayWeekdayToday { color: #12402F; font-weight: 600; }
+.page .cell.cellToday:not(.cellSelected) { background: #F4F4EF; box-shadow: none; }
+[data-theme='dark'] .page .dayHeader.dayHeaderToday { background: color-mix(in oklch, var(--l-fg) 6%, var(--surface)); box-shadow: inset 0 -2px 0 #3f8f6e; }
+[data-theme='dark'] .page .dayHeader .dayNumToday, [data-theme='dark'] .page .dayHeader .dayWeekdayToday { color: #6fc19c; }
+[data-theme='dark'] .page .cell.cellToday:not(.cellSelected) { background: color-mix(in oklch, var(--l-fg) 6%, transparent); }
+[data-theme='dark'] .page .dayHeader .dayNum:not(.dayNumToday) { color: var(--text); }
+.page .sidePanel.lb > .lbAcoes { position: relative; z-index: 6; }
