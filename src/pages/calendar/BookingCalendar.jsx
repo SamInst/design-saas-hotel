@@ -746,7 +746,7 @@ function EsqueletoGrade({ leftW }) {
       <div className={styles.skGradeTopo}>
         <span className={styles.skGradeCanto} />
         <span className={styles.skGradeDias}>
-          {Array.from({ length: 8 }, (_, i) => (
+          {Array.from({ length: DIAS_NA_TELA }, (_, i) => (
             <span key={i} className={styles.skGradeDia}>
               <span className={styles.sk} style={{ width: '58%' }} />
               <span className={[styles.sk, styles.skFino].join(' ')} style={{ width: '30%' }} />
@@ -965,7 +965,9 @@ function LinhaReserva({ r, onClick, mostrarQuarto = true, corGrupo = null, numUn
         : <span className={styles.lstNum} style={corGrupo ? { color: corGrupo, borderColor: corGrupo } : undefined}>{fmtRoom(r.quarto)}</span>)}
       <span className={styles.lstTxt}>
         <b>{r.titularNome}</b>
-        <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · <span className={styles.lstDiarias} title={diariasTxt(dias)}><CalendarDays size={12} strokeWidth={2} aria-hidden="true" />{dias}</span> · {['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>
+        {numUniforme
+          ? <small>{['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>
+          : <small>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)} · <span className={styles.lstDiarias} title={diariasTxt(dias)}><CalendarDays size={12} strokeWidth={2} aria-hidden="true" />{dias}</span> · {['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, nPessoas) : rotuloReservaTipo(r.tipoHospedagem, nPessoas)}</small>}
       </span>
       {r.status !== 'confirmada' && <span className={[styles.dtStatus, styles[`dtStatus_${r.status}`]].join(' ')}>{STATUS_LABEL[r.status] ?? r.status}</span>}
       <ChevronRight size={15} className={styles.sideSeta} />
@@ -4231,7 +4233,7 @@ function LbLinhaReserva({ r, onClick, semQuarto = false }) {
       <span className={styles.lbInfo}>
         <b className={styles.lbNome}>{r.titularNome}</b>
         <span className={styles.lbMeta}>
-          <span className={styles.lbMetaLinha}>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)}</span>
+          <span className={styles.lbMetaLinha}>{fmtDiaMes(r.dataInicio)} → {fmtDiaMes(r.dataFim)}{(() => { const np = r.hospedes?.length ?? (1 + (r.quantidadeAcompanhantes ?? 0)); const tp = ['hospedado', 'finalizado'].includes(r.status) ? rotuloHospedagemTipo(r.tipoHospedagem, np) : rotuloReservaTipo(r.tipoHospedagem, np); return tp ? ` · ${tp}` : ''; })()}</span>
         </span>
       </span>
       {mostraStatus ? (

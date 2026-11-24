@@ -1772,3 +1772,96 @@
   --l-accent-fg:    oklch(0.984 0.006 286);
   --l-ring:         oklch(0.551 0.006 286);
 }
+
+/* ═════════════════════════════════════════════════════════════
+   Padrão de design do sistema (tokens globais em styles/globals.css),
+   o mesmo do calendário de reservas e do financeiro.
+   ═════════════════════════════════════════════════════════════ */
+.page {
+  --l-bg: var(--brand-bg);
+  --l-primary: var(--brand); --l-primary-fg: var(--brand-fg);
+  --l-ring: var(--brand);
+  --l-muted: var(--brand-bg);
+  --l-secondary: var(--brand-bg); --l-secondary-fg: var(--l-fg);
+  --l-accent: var(--brand-suave); --l-accent-fg: var(--brand-hover);
+}
+[data-theme='dark'] .page, [data-theme='dark'][data-tone='grafite'] .page {
+  --l-primary: var(--brand);
+  --l-ring: var(--brand);
+}
+
+/* Box esquerda: topo claro como o corpo da pasta do calendário, sem o grafite */
+.listTopoEscuro {
+  --te-bg: var(--l-card); --te-campo: var(--brand-bg); --te-txt: var(--l-fg); --te-mudo: var(--l-muted-fg);
+  border: 1px solid var(--l-border); box-shadow: var(--l-shadow);
+}
+.listTopoEscuro .listTitulo,
+.listTopoEscuro .segmentedBtn:hover,
+.listTopoEscuro .searchClear:hover,
+.listTopoEscuro .filterBtn:hover { color: var(--l-fg); }
+.listTopoEscuro .searchInput {
+  background: var(--l-card) !important; border-color: var(--brand-border) !important; color: var(--l-fg) !important;
+}
+.listTopoEscuro .searchInput:focus { border-color: var(--brand) !important; }
+.listTopoEscuro .filterBtnOn, .listTopoEscuro .filterBtnOn:hover { color: var(--brand); }
+
+/* Abas da ficha no estilo pasta */
+.fichaTabs {
+  --pasta: var(--l-card);
+  gap: 0; padding: 8px 0 0; border: 0; border-radius: 4px 4px 0 0; background: var(--brand-bg);
+}
+.fichaTab {
+  height: 42px; padding: 0 18px; border-radius: 12px 12px 0 0;
+  background-color: transparent; transition: background-color .28s ease, color .28s ease;
+}
+.fichaTab:not(.fichaTabAtiva):hover { color: var(--l-fg); background-color: color-mix(in oklch, var(--l-card) 55%, transparent); }
+.fichaTab.fichaTabAtiva { z-index: 1; background-color: var(--pasta); color: var(--brand); font-weight: 600; }
+.fichaTab::before, .fichaTab.fichaTabAtiva::after {
+  content: ''; position: absolute; top: auto; bottom: 0; width: 12px; height: 12px; border-radius: 0; pointer-events: none;
+  opacity: 0; transition: opacity .28s ease;
+}
+.fichaTab::before { left: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--pasta) 12px); }
+.fichaTab.fichaTabAtiva::after { left: auto; right: -12px; background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--pasta) 12px); }
+.fichaTab.fichaTabAtiva::before, .fichaTab.fichaTabAtiva::after { opacity: 1; }
+.fichaTab:first-child::before, .fichaTab.fichaTabAtiva:last-child::after { display: none; }
+.fichaTab:focus-visible { outline-offset: -4px; border-radius: 12px 12px 0 0; }
+@media (prefers-reduced-motion: reduce) { .fichaTab, .fichaTab::before, .fichaTab::after { transition: none; } }
+
+/* Opções de escolha na cor da marca */
+.radioOpt:hover { border-color: var(--brand); color: var(--brand); }
+.radioOptActive { background: var(--brand-suave); border-color: var(--brand); color: var(--brand); }
+
+/* Detalhe da hospedagem (histórico): topo na cor de fundo, como a view da reserva */
+:root:not([data-theme="dark"]) .rvHead { background: var(--brand-bg); border-bottom-color: var(--brand-border); }
+.rvResumo { border-color: var(--brand-border); }
+.rvPgIcon { background: var(--brand-suave); }
+
+/* Abas Hóspedes / Empresas em estilo pasta, emendadas no topo da box esquerda */
+.abasPasta { --pasta: var(--l-card); display: flex; flex-shrink: 0; margin-bottom: -12px; }
+.abaPasta {
+  position: relative; flex: 1 1 0; height: 42px; padding: 0 12px;
+  border: 0; border-radius: 12px 12px 0 0; background-color: transparent; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 500; color: var(--l-muted-fg);
+  transition: background-color .28s ease, color .28s ease;
+}
+.abaPasta:not(.abaPastaOn):hover { color: var(--l-fg); background-color: color-mix(in oklch, var(--l-card) 55%, transparent); }
+.abaPasta.abaPastaOn { z-index: 2; background-color: var(--pasta); color: var(--brand); font-weight: 600; }
+.abaPasta::before, .abaPasta::after {
+  content: ''; position: absolute; bottom: 0; width: 12px; height: 12px; pointer-events: none;
+  opacity: 0; transition: opacity .28s ease;
+}
+.abaPasta::before { left: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--pasta) 12px); }
+.abaPasta::after { right: -12px; background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--pasta) 12px); }
+.abaPasta.abaPastaOn::before, .abaPasta.abaPastaOn::after { opacity: 1; }
+.abaPasta:first-child::before, .abaPasta:last-child::after { display: none; }
+.abaPasta:focus-visible { outline: 2px solid var(--brand); outline-offset: -4px; }
+@media (prefers-reduced-motion: reduce) { .abaPasta, .abaPasta::before, .abaPasta::after { transition: none; } }
+.listTopoEscuro.listTopoAbaIni, .listTopoEscuro.listTopoAbaFim { position: relative; z-index: 1; border: 0; border-radius: 14px; }
+.listTopoEscuro.listTopoAbaIni { border-top-left-radius: 0; }
+.listTopoEscuro.listTopoAbaFim { border-top-right-radius: 0; }
+.listTopo > button { flex: 1; }
+
+/* Faixa das abas da ficha de borda a borda do cartão, para a aba ativa não ficar recortada */
+.fichaTabs { --ficha-pad: 20px; margin-left: calc(var(--ficha-pad) * -1); margin-right: calc(var(--ficha-pad) * -1); padding: 8px var(--ficha-pad) 0; border-radius: 0; }
+.fichaTab:first-child::before, .fichaTab.fichaTabAtiva:last-child::after { display: block; }
+.fichaTabs .fichaTab { display: inline-flex; align-items: center; height: 40px; padding: 0 18px 4px; line-height: 1; }

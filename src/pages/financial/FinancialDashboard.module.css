@@ -924,3 +924,80 @@
 [data-theme='dark'][data-tone='grafite'] .page {
   --c-lucro: oklch(0.7 0.006 286);
 }
+
+/* ═════════════════════════════════════════════════════════════
+   Padrão de design do sistema (tokens globais em styles/globals.css),
+   o mesmo aplicado ao calendário de reservas.
+   ═════════════════════════════════════════════════════════════ */
+.page {
+  --l-bg: var(--brand-bg);
+  --l-primary: var(--brand); --l-primary-fg: var(--brand-fg);
+  --l-ring: var(--brand);
+  --l-secondary: var(--brand-bg); --l-secondary-fg: var(--l-fg);
+  --l-accent: var(--brand-suave); --l-accent-fg: var(--brand-hover);
+  --l-in: var(--brand);
+  --l-hero: var(--brand);
+  --l-hero-in: var(--brand-claro);
+}
+[data-theme='dark'] .page, [data-theme='dark'][data-tone='grafite'] .page {
+  --l-primary: var(--brand);
+  --l-ring: var(--brand);
+  --l-hero: oklch(0.3 0.04 165);
+}
+
+/* Saldo do caixa dentro do cabeçalho do dia, um tom acima do verde da marca */
+.diaCaixa { background: color-mix(in oklch, var(--brand) 82%, white); }
+.diaCaixaRot { color: color-mix(in oklch, var(--brand-claro) 80%, white); }
+[data-theme='dark'] .diaCaixa { background: color-mix(in oklch, var(--l-hero) 80%, white); }
+
+/* Box esquerda: topo claro como o corpo da pasta do calendário, sem o grafite */
+.listTopoEscuro {
+  --te-bg: var(--l-card); --te-campo: var(--brand-bg); --te-txt: var(--l-fg); --te-mudo: var(--l-muted-fg);
+  border: 1px solid var(--l-border); box-shadow: var(--l-shadow);
+}
+.listTopoEscuro .listTitulo,
+.listTopoEscuro .segmentedBtn:hover,
+.listTopoEscuro .searchClear:hover,
+.listTopoEscuro .filterBtn:hover { color: var(--l-fg); }
+.listTopoEscuro .searchInput {
+  background: var(--l-card) !important; border-color: var(--brand-border) !important; color: var(--l-fg) !important;
+}
+.listTopoEscuro .searchInput:focus { border-color: var(--brand) !important; }
+.listTopoEscuro .filterBtnOn, .listTopoEscuro .filterBtnOn:hover { color: var(--brand); }
+.page .btnIn { background: var(--brand); }
+.page .btnIn:hover { background: var(--brand-hover); }
+
+/* Abas do lançamento no estilo pasta */
+.fichaTabs {
+  --pasta: var(--l-card);
+  gap: 0; padding: 8px 0 0; border: 0; border-radius: 4px 4px 0 0; background: var(--brand-bg);
+}
+.fichaTab {
+  height: 42px; padding: 0 18px; border-radius: 12px 12px 0 0;
+  background-color: transparent; transition: background-color .28s ease, color .28s ease;
+}
+.fichaTab:not(.fichaTabAtiva):hover { color: var(--l-fg); background-color: color-mix(in oklch, var(--l-card) 55%, transparent); }
+.fichaTab.fichaTabAtiva { z-index: 1; background-color: var(--pasta); color: var(--brand); font-weight: 600; }
+.fichaTab::before, .fichaTab.fichaTabAtiva::after {
+  content: ''; position: absolute; top: auto; bottom: 0; width: 12px; height: 12px; border-radius: 0; pointer-events: none;
+  opacity: 0; transition: opacity .28s ease;
+}
+.fichaTab::before { left: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--pasta) 12px); }
+.fichaTab.fichaTabAtiva::after { left: auto; right: -12px; background: radial-gradient(circle at 100% 0, transparent 11.5px, var(--pasta) 12px); }
+.fichaTab.fichaTabAtiva::before, .fichaTab.fichaTabAtiva::after { opacity: 1; }
+.fichaTab:first-child::before, .fichaTab.fichaTabAtiva:last-child::after { display: none; }
+.fichaTab:focus-visible { outline-offset: -4px; border-radius: 12px 12px 0 0; }
+@media (prefers-reduced-motion: reduce) { .fichaTab, .fichaTab::before, .fichaTab::after { transition: none; } }
+
+/* Gaveta do lançamento: topo na cor de fundo e borda leve, como a gaveta da reserva */
+.lancGaveta { border: 5px solid var(--brand-bg); }
+.lgHead { background: var(--brand-bg); border-bottom-color: var(--brand-border); }
+.lgStatusIn { color: var(--brand); border-color: color-mix(in oklch, var(--brand) 35%, transparent); }
+[data-theme='dark'] .lancGaveta { border: 1px solid var(--brand-border); }
+[data-theme='dark'] .lgHead { background: transparent; }
+
+/* Faixa das abas da ficha de borda a borda do cartão, para a aba ativa não ficar recortada */
+.fichaTabs { --ficha-pad: 20px; margin-left: calc(var(--ficha-pad) * -1); margin-right: calc(var(--ficha-pad) * -1); padding: 8px var(--ficha-pad) 0; border-radius: 0; }
+.fichaTab:first-child::before, .fichaTab.fichaTabAtiva:last-child::after { display: block; }
+@media (max-width: 1023px) { .fichaTabs { --ficha-pad: 14px; } }
+.fichaTabs .fichaTab { display: inline-flex; align-items: center; height: 40px; padding: 0 18px 4px; line-height: 1; }

@@ -2929,22 +2929,22 @@ export default function RegistersPage() {
             )}
 
           <aside className={styles.listPanel}>
-            <div className={styles.listTopoEscuro}>
-            {/* Hóspedes / Empresas — e o cadastro, que antes ficava na visão geral;
-                some quando o formulário já está aberto na direita */}
-            <div className={styles.listTopo}>
-            <div className={styles.segmented}>
-              <button type="button"
-                className={[styles.segmentedBtn, !isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
+            {/* Hóspedes / Empresas em abas de pasta, como a box esquerda do calendário */}
+            <div className={styles.abasPasta} role="tablist">
+              <button type="button" role="tab" aria-selected={!isEmpresasTab}
+                className={[styles.abaPasta, !isEmpresasTab ? styles.abaPastaOn : ''].join(' ')}
                 onClick={() => changeFilter('todos')}>
                 {tr('Hóspedes')}
               </button>
-              <button type="button"
-                className={[styles.segmentedBtn, isEmpresasTab ? styles.segmentedBtnActive : ''].join(' ')}
+              <button type="button" role="tab" aria-selected={isEmpresasTab}
+                className={[styles.abaPasta, isEmpresasTab ? styles.abaPastaOn : ''].join(' ')}
                 onClick={() => changeFilter('empresas')}>
                 {tr('Empresas')}
               </button>
             </div>
+            <div className={[styles.listTopoEscuro, isEmpresasTab ? styles.listTopoAbaFim : styles.listTopoAbaIni].join(' ')}>
+            {/* O cadastro, que antes ficava na visão geral; some quando o formulário já está aberto na direita */}
+            <div className={styles.listTopo}>
             {canCadastrar && !formAtivo && (
               <Button variant="primary" className={[styles.btnSolid, styles.btnPrimary].join(' ')}
                 onClick={() => {
