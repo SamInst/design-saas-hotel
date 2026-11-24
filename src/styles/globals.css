@@ -4,6 +4,16 @@
   --font: 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'DM Mono', ui-monospace, monospace;
 
+  /* ── Cores da marca (padrão da box esquerda do calendário) ── */
+  --brand:         #12402F;
+  --brand-hover:   #0c3022;
+  --brand-fg:      #ffffff;
+  --brand-bg:      #F4F4EF;
+  --brand-border:  #e4e4db;
+  --brand-suave:   #E3ECE7;
+  --brand-suave-2: #D3E2DA;
+  --brand-claro:   #8FC2A9;
+
   /* ── LIGHT THEME ── */
   --bg:        #f0f2f7;
   --surface:   #ffffff;
@@ -38,6 +48,13 @@
 
 /* ── DARK THEME ── */
 :root[data-theme="dark"] {
+  --brand:         #3f8f6e;
+  --brand-hover:   #4fa07e;
+  --brand-bg:      oklch(0.129 0.042 264.695);
+  --brand-border:  #253248;
+  --brand-suave:   rgba(63, 143, 110, 0.16);
+  --brand-suave-2: rgba(63, 143, 110, 0.26);
+  --brand-claro:   #8FC2A9;
   --bg:        #0b1220;
   --surface:   #111827;
   --surface-2: #0f172a;

@@ -110,14 +110,23 @@ export function TimePicker({ value, onChange }) {
     setText(v);
   };
 
+  // Máscara HH:MM: só dígitos, os dois-pontos entram sozinhos depois da hora.
   const handleText = (e) => {
-    const v = e.target.value;
+    const dig = e.target.value.replace(/\D/g, '').slice(0, 4);
+    const v = dig.length > 2 ? `${dig.slice(0, 2)}:${dig.slice(2)}` : dig;
     setText(v);
-    if (/^\d{1,2}:\d{2}$/.test(v)) {
-      const [hh, mm] = v.split(':').map(Number);
-      if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59)
-        onChange(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+    if (dig.length === 4) {
+      const hh = Number(dig.slice(0, 2)); const mm = Number(dig.slice(2));
+      if (hh <= 23 && mm <= 59) onChange(v);
     }
+  };
+  // Ao sair do campo: completa o que dá (ex.: "9" → 09:00, "153" → 15:30) ou volta ao valor anterior.
+  const handleBlur = () => {
+    const dig = text.replace(/\D/g, '');
+    if (!dig) { setText(value || ''); return; }
+    const hh = Number(dig.length <= 2 ? dig : dig.slice(0, 2));
+    const mm = Number((dig.slice(2) + '00').slice(0, 2));
+    if (hh <= 23 && mm <= 59) emit(hh, mm); else setText(value || '');
   };
 
   return (
@@ -127,16 +136,18 @@ export function TimePicker({ value, onChange }) {
         className={styles.timeInput}
         value={text}
         onChange={handleText}
+        onBlur={handleBlur}
         onClick={openDrop}
+        inputMode="numeric"
         placeholder="HH:MM"
         maxLength={5}
       />
       {open && createPortal(
         <div ref={dropRef} className={styles.timeDrop} style={{ top: pos.top, left: pos.left }}>
           <div className={styles.passos}>
-            <button type="button" className={styles.passo} onClick={() => emit((h + 1) % 24, m)} aria-label={tr('Mais uma hora')}><ChevronUp size={16} /></button>
+            <button type="button" className={styles.passo} onClick={() => emit((h + 23) % 24, m)} aria-label={tr('Menos uma hora')}><ChevronUp size={16} /></button>
             <span />
-            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 1) % 60)} aria-label={tr('Mais um minuto')}><ChevronUp size={16} /></button>
+            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 59) % 60)} aria-label={tr('Menos um minuto')}><ChevronUp size={16} /></button>
           </div>
           <div className={styles.rodas} style={{ height: ITEM_H * VISIVEIS }}>
             <div className={styles.faixa} style={{ height: ITEM_H, top: ITEM_H * ((VISIVEIS - 1) / 2) }} />
@@ -145,9 +156,9 @@ export function TimePicker({ value, onChange }) {
             <Roda itens={MINUTES} valor={m} onPick={(mm) => emit(parse(atual.current).h, mm)} />
           </div>
           <div className={styles.passos}>
-            <button type="button" className={styles.passo} onClick={() => emit((h + 23) % 24, m)} aria-label={tr('Menos uma hora')}><ChevronDown size={16} /></button>
+            <button type="button" className={styles.passo} onClick={() => emit((h + 1) % 24, m)} aria-label={tr('Mais uma hora')}><ChevronDown size={16} /></button>
             <span />
-            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 59) % 60)} aria-label={tr('Menos um minuto')}><ChevronDown size={16} /></button>
+            <button type="button" className={styles.passo} onClick={() => emit(h, (m + 1) % 60)} aria-label={tr('Mais um minuto')}><ChevronDown size={16} /></button>
           </div>
           <button type="button" className={styles.timeOk} onClick={() => setOpen(false)}>{tr('OK')}</button>
         </div>,
