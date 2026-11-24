@@ -643,8 +643,8 @@ export const hospedagemApi = {
   },
 
   /** GET /hospedagem/grupos — grupos em aberto ({ grupo_id, count, titulares, descricao }); descricao = responsável principal. */
-  listarGrupos() {
-    return request('/hospedagem/grupos');
+  listarGrupos(situacao) {
+    return request(situacao && situacao !== 'abertos' ? `/hospedagem/grupos?situacao=${situacao}` : '/hospedagem/grupos');
   },
 
   /** GET /hospedagem/grupo/{grupoId} — todas as hospedagens do grupo (qualquer mês). */

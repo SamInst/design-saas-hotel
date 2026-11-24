@@ -5169,10 +5169,12 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
   const [grupos,  setGrupos]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [detalhe, setDetalhe] = useState(grupoInicial != null ? { grupo_id: grupoInicial } : null);
+  const [busca, setBusca] = useState('');
+  const [situacao, setSituacao] = useState('abertos');
 
   useEffect(() => {
     setLoading(true);
-    hospedagemApi.listarGrupos()
+    hospedagemApi.listarGrupos(situacao)
       .then((list) => {
         const arr = Array.isArray(list) ? list : [];
         setGrupos(arr);
@@ -5180,7 +5182,34 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
       })
       .catch(() => setGrupos([]))
       .finally(() => setLoading(false));
-  }, [refreshKey]);
+  }, [refreshKey, situacao]);
+
+  const nomeGrupo = (g) => g.descricao || (g.titulares || '').split(',')[0].trim() || `Grupo #${g.grupo_id}`;
+  const termo = busca.trim().toLowerCase();
+  const gruposVis = termo
+    ? grupos.filter((g) => [nomeGrupo(g), g.titulares, String(g.grupo_id)].some((t) => (t || '').toLowerCase().includes(termo)))
+    : grupos;
+  const rotSituacao = { abertos: tr('em aberto'), finalizados: tr('finalizados'), cancelados: tr('cancelados') };
+
+  const filtrosGrupos = (
+    <div className={styles.grpFiltros}>
+      <div className={styles.searchWrap}>
+        <Search size={13} className={styles.searchIcon} />
+        <input className={styles.searchInput} value={busca} onChange={(e) => setBusca(e.target.value)}
+          placeholder={tr('Buscar grupo pelo nome...')} aria-label={tr('Buscar grupo pelo nome...')} />
+        {busca && (
+          <button type="button" className={styles.clearSearch} aria-label={tr('Limpar busca')} onClick={() => setBusca('')}><X size={12} /></button>
+        )}
+      </div>
+      <div className={styles.grpSituacao} role="radiogroup" aria-label={tr('Situação')}>
+        {[['abertos', tr('Em aberto')], ['finalizados', tr('Finalizados')], ['cancelados', tr('Cancelados')]].map(([k, rot]) => (
+          <button key={k} type="button" role="radio" aria-checked={situacao === k}
+            className={[styles.grpSituacaoBtn, situacao === k ? styles.grpSituacaoOn : ''].join(' ')}
+            onClick={() => setSituacao(k)}>{rot}</button>
+        ))}
+      </div>
+    </div>
+  );
 
   const aplicarNome = (gid, nome) => {
     setGrupos((prev) => prev.map((g) => (g.grupo_id === gid ? { ...g, descricao: nome } : g)));
@@ -5189,13 +5218,13 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
 
   const listaGrupos = loading ? (
     <Esqueleto />
-  ) : grupos.length === 0 ? (
-    <div className={styles.emptyState}>{tr('Nenhum grupo em aberto.')}</div>
+  ) : gruposVis.length === 0 ? (
+    <div className={styles.emptyState}>{termo ? tr('Nenhum grupo encontrado.') : `${tr('Nenhum grupo')} ${rotSituacao[situacao]}.`}</div>
   ) : (
     <div className={styles.dayRoomList}>
-      {grupos.map((g) => {
+      {gruposVis.map((g) => {
         const qtd  = g.count ?? g.quantidade ?? 0;
-        const nome = g.descricao || (g.titulares || '').split(',')[0].trim() || `Grupo #${g.grupo_id}`;
+        const nome = nomeGrupo(g);
         return (
           <div key={g.grupo_id} className={styles.dayRoomRow} onClick={() => setDetalhe(g)}>
             <span className={styles.grpListaDot} style={{ background: grupoColor(g.grupo_id) }} aria-hidden="true" />
@@ -5228,7 +5257,8 @@ function GruposModal({ onClose, refreshKey, tiposPagamento, onSelectReserva, onN
       <GavetaDir classe={styles.rvGavetaGrupo}>
         <div className={styles.rcCard}>
           <CabecalhoGaveta titulo={tr('Reservas em grupo')}
-            meta={!loading && grupos.length > 0 ? `${grupos.length} ${tr('em aberto')}` : null} onClose={onClose} />
+            meta={!loading && grupos.length > 0 ? `${grupos.length} ${rotSituacao[situacao]}` : null} onClose={onClose} />
+          {filtrosGrupos}
           {listaGrupos}
         </div>
       </GavetaDir>
